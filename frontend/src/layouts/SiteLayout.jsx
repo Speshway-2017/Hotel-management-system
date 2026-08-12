@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, X, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { Logo } from "./Logo";
@@ -6,30 +6,47 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
 const links = [
-{ label: "Home", to: "/" },
-{ label: "Features", to: "/features" },
-{ label: "About", to: "/about" },
-{ label: "Blog", to: "/blog" },
-{ label: "Contact", to: "/contact" }];
-
+  { label: "Home", to: "/" },
+  { label: "Features", to: "/features" },
+  { label: "About", to: "/about" },
+  { label: "Blog", to: "/blog" },
+  { label: "Contact", to: "/contact" }
+];
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 20) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-navy/10 bg-cream/85 backdrop-blur-md">
+    <header className={cn(
+      "sticky top-0 z-40 border-b border-navy/10 bg-cream/85 backdrop-blur-md transition-all duration-300",
+      scrolled && "shadow-[rgba(13,27,42,0.08)_0px_8px_20px_-10px] bg-cream/95 py-0.5 border-navy/5"
+    )}>
       <div className="mx-auto flex h-18 max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         <Logo />
         <nav className="ml-auto hidden items-center gap-1 lg:flex">
           {links.map((l) =>
-          <Link
-            key={l.to}
-            to={l.to}
-            className={cn(
-              "flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-navy/75 transition-colors hover:bg-navy/5 hover:text-navy",
-              pathname === l.to && "text-navy"
-            )}>
+            <Link
+              key={l.to}
+              to={l.to}
+              className={cn(
+                "flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-navy/70 transition-all duration-300 hover:bg-navy/5 hover:text-navy relative group",
+                pathname === l.to && "text-navy font-semibold active-link"
+              )}
+            >
               {l.label}
             </Link>
           )}
@@ -47,25 +64,25 @@ export function SiteHeader() {
           <button
             className="grid size-11 place-items-center rounded-md text-navy lg:hidden"
             onClick={() => setOpen(!open)}
-            aria-label="Toggle menu">
-            
+            aria-label="Toggle menu"
+          >
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
         </div>
       </div>
       {open &&
-      <div className="border-t border-navy/10 bg-cream px-4 pb-4 lg:hidden animate-fade-in">
+        <div className="border-t border-navy/10 bg-cream px-4 pb-4 lg:hidden animate-fade-in">
           <nav className="flex flex-col">
             {links.map((l) =>
-          <Link
-            key={l.to}
-            to={l.to}
-            onClick={() => setOpen(false)}
-            className="flex min-h-11 items-center border-b border-navy/5 text-sm font-medium text-navy">
-            
+              <Link
+                key={l.to}
+                to={l.to}
+                onClick={() => setOpen(false)}
+                className="flex min-h-11 items-center border-b border-navy/5 text-sm font-medium text-navy"
+              >
                 {l.label}
               </Link>
-          )}
+            )}
             <div className="mt-3 flex gap-2">
               <Button asChild variant="outline" className="min-h-11 flex-1">
                 <Link to="/login">Sign in</Link>
@@ -81,8 +98,8 @@ export function SiteHeader() {
           </nav>
         </div>
       }
-    </header>);
-
+    </header>
+  );
 }
 
 export function SiteFooter() {
@@ -222,11 +239,44 @@ export function SiteFooter() {
 }
 
 export function SiteLayout({ children }) {
+  useEffect(() => {
+    // Intersection observer for section scroll reveal animations
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("revealed");
+          }
+        });
+      },
+      {
+        threshold: 0.05,
+        rootMargin: "0px 0px -40px 0px"
+      }
+    );
+
+    const elements = document.querySelectorAll("section, .reveal-on-scroll");
+    elements.forEach((el) => observer.observe(el));
+
+    return () => {
+      elements.forEach((el) => observer.unobserve(el));
+    };
+  }, [children]);
+
   return (
-    <div className="flex min-h-screen flex-col bg-cream text-foreground">
-      <SiteHeader />
-      <main className="flex-1 animate-fade-in">{children}</main>
-      <SiteFooter />
+    <div className="flex min-h-screen flex-col bg-cream text-foreground relative overflow-hidden">
+      {/* Slow-moving Abstract Color Blobs in Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[10%] left-[-15%] size-[400px] rounded-full bg-purple/5 blur-[100px] animate-float-blob-1" />
+        <div className="absolute top-[45%] right-[-15%] size-[500px] rounded-full bg-gold/5 blur-[120px] animate-float-blob-2" />
+        <div className="absolute bottom-[10%] left-[15%] size-[450px] rounded-full bg-blush/5 blur-[100px] animate-float-blob-1" />
+      </div>
+
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <SiteHeader />
+        <main className="flex-1">{children}</main>
+        <SiteFooter />
+      </div>
     </div>
   );
 }
