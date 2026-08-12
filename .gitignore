@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Production/Build outputs
+dist/
+**/dist/
+.output/
+**/.output/
+
+# Cache and local directories
+.lovable/
+**/.lovable/
+.tanstack/
+**/.tanstack/
+.env
+.env.*
+**/.env
+**/.env.*
+.tmp
+.vercel
+.netlify
