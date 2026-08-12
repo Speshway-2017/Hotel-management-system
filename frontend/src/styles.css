@@ -177,6 +177,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
     border-color: var(--color-border);
   }
@@ -192,6 +196,132 @@
   h2,
   h3 {
     font-family: var(--font-display);
+  }
+}
+
+/* Section scroll reveals */
+section, .reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+section.revealed, .reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Card hover lift animations */
+.card-guest, 
+article, 
+.grid > div[class*="bg-white"],
+.grid > article {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-guest:hover, 
+article:hover, 
+.grid > div[class*="bg-white"]:hover,
+.grid > article:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px -10px rgba(13, 27, 42, 0.08), 0 20px 40px -15px rgba(91, 33, 182, 0.04);
+}
+
+/* Image hover zoom transitions */
+.card-guest img, 
+article img, 
+.hover-zoom img,
+article div img {
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.card-guest:hover img, 
+article:hover img, 
+.hover-zoom:hover img,
+article:hover div img {
+  transform: scale(1.04);
+}
+
+/* Header nav links active lines styling */
+header nav a {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+header nav a::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background-color: var(--color-gold);
+  border-radius: 4px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+header nav a:hover::after,
+header nav a.active-link::after {
+  transform: scaleX(1);
+}
+
+/* Button icon translations */
+button:hover .lucide-arrow-right, 
+a:hover .lucide-arrow-right {
+  transform: translateX(3px);
+}
+
+.lucide-arrow-right {
+  transition: transform 0.25s ease;
+}
+
+/* Floating Blobs Keyframe Animations */
+@keyframes float-blob-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.08);
+  }
+  66% {
+    transform: translate(-25px, 25px) scale(0.95);
+  }
+}
+
+@keyframes float-blob-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-40px, 40px) scale(1.12);
+  }
+}
+
+.animate-float-blob-1 {
+  animation: float-blob-1 16s infinite alternate ease-in-out;
+}
+
+.animate-float-blob-2 {
+  animation: float-blob-2 22s infinite alternate ease-in-out;
+}
+
+/* Accessibility: respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  section, 
+  .reveal-on-scroll,
+  .animate-float-blob-1,
+  .animate-float-blob-2,
+  .card-guest,
+  article,
+  .card-guest img,
+  article img,
+  header nav a::after {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }
 
