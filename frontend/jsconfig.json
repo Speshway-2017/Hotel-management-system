@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@tanstack/react-router": ["./src/utils/tanstack-router-mock.jsx"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}
