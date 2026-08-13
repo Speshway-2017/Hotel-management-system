@@ -56,4 +56,4 @@ export function useNavigate() {
   };
 }
 
-export { Outlet } from 'react-router-dom';
+export { Outlet, useLocation } from 'react-router-dom';

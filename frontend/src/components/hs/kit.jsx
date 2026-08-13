@@ -1,5 +1,5 @@
 
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { cn } from "@/utils/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,46 +44,49 @@ export function StatCard({
   delta,
   hint,
   icon: Icon
-
-
-
-
-
-
 }) {
   const up = (delta ?? 0) >= 0;
+  
+  let borderClasses = "border-l-4 border-l-purple";
+  const lbl = label.toLowerCase();
+  if (lbl.includes("rev") || lbl.includes("spend") || lbl.includes("amount") || lbl.includes("total")) {
+    borderClasses = "border-l-4 border-l-gold";
+  } else if (lbl.includes("adr") || lbl.includes("rate") || lbl.includes("occupancy")) {
+    borderClasses = "border-l-4 border-l-blush";
+  } else if (lbl.includes("active") || lbl.includes("properties") || lbl.includes("staff") || lbl.includes("keys") || lbl.includes("rooms")) {
+    borderClasses = "border-l-4 border-l-navy";
+  }
+
   return (
-    <Card className="gap-0 py-4 shadow-soft transition-shadow duration-300 hover:shadow-lift">
-      <CardContent className="px-4">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <div className={cn("bg-white rounded-xl border border-muted p-5 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden", borderClasses)}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             {label}
           </p>
-          {Icon &&
-          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-accent/25 text-navy dark:text-accent">
-              <Icon className="size-4" />
-            </span>
-          }
+          <p className="mt-2 font-sans text-2xl font-black text-navy leading-none">{value}</p>
         </div>
-        <p className="mt-2 font-sans text-2xl font-semibold tracking-tight">{value}</p>
-        <div className="mt-1 flex items-center gap-2 text-xs">
-          {delta !== undefined &&
+        {Icon && (
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted/65 text-navy-deep">
+            <Icon className="size-4.5" />
+          </span>
+        )}
+      </div>
+      <div className="mt-4 flex items-center gap-1.5 text-xs">
+        {delta !== undefined && (
           <span
             className={cn(
-              "inline-flex items-center gap-1 font-medium",
+              "inline-flex items-center gap-0.5 font-bold",
               up ? "text-success" : "text-error"
             )}>
-            
-              {up ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
-              {up ? "+" : ""}
-              {delta}%
-            </span>
-          }
-          {hint && <span className="truncate text-muted-foreground">{hint}</span>}
-        </div>
-      </CardContent>
-    </Card>);
-
+            {up ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+            {up ? "+" : ""}{delta}%
+          </span>
+        )}
+        {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+      </div>
+    </div>
+  );
 }
 
 export function Panel({
@@ -93,48 +96,39 @@ export function Panel({
   children,
   className,
   guest
-
-
-
-
-
-
-
 }) {
   return (
     <section
       className={cn(
-        "border bg-card text-card-foreground shadow-soft",
-        guest ? "card-guest" : "rounded-lg",
+        "border border-muted bg-white text-card-foreground shadow-soft rounded-xl overflow-hidden",
         className
       )}>
       
       {(title || actions) &&
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-muted px-5 py-4 bg-muted/10">
           <div className="min-w-0">
             {title &&
-          <h2 className={cn("truncate text-sm font-semibold", guest ? "font-display text-base" : "font-sans")}>
+              <h2 className="truncate font-sans text-sm font-bold text-navy">
                 {title}
               </h2>
-          }
+            }
             {description &&
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{description}</p>
-          }
+              <p className="mt-1 truncate text-xs text-muted-foreground">{description}</p>
+            }
           </div>
           {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
         </div>
       }
-      {children}
-    </section>);
-
+      <div className="p-0">
+        {children}
+      </div>
+    </section>
+  );
 }
 
 export function StatusPill({
   status,
   className
-
-
-
 }) {
   const m = roomStatusMeta[status];
   return (
@@ -144,11 +138,10 @@ export function StatusPill({
         m.chip,
         className
       )}>
-      
       <span aria-hidden>{m.icon}</span>
       {m.label}
-    </span>);
-
+    </span>
+  );
 }
 
 const toneMap = {
@@ -242,17 +235,12 @@ export function Notice({
   title,
   children,
   className
-
-
-
-
-
 }) {
   const Icon = noticeIcon[tone];
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-lg border p-3 text-sm",
+        "flex items-start gap-3 rounded-xl border p-4 text-xs font-medium",
         toneMap[tone],
         className
       )}
@@ -260,11 +248,11 @@ export function Notice({
       
       <Icon className="mt-0.5 size-4 shrink-0" />
       <div className="min-w-0">
-        <p className="font-medium">{title}</p>
-        {children && <div className="mt-0.5 text-xs opacity-90">{children}</div>}
+        <p className="font-bold text-navy">{title}</p>
+        {children && <div className="mt-1 text-xs opacity-90 leading-relaxed">{children}</div>}
       </div>
-    </div>);
-
+    </div>
+  );
 }
 
 export function Crumbs({ items }) {
@@ -284,4 +272,32 @@ export function Crumbs({ items }) {
       )}
     </nav>);
 
+}
+
+export function HorizontalRouteTabs({ tabs }) {
+  const location = useLocation();
+  return (
+    <div className="flex justify-start mb-6">
+      <div className="bg-white p-1 rounded-full border border-muted shadow-soft inline-flex items-center gap-1 overflow-x-auto max-w-full scrollbar-none">
+        {tabs.map((tab) => {
+          const active = location.pathname === tab.to;
+          return (
+            <Link
+              key={tab.to}
+              to={tab.to}
+              className={cn(
+                "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap",
+                active
+                  ? "bg-purple/10 text-purple border border-purple/15 shadow-sm font-bold"
+                  : "text-muted-foreground hover:text-navy hover:bg-muted/40 border border-transparent"
+              )}
+            >
+              {tab.icon && <tab.icon className={cn("size-3.5", active ? "text-purple" : "text-muted-foreground")} />}
+              <span>{tab.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
