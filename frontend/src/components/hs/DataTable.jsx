@@ -41,16 +41,15 @@ export function DataTable({
     <div className="w-full overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/60 hover:bg-muted/60">
+          <TableRow className="bg-muted/15 hover:bg-muted/15 border-b border-muted">
             {columns.map((c) =>
             <TableHead
               key={c.key}
               className={cn(
-                "h-11 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
+                "h-11 whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-4",
                 hide(c.hideOn),
                 c.className
               )}>
-              
                 {c.header}
               </TableHead>
             )}
@@ -58,12 +57,11 @@ export function DataTable({
         </TableHeader>
         <TableBody>
           {rows.map((row, i) =>
-          <TableRow key={i} className="transition-colors hover:bg-accent/10">
+          <TableRow key={i} className="transition-colors hover:bg-muted/10 border-b border-muted/5">
               {columns.map((c) =>
             <TableCell
               key={c.key}
-              className={cn("py-3 text-sm", hide(c.hideOn), c.className)}>
-              
+              className={cn("py-3.5 text-xs text-navy font-medium px-4", hide(c.hideOn), c.className)}>
                   {c.cell ? c.cell(row) : String(row[c.key] ?? "—")}
                 </TableCell>
             )}

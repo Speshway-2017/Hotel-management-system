@@ -184,22 +184,14 @@ export function WorkspacePage({
   notice,
   tableTitle,
   actions,
-  children
-
-
-
-
-
-
-
-
-
-
+  children,
+  navTabs
 }) {
   const ds = dataset === "none" ? null : datasets[dataset];
   return (
     <>
       <PageHeader title={title} subtitle={subtitle} actions={actions} />
+      {navTabs && navTabs}
       {notice &&
       <Notice tone={notice.tone} title={notice.title}>
           {notice.body}

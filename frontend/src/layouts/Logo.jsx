@@ -6,12 +6,8 @@ export function Logo({
   to = "/",
   tone = "dark",
   compact = false,
-  className
-
-
-
-
-
+  className,
+  imgClassName
 }) {
   return (
     <Link
@@ -21,9 +17,9 @@ export function Logo({
       <img
         src={logo}
         alt="Hour Stay"
-        width={56}
-        height={56}
-        className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
+        width={36}
+        height={36}
+        className={cn("h-8 w-8 sm:h-9 sm:w-9 object-contain bg-white p-1 rounded-xl shadow-soft", imgClassName)}
         style={{ imageRendering: "-webkit-optimize-contrast" }}
       />
       {!compact &&
@@ -35,15 +31,7 @@ export function Logo({
           )}>
             Hour <span className="text-[#F5C06A]">Stay</span>
           </span>
-          <span
-          className={cn(
-            "block text-[8px] sm:text-[9px] uppercase tracking-[0.18em] font-semibold mt-0.5",
-            tone === "light" ? "text-gold" : "text-muted-foreground"
-          )}>
-            Stay for Hours, Pay for Time
-          </span>
         </span>
       }
     </Link>);
-
 }

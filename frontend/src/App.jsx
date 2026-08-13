@@ -1,8 +1,10 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams, useLocation, Outlet, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { LoaderDataContext } from "@/utils/tanstack-router-mock";
+import { AuthLayout } from "./layouts/AuthLayout";
+import { authService } from "./services/auth";
 
 // Import Public Pages
 import { Route as Home } from "./pages/Home";
@@ -16,6 +18,8 @@ import { Route as BlogPost } from "./pages/BlogPost";
 import { Route as Login } from "./pages/Login";
 import { Route as Register } from "./pages/Register";
 import { Route as ForgotPassword } from "./pages/ForgotPassword";
+import { Route as ResetPassword } from "./pages/ResetPassword";
+import { Route as VerifyOtp } from "./pages/VerifyOtp";
 import { Route as BookingIndex } from "./pages/BookingIndex";
 import { Route as BookingConfirmation } from "./pages/BookingConfirmation";
 
@@ -92,6 +96,8 @@ import { Route as SuperAdminProperties } from "./roles/super-admin/pages/Propert
 import { Route as SuperAdminReports } from "./roles/super-admin/pages/Reports";
 import { Route as SuperAdminReservations } from "./roles/super-admin/pages/Reservations";
 import { Route as SuperAdminUsers } from "./roles/super-admin/pages/Users";
+import { Route as SuperAdminBranding } from "./roles/super-admin/pages/Branding";
+import { Route as SuperAdminSubscription } from "./roles/super-admin/pages/Subscription";
 
 const queryClient = new QueryClient();
 
@@ -120,6 +126,67 @@ function RouteWrapper({ routeObj }) {
   );
 }
 
+function ProtectedRoute({ children, allowedRoles }) {
+  const isAuthenticated = authService.isAuthenticated();
+  const user = authService.getCurrentUser();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+    const fallbackMap = {
+      "super-admin": "/super-admin",
+      "admin": "/admin",
+      "manager": "/manager",
+      "receptionist": "/reception",
+      "guest": "/guest"
+    };
+    const redirectPath = fallbackMap[user?.role] || "/login";
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  return children;
+}
+
+// Auth metadata for shared layouts
+const authMeta = {
+  "/login": {},
+  "/register": {},
+  "/forgot-password": {},
+  "/reset-password": {
+    badge: "Account Security",
+    title: "Set New",
+    titleHighlight: "Password",
+    subtitle: '"Choose a strong new password to protect your account."',
+    description: "Enter your new password below. Make sure it is at least 6 characters long."
+  },
+  "/verify-otp": {
+    badge: "Two-Factor Security",
+    title: "Verify Your",
+    titleHighlight: "Identity",
+    subtitle: '"We have sent a 6-digit security code to your device."',
+    description: "Please enter the 6-digit code below to complete verification and proceed safely to your workspace."
+  },
+  "/otp": {
+    badge: "Two-Factor Security",
+    title: "Verify Your",
+    titleHighlight: "Identity",
+    subtitle: '"We have sent a 6-digit security code to your device."',
+    description: "Please enter the 6-digit code below to complete verification and proceed safely to your workspace."
+  }
+};
+
+function AuthRoutesLayout() {
+  const location = useLocation();
+  const meta = authMeta[location.pathname] || {};
+  return (
+    <AuthLayout {...meta}>
+      <Outlet />
+    </AuthLayout>
+  );
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -134,14 +201,22 @@ export default function App() {
           <Route path="/rooms/:roomId" element={<RouteWrapper routeObj={RoomDetails} />} />
           <Route path="/blog" element={<RouteWrapper routeObj={BlogIndex} />} />
           <Route path="/blog/:slug" element={<RouteWrapper routeObj={BlogPost} />} />
-          <Route path="/login" element={<RouteWrapper routeObj={Login} />} />
-          <Route path="/register" element={<RouteWrapper routeObj={Register} />} />
-          <Route path="/forgot-password" element={<RouteWrapper routeObj={ForgotPassword} />} />
+          
+          {/* Shared Auth Layout Routes */}
+          <Route element={<AuthRoutesLayout />}>
+            <Route path="/login" element={<RouteWrapper routeObj={Login} />} />
+            <Route path="/register" element={<RouteWrapper routeObj={Register} />} />
+            <Route path="/forgot-password" element={<RouteWrapper routeObj={ForgotPassword} />} />
+            <Route path="/reset-password" element={<RouteWrapper routeObj={ResetPassword} />} />
+            <Route path="/verify-otp" element={<RouteWrapper routeObj={VerifyOtp} />} />
+            <Route path="/otp" element={<RouteWrapper routeObj={VerifyOtp} />} />
+          </Route>
+
           <Route path="/booking" element={<RouteWrapper routeObj={BookingIndex} />} />
           <Route path="/booking/confirmation" element={<RouteWrapper routeObj={BookingConfirmation} />} />
 
           {/* Admin Workspace */}
-          <Route element={<RouteWrapper routeObj={AdminLayout} />}>
+          <Route element={<ProtectedRoute allowedRoles={["admin"]}><RouteWrapper routeObj={AdminLayout} /></ProtectedRoute>}>
             <Route path="/admin" element={<RouteWrapper routeObj={AdminDashboard} />} />
             <Route path="/admin/approvals" element={<RouteWrapper routeObj={AdminApprovals} />} />
             <Route path="/admin/billing" element={<RouteWrapper routeObj={AdminBilling} />} />
@@ -160,7 +235,7 @@ export default function App() {
           </Route>
 
           {/* Manager Workspace */}
-          <Route element={<RouteWrapper routeObj={ManagerLayout} />}>
+          <Route element={<ProtectedRoute allowedRoles={["manager"]}><RouteWrapper routeObj={ManagerLayout} /></ProtectedRoute>}>
             <Route path="/manager" element={<RouteWrapper routeObj={ManagerDashboard} />} />
             <Route path="/manager/approvals" element={<RouteWrapper routeObj={ManagerApprovals} />} />
             <Route path="/manager/arrivals" element={<RouteWrapper routeObj={ManagerArrivals} />} />
@@ -174,7 +249,7 @@ export default function App() {
           </Route>
 
           {/* Receptionist Workspace */}
-          <Route element={<RouteWrapper routeObj={ReceptionLayout} />}>
+          <Route element={<ProtectedRoute allowedRoles={["receptionist"]}><RouteWrapper routeObj={ReceptionLayout} /></ProtectedRoute>}>
             <Route path="/reception" element={<RouteWrapper routeObj={ReceptionDashboard} />} />
             <Route path="/reception/check-in" element={<RouteWrapper routeObj={ReceptionCheckIn} />} />
             <Route path="/reception/check-out" element={<RouteWrapper routeObj={ReceptionCheckOut} />} />
@@ -190,7 +265,7 @@ export default function App() {
           </Route>
 
           {/* Guest Workspace */}
-          <Route element={<RouteWrapper routeObj={GuestLayout} />}>
+          <Route element={<ProtectedRoute allowedRoles={["guest"]}><RouteWrapper routeObj={GuestLayout} /></ProtectedRoute>}>
             <Route path="/guest" element={<RouteWrapper routeObj={GuestDashboard} />} />
             <Route path="/guest/booking" element={<RouteWrapper routeObj={GuestBooking} />} />
             <Route path="/guest/bookings" element={<RouteWrapper routeObj={GuestBookings} />} />
@@ -206,7 +281,7 @@ export default function App() {
           </Route>
 
           {/* Super Admin Workspace */}
-          <Route element={<RouteWrapper routeObj={SuperAdminLayout} />}>
+          <Route element={<ProtectedRoute allowedRoles={["super-admin"]}><RouteWrapper routeObj={SuperAdminLayout} /></ProtectedRoute>}>
             <Route path="/super-admin" element={<RouteWrapper routeObj={SuperAdminDashboard} />} />
             <Route path="/super-admin/admins" element={<RouteWrapper routeObj={SuperAdminAdmins} />} />
             <Route path="/super-admin/audit-logs" element={<RouteWrapper routeObj={SuperAdminAuditLogs} />} />
@@ -217,6 +292,8 @@ export default function App() {
             <Route path="/super-admin/reports" element={<RouteWrapper routeObj={SuperAdminReports} />} />
             <Route path="/super-admin/reservations" element={<RouteWrapper routeObj={SuperAdminReservations} />} />
             <Route path="/super-admin/users" element={<RouteWrapper routeObj={SuperAdminUsers} />} />
+            <Route path="/super-admin/branding" element={<RouteWrapper routeObj={SuperAdminBranding} />} />
+            <Route path="/super-admin/subscription" element={<RouteWrapper routeObj={SuperAdminSubscription} />} />
           </Route>
         </Routes>
         <Toaster />

@@ -79,36 +79,17 @@ export const roleMeta =
 export const navByRole = {
   "super-admin": [
   {
-    group: "Overview",
+    group: "Super Admin Panel",
     items: [
-    { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
-    { label: "Occupancy & Revenue", to: "/super-admin/occupancy", icon: TrendingUp },
-    { label: "Reports & Analytics", to: "/super-admin/reports", icon: BarChart3 }]
-
-  },
-  {
-    group: "Portfolio",
-    items: [
-    { label: "Properties", to: "/super-admin/properties", icon: Building2 },
-    { label: "Reservations", to: "/super-admin/reservations", icon: CalendarCheck },
-    { label: "Channel Manager", to: "/super-admin/channel-manager", icon: Activity }]
-
-  },
-  {
-    group: "Governance",
-    items: [
-    { label: "Admin Management", to: "/super-admin/admins", icon: UserCog },
-    { label: "Users & Roles", to: "/super-admin/users", icon: ShieldCheck },
-    { label: "Audit Logs", to: "/super-admin/audit-logs", icon: ScrollText }]
-
-  },
-  {
-    group: "Brand",
-    items: [
-    { label: "Loyalty & Branding", to: "/super-admin/branding", icon: Sparkles },
-    { label: "Subscription", to: "/super-admin/subscription", icon: BadgeIndianRupee },
-    { label: "Notifications", to: "/super-admin/notifications", icon: Bell }]
-
+      { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
+      { label: "Platform", to: "/super-admin/properties", icon: Building2 },
+      { label: "Operations", to: "/super-admin/reservations", icon: CalendarCheck },
+      { label: "Distribution", to: "/super-admin/channel-manager", icon: Activity },
+      { label: "Finance", to: "/super-admin/reports", icon: CreditCard },
+      { label: "Analytics", to: "/super-admin/occupancy", icon: TrendingUp },
+      { label: "System", to: "/super-admin/notifications", icon: Settings },
+      { label: "Subscription", to: "/super-admin/subscription", icon: BadgeIndianRupee }
+    ]
   }],
 
   admin: [

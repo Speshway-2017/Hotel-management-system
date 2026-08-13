@@ -1,0 +1,52 @@
+[
+  {
+    "id": "4044drz30u18tdq683z0rl",
+    "name": "Super Admin",
+    "email": "superadmin@hourstay.com",
+    "password": "$2a$10$qDGHtVQImFFXUJ.pWsSxeODXdxfoAxmY0l14/VzkQITmBM.ULMfqi",
+    "role": "super-admin",
+    "mobile": "9999999999",
+    "createdAt": "2026-08-13T07:30:58.800Z",
+    "updatedAt": "2026-08-13T07:30:58.802Z"
+  },
+  {
+    "id": "8ois91cdc3mrxxhihrelng",
+    "name": "Hotel Admin",
+    "email": "admin@hourstay.com",
+    "password": "$2a$10$7Gj1SKwgpbYZXp/cd4KKZODhtzJyCozLE/kmiBEscdBs5n4aLRUCO",
+    "role": "admin",
+    "mobile": "9888888888",
+    "createdAt": "2026-08-13T07:31:00.935Z",
+    "updatedAt": "2026-08-13T07:31:00.936Z"
+  },
+  {
+    "id": "roetf6hsy6c4218o9trtx9",
+    "name": "Hotel Manager",
+    "email": "manager@hourstay.com",
+    "password": "$2a$10$Xnyy.qjCAK7wC1HYODewieFEWUqDXIh3wzjOLqQBGplUa2VZ.fhq.",
+    "role": "manager",
+    "mobile": "9777777777",
+    "createdAt": "2026-08-13T07:31:01.800Z",
+    "updatedAt": "2026-08-13T07:31:01.801Z"
+  },
+  {
+    "id": "h2n3d51avckfi5u39l251",
+    "name": "Front Desk Receptionist",
+    "email": "receptionist@hourstay.com",
+    "password": "$2a$10$9EX92.8EfKvKFMB5mEF6CumUaSdOBbvTZRfQEMzFVW8xPs6AG79Ly",
+    "role": "receptionist",
+    "mobile": "9666666666",
+    "createdAt": "2026-08-13T07:31:02.036Z",
+    "updatedAt": "2026-08-13T07:31:02.036Z"
+  },
+  {
+    "id": "l7hsx8g82ujcid9fwappcg",
+    "name": "Regular Guest",
+    "email": "guest@hourstay.com",
+    "password": "$2a$10$G6wXLQtzsp0VNUAwKypZMuJxxw7dR1ME05dyz18gTYX887VFG.5wK",
+    "role": "guest",
+    "mobile": "9555555555",
+    "createdAt": "2026-08-13T07:31:02.347Z",
+    "updatedAt": "2026-08-13T07:31:02.347Z"
+  }
+]

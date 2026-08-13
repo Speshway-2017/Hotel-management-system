@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, X, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { Logo } from "./Logo";
@@ -15,37 +15,60 @@ const links = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 15);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-navy/10 bg-cream/85 backdrop-blur-md">
-      <div className="mx-auto flex h-18 max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+    <header className={cn(
+      "sticky top-0 z-40 transition-all duration-300 w-full border-b",
+      scrolled 
+        ? "bg-cream/90 backdrop-blur-md shadow-[0_10px_30px_-10px_rgba(13,27,42,0.08)] border-navy/5 py-2" 
+        : "bg-cream/50 backdrop-blur-sm border-transparent py-4"
+    )}>
+      <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 sm:px-6 transition-all duration-300">
         <Logo />
-        <nav className="ml-auto hidden items-center gap-1 lg:flex">
+        <nav className="ml-auto hidden items-center gap-8 lg:flex">
           {links.map((l) =>
           <Link
             key={l.to}
             to={l.to}
             className={cn(
-              "flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-navy/75 transition-colors hover:bg-navy/5 hover:text-navy",
-              pathname === l.to && "text-navy"
+              "group relative flex min-h-11 items-center px-1 text-sm font-medium tracking-wide text-navy/70 transition-all duration-300 hover:text-purple",
+              pathname === l.to && "text-navy font-semibold"
             )}>
-              {l.label}
+              <span>{l.label}</span>
+              <span className={cn(
+                "absolute bottom-1 left-0 h-[2px] bg-gradient-to-r from-gold to-purple transition-all duration-300",
+                pathname === l.to ? "w-full opacity-100" : "w-0 opacity-0 group-hover:w-full group-hover:opacity-100"
+              )} />
             </Link>
           )}
         </nav>
-        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          <Button asChild variant="ghost" className="hidden min-h-11 sm:inline-flex">
-            <Link to="/login">Sign in</Link>
-          </Button>
+        <div className="ml-auto flex items-center gap-4 lg:ml-0">
+          <Link 
+            to="/login"
+            className="hidden sm:inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium tracking-wide text-navy/75 hover:text-purple hover:-translate-y-0.5 transition-all duration-300"
+          >
+            Sign in
+          </Link>
           <Link
             to="/search"
-            className="hidden sm:flex justify-center items-center px-5 py-2 bg-navy text-white outline-3 outline-navy outline-offset-[-3px] rounded-md font-bold text-sm transition-all duration-400 hover:bg-transparent hover:text-navy"
+            className="relative overflow-hidden group hidden sm:flex justify-center items-center px-6 py-2.5 bg-gradient-to-r from-navy via-navy to-purple text-cream rounded-full font-bold text-sm transition-all duration-300 shadow-[0_4px_14px_rgba(91,33,182,0.15)] hover:shadow-[0_6px_20px_rgba(91,33,182,0.25)] hover:scale-[1.02] hover:-translate-y-0.5"
           >
-            <span>Book a stay</span>
+            <span className="relative z-10">Book a stay</span>
+            <span className="absolute inset-0 bg-gradient-to-r from-purple via-[#FF6B8B] to-gold opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </Link>
           <button
-            className="grid size-11 place-items-center rounded-md text-navy lg:hidden"
+            className="grid size-11 place-items-center rounded-full text-navy/80 hover:text-navy hover:bg-navy/5 transition-all duration-300 lg:hidden"
             onClick={() => setOpen(!open)}
             aria-label="Toggle menu">
             
@@ -54,28 +77,38 @@ export function SiteHeader() {
         </div>
       </div>
       {open &&
-      <div className="border-t border-navy/10 bg-cream px-4 pb-4 lg:hidden animate-fade-in">
-          <nav className="flex flex-col">
+      <div className="border-t border-navy/5 bg-cream/95 backdrop-blur-md px-6 py-4 lg:hidden animate-fade-in shadow-inner">
+          <nav className="flex flex-col gap-2">
             {links.map((l) =>
           <Link
             key={l.to}
             to={l.to}
             onClick={() => setOpen(false)}
-            className="flex min-h-11 items-center border-b border-navy/5 text-sm font-medium text-navy">
-            
-                {l.label}
+            className={cn(
+              "relative flex min-h-11 items-center justify-between text-sm font-medium tracking-wide text-navy/80 py-2 border-b border-navy/5 hover:text-purple transition-colors",
+              pathname === l.to && "text-purple font-semibold"
+            )}>
+                <span>{l.label}</span>
+                {pathname === l.to && (
+                  <span className="size-1.5 rounded-full bg-gold" />
+                )}
               </Link>
           )}
-            <div className="mt-3 flex gap-2">
-              <Button asChild variant="outline" className="min-h-11 flex-1">
-                <Link to="/login">Sign in</Link>
-              </Button>
+            <div className="mt-6 flex flex-col gap-3">
+              <Link
+                to="/login"
+                onClick={() => setOpen(false)}
+                className="flex h-11 items-center justify-center rounded-full border border-navy/20 text-navy font-bold text-sm hover:bg-navy/5 transition-all duration-300"
+              >
+                Sign in
+              </Link>
               <Link
                 to="/search"
-                className="flex justify-center items-center px-5 py-2.5 bg-navy text-white outline-3 outline-navy outline-offset-[-3px] rounded-md font-bold text-sm transition-all duration-400 hover:bg-transparent hover:text-navy flex-1"
+                className="relative overflow-hidden group flex h-11 items-center justify-center bg-gradient-to-r from-navy via-navy to-purple text-cream rounded-full font-bold text-sm transition-all duration-300 shadow-[0_4px_14px_rgba(91,33,182,0.15)]"
                 onClick={() => setOpen(false)}
               >
-                <span>Book a stay</span>
+                <span className="relative z-10">Book a stay</span>
+                <span className="absolute inset-0 bg-gradient-to-r from-purple via-[#FF6B8B] to-gold opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </Link>
             </div>
           </nav>
@@ -100,9 +133,6 @@ export function SiteFooter() {
         {/* Column 1 - Brand */}
         <div className="space-y-6">
           <Logo tone="light" />
-          <p className="text-xs sm:text-sm font-semibold tracking-wider text-gold uppercase">
-            "Stay for hours, pay for time."
-          </p>
           <p className="text-xs sm:text-sm leading-relaxed text-[#FFF7E6]/70">
             A calm, premium property management suite built for Indian hospitality.
           </p>
