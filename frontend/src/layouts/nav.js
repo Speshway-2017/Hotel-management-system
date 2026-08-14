@@ -78,19 +78,19 @@ export const roleMeta =
 
 export const navByRole = {
   "super-admin": [
-  {
-    group: "Super Admin Panel",
-    items: [
-      { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
-      { label: "Platform", to: "/super-admin/properties", icon: Building2 },
-      { label: "Operations", to: "/super-admin/reservations", icon: CalendarCheck },
-      { label: "Distribution", to: "/super-admin/channel-manager", icon: Activity },
-      { label: "Finance", to: "/super-admin/reports", icon: CreditCard },
-      { label: "Analytics", to: "/super-admin/occupancy", icon: TrendingUp },
-      { label: "System", to: "/super-admin/notifications", icon: Settings },
-      { label: "Subscription", to: "/super-admin/subscription", icon: BadgeIndianRupee }
-    ]
-  }],
+    {
+      group: "Super Admin Panel",
+      items: [
+        { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
+        { label: "Property Management", to: "/super-admin/properties", icon: Building2 },
+        { label: "Operations", to: "/super-admin/reservations", icon: CalendarCheck },
+        { label: "Analytics & Reports", to: "/super-admin/occupancy", icon: TrendingUp },
+        { label: "Access & Security", to: "/super-admin/users", icon: ShieldCheck },
+        { label: "Integrations", to: "/super-admin/channel-manager", icon: Activity },
+        { label: "System", to: "/super-admin/branding", icon: Settings }
+      ]
+    }
+  ],
 
   admin: [
   {

@@ -31,8 +31,8 @@ export function SiteHeader() {
     <header className={cn(
       "sticky top-0 z-40 transition-all duration-300 w-full border-b",
       scrolled 
-        ? "bg-cream/90 backdrop-blur-md shadow-[0_10px_30px_-10px_rgba(13,27,42,0.08)] border-navy/5 py-2" 
-        : "bg-cream/50 backdrop-blur-sm border-transparent py-4"
+        ? "bg-cream shadow-[0_10px_30px_-10px_rgba(13,27,42,0.08)] border-navy/5 py-2" 
+        : "bg-cream border-transparent py-4"
     )}>
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 sm:px-6 transition-all duration-300">
         <Logo />
@@ -77,7 +77,7 @@ export function SiteHeader() {
         </div>
       </div>
       {open &&
-      <div className="border-t border-navy/5 bg-cream/95 backdrop-blur-md px-6 py-4 lg:hidden animate-fade-in shadow-inner">
+      <div className="border-t border-navy/5 bg-cream px-6 py-4 lg:hidden animate-fade-in shadow-inner">
           <nav className="flex flex-col gap-2">
             {links.map((l) =>
           <Link

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "L-88234",
+    "_id": "L-88234",
+    "user": "superadmin@hourstay.com",
+    "action": "Property created",
+    "entity": "Hour Stay Aerocity, New Delhi",
+    "ip": "49.36.180.5",
+    "time": "14 Aug 2026, 12:03"
+  },
+  {
+    "id": "L-88233",
+    "_id": "L-88233",
+    "user": "superadmin@hourstay.com",
+    "action": "Admin assigned",
+    "entity": "Sneha Deshpande to Mumbai",
+    "ip": "49.36.180.5",
+    "time": "14 Aug 2026, 11:15"
+  },
+  {
+    "id": "L-88232",
+    "_id": "L-88232",
+    "user": "superadmin@hourstay.com",
+    "action": "Property activated",
+    "entity": "Hour Stay Marine Drive, Mumbai",
+    "ip": "49.36.180.5",
+    "time": "14 Aug 2026, 10:45"
+  },
+  {
+    "id": "L-88231",
+    "_id": "L-88231",
+    "user": "superadmin@hourstay.com",
+    "action": "Rate configuration updated",
+    "entity": "Diwali Peak rate plan",
+    "ip": "49.36.180.5",
+    "time": "13 Aug 2026, 18:30"
+  },
+  {
+    "id": "L-88230",
+    "_id": "L-88230",
+    "user": "system@hourstay.com",
+    "action": "OTA/channel sync issue",
+    "entity": "Goibibo parity mismatch flagged",
+    "ip": "127.0.0.1",
+    "time": "14 Aug 2026, 13:58"
+  },
+  {
+    "id": "L-88229",
+    "_id": "L-88229",
+    "user": "system@hourstay.com",
+    "action": "Payment/integration alert",
+    "entity": "UPI gateway latency elevated",
+    "ip": "127.0.0.1",
+    "time": "14 Aug 2026, 13:10"
+  }
+]

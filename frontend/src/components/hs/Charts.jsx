@@ -5,6 +5,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -63,13 +65,19 @@ export function RevenueChart({ height = 260 }) {
 export function OccupancyChart({ height = 260 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={revenueTrend} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+      <LineChart data={revenueTrend} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
         <XAxis dataKey="m" {...axis} />
         <YAxis {...axis} unit="%" />
         <Tooltip {...tooltipStyle} formatter={(v) => [`${v}%`, "Occupancy"]} />
-        <Bar dataKey="occupancy" radius={[6, 6, 0, 0]} fill="var(--color-chart-1)" />
-      </BarChart>
+        <Line
+          type="monotone"
+          dataKey="occupancy"
+          stroke="var(--color-chart-3)"
+          strokeWidth={3}
+          dot={{ r: 4, strokeWidth: 1 }}
+          activeDot={{ r: 6 }} />
+      </LineChart>
     </ResponsiveContainer>);
 
 }

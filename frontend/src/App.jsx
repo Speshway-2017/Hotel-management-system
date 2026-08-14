@@ -91,13 +91,16 @@ import { Route as SuperAdminAdmins } from "./roles/super-admin/pages/Admins";
 import { Route as SuperAdminAuditLogs } from "./roles/super-admin/pages/AuditLogs";
 import { Route as SuperAdminChannelManager } from "./roles/super-admin/pages/ChannelManager";
 import { Route as SuperAdminNotifications } from "./roles/super-admin/pages/Notifications";
+import { Route as SuperAdminNotificationDetails } from "./roles/super-admin/pages/NotificationDetails";
 import { Route as SuperAdminOccupancy } from "./roles/super-admin/pages/Occupancy";
 import { Route as SuperAdminProperties } from "./roles/super-admin/pages/Properties";
 import { Route as SuperAdminReports } from "./roles/super-admin/pages/Reports";
 import { Route as SuperAdminReservations } from "./roles/super-admin/pages/Reservations";
+import { Route as SuperAdminRoomsRates } from "./roles/super-admin/pages/RoomsRates";
 import { Route as SuperAdminUsers } from "./roles/super-admin/pages/Users";
 import { Route as SuperAdminBranding } from "./roles/super-admin/pages/Branding";
 import { Route as SuperAdminSubscription } from "./roles/super-admin/pages/Subscription";
+import { Route as SuperAdminProfile } from "./roles/super-admin/pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -287,13 +290,16 @@ export default function App() {
             <Route path="/super-admin/audit-logs" element={<RouteWrapper routeObj={SuperAdminAuditLogs} />} />
             <Route path="/super-admin/channel-manager" element={<RouteWrapper routeObj={SuperAdminChannelManager} />} />
             <Route path="/super-admin/notifications" element={<RouteWrapper routeObj={SuperAdminNotifications} />} />
+            <Route path="/super-admin/notifications/:id" element={<RouteWrapper routeObj={SuperAdminNotificationDetails} />} />
             <Route path="/super-admin/occupancy" element={<RouteWrapper routeObj={SuperAdminOccupancy} />} />
             <Route path="/super-admin/properties" element={<RouteWrapper routeObj={SuperAdminProperties} />} />
             <Route path="/super-admin/reports" element={<RouteWrapper routeObj={SuperAdminReports} />} />
             <Route path="/super-admin/reservations" element={<RouteWrapper routeObj={SuperAdminReservations} />} />
+            <Route path="/super-admin/rooms" element={<RouteWrapper routeObj={SuperAdminRoomsRates} />} />
             <Route path="/super-admin/users" element={<RouteWrapper routeObj={SuperAdminUsers} />} />
             <Route path="/super-admin/branding" element={<RouteWrapper routeObj={SuperAdminBranding} />} />
             <Route path="/super-admin/subscription" element={<RouteWrapper routeObj={SuperAdminSubscription} />} />
+            <Route path="/super-admin/profile" element={<RouteWrapper routeObj={SuperAdminProfile} />} />
           </Route>
         </Routes>
         <Toaster />
