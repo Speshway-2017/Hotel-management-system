@@ -20,8 +20,8 @@
   --color-error: #C62828;
   --color-info: #1565C0;
 
-  --shadow-soft: 0 1px 2px rgba(13, 27, 42, 0.06), 0 8px 24px rgba(13, 27, 42, 0.06);
-  --shadow-lift: 0 2px 6px rgba(13, 27, 42, 0.08), 0 18px 42px rgba(13, 27, 42, 0.12);
+  --shadow-soft: 0 2px 8px #FEF9F1, 0 8px 24px #FEF9F1;
+  --shadow-lift: 0 4px 16px #FEF9F1, 0 16px 48px #FEF9F1;
 
   --animate-fade-up: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 0.4s ease both;
@@ -106,7 +106,7 @@
 
 :root {
   --radius: 0.5rem;
-  --background: #FFF7E6;
+  --background: #FFFFFF;
   --foreground: #0D1B2A;
   --card: #E7E9EE;
   --card-foreground: #0D1B2A;
@@ -122,7 +122,7 @@
   --accent-foreground: #0D1B2A;
   --destructive: #FF6B8B;
   --destructive-foreground: #FFF7E6;
-  --border: #E7E9EE;
+  --border: #FFFFFF;
   --input: #E7E9EE;
   --ring: #5B21B6;
   --chart-1: #0D1B2A;
@@ -485,10 +485,205 @@
 }
 
 /* Hide scrollbars completely while retaining scroll functionality */
-.scrollbar-none::-webkit-scrollbar {
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+::-webkit-scrollbar {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
-.scrollbar-none {
+html,
+body,
+* {
   -ms-overflow-style: none !important;  /* IE and Edge */
   scrollbar-width: none !important;  /* Firefox */
+}
+
+/* ==========================================================================
+   Enterprise Hotel-Management Table Styles (Universal)
+   ========================================================================== */
+table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  font-family: var(--font-ui) !important;
+  background-color: #FFFFFF !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-soft) !important;
+}
+
+.dark table {
+  background-color: #0D1B2A !important;
+}
+
+thead {
+  background-color: #F8FAFC !important; /* Soft distinct slate header backdrop */
+  border-bottom: 2px solid #E2E8F0 !important;
+}
+
+.dark thead {
+  background-color: #08121E !important;
+  border-bottom: 2px solid rgba(231, 233, 238, 0.15) !important;
+}
+
+tr {
+  border-bottom: 1px solid #F1F5F9 !important; /* Very subtle row separator */
+  transition: background-color 0.15s ease-in-out !important;
+  background-color: transparent !important;
+}
+
+.dark tr {
+  border-bottom: 1px solid rgba(231, 233, 238, 0.08) !important;
+}
+
+tbody tr:hover {
+  background-color: #F8FAFC !important; /* Elegant subtle hover state */
+}
+
+.dark tbody tr:hover {
+  background-color: rgba(255, 247, 230, 0.015) !important;
+}
+
+th {
+  color: #475569 !important; /* Distinct dark slate-600 */
+  font-weight: 700 !important;
+  font-size: 0.65rem !important; /* Extra small, uppercase, tracked */
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  padding: 1rem 1rem !important; /* Clean spacious padding */
+  text-align: left !important;
+  border: none !important;
+  background-color: transparent !important;
+}
+
+.dark th {
+  color: #94A3B8 !important; /* Slate-400 for dark mode accessibility */
+}
+
+td {
+  color: #0D1B2A !important; /* Dynamic high contrast dark data text */
+  font-size: 0.75rem !important; /* text-xs for enterprise grid */
+  padding: 1rem 1rem !important; /* Clean matching padding */
+  vertical-align: middle !important;
+  border: none !important;
+  background-color: transparent !important;
+}
+
+.dark td {
+  color: #FFF7E6 !important; /* Cream text for dark mode accessibility */
+}
+
+/* Ensure clean status badges */
+.Tag,
+[class*="Tag"],
+[class*="tag"] {
+  font-weight: 700 !important;
+  font-size: 0.6rem !important;
+  text-transform: uppercase !important;
+  padding: 0.2rem 0.5rem !important;
+  border-radius: 9999px !important;
+  letter-spacing: 0.05em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* Dark mode theme accessibility overrides for hardcoded dark text */
+.dark .text-navy {
+  color: var(--foreground) !important;
+}
+
+.dark .text-navy-deep {
+  color: var(--foreground) !important;
+}
+
+/* Force light mode body background to pure white */
+body {
+  background-color: #FFFFFF !important;
+}
+
+.dark body {
+  background-color: #0D1B2A !important;
+}
+
+/* White cards, panels, and content containers */
+main .bg-white,
+main section,
+main .card-guest,
+main .Panel,
+.PremiumStatCard,
+.bg-white.rounded-xl,
+.bg-white.rounded-2xl,
+.bg-cream,
+.bg-cream\/40,
+.bg-cream\/20,
+.card-guest,
+tbody tr,
+.bg-white.rounded-b-xl,
+form.bg-white {
+  background-color: #FFFFFF !important;
+}
+
+/* Set border colors of all cards and panels to pure white */
+.border,
+.border-muted {
+  border-color: #FFFFFF !important;
+}
+
+.dark .border,
+.dark .border-muted {
+  border-color: rgba(231, 233, 238, 0.15) !important;
+}
+
+/* Floating Tooltip animations */
+@keyframes tooltip-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+.animate-tooltip {
+  animation: tooltip-slide 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom dynamic left border for KPI Cards */
+.PremiumStatCard {
+  border-left-width: 3px !important;
+  border-left-style: solid !important;
+  border-left-color: var(--accent-color, #0d1b2a) !important;
+}
+
+/* Card shadow overrides using #FEF9F1 for glowing soft warm shadows */
+.shadow-soft,
+.PremiumStatCard,
+.Panel,
+.card-guest,
+.bg-card,
+[class*="shadow-soft"] {
+  box-shadow: 0 4px 6px -1px rgba(13, 27, 42, 0.02), 0 10px 20px -5px #FEF9F1, 0 10px 25px -5px rgba(212, 192, 160, 0.25) !important;
+}
+
+.shadow-lift:hover,
+[class*="shadow-lift"]:hover {
+  box-shadow: 0 10px 15px -3px rgba(13, 27, 42, 0.03), 0 20px 30px -10px #FEF9F1, 0 20px 40px -10px rgba(212, 192, 160, 0.35) !important;
+  transform: translateY(-4px) !important;
+}
+
+.dark .shadow-soft,
+.dark .PremiumStatCard,
+.dark .Panel,
+.dark .card-guest,
+.dark .bg-card,
+.dark [class*="shadow-soft"] {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15), 0 10px 25px -5px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark .shadow-lift:hover,
+.dark [class*="shadow-lift"]:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25), 0 20px 30px -10px rgba(0, 0, 0, 0.35) !important;
 }

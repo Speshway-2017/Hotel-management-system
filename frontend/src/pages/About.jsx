@@ -212,23 +212,116 @@ function About() {
         </div>
       </section>
 
-      {/* 6. Vision & Mission Section */}
-      <section className="bg-white py-20 border-t border-navy/5">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="grid gap-8 md:grid-cols-2 text-left font-ui">
-            <div className="border border-navy/5 bg-cream/40 p-8 rounded-2xl shadow-soft">
-              <span className="text-xs font-bold uppercase tracking-widest text-purple">The Future</span>
-              <h3 className="mt-2 font-display text-2xl font-bold text-navy">Our Vision</h3>
-              <p className="mt-4 text-sm leading-relaxed text-muted-foreground font-ui italic">
-                “Make hotel operations simpler, smarter and more connected, setting a new benchmark for premium hospitality SaaS across the Indian market.”
-              </p>
-            </div>
-            <div className="border border-navy/5 bg-cream/40 p-8 rounded-2xl shadow-soft">
-              <span className="text-xs font-bold uppercase tracking-widest text-purple">The Commitment</span>
-              <h3 className="mt-2 font-display text-2xl font-bold text-navy">Our Mission</h3>
-              <p className="mt-4 text-sm leading-relaxed text-muted-foreground font-ui">
-                Help Indian hospitality businesses manage their daily front desk operations efficiently, reduce double bookings, split GST folios cleanly, and deliver an elevated, smooth experience to every guest.
-              </p>
+      {/* 6. System Roles & Platform Targets Section */}
+      <section className="bg-white py-20 border-t border-navy/5 animate-fade-up">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 text-left">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold uppercase tracking-widest text-purple">Platform Matrix</span>
+            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+              System Roles & Platform Targets
+            </h2>
+            <p className="mt-4 mx-auto max-w-2xl text-sm text-muted-foreground font-ui">
+              Hour Stay is designed with dedicated workspaces tailored for every role in Indian hotel operations.
+            </p>
+          </div>
+
+          {/* User Roles Cards */}
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-16">
+            {[
+              {
+                role: "Super Admin",
+                desc: "Multi-property management, central audits, global channel sync, and group policies.",
+                device: "Desktop & Mobile Monitor"
+              },
+              {
+                role: "Admin / Owner",
+                desc: "Property rate setup, tax parameters, staff directories, and financial dashboard reports.",
+                device: "Desktop / Laptop"
+              },
+              {
+                role: "Manager",
+                desc: "Shift scheduling, discount approvals, arrivals list monitoring, and complaint resolutions.",
+                device: "Mobile & Web Portal"
+              },
+              {
+                role: "Receptionist",
+                desc: "Express walk-ins, digital Aadhaar OCR capture, folio check-out settlements, and room assignment.",
+                device: "Front Desk Console (Web/Tablet)"
+              },
+              {
+                role: "Housekeeping",
+                desc: "Real-time clean/dirty status toggle, linen allocations, supervisor sync, and room deep-cleans.",
+                device: "Mobile App (Android-first)"
+              },
+              {
+                role: "Maintenance Staff",
+                desc: "Room out-of-order logs, technical repair checklists, and facility ticketing operations.",
+                device: "Mobile App (Android-first)"
+              },
+              {
+                role: "Accountant",
+                desc: "GST invoices, corporate credit limits, CA audits, and payment gateway ledger adjustments.",
+                device: "Web Dashboard (Desktop-only)"
+              },
+              {
+                role: "Guest / Customer",
+                desc: "Direct booking engine, dynamic check-in, digital check-out, and pre check-in sheets.",
+                device: "Responsive Mobile Web"
+              },
+              {
+                role: "Travel Agent / Corporate",
+                desc: "Negotiated contract pricing lists, corporate credit limits, and historical booking indexes.",
+                device: "Web Partner Portal"
+              }
+            ].map((r, idx) => (
+              <div key={idx} className="card-guest border border-navy/5 bg-cream/20 p-5 rounded-xl shadow-soft font-ui">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-sans text-sm font-bold text-navy">{r.role}</h3>
+                  <span className="text-[10px] font-semibold text-purple bg-purple/10 px-2 py-0.5 rounded-full">{r.device}</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{r.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Platform Targets Table */}
+          <div className="border border-navy/5 rounded-xl bg-white shadow-soft overflow-hidden p-6 font-ui">
+            <h3 className="font-display text-lg font-bold text-navy mb-4">Role Permission & Device Access Matrix</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
+                    <th className="p-3 text-left">Operational Role</th>
+                    <th className="p-3 text-left">Primary Device Target</th>
+                    <th className="p-3 text-center">Configure Rates</th>
+                    <th className="p-3 text-center">Manage Staff</th>
+                    <th className="p-3 text-center">Approve Refunds</th>
+                    <th className="p-3 text-center">Tax / Financials</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y font-sans">
+                  {[
+                    { role: "Super Admin", target: "Web dashboard + Mobile app", rates: "Yes", staff: "Yes", refunds: "Yes", tax: "Yes" },
+                    { role: "Admin / Owner", target: "Web dashboard + Mobile app", rates: "Yes", staff: "Yes", refunds: "Yes", tax: "Yes" },
+                    { role: "General Manager", target: "Web + Mobile app", rates: "Limited", staff: "Limited", refunds: "Yes", tax: "Yes" },
+                    { role: "Receptionist", target: "Tablet or Desk Console", rates: "No", staff: "No", refunds: "No", tax: "No" },
+                    { role: "Housekeeping", target: "Android Smartphone", rates: "No", staff: "No", refunds: "No", tax: "No" },
+                    { role: "Maintenance", target: "Android Smartphone", rates: "No", staff: "No", refunds: "No", tax: "No" },
+                    { role: "Accountant", target: "Desktop / Laptop", rates: "No", staff: "No", refunds: "No", tax: "Yes" },
+                    { role: "Guest / Customer", target: "Mobile app + Website", rates: "No", staff: "No", refunds: "No", tax: "No" },
+                    { role: "Travel Agent / Corporate", target: "Web portal (responsive)", rates: "No", staff: "No", refunds: "No", tax: "No" }
+                  ].map((row, idx) => (
+                    <tr key={idx} className="hover:bg-muted/15 transition-colors">
+                      <td className="p-3 font-semibold text-navy">{row.role}</td>
+                      <td className="p-3 text-muted-foreground">{row.target}</td>
+                      <td className="p-3 text-center font-medium">{row.rates}</td>
+                      <td className="p-3 text-center font-medium">{row.staff}</td>
+                      <td className="p-3 text-center font-medium">{row.refunds}</td>
+                      <td className="p-3 text-center font-medium">{row.tax}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

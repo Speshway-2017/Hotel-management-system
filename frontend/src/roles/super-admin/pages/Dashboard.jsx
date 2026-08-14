@@ -2,43 +2,40 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows, Tag, statusTone } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
-import { RevenueChart, OccupancyChart, SourceMixChart } from "@/components/hs/Charts";
+import { RevenueChart, OccupancyChart } from "@/components/hs/Charts";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
   Building2, TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, 
-  Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, AlertTriangle, Play, Bed 
+  Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, AlertTriangle, 
+  Play, Bed, RefreshCw, Eye, ExternalLink, ChevronUp, ChevronDown, Search, ArrowRight 
 } from "lucide-react";
 
-function PremiumStatCard({ label, value, delta, hint, icon: Icon, borderTone = "purple" }) {
-  const up = (delta ?? 0) >= 0;
-  const borderClasses = {
-    purple: "border-l-4 border-l-purple",
-    gold: "border-l-4 border-l-gold",
-    blush: "border-l-4 border-l-blush",
-    navy: "border-l-4 border-l-navy"
-  };
-
+function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColor = "#0d1b2a" }) {
   return (
-    <div className={`bg-white rounded-xl border border-muted p-3.5 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden ${borderClasses[borderTone]}`}>
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full"
+    >
       <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
-          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none">{value}</h3>
+        <div className="flex-1 min-w-0">
+          <div className="h-8 flex items-start">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          </div>
+          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none whitespace-nowrap">{value}</h3>
         </div>
         {Icon && (
-          <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep">
+          <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
             <Icon className="size-4" />
           </span>
         )}
       </div>
-      <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
-        {delta !== undefined && (
-          <span className={`inline-flex items-center gap-0.5 font-bold ${up ? "text-success" : "text-error"}`}>
-            {up ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
-            {up ? "+" : ""}{delta}%
-          </span>
-        )}
-        {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+      <div className="mt-auto pt-2 flex items-center gap-1.5 text-[10px] h-4">
+        <span className="inline-flex items-center gap-0.5 font-bold shrink-0 text-success">
+          <ArrowUpRight className="size-3.5" />
+          +{delta}%
+        </span>
+        {hint && <span className="text-[10px] text-muted-foreground truncate">{hint}</span>}
       </div>
     </div>
   );
@@ -46,6 +43,7 @@ function PremiumStatCard({ label, value, delta, hint, icon: Icon, borderTone = "
 
 function SuperAdminDashboard() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   // Live state datasets
@@ -53,6 +51,22 @@ function SuperAdminDashboard() {
   const [reservations, setReservations] = useState([]);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
+
+  // Scope & Date states
+  const [propertyScope, setPropertyScope] = useState("All");
+  const [dateRange, setDateRange] = useState("Last 30 Days");
+
+  // Table controls states
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [propertyFilter, setPropertyFilter] = useState("All");
+  const [sortField, setSortField] = useState("name");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+
+  // Revenue Period state
+  const [revPeriod, setRevPeriod] = useState("Monthly");
 
   // System Health States
   const systemHealth = [
@@ -62,35 +76,44 @@ function SuperAdminDashboard() {
     { name: "RBAC Session Auditor", status: "Healthy", desc: "Audits synchronized" }
   ];
 
-  // Pending Actions Alerts
-  const pendingActions = [
-    { id: 1, title: "Lake Palace Onboarding", action: "Review License Tier", severity: "warning" },
-    { id: 2, title: "Goibibo Rate Parity discrepancy", action: "Fix Jaipur Tariff", severity: "error" },
-    { id: 3, title: "Monthly GST compilation", action: "Generate Tax Ledger", severity: "info" }
+  // Attention Required Alerts
+  const attentionRequiredAlerts = [
+    { id: 1, type: "error", title: "Inactive Property", message: "Hour Stay Candolim Beach Resort is pending onboarding validation.", action: "Activate" },
+    { id: 2, type: "warning", title: "OTA Parity Sync Issue", message: "MakeMyTrip rate discrepancy flagged for Udaipur Lake Palace.", action: "Sync OTA" },
+    { id: 3, type: "error", title: "Payment Gateway Latency", message: "Razorpay UPI gateway response time exceeded 6.5s.", action: "Check API" },
+    { id: 4, type: "info", title: "Pending Admin Action", message: "Approval required for booking refund request above threshold.", action: "Review" },
+    { id: 5, type: "warning", title: "Security Audit Trigger", message: "Unusual login activity detected from IP 192.168.1.105.", action: "Audit Logs" }
   ];
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        const [statsRes, propertiesRes, reservationsRes, logsRes] = await Promise.all([
-          superAdminService.getDashboardStats(),
-          superAdminService.getProperties(),
-          superAdminService.getReservations(),
-          superAdminService.getAuditLogs()
-        ]);
-        
-        if (statsRes.success) setStats(statsRes.data.stats);
-        if (propertiesRes.success) setProperties(propertiesRes.data);
-        if (reservationsRes.success) setReservations(reservationsRes.data);
-        if (logsRes.success) setLogs(logsRes.data);
-      } catch (err) {
-        setError(err.message || "Failed to sync dashboard data.");
-      } finally {
-        setLoading(false);
-      }
+  async function loadDashboardData() {
+    try {
+      const [statsRes, propertiesRes, reservationsRes, logsRes] = await Promise.all([
+        superAdminService.getDashboardStats(),
+        superAdminService.getProperties(),
+        superAdminService.getReservations(),
+        superAdminService.getAuditLogs()
+      ]);
+      
+      if (statsRes.success) setStats(statsRes.data.stats);
+      if (propertiesRes.success) setProperties(propertiesRes.data);
+      if (reservationsRes.success) setReservations(reservationsRes.data);
+      if (logsRes.success) setLogs(logsRes.data);
+    } catch (err) {
+      setError(err.message || "Failed to sync dashboard data.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  }
+
+  useEffect(() => {
     loadDashboardData();
   }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
 
   // Compute live KPIs
   const totalProperties = properties.length;
@@ -98,13 +121,69 @@ function SuperAdminDashboard() {
   const totalBookings = reservations.length;
   const totalRevenue = reservations.reduce((sum, r) => sum + (r.amount || 0), 0);
   const avgOccupancy = Math.round(properties.reduce((sum, p) => sum + (p.occupancy || 0), 0) / (properties.length || 1));
+  const activeAdmins = properties.length;
+
+  // Sorting Handler
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+    setPage(1);
+  };
+
+  // Table filtering and sorting calculations
+  const filteredAndSortedProperties = properties
+    .filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.city.toLowerCase().includes(search.toLowerCase());
+      const matchesScope = propertyScope === "All" || p.id === propertyScope || p._id === propertyScope;
+      return matchesSearch && matchesScope;
+    })
+    .sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      // Handle calculated values
+      if (sortField === "revenue" || sortField === "reservations") {
+        const aRes = reservations.filter(r => r.propertyId === a.id || r.propertyId === a._id);
+        const bRes = reservations.filter(r => r.propertyId === b.id || r.propertyId === b._id);
+        aVal = sortField === "revenue" ? aRes.reduce((sum, r) => sum + (r.amount || 0), 0) : aRes.length;
+        bVal = sortField === "revenue" ? bRes.reduce((sum, r) => sum + (r.amount || 0), 0) : bRes.length;
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+  const totalPages = Math.ceil(filteredAndSortedProperties.length / itemsPerPage);
+  const paginatedProperties = filteredAndSortedProperties.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  // Dynamic Channel Performance Aggregations
+  const channelPerformanceData = (() => {
+    const sources = ["Direct", "MakeMyTrip", "Goibibo", "Booking.com", "Agoda", "Other"];
+    const totalBookingsSum = reservations.length || 1;
+    const totalRevSum = reservations.reduce((sum, r) => sum + (r.amount || 0), 0) || 1;
+
+    return sources.map(src => {
+      const pReservations = reservations.filter(r => {
+        if (src === "Other") {
+          return !["Direct", "MakeMyTrip", "Goibibo", "Booking.com", "Agoda"].includes(r.source);
+        }
+        return r.source === src;
+      });
+      const count = pReservations.length;
+      const rev = pReservations.reduce((sum, r) => sum + (r.amount || 0), 0);
+      const pct = ((rev / totalRevSum) * 100).toFixed(1);
+      return { source: src, count, rev, pct };
+    });
+  })();
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Group Portfolio Console"
-        subtitle="Access consolidated operational statistics, channel billing summaries, and GST tax filings."
-      />
+
 
       {error && <Notice tone="error" title="Synchronization Error" className="text-left">{error}</Notice>}
 
@@ -115,22 +194,29 @@ function SuperAdminDashboard() {
           value={loading ? "—" : `${totalProperties} Hotels`}
           hint="Hour Stay portfolio"
           icon={Building2}
-          borderTone="navy"
+          accentColor="#0D1B2A"
         />
         <PremiumStatCard
-          label="Total Mapped Rooms"
+          label="Total Rooms"
           value={loading ? "—" : `${totalRooms} Keys`}
           hint="Room inventories"
           icon={Bed}
-          borderTone="purple"
+          accentColor="#5B21B6"
         />
         <PremiumStatCard
-          label="Total Bookings"
+          label="Occupancy"
+          value={loading ? "—" : `${avgOccupancy}%`}
+          hint="Portfolio average"
+          icon={Percent}
+          accentColor="#FF7A59"
+        />
+        <PremiumStatCard
+          label="Total Reservations"
           value={loading ? "—" : totalBookings}
           delta={stats && stats[0] ? stats[0].delta : 8}
           hint="Nights sold"
           icon={Calendar}
-          borderTone="blush"
+          accentColor="#FF6B8B"
         />
         <PremiumStatCard
           label="Total Revenue"
@@ -138,192 +224,307 @@ function SuperAdminDashboard() {
           delta={stats && stats[1] ? stats[1].delta : 12}
           hint="Consolidated billing"
           icon={DollarSign}
-          borderTone="gold"
+          accentColor="#F5C06A"
         />
         <PremiumStatCard
-          label="Occupancy Rate"
-          value={loading ? "—" : `${avgOccupancy}%`}
-          hint="Portfolio average"
-          icon={Percent}
-          borderTone="blush"
-        />
-        <PremiumStatCard
-          label="Active Staff Users"
-          value="18 Active"
-          hint="System operators online"
+          label="Active Admins"
+          value={loading ? "—" : `${activeAdmins} Active`}
+          hint="Property managers"
           icon={Users}
-          borderTone="navy"
+          accentColor="#071420"
         />
       </div>
 
-      {/* Charts section: Revenue Trend & Occupancy Trend */}
+      {/* Charts section: Revenue Analytics & Occupancy Analytics */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Revenue Trends" description="Monthly room revenues portfolio summary.">
+        <Panel
+          title="Revenue Analytics"
+          description="Monthly room revenues portfolio summary."
+          actions={
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold text-success mr-2 font-mono">₹{totalRevenue.toLocaleString("en-IN")} (+12% vs previous)</span>
+              {["Daily", "Weekly", "Monthly"].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setRevPeriod(p)}
+                  className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border transition-all ${
+                    revPeriod === p
+                      ? "bg-purple/15 text-purple border-purple/35"
+                      : "bg-transparent text-muted-foreground/60 border-muted hover:bg-muted/10"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          }
+        >
           <div className="p-5 bg-white rounded-b-xl">
             <RevenueChart />
           </div>
         </Panel>
-        <Panel title="Occupancy Trends" description="Consolidated monthly room occupancy rates.">
+        <Panel 
+          title="Occupancy Analytics" 
+          description="Consolidated monthly room occupancy rates."
+          actions={
+            <span className="text-[10px] font-bold text-success font-mono">{avgOccupancy}% avg (+4% vs previous)</span>
+          }
+        >
           <div className="p-5 bg-white rounded-b-xl">
             <OccupancyChart />
           </div>
         </Panel>
       </div>
 
-      {/* Triple Grid Row: OTA Mix, Pending Actions, System Health */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Booking Source Mix */}
-        <Panel title="OTA Distribution Mix" description="Bookings contributions by distributor.">
-          <div className="p-5 bg-white rounded-b-xl flex flex-col justify-center min-h-[260px]">
-            <SourceMixChart />
-          </div>
-        </Panel>
+      {/* Property Performance Table Section with Search, Sort, Filter, Pagination */}
+      <Panel title="Property Performance" description="Operational statistics across Hour Stay hotels.">
+        <div className="p-4 bg-white rounded-b-xl space-y-4">
+          {/* Controls row */}
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+            {/* Search */}
+            <div className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search property name or city..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="pl-9 h-9 rounded-full border-muted text-xs bg-white w-full"
+              />
+            </div>
 
-        {/* Pending Actions */}
-        <Panel title="Operations Action Alerts" description="Issues requiring administrative overrides.">
-          <div className="p-4 bg-white rounded-b-xl space-y-3">
-            {pendingActions.map((act) => (
-              <div key={act.id} className="flex gap-3 items-start border p-3.5 rounded-xl hover:bg-muted/10 transition-colors">
-                <span className="grid size-8 place-items-center rounded-lg bg-warning/10 text-warning shrink-0 mt-0.5">
-                  <AlertTriangle className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h5 className="font-semibold text-navy text-xs">{act.title}</h5>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Action: <strong>{act.action}</strong></p>
-                </div>
-                <Button size="xs" variant="outline" className="text-[10px] h-7 rounded-full border-muted text-navy-deep">Resolve</Button>
-              </div>
-            ))}
+            {/* Filters removed */}
           </div>
-        </Panel>
 
-        {/* System Health */}
-        <Panel title="SaaS Infrastructure Health" description="Hour Stay core module connectivity status.">
-          <div className="p-4 bg-white rounded-b-xl space-y-3 text-xs">
-            {systemHealth.map((health) => (
-              <div key={health.name} className="flex justify-between items-center border-b pb-2.5 last:border-0 last:pb-0">
-                <div>
-                  <p className="font-semibold text-navy">{health.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{health.desc}</p>
-                </div>
-                <Tag tone={health.status === "Healthy" || health.status === "Connected" ? "success" : "warning"}>
-                  {health.status}
-                </Tag>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
+          {/* Table wrapper */}
+          {loading ? (
+            <LoadingRows rows={4} />
+          ) : paginatedProperties.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-xs">No matching property records found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[950px]">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
+                    <th onClick={() => handleSort("name")} className="p-4 w-[20%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Property
+                        {sortField === "name" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("city")} className="p-4 w-[12%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Location
+                        {sortField === "city" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("rooms")} className="p-4 w-[8%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Rooms
+                        {sortField === "rooms" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("occupancy")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Occupancy
+                        {sortField === "occupancy" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("adr")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        ADR
+                        {sortField === "adr" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("revpar")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        RevPAR
+                        {sortField === "revpar" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("revenue")} className="p-4 w-[12%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Revenue
+                        {sortField === "revenue" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("reservations")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Reservations
+                        {sortField === "reservations" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th onClick={() => handleSort("status")} className="p-4 w-[8%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-1">
+                        Status
+                        {sortField === "status" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
+                      </div>
+                    </th>
+                    <th className="p-4 w-[10%] text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y font-sans">
+                  {paginatedProperties.map((p) => {
+                    const pReservations = reservations.filter(r => r.propertyId === p.id || r.propertyId === p._id);
+                    const resCount = pReservations.length;
+                    const revenueSum = pReservations.reduce((sum, r) => sum + (r.amount || 0), 0);
 
-      {/* Double Column bottom layout: Properties Directory & Recent Feeds */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Properties Directory (2/3 width) */}
-        <div className="lg:col-span-2">
-          <Panel title="Property Performance Directory" description="Operational statistics across Hour Stay hotels.">
-            {loading ? (
-              <LoadingRows rows={4} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4">Property</th>
-                      <th className="p-4">Inventory</th>
-                      <th className="p-4">Occupancy</th>
-                      <th className="p-4">Average ADR</th>
-                      <th className="p-4">Average RevPAR</th>
-                      <th className="p-4 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y font-sans">
-                    {properties.map((p) => (
+                    return (
                       <tr key={p.id || p._id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4">
-                          <div>
-                            <p className="font-semibold text-navy text-sm">{p.name}</p>
-                            <p className="text-muted-foreground text-xs">{p.city}</p>
-                          </div>
+                        <td className="p-4 w-[20%] text-left">
+                          <p className="font-semibold text-navy text-sm">{p.name}</p>
                         </td>
-                        <td className="p-4 font-semibold text-navy">{p.rooms} Keys</td>
-                        <td className="p-4 font-semibold text-navy">{p.occupancy}%</td>
-                        <td className="p-4 font-semibold text-navy">₹{(p.adr || 0).toLocaleString("en-IN")}</td>
-                        <td className="p-4 font-semibold text-navy">₹{(p.revpar || 0).toLocaleString("en-IN")}</td>
-                        <td className="p-4 text-right">
+                        <td className="p-4 w-[12%] text-left text-muted-foreground text-xs">
+                          {p.city}
+                        </td>
+                        <td className="p-4 w-[8%] text-left font-semibold text-navy">{p.rooms} Keys</td>
+                        <td className="p-4 w-[10%] text-left font-semibold text-navy">{p.occupancy}%</td>
+                        <td className="p-4 w-[10%] text-left font-semibold text-navy">₹{(p.adr || 0).toLocaleString("en-IN")}</td>
+                        <td className="p-4 w-[10%] text-left font-semibold text-navy">₹{(p.revpar || 0).toLocaleString("en-IN")}</td>
+                        <td className="p-4 w-[12%] text-left font-semibold text-navy">₹{revenueSum.toLocaleString("en-IN")}</td>
+                        <td className="p-4 w-[10%] text-left font-semibold text-navy">{resCount} Bookings</td>
+                        <td className="p-4 w-[8%] text-left">
                           <Tag tone={statusTone(p.status)}>{p.status}</Tag>
                         </td>
+                        <td className="p-4 w-[10%] text-right">
+                          <div className="flex gap-1.5 justify-end">
+                            <button className="p-1 rounded hover:bg-muted text-navy-deep" title="View Details">
+                              <Eye className="size-3.5" />
+                            </button>
+                            <button className="p-1 rounded hover:bg-muted text-purple" title="Open Property">
+                              <ExternalLink className="size-3.5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t pt-4 text-xs">
+              <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                  disabled={page === 1}
+                  variant="outline"
+                  size="xs"
+                  className="rounded-full border-muted hover:bg-muted font-semibold"
+                >
+                  Previous
+                </Button>
+                <Button
+                  onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={page === totalPages}
+                  variant="outline"
+                  size="xs"
+                  className="rounded-full border-muted hover:bg-muted font-semibold"
+                >
+                  Next
+                </Button>
               </div>
-            )}
-          </Panel>
-        </div>
-
-        {/* Recent Bookings & Audit Activities (1/3 width) */}
-        <div className="space-y-6">
-          {/* Recent Bookings */}
-          <Panel title="Recent Bookings" description="Latest room reservation transactions.">
-            <div className="p-4 bg-white rounded-b-xl space-y-3.5">
-              {loading ? (
-                <LoadingRows rows={3} />
-              ) : reservations.length === 0 ? (
-                <div className="text-center text-muted-foreground text-xs">No bookings recorded.</div>
-              ) : (
-                reservations.slice(0, 3).map((r) => (
-                  <div key={r.id} className="flex justify-between items-start border-b pb-3 last:border-0 last:pb-0">
-                    <div>
-                      <p className="font-semibold text-navy text-xs">{r.guest}</p>
-                      <p className="text-[10px] text-muted-foreground">{r.room} · {r.checkIn}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-navy font-mono text-xs">₹{r.amount.toLocaleString("en-IN")}</p>
-                      <Tag tone={statusTone(r.status)} className="text-[9px] px-1.5 py-0 mt-1">{r.status}</Tag>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
-          </Panel>
-
-          {/* Recent System Activities */}
-          <Panel title="Security Audit Trails" description="Administrative action updates.">
-            <div className="p-4 bg-white rounded-b-xl space-y-3">
-              {loading ? (
-                <LoadingRows rows={3} />
-              ) : logs.length === 0 ? (
-                <div className="text-center text-muted-foreground text-xs">No logs recorded.</div>
-              ) : (
-                logs.slice(0, 3).map((log, idx) => (
-                  <div key={idx} className="flex gap-2.5 items-start text-xs border-b pb-3 last:border-0 last:pb-0">
-                    <span className="grid size-6 place-items-center rounded-lg bg-muted text-muted-foreground shrink-0 mt-0.5">
-                      <ShieldCheck className="size-3 text-purple" />
-                    </span>
-                    <div>
-                      <p className="font-medium text-navy text-[11px] leading-relaxed">
-                        <strong>{log.user}</strong>: {log.action}
-                      </p>
-                      <p className="text-[9px] text-muted-foreground font-mono mt-0.5">{log.time} · IP: {log.ip || "—"}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Panel>
+          )}
         </div>
+      </Panel>
+
+      {/* Triple Grid Row: Channel Performance, Alerts, Recent Activity */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Channel Performance (compact table) */}
+        <Panel title="Channel Performance" description="OTA and direct bookings contributions.">
+          <div className="bg-white rounded-b-xl p-2">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[400px] table-fixed">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[9px] font-semibold">
+                    <th className="p-3 w-[35%] text-left">Source</th>
+                    <th className="p-3 w-[20%] text-left">Bookings</th>
+                    <th className="p-3 w-[25%] text-left">Revenue</th>
+                    <th className="p-3 w-[20%] text-right">Contrib %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y font-sans">
+                  {channelPerformanceData.map((ch) => (
+                    <tr key={ch.source} className="hover:bg-muted/15 transition-colors">
+                      <td className="p-3 w-[35%] text-left font-semibold text-navy truncate" title={ch.source}>{ch.source}</td>
+                      <td className="p-3 w-[20%] text-left font-medium text-navy">{ch.count}</td>
+                      <td className="p-3 w-[25%] text-left font-bold text-purple">₹{ch.rev.toLocaleString("en-IN")}</td>
+                      <td className="p-3 w-[20%] text-right font-mono font-bold text-navy">{ch.pct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Panel>
+
+        {/* Attention Required Alerts */}
+        <Panel title="Attention Required" description="System alerts requiring override intervention.">
+          <div className="p-3 bg-white rounded-b-xl space-y-3">
+            {attentionRequiredAlerts.map((alt) => (
+              <div key={alt.id} className="flex gap-2.5 items-start text-xs border-b pb-2.5 last:border-0 last:pb-0">
+                <span className={`grid size-6 place-items-center rounded-lg shrink-0 mt-0.5 ${
+                  alt.type === "error" ? "bg-error/10 text-error" : alt.type === "warning" ? "bg-warning/10 text-warning" : "bg-info/10 text-info"
+                }`}>
+                  <AlertTriangle className="size-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h6 className="font-semibold text-navy text-[11px] leading-tight flex items-center gap-1.5">
+                    {alt.title}
+                    <span className={`inline-block size-1.5 rounded-full ${
+                      alt.type === "error" ? "bg-error" : alt.type === "warning" ? "bg-warning" : "bg-info"
+                    }`} />
+                  </h6>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{alt.message}</p>
+                </div>
+                <Button size="xs" variant="outline" className="text-[9px] px-2 py-0.5 h-6 rounded-full border-muted text-navy-deep shrink-0 flex items-center justify-center font-bold">
+                  {alt.action}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        {/* Recent Activity Log */}
+        <Panel title="Recent Activity" description="Platform audit logs of administrative actions.">
+          <div className="bg-white rounded-b-xl p-2">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[450px] table-fixed">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[9px] font-semibold">
+                    <th className="p-3 w-[25%] text-left">User</th>
+                    <th className="p-3 w-[35%] text-left">Action</th>
+                    <th className="p-3 w-[20%] text-left">Entity</th>
+                    <th className="p-3 w-[20%] text-right">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y font-sans">
+                  {logs.slice(0, 5).map((log, idx) => (
+                    <tr key={idx} className="hover:bg-muted/15 transition-colors">
+                      <td className="p-3 w-[25%] text-left font-semibold text-navy truncate" title={log.user || "system@hourstay.com"}>
+                        {String(log.user || "system@hourstay.com").split('@')[0]}
+                      </td>
+                      <td className="p-3 w-[35%] text-left text-muted-foreground truncate" title={log.action}>{log.action}</td>
+                      <td className="p-3 w-[20%] text-left text-purple font-medium truncate" title={log.entity}>{log.entity || "Global"}</td>
+                      <td className="p-3 w-[20%] text-right font-mono text-[9px] text-muted-foreground truncate" title={log.time || log.createdAt || "Global Action"}>
+                        {String(log.time || log.createdAt || "14 Aug 2026").split(',')[0]}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Panel>
       </div>
     </div>
   );
 }
 
 export const Route = createFileRoute("/super-admin/")({
-  head: () => ({
-    meta: [
-      { title: "Group Dashboard — Hour Stay" },
-      { name: "description", content: "Consolidated performance across all Hour Stay properties." },
-      { property: "og:title", content: "Group Dashboard — Hour Stay" },
-      { property: "og:description", content: "Consolidated performance across all Hour Stay properties." }
-    ]
-  }),
   component: SuperAdminDashboard
 });

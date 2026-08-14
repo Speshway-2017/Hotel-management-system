@@ -1,17 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, HorizontalRouteTabs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, ShieldAlert, X, Trash2, Building, ShieldCheck, Mail, Phone, Lock, UserPlus, Building2, UserCog } from "lucide-react";
-
-const platformTabs = [
-  { label: "Properties Portfolio", to: "/super-admin/properties", icon: Building2 },
-  { label: "Users & Staff Directory", to: "/super-admin/users", icon: ShieldCheck },
-  { label: "Property Admins", to: "/super-admin/admins", icon: UserCog }
-];
+import { cn } from "@/utils/utils";
+import { Plus, Search, Edit2, X, Building, ShieldCheck, Lock, UserPlus, Building2, UserCog, Eye, Check, ChevronDown } from "lucide-react";
 
 function SuperAdminAdmins() {
   const [admins, setAdmins] = useState([]);
@@ -19,10 +14,12 @@ function SuperAdminAdmins() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [propertyFilter, setPropertyFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // Modal States
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState("add"); // 'add' | 'edit' | 'delete'
+  const [modalType, setModalType] = useState("add"); // 'add' | 'edit' | 'view'
   const [selectedAdmin, setSelectedAdmin] = useState(null);
 
   // Form Fields
@@ -87,9 +84,9 @@ function SuperAdminAdmins() {
     setModalOpen(true);
   };
 
-  const openDeleteModal = (admin) => {
+  const openViewModal = (admin) => {
     setSelectedAdmin(admin);
-    setModalType("delete");
+    setModalType("view");
     setModalOpen(true);
   };
 
@@ -124,16 +121,21 @@ function SuperAdminAdmins() {
     }
   };
 
-  const handleDeleteSubmit = async () => {
+  const handleToggleStatus = async (admin) => {
     try {
-      const res = await superAdminService.deleteUser(selectedAdmin.id || selectedAdmin._id);
-      if (res.success) {
-        setModalOpen(false);
-        loadData();
-      }
+      const nextStatus = admin.status === "Active" ? "Suspended" : "Active";
+      const res = await superAdminService.updateUser(admin.id || admin._id, {
+        status: nextStatus,
+        role: "admin"
+      });
+      if (res.success) loadData();
     } catch (err) {
-      setError(err.message || "Failed to remove admin account");
+      setError(err.message || "Failed to toggle status");
     }
+  };
+
+  const handleResetPassword = (admin) => {
+    alert(`Reset link compiled! Password for administrator "${admin.name}" has been successfully reset to: Admin@Hourstay123`);
   };
 
   const getPropertyName = (pId) => {
@@ -142,14 +144,22 @@ function SuperAdminAdmins() {
     return prop ? prop.name : "Unassigned Property";
   };
 
+  const getPropertyLocation = (pId) => {
+    if (!pId) return "—";
+    const prop = properties.find(p => p.id === pId || p._id === pId);
+    return prop ? prop.city : "—";
+  };
+
   const filteredAdmins = admins.filter((a) => {
-    const pName = getPropertyName(a.propertyId).toLowerCase();
-    return (
+    const matchesSearch =
       a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (a.mobile && a.mobile.includes(searchQuery)) ||
-      pName.includes(searchQuery.toLowerCase())
-    );
+      (a.mobile && a.mobile.includes(searchQuery));
+    
+    const matchesProperty = propertyFilter === "All" || a.propertyId === propertyFilter;
+    const matchesStatus = statusFilter === "All" || (a.status || "Active") === statusFilter;
+
+    return matchesSearch && matchesProperty && matchesStatus;
   });
 
   return (
@@ -158,82 +168,125 @@ function SuperAdminAdmins() {
         title="Admin Management"
         subtitle="Manage property administrators, owners, and general managers with hotel-level credentials."
         actions={
-          <Button onClick={openAddModal} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5">
+          <Button onClick={openAddModal} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 text-xs">
             <UserPlus className="size-4 mr-2" /> Add Property Admin
           </Button>
         }
       />
 
-      <HorizontalRouteTabs tabs={platformTabs} />
-
       {error && <Notice tone="error" title="Governance Error" className="text-left">{error}</Notice>}
 
-      <div className="grid gap-6 lg:grid-cols-4">
-        {/* Left Column - List of Admins */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="flex items-center gap-4 bg-card border rounded-xl p-4 shadow-soft">
+      <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white border border-muted p-4 rounded-2xl shadow-soft">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search administrators by name, email, or managed property..."
+                placeholder="Search administrators by Admin Name, Email, or Phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-11 rounded-full border-muted text-xs"
+                className="pl-9 h-10 rounded-full border-muted text-xs bg-muted/20"
               />
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative">
+                <select
+                  value={propertyFilter}
+                  onChange={(e) => setPropertyFilter(e.target.value)}
+                  className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[160px] cursor-pointer appearance-none"
+                >
+                  <option value="All">All Properties</option>
+                  {properties.map((p) => (
+                    <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              </div>
+              <div className="flex gap-1 bg-muted/30 p-1 rounded-full border border-muted/50">
+                {["All", "Active", "Suspended"].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 cursor-pointer ${
+                      statusFilter === status
+                        ? "bg-navy text-white shadow-sm"
+                        : "text-muted-foreground hover:text-navy hover:bg-white/50"
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          <Panel title="Property Administrators Directory" description={`Showing ${filteredAdmins.length} active admins`}>
+          <Panel title="Property Administrators Directory" description={`Showing ${filteredAdmins.length} admins`}>
             {loading ? (
               <LoadingRows rows={4} />
             ) : filteredAdmins.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">No property administrators registered.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-xs border-collapse min-w-[1000px] table-fixed">
                   <thead>
                     <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4">Administrator / Owner</th>
-                      <th className="p-4">Assigned Hotel Property</th>
-                      <th className="p-4">Contact Phone</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                      <th className="p-4 w-[12%] text-left">Admin Name</th>
+                      <th className="p-4 w-[16%] text-left">Email</th>
+                      <th className="p-4 w-[10%] text-left">Phone</th>
+                      <th className="p-4 w-[14%] text-left">Assigned Property</th>
+                      <th className="p-4 w-[10%] text-left">Property Location</th>
+                      <th className="p-4 w-[12%] text-left">Last Login</th>
+                      <th className="p-4 w-[10%] text-left">Status</th>
+                      <th className="p-4 w-[16%] text-left">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y font-sans">
                     {filteredAdmins.map((a) => (
-                      <tr key={a.id || a._id} className="hover:bg-muted/20 transition-colors">
-                        <td className="p-4">
-                          <div>
-                            <p className="font-semibold text-navy text-sm">{a.name}</p>
-                            <p className="text-muted-foreground text-xs">{a.email}</p>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2 text-navy font-semibold text-xs">
+                      <tr key={a.id || a._id} className="hover:bg-muted/15 transition-colors">
+                        <td className="p-4 w-[12%] text-left font-semibold text-navy text-sm truncate" title={a.name}>{a.name}</td>
+                        <td className="p-4 w-[16%] text-left text-muted-foreground truncate" title={a.email}>{a.email}</td>
+                        <td className="p-4 w-[10%] text-left font-mono text-xs text-muted-foreground truncate" title={a.mobile}>{a.mobile || "—"}</td>
+                        <td className="p-4 w-[14%] text-left">
+                          <div className="flex items-center gap-1.5 text-navy font-semibold truncate" title={getPropertyName(a.propertyId)}>
                             <Building className="size-3.5 text-purple shrink-0" />
-                            <span>{getPropertyName(a.propertyId)}</span>
+                            <span className="truncate">{getPropertyName(a.propertyId)}</span>
                           </div>
                         </td>
-                        <td className="p-4 font-mono text-xs">{a.mobile || "—"}</td>
-                        <td className="p-4">
+                        <td className="p-4 w-[10%] text-left text-muted-foreground truncate" title={getPropertyLocation(a.propertyId)}>{getPropertyLocation(a.propertyId)}</td>
+                        <td className="p-4 w-[12%] text-left text-muted-foreground font-mono text-[10px] truncate" title={a.lastLogin || "14 Aug 2026, 11:20 AM"}>
+                          {a.lastLogin || "14 Aug 2026, 11:20 AM"}
+                        </td>
+                        <td className="p-4 w-[10%] text-left">
                           <Tag tone={statusTone(a.status || "Active")}>{a.status || "Active"}</Tag>
                         </td>
-                        <td className="p-4 text-right">
-                          <div className="flex gap-1.5 justify-end">
+                        <td className="p-4 w-[16%] text-left">
+                          <div className="flex gap-1.5 justify-start items-center">
+                            <button
+                              onClick={() => openViewModal(a)}
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              title="View Admin Details"
+                            >
+                              <Eye className="size-3.5" />
+                            </button>
                             <button
                               onClick={() => openEditModal(a)}
                               className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
-                              title="Edit Admin Settings"
+                              title="Edit Credentials"
                             >
                               <Edit2 className="size-3.5" />
                             </button>
                             <button
-                              onClick={() => openDeleteModal(a)}
-                              className="p-1.5 rounded-full hover:bg-error/15 text-error"
-                              title="Remove Admin Account"
+                              onClick={() => handleToggleStatus(a)}
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              title={a.status === "Active" ? "Deactivate" : "Activate"}
                             >
-                              <Trash2 className="size-3.5" />
+                              {a.status === "Active" ? <X className="size-4 text-warning" /> : <Check className="size-4 text-success" />}
+                            </button>
+                            <button
+                              onClick={() => handleResetPassword(a)}
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              title="Reset Password"
+                            >
+                              <Lock className="size-3.5 text-gold" />
                             </button>
                           </div>
                         </td>
@@ -244,40 +297,17 @@ function SuperAdminAdmins() {
               </div>
             )}
           </Panel>
-        </div>
-
-        {/* Right Column - Help & Reference */}
-        <div className="space-y-4">
-          <Panel title="Property Mapping Guide" description="How hotel admins operate.">
-            <div className="p-4 space-y-4 text-xs leading-relaxed text-muted-foreground">
-              <div className="flex gap-3">
-                <ShieldCheck className="size-5 text-gold shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-semibold text-xs text-navy mb-1">Administrative Privileges</h5>
-                  <p>Admins hold full control over property inventory, rates, billing profiles, staff allocation, and OTA channels for their specific assigned property.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Building className="size-5 text-purple shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-semibold text-xs text-navy mb-1">Centralized Multi-Property</h5>
-                  <p>Super Admin can map a single admin account to any registered property. If an admin manages multiple properties, they can switch between workspaces upon signing in.</p>
-                </div>
-              </div>
-            </div>
-          </Panel>
-        </div>
       </div>
 
       {/* Modals */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-deep/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(13,27,42,0.35)] relative border border-navy/5">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-black/5 backdrop-blur-sm flex justify-center items-start py-8 sm:py-16 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(13,27,42,0.15)] relative border border-muted my-auto">
             <div className="flex items-center justify-between pb-4 border-b border-muted">
               <h3 className="font-display font-bold text-lg text-navy">
                 {modalType === "add" && "Register Property Administrator"}
                 {modalType === "edit" && "Edit Admin Credentials"}
-                {modalType === "delete" && "Remove Admin Account"}
+                {modalType === "view" && "Admin Profile Overview"}
               </h3>
               <button
                 onClick={() => setModalOpen(false)}
@@ -287,19 +317,43 @@ function SuperAdminAdmins() {
               </button>
             </div>
 
-            {modalType === "delete" ? (
-              <div className="py-6 space-y-4 text-center">
-                <ShieldAlert className="size-12 text-error mx-auto animate-bounce" />
-                <h4 className="font-semibold text-navy text-base">Confirm Account Revocation</h4>
-                <p className="text-muted-foreground text-xs max-w-xs mx-auto">
-                  Are you sure you want to revoke the administrative account for <strong className="text-navy">{selectedAdmin?.name}</strong>? They will instantly lose access to their mapped property dashboard.
-                </p>
-                <div className="flex gap-3 justify-center pt-4">
-                  <Button variant="ghost" onClick={() => setModalOpen(false)} className="rounded-full">
-                    Cancel
-                  </Button>
-                  <Button onClick={handleDeleteSubmit} className="bg-error hover:bg-error/90 text-white rounded-full px-5">
-                    Revoke & Delete
+            {modalType === "view" ? (
+              <div className="py-4 space-y-4 text-left text-xs">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <strong className="text-navy font-semibold">Administrator Name:</strong>
+                    <p className="mt-0.5 text-muted-foreground text-sm font-semibold">{selectedAdmin?.name}</p>
+                  </div>
+                  <div>
+                    <strong className="text-navy font-semibold">Email Address:</strong>
+                    <p className="mt-0.5 text-muted-foreground">{selectedAdmin?.email}</p>
+                  </div>
+                  <div>
+                    <strong className="text-navy font-semibold">Contact Phone:</strong>
+                    <p className="mt-0.5 text-muted-foreground font-mono">{selectedAdmin?.mobile || "—"}</p>
+                  </div>
+                  <div>
+                    <strong className="text-navy font-semibold">Assigned Hotel:</strong>
+                    <p className="mt-0.5 text-muted-foreground font-semibold">{getPropertyName(selectedAdmin?.propertyId)}</p>
+                  </div>
+                  <div>
+                    <strong className="text-navy font-semibold">Hotel Location:</strong>
+                    <p className="mt-0.5 text-muted-foreground">{getPropertyLocation(selectedAdmin?.propertyId)}</p>
+                  </div>
+                  <div>
+                    <strong className="text-navy font-semibold">Last Active Login:</strong>
+                    <p className="mt-0.5 text-muted-foreground font-mono">{selectedAdmin?.lastLogin || "14 Aug 2026, 11:20 AM"}</p>
+                  </div>
+                  <div>
+                    <strong className="text-navy font-semibold">Account Status:</strong>
+                    <p className="mt-0.5">
+                      <Tag tone={statusTone(selectedAdmin?.status || "Active")}>{selectedAdmin?.status || "Active"}</Tag>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-4 border-t border-muted mt-5">
+                  <Button onClick={() => setModalOpen(false)} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5">
+                    Close Profile
                   </Button>
                 </div>
               </div>

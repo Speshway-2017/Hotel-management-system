@@ -10,7 +10,13 @@ const SEED_USERS = [
   { name: 'Hotel Admin', email: 'admin@hourstay.com', password: 'password123', role: 'admin', mobile: '9888888888' },
   { name: 'Hotel Manager', email: 'manager@hourstay.com', password: 'password123', role: 'manager', mobile: '9777777777' },
   { name: 'Front Desk Receptionist', email: 'receptionist@hourstay.com', password: 'password123', role: 'receptionist', mobile: '9666666666' },
-  { name: 'Regular Guest', email: 'guest@hourstay.com', password: 'password123', role: 'guest', mobile: '9555555555' }
+  { name: 'Regular Guest', email: 'guest@hourstay.com', password: 'password123', role: 'guest', mobile: '9555555555' },
+  { name: 'Vikram Rathore', email: 'vikram.rathore@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98290 11223', propertyId: 'HS-JAI', status: 'Active' },
+  { name: 'Meera Nair', email: 'meera.nair@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 97444 88321', propertyId: 'HS-UDA', status: 'Active' },
+  { name: 'Joaquim Fernandes', email: 'joaquim@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98221 44556', propertyId: 'HS-GOA', status: 'Active' },
+  { name: 'Anand Pillai', email: 'anand.pillai@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 94470 55667', propertyId: 'HS-KER', status: 'Active' },
+  { name: 'Sanjana Kapoor', email: 'sanjana@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98110 22334', propertyId: 'HS-DEL', status: 'Suspended' },
+  { name: 'Rehan Shaikh', email: 'rehan@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 99300 77889', propertyId: 'HS-MUM', status: 'Active' }
 ];
 
 const SEED_PROPERTIES = [

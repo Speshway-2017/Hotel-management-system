@@ -401,6 +401,136 @@ function Features() {
         </div>
       </section>
 
+      {/* Complete Product Feature Directory Section */}
+      <section className="bg-cream py-20 border-t border-navy/5 animate-fade-up">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>
+            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+              All Platform Modules & Features
+            </h2>
+            <p className="mt-4 mx-auto max-w-2xl text-sm text-muted-foreground font-ui">
+              Explore the exhaustive list of modules built to handle every dimension of modern hospitality operations.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 text-left font-ui">
+            {[
+              {
+                title: "01. Reservation & Booking",
+                desc: "Direct booking engine, live availability search, tax-inclusive rate selectors, group reservations, and source tags.",
+                points: ["Dynamic rate calendars", "MMT / Agoda parity alerts", "Deposit adjustments"]
+              },
+              {
+                title: "02. Front Desk Console",
+                desc: "Walk-in management, digital Aadhaar OCR capture, Form C registration cards, auto room suggestion, and check-out checkout.",
+                points: ["Real-time status grid", "Offline mode sync", "Shift handovers"]
+              },
+              {
+                title: "03. Housekeeping App",
+                desc: "Mobile task assignment lists, status lifecycles, real-time sync with front desk, and lost & found logs.",
+                points: ["Linen tracking", "Auto-dirty toggle on check-out", "Turnaround metrics"]
+              },
+              {
+                title: "04. Room & Rate Master",
+                desc: "Configurable dynamic/demand pricing, seasonal calendars, peak day rules, rate plans, and bulk allocation changes.",
+                points: ["Negotiated rate plans", "Owner occupancy blocks", "Room type limits"]
+              },
+              {
+                title: "05. Invoicing & Billing",
+                desc: "GST split billing (CGST, SGST, IGST), SAC code compliance, master folios, corporate tag splits, and refund credits.",
+                points: ["Automatic tax-slab mapping", "Invoice WhatsApp dispatch", "Outstanding ledger"]
+              },
+              {
+                title: "06. Unified Payments",
+                desc: "UPI dynamic QR codes, integrated card payments, net banking, automated Settlements, and original payment refunds.",
+                points: ["Instant UPI verification", "Partial checks tracking", "Commission-free payments"]
+              },
+              {
+                title: "07. POS Integrations",
+                desc: "In-house restaurant dining bills, bar/spa outlet charges, laundry postings, and room service order folio links.",
+                points: ["Unified POS reports", "Direct checkout mapping", "Outlet commission audits"]
+              },
+              {
+                title: "08. Guest CRM & Loyalty",
+                desc: "Central guest profiles, stay logs, preferences notes, loyalty tier points, and repeat guest marketing offers.",
+                points: ["Personalized check-in", "Blacklist tags", "Occasion notifications"]
+              },
+              {
+                title: "09. Maintenance Tickets",
+                desc: "Guest-initiated service requests via mobile app (housekeeping, room service, maintenance), ticketing assignments, and SLAs.",
+                points: ["Out-of-order inventory hold", "Staff assignment notifications", "Problem details photo logs"]
+              },
+              {
+                title: "10. Staff Roster & Shifts",
+                desc: "Granular role-based accounts, geo-tagged mobile attendance sheets, shift rosters, and performance indexes.",
+                points: ["Biometric optional link", "Salary/wage calculations", "Shift handover logs"]
+              },
+              {
+                title: "11. Reports & Analytics",
+                desc: "Consolidated occupancy charts, RevPAR, ADR logs, statutory tax summaries, and multi-branch benchmarks.",
+                points: ["Custom PDF/CSV export", "Payment gateway audits", "YoY comparative graphs"]
+              },
+              {
+                title: "12. Channel Sync Manager",
+                desc: "Centralized room pushes, rate parity conflict flags, commission percentages tracking, and instant stop-sells.",
+                points: ["2-way API synchronization", "MMT, Goibibo, Booking.com", "Overbooking safeguards"]
+              },
+              {
+                title: "13. Multi-Property Hub",
+                desc: "Centralized Super Admin console, cross-property guest tracking, central catalog sync, and central invoicing.",
+                points: ["Branch comparisons", "Centrally pushed rate plans", "Consolidated tax ledger"]
+              },
+              {
+                title: "14. Smart Notifications",
+                desc: "SMS reminders, WhatsApp API confirmations, digital invoice dispatches, and internal staff alert pushes.",
+                points: ["Low inventory notifications", "AC/pest maintenance alerts", "Payment confirmations"]
+              },
+              {
+                title: "15. Guest Self-Service",
+                desc: "Mobile check-in ID uploads, digital room keys, in-stay service requests, and digital folio access.",
+                points: ["Contactless entry", "Check-out request", "Front desk chat support"]
+              },
+              {
+                title: "16. Post-Stay Feedback",
+                desc: "Automated WhatsApp feedback request logs, guest review dashboard, and review responses templates.",
+                points: ["Google Business hooks", "Sentiment trend reports", "Issue resolution alerts"]
+              },
+              {
+                title: "17. Travel Agent Portal",
+                desc: "Partner logins, contract rate pricing bookings, credit invoice registers, and agent commissions records.",
+                points: ["Agent performance matrix", "Direct credit settlement", "Commission tracking logs"]
+              },
+              {
+                title: "18. Security & Audit Logs",
+                desc: "Role-based access controls, two-factor logins (2FA), encrypted PII storage, and full database audit trails.",
+                points: ["Discount audit logs", "Session timeout guards", "Data export alerts"]
+              },
+              {
+                title: "19. Localizations",
+                desc: "Regional Indian languages localization (Hindi, etc.), multi-currency converters, and language parameters per guest.",
+                points: ["Dynamic exchange rates", "Invoice regional text", "Staff dashboard translations"]
+              }
+            ].map((mod, idx) => (
+              <div key={idx} className="card-guest border border-navy/5 bg-white p-6 rounded-xl shadow-soft flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
+                <div>
+                  <h3 className="font-display text-sm font-bold text-navy border-b border-navy/5 pb-2 mb-3">{mod.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-4">{mod.desc}</p>
+                </div>
+                <ul className="space-y-1.5 pt-2 border-t border-navy/5">
+                  {mod.points.map((pt, pIdx) => (
+                    <li key={pIdx} className="flex items-center gap-1.5 text-[11px] font-semibold text-navy">
+                      <span className="size-1 rounded-full bg-purple" />
+                      <span>{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
     </SiteLayout>
   );
 }
