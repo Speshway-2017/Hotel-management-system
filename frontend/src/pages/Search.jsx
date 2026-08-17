@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { 
   MapPin, Star, Calendar, Users, Coffee, Bed, 
@@ -7,6 +7,7 @@ import {
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Input } from "@/components/ui/input";
 import { inr, roomTypes } from "@/data/hs-data";
+import { publicService } from "@/services/public";
 
 // Import Resort/Room Images
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -42,6 +43,27 @@ function SearchPage() {
   const [checkOutDate, setCheckOutDate] = useState("2026-08-15");
   const [guestsCount, setGuestsCount] = useState(2);
   const [searchRoomType, setSearchRoomType] = useState("all");
+
+  const [mediaMap, setMediaMap] = useState({});
+
+  useEffect(() => {
+    publicService.getMedia()
+      .then(res => {
+        if (res.success && res.data) {
+          setMediaMap(res.data);
+        }
+      })
+      .catch(err => {});
+  }, []);
+
+  const getRoomImage = (id) => {
+    let key = '';
+    if (id === 'RT-DLX') key = 'jaipur';
+    else if (id === 'RT-PRE') key = 'palace';
+    else if (id === 'RT-SUI') key = 'kerala';
+    else if (id === 'RT-VIL') key = 'goa';
+    return mediaMap[key] || roomImages[id] || jaipurImg;
+  };
 
   // Filtering States
   const [priceRange, setPriceRange] = useState(40000);
@@ -383,7 +405,7 @@ function SearchPage() {
                       {/* Image container */}
                       <div className="relative h-48 sm:h-full min-h-[180px] overflow-hidden bg-navy">
                         <img 
-                          src={roomImages[room.id] || jaipurImg} 
+                          src={getRoomImage(room.id)} 
                           alt={room.name} 
                           className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                         />

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SiteLayout } from "@/layouts/SiteLayout";
+import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { blogPosts } from "@/data/hs-data";
 import { Sparkles, CalendarDays, ArrowRight } from "lucide-react";
@@ -69,14 +70,38 @@ function BlogList() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [posts, setPosts] = useState(blogPosts);
+
+  useEffect(() => {
+    publicService.getBlogs()
+      .then(res => {
+        if (res.success && res.data && res.data.length > 0) {
+          const mapped = res.data.map(b => ({
+            slug: b.slug,
+            tag: b.tag || "Hotel Management",
+            readTime: b.readTime || "5 min read",
+            date: b.date || new Date(b.createdAt).toLocaleDateString("en-IN"),
+            title: b.title,
+            excerpt: b.excerpt,
+            author: b.author || "Super Admin",
+            role: b.role || "Hour Stay Group",
+            content: b.content || "",
+            imageUrl: b.imageUrl || "",
+            description: b.description || ""
+          }));
+          setPosts(mapped);
+        }
+      })
+      .catch(err => {});
+  }, []);
 
   // Filter blog posts dynamically
   const filteredPosts = selectedCategory === "All" 
-    ? blogPosts 
-    : blogPosts.filter(p => p.tag === selectedCategory);
+    ? posts 
+    : posts.filter(p => p.tag === selectedCategory);
 
   // Identify featured article (first one in full list)
-  const featuredArticle = blogPosts[0];
+  const featuredArticle = posts[0];
 
   const handleSubscribe = (e) => {
     e.preventDefault();
@@ -139,7 +164,7 @@ function BlogList() {
               <div className="grid gap-6 lg:grid-cols-12 rounded-2xl border border-navy/5 bg-white overflow-hidden shadow-soft hover:shadow-lift transition-shadow duration-300 lg:h-[350px]">
                 <div className="lg:col-span-7 h-56 sm:h-72 lg:h-full relative overflow-hidden group">
                   <img 
-                    src={getPostImage(featuredArticle.slug)} 
+                    src={featuredArticle.imageUrl || featuredArticle.description || getPostImage(featuredArticle.slug)} 
                     alt={featuredArticle.title} 
                     className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500" 
                   />
@@ -194,7 +219,7 @@ function BlogList() {
                       <div className="text-left flex-grow flex flex-col">
                         <div className="h-44 overflow-hidden relative">
                           <img 
-                            src={getPostImage(post.slug)} 
+                            src={post.imageUrl || post.description || getPostImage(post.slug)} 
                             alt={post.title} 
                             className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500" 
                           />

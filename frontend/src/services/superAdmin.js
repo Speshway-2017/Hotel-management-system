@@ -69,6 +69,23 @@ export const superAdminService = {
   getReservations: async () => {
     return await request('/super-admin/reservations');
   },
+  createReservation: async (data) => {
+    return await request('/super-admin/reservations', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updateReservation: async (id, data) => {
+    return await request(`/super-admin/reservations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  deleteReservation: async (id) => {
+    return await request(`/super-admin/reservations/${id}`, {
+      method: 'DELETE'
+    });
+  },
 
   getAuditLogs: async () => {
     return await request('/super-admin/audit-logs');

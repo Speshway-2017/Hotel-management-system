@@ -32,6 +32,7 @@ import {
   TrendingUp,
   UserCog,
   Users,
+  User,
   Wrench } from
 "lucide-react";
 
@@ -93,41 +94,18 @@ export const navByRole = {
   ],
 
   admin: [
-  {
-    group: "Overview",
-    items: [
-    { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-    { label: "Front Desk Overview", to: "/admin/front-desk", icon: ConciergeBell },
-    { label: "Reports & Analytics", to: "/admin/reports", icon: BarChart3 }]
-
-  },
-  {
-    group: "Inventory",
-    items: [
-    { label: "Rooms & Room Types", to: "/admin/rooms", icon: Bed },
-    { label: "Rates & Seasons", to: "/admin/rates", icon: CalendarClock },
-    { label: "Reservations", to: "/admin/reservations", icon: CalendarCheck },
-    { label: "OTA / Channels", to: "/admin/channels", icon: Activity }]
-
-  },
-  {
-    group: "Revenue",
-    items: [
-    { label: "Billing & Invoices", to: "/admin/billing", icon: Receipt },
-    { label: "Payments", to: "/admin/payments", icon: CreditCard },
-    { label: "Discounts & Refunds", to: "/admin/approvals", icon: Percent },
-    { label: "Taxes & GST", to: "/admin/taxes", icon: FileText }]
-
-  },
-  {
-    group: "People",
-    items: [
-    { label: "Guests / CRM", to: "/admin/guests", icon: Users },
-    { label: "Staff Management", to: "/admin/staff", icon: UserCog },
-    { label: "Notifications", to: "/admin/notifications", icon: Bell },
-    { label: "Settings", to: "/admin/settings", icon: Settings }]
-
-  }],
+    {
+      group: "Admin Console",
+      items: [
+        { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+        { label: "Operations", to: "/admin/reservations", icon: CalendarCheck },
+        { label: "Finance", to: "/admin/billing", icon: Receipt },
+        { label: "Analytics", to: "/admin/reports", icon: BarChart3 },
+        { label: "Management", to: "/admin/staff", icon: UserCog },
+        { label: "Settings", to: "/admin/settings", icon: Settings }
+      ]
+    }
+  ],
 
   manager: [
   {

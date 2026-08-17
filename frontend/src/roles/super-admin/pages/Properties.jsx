@@ -35,6 +35,7 @@ function SuperAdminPlatform() {
     occupancy: 70,
     adr: 5000,
     gm: "",
+    assignedAdmin: "",
     status: "Onboarding"
   });
 
@@ -99,7 +100,7 @@ function SuperAdminPlatform() {
 
   // Open Add Modals
   const openAddProperty = () => {
-    setPropertyForm({ name: "", city: "", propertyType: "Boutique Resort", rooms: 50, occupancy: 70, adr: 5000, gm: "", status: "Onboarding" });
+    setPropertyForm({ name: "", city: "", propertyType: "Boutique Resort", rooms: 50, occupancy: 70, adr: 5000, gm: "", assignedAdmin: "", status: "Onboarding" });
     setModalType("add_property");
     setModalOpen(true);
   };
@@ -114,6 +115,7 @@ function SuperAdminPlatform() {
       occupancy: item.occupancy,
       adr: item.adr,
       gm: item.gm || "",
+      assignedAdmin: item.assignedAdmin ? (item.assignedAdmin._id || item.assignedAdmin) : "",
       status: item.status
     });
     setModalType("edit_property");
@@ -204,7 +206,7 @@ function SuperAdminPlatform() {
                         <td className="p-4 font-semibold text-navy">{p.rooms} Keys</td>
                         <td className="p-4 font-semibold text-navy">{p.occupancy}%</td>
                         <td className="p-4 font-bold text-purple">₹{revenueSum.toLocaleString("en-IN")}</td>
-                        <td className="p-4 text-muted-foreground">{p.gm || "Unassigned"}</td>
+                        <td className="p-4 text-muted-foreground">{p.assignedAdmin?.name || p.gm || "Unassigned"}</td>
                         <td className="p-4">
                           <Tag tone={statusTone(p.status)}>{p.status}</Tag>
                         </td>
@@ -296,8 +298,8 @@ function SuperAdminPlatform() {
                       <p className="mt-0.5 text-muted-foreground">{selectedItem.city}</p>
                     </div>
                     <div>
-                      <strong className="text-navy font-semibold">General Manager GM:</strong>
-                      <p className="mt-0.5 text-muted-foreground">{selectedItem.gm || "Unassigned"}</p>
+                      <strong className="text-navy font-semibold">Assigned Admin:</strong>
+                      <p className="mt-0.5 text-muted-foreground">{selectedItem.assignedAdmin?.name || selectedItem.gm || "Unassigned"}</p>
                     </div>
                     <div>
                       <strong className="text-navy font-semibold">Registered Date:</strong>
@@ -486,15 +488,29 @@ function SuperAdminPlatform() {
                     className="mt-1 h-10 text-xs"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="prop-gm" className="text-xs text-navy font-semibold">General Manager Name</Label>
-                  <Input
-                    id="prop-gm"
-                    value={propertyForm.gm}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, gm: e.target.value })}
-                    placeholder="e.g. Vikramaditya Singh"
-                    className="mt-1 h-10 text-xs"
-                  />
+                 <div>
+                  <Label htmlFor="prop-admin" className="text-xs text-navy font-semibold">Assign Property Admin / Owner</Label>
+                  <select
+                    id="prop-admin"
+                    value={propertyForm.assignedAdmin || ""}
+                    onChange={(e) => {
+                      const selectedAdminId = e.target.value;
+                      const selectedUserObj = users.find(u => u.id === selectedAdminId || u._id === selectedAdminId);
+                      setPropertyForm({ 
+                        ...propertyForm, 
+                        assignedAdmin: selectedAdminId || null,
+                        gm: selectedUserObj ? selectedUserObj.name : "—"
+                      });
+                    }}
+                    className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple mt-1 cursor-pointer"
+                  >
+                    <option value="">Select Property Admin / Owner</option>
+                    {users.filter(u => u.role === "admin" || u.role === "manager").map(u => (
+                      <option key={u.id || u._id} value={u.id || u._id}>
+                        {u.name} ({u.email})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex gap-3 justify-end pt-4 border-t border-muted mt-5">
                   <Button variant="ghost" type="button" onClick={() => setModalOpen(false)} className="rounded-full">Cancel</Button>

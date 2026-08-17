@@ -57,7 +57,7 @@ export const properties = [
 {
   id: "HS-JAI",
   name: "Hour Stay Rambagh Residency",
-  city: "Jaipur, Rajasthan",
+  city: "Madhapur,Hyderabad",
   rooms: 128,
   occupancy: 84,
   adr: 11400,

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { 
   Mail, MapPin, Phone, ChevronDown, ChevronUp, 
   Sparkles, ShoppingCart, LifeBuoy, Handshake, Check 
 } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
+import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -72,6 +73,45 @@ const faqs = [
 function Contact() {
   const [sent, setSent] = useState(false);
   const [errors, setErrors] = useState({});
+  const [contactData, setContactData] = useState({
+    name: "Hour Stay Headquarters",
+    email: "stay@hourstay.in",
+    phone: "+91 141 4055 900",
+    address: "2nd Floor, Gulmohar House, Amber Fort Road, Jaipur 302002, Rajasthan",
+    hours: "Monday – Saturday, 9:00 AM – 6:00 PM IST (Front Desk Support 24/7)"
+  });
+
+  const [dbFaqs, setDbFaqs] = useState([]);
+
+  useEffect(() => {
+    publicService.getContact()
+      .then(res => {
+        if (res.success && res.data) {
+          const config = res.data;
+          setContactData({
+            name: config.name || "Hour Stay Headquarters",
+            email: config.email || "stay@hourstay.in",
+            phone: config.phone || "+91 141 4055 900",
+            address: config.address || "2nd Floor, Gulmohar House, Amber Fort Road, Jaipur 302002, Rajasthan",
+            hours: config.hours || "Monday – Saturday, 9:00 AM – 6:00 PM IST (Front Desk Support 24/7)"
+          });
+        }
+      })
+      .catch(err => {});
+
+    publicService.getFaqs()
+      .then(res => {
+        if (res.success && res.data && res.data.length > 0) {
+          setDbFaqs(res.data.map(f => ({
+            q: f.question,
+            a: f.answer
+          })));
+        }
+      })
+      .catch(err => {});
+  }, []);
+
+  const allFaqs = dbFaqs.length > 0 ? dbFaqs : faqs;
   const [form, setForm] = useState({ 
     name: "", 
     email: "", 
@@ -169,32 +209,32 @@ function Contact() {
               {/* Office Info Card */}
               <div className="rounded-2xl border border-navy/5 bg-white p-6 sm:p-8 shadow-soft">
                 <h3 className="font-display text-lg sm:text-xl font-bold text-navy border-b border-navy/5 pb-3 mb-6">
-                  Office Information
+                  {contactData.name}
                 </h3>
                 <ul className="space-y-5 text-xs sm:text-sm font-ui text-navy">
                   <li className="flex items-start gap-3">
                     <Phone className="size-4.5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Call Support</p>
-                      <p className="text-muted-foreground mt-0.5">+91 141 4055 900</p>
+                      <p className="text-muted-foreground mt-0.5">{contactData.phone}</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
                     <Mail className="size-4.5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Email Inquiry</p>
-                      <p className="text-muted-foreground mt-0.5">stay@hourstay.in</p>
+                      <p className="text-muted-foreground mt-0.5">{contactData.email}</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
                     <MapPin className="size-4.5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Headquarters Office</p>
-                      <p className="text-muted-foreground mt-0.5">2nd Floor, Gulmohar House, Amber Fort Road, Jaipur 302002, Rajasthan</p>
+                      <p className="text-muted-foreground mt-0.5">{contactData.address}</p>
                     </div>
                   </li>
-                  <li className="flex items-start gap-3 pt-3 border-t border-navy/5 text-[11px] text-muted-foreground">
-                    <span>Business Hours: Monday – Saturday, 9:00 AM – 6:00 PM IST (Front Desk Support 24/7)</span>
+                  <li className="flex items-start gap-3 pt-3 border-t border-navy/5 text-[11px] text-muted-foreground font-medium">
+                    <span>Business Hours: {contactData.hours}</span>
                   </li>
                 </ul>
               </div>
@@ -205,7 +245,7 @@ function Contact() {
                   Frequently Asked Questions
                 </h3>
                 <div className="space-y-2">
-                  {faqs.map((faq, idx) => {
+                  {allFaqs.map((faq, idx) => {
                     const isOpen = openFaq === idx;
                     return (
                       <div 

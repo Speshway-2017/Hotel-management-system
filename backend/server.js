@@ -71,3 +71,4 @@ startServer().catch((err) => {
   console.error('❌ Failed to start HMS server:', err.message);
   process.exit(1);
 });
+// Trigger seed refresh - force rerun migration v4

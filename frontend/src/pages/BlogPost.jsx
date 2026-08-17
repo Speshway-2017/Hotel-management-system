@@ -1,7 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { blogPosts } from "@/data/hs-data";
 import { Button } from "@/components/ui/button";
+import { publicService } from "@/services/public";
 
 // Import Resort Images
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -31,7 +33,9 @@ const getPostImage = (slug) => {
 export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
     const post = blogPosts.find((p) => p.slug === params.slug);
-    if (!post) throw notFound();
+    if (!post) {
+      return { post: { slug: params.slug, title: "Loading...", excerpt: "", author: "", role: "", date: "", readTime: "", content: "" } };
+    }
     return { post };
   },
   head: ({ loaderData }) => {
@@ -68,7 +72,34 @@ function PostNotFound() {
 }
 
 function BlogPost() {
-  const { post } = Route.useLoaderData();
+  const { post: loaderPost } = Route.useLoaderData();
+  const [post, setPost] = useState(loaderPost);
+
+  useEffect(() => {
+    publicService.getBlogs()
+      .then(res => {
+        if (res.success && res.data) {
+          const dbBlog = res.data.find(item => item.slug === post.slug);
+          if (dbBlog) {
+            setPost({
+              slug: dbBlog.slug,
+              tag: dbBlog.tag || "Hotel Management",
+              readTime: dbBlog.readTime || "5 min read",
+              date: dbBlog.date || new Date(dbBlog.createdAt).toLocaleDateString("en-IN"),
+              title: dbBlog.title,
+              excerpt: dbBlog.excerpt,
+              author: dbBlog.author || "Super Admin",
+              role: dbBlog.role || "Hour Stay Group",
+              content: dbBlog.content || "",
+              imageUrl: dbBlog.imageUrl || "",
+              description: dbBlog.description || ""
+            });
+          }
+        }
+      })
+      .catch(err => {});
+  }, [post.slug]);
+
   return (
     <SiteLayout>
       <article className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
@@ -83,7 +114,7 @@ function BlogPost() {
         {/* Dynamic Cover Image instead of gradient box */}
         <div className="mt-8 h-64 sm:h-80 rounded-2xl overflow-hidden shadow-soft relative group">
           <img 
-            src={getPostImage(post.slug)} 
+            src={post.imageUrl || post.description || getPostImage(post.slug)} 
             alt={post.title} 
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-101" 
           />
@@ -92,28 +123,36 @@ function BlogPost() {
 
         <div className="mt-10 space-y-5 text-sm sm:text-base leading-relaxed text-foreground/85 text-left font-ui">
           <p className="text-base sm:text-lg text-navy font-bold">{post.excerpt}</p>
-          <p>
-            On any given Saturday in wedding season, a 120-key property in Jaipur will process
-            forty arrivals between 13:00 and 16:00. The difference between a calm lobby and a
-            queue at the desk is rarely staffing — it is how many decisions each receptionist has
-            to make per guest.
-          </p>
-          <h2 className="pt-4 font-display text-2xl font-semibold text-navy text-left">Start with the folio</h2>
-          <p>
-            Every operational habit eventually shows up on the folio. When room moves, late
-            check-outs and F&amp;B postings are captured as they happen, the night audit becomes a
-            five-minute review rather than a two-hour reconciliation.
-          </p>
-          <blockquote className="border-l-2 border-gold pl-5 font-display text-xl text-navy italic my-6 text-left">
-            “The fastest check-in we ever built was the one where the guest had already told us
-            everything, twice.”
-          </blockquote>
-          <h2 className="pt-4 font-display text-2xl font-semibold text-navy text-left">What to change this week</h2>
-          <ul className="list-disc space-y-2 pl-5 text-left">
-            <li>Pre-assign rooms for all arrivals with a confirmed ETA before 11:00.</li>
-            <li>Move ID capture to pre check-in so the desk only verifies, never types.</li>
-            <li>Set rate-parity alerts on your top two OTAs and review them at the morning brief.</li>
-          </ul>
+          {post.content ? (
+            post.content.split("\n\n").map((para, i) => (
+              <p key={i}>{para}</p>
+            ))
+          ) : (
+            <>
+              <p>
+                On any given Saturday in wedding season, a 120-key property in Jaipur will process
+                forty arrivals between 13:00 and 16:00. The difference between a calm lobby and a
+                queue at the desk is rarely staffing — it is how many decisions each receptionist has
+                to make per guest.
+              </p>
+              <h2 className="pt-4 font-display text-2xl font-semibold text-navy text-left">Start with the folio</h2>
+              <p>
+                Every operational habit eventually shows up on the folio. When room moves, late
+                check-outs and F&amp;B postings are captured as they happen, the night audit becomes a
+                five-minute review rather than a two-hour reconciliation.
+              </p>
+              <blockquote className="border-l-2 border-gold pl-5 font-display text-xl text-navy italic my-6 text-left">
+                “The fastest check-in we ever built was the one where the guest had already told us
+                everything, twice.”
+              </blockquote>
+              <h2 className="pt-4 font-display text-2xl font-semibold text-navy text-left">What to change this week</h2>
+              <ul className="list-disc space-y-2 pl-5 text-left">
+                <li>Pre-assign rooms for all arrivals with a confirmed ETA before 11:00.</li>
+                <li>Move ID capture to pre check-in so the desk only verifies, never types.</li>
+                <li>Set rate-parity alerts on your top two OTAs and review them at the morning brief.</li>
+              </ul>
+            </>
+          )}
         </div>
       </article>
     </SiteLayout>

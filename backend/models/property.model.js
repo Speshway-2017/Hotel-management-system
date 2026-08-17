@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data/properties.json');
 
 const propertySchema = new mongoose.Schema({
+  _id: { type: String },
   name: { type: String, required: true, trim: true },
   city: { type: String, required: true, trim: true },
   rooms: { type: Number, required: true, default: 0 },
@@ -16,6 +17,7 @@ const propertySchema = new mongoose.Schema({
   revpar: { type: Number, default: 0 },
   status: { type: String, enum: ['Active', 'Suspended', 'Pending', 'Onboarding', 'Rejected'], default: 'Onboarding' },
   gm: { type: String, trim: true },
+  assignedAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   subscriptionTier: { type: String, enum: ['Basic', 'Premium', 'Enterprise', 'None'], default: 'None' },
   subscriptionStatus: { type: String, enum: ['Active', 'Unpaid', 'Expired', 'None'], default: 'None' },
   subscriptionExpiry: { type: Date }
@@ -39,7 +41,7 @@ const ensureDataFile = () => {
         id: "HS-JAI",
         _id: "HS-JAI",
         name: "Hour Stay Rambagh Residency",
-        city: "Jaipur, Rajasthan",
+        city: "Madhapur,Hyderabad",
         rooms: 128,
         occupancy: 84,
         adr: 11400,
@@ -213,6 +215,7 @@ const MockProperty = {
       revpar: Number(data.revpar) || 0,
       status: data.status || 'Onboarding',
       gm: data.gm || '—',
+      assignedAdmin: data.assignedAdmin || null,
       subscriptionTier: data.subscriptionTier || 'None',
       subscriptionStatus: data.subscriptionStatus || 'None',
       subscriptionExpiry: data.subscriptionExpiry || null,
@@ -269,7 +272,8 @@ class QueryWrapper {
     return this;
   }
 
-  populate() {
+  populate(path) {
+    this.populatePath = path;
     return this;
   }
 
@@ -280,6 +284,9 @@ class QueryWrapper {
         let query = this.executor(true);
         for (const fields of this.selectFields) {
           query = query.select(fields);
+        }
+        if (this.populatePath) {
+          query = query.populate(this.populatePath);
         }
         result = await query;
       } else {

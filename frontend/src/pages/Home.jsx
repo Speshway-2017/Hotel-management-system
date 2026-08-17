@@ -23,9 +23,11 @@ import {
   FileText,
   Smartphone,
   ChevronLeft,
-  Search as SearchIcon
+  Search as SearchIcon,
+  ShieldAlert
 } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
+import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { inr, searchResults, blogPosts } from "@/data/hs-data";
@@ -118,6 +120,60 @@ const propertyTypes = [
 
 function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [dynamicSlides, setDynamicSlides] = useState(slides);
+  const [homeData, setHomeData] = useState({
+    title: "The calm operating system for Indian hospitality",
+    description: "Hour Stay unifies reservations, front desk registration, GST tax slab billing, OTA inventory sync, and mobile-first guest experiences. Built for how Indian hotels actually operate."
+  });
+  const [settings, setSettings] = useState({
+    publicBookingsEnabled: true
+  });
+
+  useEffect(() => {
+    publicService.getHome()
+      .then(res => {
+        if (res.success && res.data) {
+          const config = res.data;
+          setHomeData({
+            title: config.title || "The calm operating system for Indian hospitality",
+            description: config.excerpt || "Hour Stay unifies reservations, front desk registration, GST tax slab billing, OTA inventory sync, and mobile-first guest experiences. Built for how Indian hotels actually operate."
+          });
+        }
+      })
+      .catch(err => {});
+
+    publicService.getSettings()
+      .then(res => {
+        if (res.success && res.data && res.data.content) {
+          const parsed = JSON.parse(res.data.content);
+          setSettings({
+            publicBookingsEnabled: parsed.publicBookingsEnabled !== false
+          });
+        }
+      })
+      .catch(err => {});
+
+    publicService.getMedia()
+      .then(res => {
+        if (res.success && res.data) {
+          const mapping = res.data;
+          const mappedSlides = slides.map(slide => {
+            let key = '';
+            if (slide.image === jaipurImg) key = 'jaipur';
+            else if (slide.image === goaImg) key = 'goa';
+            else if (slide.image === palaceImg) key = 'palace';
+            else if (slide.image === keralaImg) key = 'kerala';
+
+            return {
+              ...slide,
+              image: mapping[key] || slide.image
+            };
+          });
+          setDynamicSlides(mappedSlides);
+        }
+      })
+      .catch(err => {});
+  }, []);
 
   // States for OTA Sync Interaction
   const [otaState, setOtaState] = useState("idle"); // idle, booking_made, syncing_pms, syncing_all, synced
@@ -128,10 +184,10 @@ function Home() {
   // Slide Auto-play
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
+      setCurrentSlide((prev) => (prev + 1) % dynamicSlides.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [dynamicSlides.length]);
 
   // Trigger OTA Mock Booking Simulation
   const triggerOtaSync = (channelName) => {
@@ -162,7 +218,7 @@ function Home() {
       {/* Dynamic Hero Slider */}
       <section className="relative w-full overflow-hidden bg-navy py-12 md:py-20 lg:py-24">
         <div className="absolute inset-0 z-0">
-          {slides.map((slide, idx) => (
+          {dynamicSlides.map((slide, idx) => (
             <div
               key={idx}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
@@ -182,10 +238,10 @@ function Home() {
         <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-10 px-4 sm:px-6">
           <div>
             <h1 className="font-display text-4xl leading-[1.1] font-bold text-cream sm:text-6xl">
-              The calm operating system for Indian hospitality
+              {homeData.title}
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-relaxed text-cream/80 sm:text-xl font-ui">
-              Hour Stay unifies reservations, front desk registration, GST tax slab billing, OTA inventory sync, and mobile-first guest experiences. Built for how Indian hotels actually operate.
+              {homeData.description}
             </p>
            
           </div>
@@ -193,36 +249,44 @@ function Home() {
           {/* Quick Search Card embedded directly inside the hero flow */}
           <div className="w-full max-w-4xl">
             <div className="rounded-xl border border-cream/10 bg-white/95 p-5 shadow-lift sm:p-6 backdrop-blur-sm">
-              <div className="grid gap-4 sm:grid-cols-4">
-                <label className="block text-left">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Destination</span>
-                  <span className="relative mt-1.5 block">
-                    <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
-                    <Input className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-navy font-semibold" placeholder="Jaipur, Udaipur, Goa..." />
-                  </span>
-                </label>
-                <label className="block text-left">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-in Date</span>
-                  <span className="relative mt-1.5 block">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
-                    <Input type="date" className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-sm text-navy font-semibold" defaultValue="2026-08-12" />
-                  </span>
-                </label>
-                <label className="block text-left">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-out Date</span>
-                  <span className="relative mt-1.5 block">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
-                    <Input type="date" className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-sm text-navy font-semibold" defaultValue="2026-08-15" />
-                  </span>
-                </label>
-                <div className="flex items-end">
-                  <Button asChild className="h-12 w-full rounded-md bg-navy text-cream hover:bg-navy/90 font-semibold gap-2 shadow-soft cursor-pointer">
-                    <Link to="/search">
-                      <SearchIcon className="size-4" /> Search Rooms
-                    </Link>
-                  </Button>
+              {!settings.publicBookingsEnabled ? (
+                <div className="text-center py-4 text-navy font-semibold flex flex-col items-center gap-1.5 font-ui">
+                  <ShieldAlert className="size-8 text-gold" />
+                  <p className="text-sm">Online direct bookings are temporarily disabled by the administrator.</p>
+                  <p className="text-xs text-muted-foreground font-medium">Please contact our reservation desk or front office directly to book a room.</p>
                 </div>
-              </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-4">
+                  <label className="block text-left">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Destination</span>
+                    <span className="relative mt-1.5 block">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
+                      <Input className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-navy font-semibold" placeholder="Jaipur, Udaipur, Goa..." />
+                    </span>
+                  </label>
+                  <label className="block text-left">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-in Date</span>
+                    <span className="relative mt-1.5 block">
+                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
+                      <Input type="date" className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-sm text-navy font-semibold" defaultValue="2026-08-12" />
+                    </span>
+                  </label>
+                  <label className="block text-left">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-out Date</span>
+                    <span className="relative mt-1.5 block">
+                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
+                      <Input type="date" className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-sm text-navy font-semibold" defaultValue="2026-08-15" />
+                    </span>
+                  </label>
+                  <div className="flex items-end">
+                    <Button asChild className="h-12 w-full rounded-md bg-navy text-cream hover:bg-navy/90 font-semibold gap-2 shadow-soft cursor-pointer">
+                      <Link to="/search">
+                        <SearchIcon className="size-4" /> Search Rooms
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -1,8 +1,10 @@
+import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Star } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { inr, roomTypes, searchResults } from "@/data/hs-data";
+import { publicService } from "@/services/public";
 
 // Import Resort Images for Gallery
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -46,7 +48,30 @@ export const Route = createFileRoute("/rooms/$roomId")({
 
 function RoomDetails() {
   const { hotel } = Route.useLoaderData();
-  const [mainImg, sideImg1, sideImg2] = getHotelGallery(hotel.id);
+  
+  const [mediaMap, setMediaMap] = useState({});
+
+  useEffect(() => {
+    publicService.getMedia()
+      .then(res => {
+        if (res.success && res.data) {
+          setMediaMap(res.data);
+        }
+      })
+      .catch(err => {});
+  }, []);
+
+  const getMediaUrl = (fallbackImg) => {
+    let key = '';
+    if (fallbackImg === jaipurImg) key = 'jaipur';
+    else if (fallbackImg === goaImg) key = 'goa';
+    else if (fallbackImg === palaceImg) key = 'palace';
+    else if (fallbackImg === keralaImg) key = 'kerala';
+    return mediaMap[key] || fallbackImg;
+  };
+
+  const gallery = getHotelGallery(hotel.id).map(img => getMediaUrl(img));
+  const [mainImg, sideImg1, sideImg2] = gallery;
 
   return (
     <SiteLayout>

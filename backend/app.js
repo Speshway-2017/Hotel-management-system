@@ -10,6 +10,7 @@ import managerRoutes from './routes/manager.routes.js';
 import receptionistRoutes from './routes/receptionist.routes.js';
 import guestRoutes from './routes/guest.routes.js';
 import superAdminRoutes from './routes/superAdmin.routes.js';
+import publicRoutes from './routes/public.routes.js';
 
 import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
 
@@ -55,6 +56,32 @@ app.use('/api/manager', managerRoutes);
 app.use('/api/receptionist', receptionistRoutes);
 app.use('/api/guest', guestRoutes);
 app.use('/api/super-admin', superAdminRoutes);
+
+// Mount Route Versioning Aliases
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/manager', managerRoutes);
+app.use('/api/v1/receptionist', receptionistRoutes);
+app.use('/api/v1/guest', guestRoutes);
+app.use('/api/v1/super-admin', superAdminRoutes);
+
+app.use('/api/public', publicRoutes);
+app.use('/api/v1/public', publicRoutes);
+
+// Route aliases for /api/properties and /api/admins to reuse super-admin routes
+const aliasProperties = (req, res, next) => {
+  req.url = '/properties' + (req.url === '/' ? '' : req.url);
+  superAdminRoutes(req, res, next);
+};
+const aliasAdmins = (req, res, next) => {
+  req.url = '/users' + (req.url === '/' ? '' : req.url);
+  superAdminRoutes(req, res, next);
+};
+
+app.use('/api/properties', aliasProperties);
+app.use('/api/v1/properties', aliasProperties);
+app.use('/api/admins', aliasAdmins);
+app.use('/api/v1/admins', aliasAdmins);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

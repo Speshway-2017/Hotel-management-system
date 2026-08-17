@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { SiteLayout } from "@/layouts/SiteLayout";
+import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { 
   Sparkles, Check, ArrowRight, CalendarDays, 
@@ -29,6 +31,42 @@ export const Route = createFileRoute("/about")({
 });
 
 function About() {
+  const [mediaMap, setMediaMap] = useState({});
+  const [aboutData, setAboutData] = useState({
+    title: "Built for the way Indian hospitality works.",
+    description: "We believe in technology that respects the hustle behind the desk. Hour Stay is engineered to simplify operations, remove dashboard clutter, and streamline guest management.",
+    story: "Hour Stay began with a simple observation: most hotel management software is too complicated. Properties were forced to juggle separate systems for front desk check-ins, guest billing, housekeeping lists, and OTA channel managers.\n\nWe set out to rebuild this stack from scratch. Hour Stay is a unified, cloud-based Hotel Management System that connects reservations, front desk check-in/out, GST billing, housekeeping tasks, guest mobile apps, and analytics in one cohesive platform.\n\nToday, properties across India use Hour Stay to run clean, efficient, and profitable operations without the operational noise of legacy tools.",
+    mission: "To empower Indian hoteliers with modern, reliable, and intuitive cloud technology to run smooth daily check-ins and check-outs.",
+    vision: "To be the preferred core PMS system across 5,000+ boutique, heritage, and independent hotels in South Asia.",
+    imageUrl: ""
+  });
+
+  useEffect(() => {
+    publicService.getAbout()
+      .then(res => {
+        if (res.success && res.data) {
+          const config = res.data;
+          setAboutData({
+            title: config.title || "Built for the way Indian hospitality works.",
+            description: config.excerpt || "We believe in technology that respects the hustle behind the desk. Hour Stay is engineered to simplify operations, remove dashboard clutter, and streamline guest management.",
+            story: config.author || "",
+            mission: config.tag || "To empower Indian hoteliers with modern, reliable, and intuitive cloud technology to run smooth daily check-ins and check-outs.",
+            vision: config.role || "To be the preferred core PMS system across 5,000+ boutique, heritage, and independent hotels in South Asia.",
+            imageUrl: config.content || ""
+          });
+        }
+      })
+      .catch(err => {});
+
+    publicService.getMedia()
+      .then(res => {
+        if (res.success && res.data) {
+          setMediaMap(res.data);
+        }
+      })
+      .catch(err => {});
+  }, []);
+
   return (
     <SiteLayout>
       {/* 1. Hero Section */}
@@ -43,17 +81,17 @@ function About() {
                 <Sparkles className="size-3 text-gold" /> Our Identity
               </span>
               <h1 className="font-display text-4xl leading-[1.1] font-bold text-cream sm:text-5xl lg:text-6xl">
-                Built for the way <span className="text-[#F5C06A]">Indian hospitality</span> works.
+                {aboutData.title}
               </h1>
-              <p className="text-base leading-relaxed text-cream/70 sm:text-lg font-ui">
-                We believe in technology that respects the hustle behind the desk. Hour Stay is engineered to simplify operations, remove dashboard clutter, and streamline guest management.
+              <p className="text-base leading-relaxed text-cream/70 sm:text-lg font-ui font-medium">
+                {aboutData.description}
               </p>
             </div>
             <div className="relative mx-auto w-full max-w-md lg:max-w-none">
               <div className="overflow-hidden rounded-2xl border border-cream/10 shadow-lift group">
                 <img 
-                  src={palaceImg} 
-                  alt="Udaipur palace heritage resort running Hour Stay" 
+                  src={aboutData.imageUrl || palaceImg} 
+                  alt="Hour Stay visual resort asset" 
                   className="w-full h-80 lg:h-96 object-cover transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
@@ -71,14 +109,30 @@ function About() {
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy">Our Story</h2>
             </div>
             <div className="lg:col-span-8 space-y-6 text-base text-muted-foreground font-ui leading-relaxed">
-              <p>
-                Hour Stay began with a simple observation: most hotel management software is too complicated. Properties were forced to juggle separate systems for front desk check-ins, guest billing, housekeeping lists, and OTA channel managers.
+              {aboutData.story.split("\n\n").map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.5. Mission & Vision Section */}
+      <section className="bg-cream/50 py-16 border-t border-navy/5">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="grid gap-8 md:grid-cols-2 text-left">
+            <div className="bg-white border rounded-2xl p-6 sm:p-8 shadow-soft">
+              <span className="text-xs font-bold uppercase tracking-widest text-purple">Purpose</span>
+              <h3 className="mt-2 font-display text-xl font-bold text-navy">Our Mission</h3>
+              <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed font-ui font-medium">
+                {aboutData.mission}
               </p>
-              <p>
-                We set out to rebuild this stack from scratch. Hour Stay is a unified, cloud-based Hotel Management System that connects **reservations, front desk check-in/out, GST billing, housekeeping tasks, guest mobile apps, and analytics** in one cohesive platform.
-              </p>
-              <p>
-                Today, properties across India use Hour Stay to run clean, efficient, and profitable operations without the operational noise of legacy tools.
+            </div>
+            <div className="bg-white border rounded-2xl p-6 sm:p-8 shadow-soft">
+              <span className="text-xs font-bold uppercase tracking-widest text-purple">Future</span>
+              <h3 className="mt-2 font-display text-xl font-bold text-navy">Our Vision</h3>
+              <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed font-ui font-medium">
+                {aboutData.vision}
               </p>
             </div>
           </div>
@@ -155,10 +209,10 @@ function About() {
 
           <div className="grid gap-8 md:grid-cols-4">
             {[
-              { label: "Hotels", desc: "City business hotels and luxury boutique properties.", img: jaipurImg },
-              { label: "Resorts", desc: "Sprawling coastal properties and hill retreats.", img: beachImg },
-              { label: "Boutique Havelis", desc: "Historic palaces requiring custom room architectures.", img: palaceImg },
-              { label: "Multi-Property Chains", desc: "Centrally managed portfolios and transit keys.", img: retreatImg }
+              { label: "Hotels", desc: "City business hotels and luxury boutique properties.", img: mediaMap.jaipur || jaipurImg },
+              { label: "Resorts", desc: "Sprawling coastal properties and hill retreats.", img: mediaMap.goa || beachImg },
+              { label: "Boutique Havelis", desc: "Historic palaces requiring custom room architectures.", img: mediaMap.palace || palaceImg },
+              { label: "Multi-Property Chains", desc: "Centrally managed portfolios and transit keys.", img: mediaMap.kerala || retreatImg }
             ].map((cat, idx) => (
               <div key={idx} className="group overflow-hidden rounded-xl border border-navy/5 bg-white shadow-soft transition-all duration-300 hover:-translate-y-1">
                 <div className="h-44 overflow-hidden relative">
