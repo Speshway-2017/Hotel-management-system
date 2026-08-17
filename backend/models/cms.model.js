@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data/cms.json');
 
 const cmsSchema = new mongoose.Schema({
-  type: { type: String, enum: ['blog', 'faq', 'about', 'feature', 'contact'], required: true },
+  type: { type: String, enum: ['blog', 'faq', 'about', 'feature', 'contact', 'home', 'branding', 'settings', 'media_assets'], required: true },
   title: { type: String },
   slug: { type: String },
   excerpt: { type: String },
@@ -25,7 +25,9 @@ const cmsSchema = new mongoose.Schema({
   name: { type: String },
   email: { type: String },
   subject: { type: String },
-  message: { type: String }
+  message: { type: String },
+  imageUrl: { type: String },
+  imagePublicId: { type: String }
 }, {
   timestamps: true
 });

@@ -5,9 +5,25 @@
     "email": "superadmin@hourstay.com",
     "password": "$2a$10$qDGHtVQImFFXUJ.pWsSxeODXdxfoAxmY0l14/VzkQITmBM.ULMfqi",
     "role": "super-admin",
-    "mobile": "9999999999",
+    "mobile": "+91 99999 99999",
+    "status": "Active",
+    "propertyId": null,
+    "lastLogin": "17 Aug 2026, 09:30 AM",
     "createdAt": "2026-08-13T07:30:58.800Z",
-    "updatedAt": "2026-08-13T07:30:58.802Z"
+    "updatedAt": "2026-08-17T09:30:00.000Z"
+  },
+  {
+    "id": "usr-sa-kiran",
+    "name": "Kiran Deshpande",
+    "email": "kiran.d@hourstay.com",
+    "password": "$2a$10$qDGHtVQImFFXUJ.pWsSxeODXdxfoAxmY0l14/VzkQITmBM.ULMfqi",
+    "role": "super-admin",
+    "mobile": "+91 98765 43210",
+    "status": "Active",
+    "propertyId": null,
+    "lastLogin": "17 Aug 2026, 10:05 AM",
+    "createdAt": "2026-08-14T05:20:00.000Z",
+    "updatedAt": "2026-08-17T10:05:00.000Z"
   },
   {
     "id": "adm-jai-rathore",
@@ -18,9 +34,9 @@
     "mobile": "+91 98290 11223",
     "propertyId": "HS-JAI",
     "status": "Active",
-    "lastLogin": "14 Aug 2026, 11:20 AM",
+    "lastLogin": "16 Aug 2026, 11:20 AM",
     "createdAt": "2026-08-13T07:31:00.935Z",
-    "updatedAt": "2026-08-13T07:31:00.936Z"
+    "updatedAt": "2026-08-16T11:20:00.000Z"
   },
   {
     "id": "adm-uda-nair",
@@ -31,9 +47,9 @@
     "mobile": "+91 97444 88321",
     "propertyId": "HS-UDA",
     "status": "Active",
-    "lastLogin": "14 Aug 2026, 10:15 AM",
+    "lastLogin": "15 Aug 2026, 02:15 PM",
     "createdAt": "2026-08-13T07:31:00.935Z",
-    "updatedAt": "2026-08-13T07:31:00.936Z"
+    "updatedAt": "2026-08-15T14:15:00.000Z"
   },
   {
     "id": "adm-goa-fernandes",
@@ -44,9 +60,9 @@
     "mobile": "+91 98221 44556",
     "propertyId": "HS-GOA",
     "status": "Active",
-    "lastLogin": "13 Aug 2026, 06:45 PM",
+    "lastLogin": "16 Aug 2026, 08:45 PM",
     "createdAt": "2026-08-13T07:31:00.935Z",
-    "updatedAt": "2026-08-13T07:31:00.936Z"
+    "updatedAt": "2026-08-16T20:45:00.000Z"
   },
   {
     "id": "adm-ker-pillai",
@@ -57,9 +73,9 @@
     "mobile": "+91 94470 55667",
     "propertyId": "HS-KER",
     "status": "Active",
-    "lastLogin": "14 Aug 2026, 08:30 AM",
+    "lastLogin": "17 Aug 2026, 08:30 AM",
     "createdAt": "2026-08-13T07:31:00.935Z",
-    "updatedAt": "2026-08-13T07:31:00.936Z"
+    "updatedAt": "2026-08-17T08:30:00.000Z"
   },
   {
     "id": "adm-del-kapoor",
@@ -69,10 +85,10 @@
     "role": "admin",
     "mobile": "+91 98110 22334",
     "propertyId": "HS-DEL",
-    "status": "Suspended",
+    "status": "Inactive",
     "lastLogin": "10 Aug 2026, 04:12 PM",
     "createdAt": "2026-08-13T07:31:00.935Z",
-    "updatedAt": "2026-08-13T07:31:00.936Z"
+    "updatedAt": "2026-08-10T16:12:00.000Z"
   },
   {
     "id": "adm-mum-shaikh",
@@ -83,38 +99,112 @@
     "mobile": "+91 99300 77889",
     "propertyId": "HS-MUM",
     "status": "Active",
-    "lastLogin": "14 Aug 2026, 12:05 PM",
+    "lastLogin": "17 Aug 2026, 09:15 AM",
     "createdAt": "2026-08-13T07:31:00.935Z",
-    "updatedAt": "2026-08-13T07:31:00.936Z"
+    "updatedAt": "2026-08-17T09:15:00.000Z"
   },
   {
     "id": "roetf6hsy6c4218o9trtx9",
-    "name": "Hotel Manager",
+    "name": "Rajesh Sharma",
     "email": "manager@hourstay.com",
     "password": "$2a$10$Xnyy.qjCAK7wC1HYODewieFEWUqDXIh3wzjOLqQBGplUa2VZ.fhq.",
     "role": "manager",
-    "mobile": "9777777777",
+    "mobile": "+91 97777 77777",
+    "propertyId": "HS-JAI",
+    "status": "Active",
+    "lastLogin": "16 Aug 2026, 06:10 PM",
     "createdAt": "2026-08-13T07:31:01.800Z",
-    "updatedAt": "2026-08-13T07:31:01.801Z"
+    "updatedAt": "2026-08-16T18:10:00.000Z"
+  },
+  {
+    "id": "usr-mgr-arjun",
+    "name": "Arjun Singhal",
+    "email": "arjun.s@hourstay.com",
+    "password": "$2a$10$Xnyy.qjCAK7wC1HYODewieFEWUqDXIh3wzjOLqQBGplUa2VZ.fhq.",
+    "role": "manager",
+    "mobile": "+91 98123 45678",
+    "propertyId": "HS-UDA",
+    "status": "Active",
+    "lastLogin": "16 Aug 2026, 03:22 PM",
+    "createdAt": "2026-08-14T09:15:00.000Z",
+    "updatedAt": "2026-08-16T15:22:00.000Z"
+  },
+  {
+    "id": "usr-mgr-priya",
+    "name": "Priya Patel",
+    "email": "priya.p@hourstay.com",
+    "password": "$2a$10$Xnyy.qjCAK7wC1HYODewieFEWUqDXIh3wzjOLqQBGplUa2VZ.fhq.",
+    "role": "manager",
+    "mobile": "+91 96123 78901",
+    "propertyId": "HS-MUM",
+    "status": "Active",
+    "lastLogin": "17 Aug 2026, 10:00 AM",
+    "createdAt": "2026-08-14T11:45:00.000Z",
+    "updatedAt": "2026-08-17T10:00:00.000Z"
   },
   {
     "id": "h2n3d51avckfi5u39l251",
-    "name": "Front Desk Receptionist",
+    "name": "Amit Verma",
     "email": "receptionist@hourstay.com",
     "password": "$2a$10$9EX92.8EfKvKFMB5mEF6CumUaSdOBbvTZRfQEMzFVW8xPs6AG79Ly",
     "role": "receptionist",
-    "mobile": "9666666666",
+    "mobile": "+91 96666 66666",
+    "propertyId": "HS-DEL",
+    "status": "Active",
+    "lastLogin": "16 Aug 2026, 08:00 AM",
     "createdAt": "2026-08-13T07:31:02.036Z",
-    "updatedAt": "2026-08-13T07:31:02.036Z"
+    "updatedAt": "2026-08-16T08:00:00.000Z"
+  },
+  {
+    "id": "usr-rcp-sunita",
+    "name": "Sunita Rao",
+    "email": "sunita.r@hourstay.com",
+    "password": "$2a$10$9EX92.8EfKvKFMB5mEF6CumUaSdOBbvTZRfQEMzFVW8xPs6AG79Ly",
+    "role": "receptionist",
+    "mobile": "+91 98888 77777",
+    "propertyId": "HS-GOA",
+    "status": "Active",
+    "lastLogin": "15 Aug 2026, 09:00 PM",
+    "createdAt": "2026-08-14T14:30:00.000Z",
+    "updatedAt": "2026-08-15T21:00:00.000Z"
   },
   {
     "id": "l7hsx8g82ujcid9fwappcg",
-    "name": "Regular Guest",
+    "name": "Rohan Deshmukh",
     "email": "guest@hourstay.com",
     "password": "$2a$10$G6wXLQtzsp0VNUAwKypZMuJxxw7dR1ME05dyz18gTYX887VFG.5wK",
     "role": "guest",
-    "mobile": "9555555555",
+    "mobile": "+91 95555 55555",
+    "propertyId": "HS-MUM",
+    "status": "Active",
+    "lastLogin": "14 Aug 2026, 12:00 PM",
     "createdAt": "2026-08-13T07:31:02.347Z",
-    "updatedAt": "2026-08-13T07:31:02.347Z"
+    "updatedAt": "2026-08-14T12:00:00.000Z"
+  },
+  {
+    "id": "usr-gst-divya",
+    "name": "Divya Iyer",
+    "email": "divya.i@hourstay.com",
+    "password": "$2a$10$G6wXLQtzsp0VNUAwKypZMuJxxw7dR1ME05dyz18gTYX887VFG.5wK",
+    "role": "guest",
+    "mobile": "+91 94444 33333",
+    "propertyId": "HS-KER",
+    "status": "Active",
+    "lastLogin": "13 Aug 2026, 04:30 PM",
+    "createdAt": "2026-08-15T10:00:00.000Z",
+    "updatedAt": "2026-08-13T16:30:00.000Z"
+  },
+  {
+    "id": "usr-gst-karan",
+    "name": "Karan Johar",
+    "email": "karan.j@hourstay.com",
+    "password": "$2a$10$G6wXLQtzsp0VNUAwKypZMuJxxw7dR1ME05dyz18gTYX887VFG.5wK",
+    "role": "guest",
+    "mobile": "+91 93333 22222",
+    "propertyId": "HS-DEL",
+    "status": "Inactive",
+    "lastLogin": "08 Aug 2026, 11:15 AM",
+    "createdAt": "2026-08-15T11:00:00.000Z",
+    "updatedAt": "2026-08-08T11:15:00.000Z"
   }
 ]

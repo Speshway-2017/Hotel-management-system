@@ -1,6 +1,19 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+:root {
+  --text-primary: #172033;
+  --text-secondary: #344054;
+  --text-body: #475467;
+  --text-muted: #667085;
+  --text-link: #2563EB;
+  --text-link-hover: #1D4ED8;
+  --text-success: #15803D;
+  --text-warning: #B45309;
+  --text-danger: #DC2626;
+  --text-placeholder: #98A2B3;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -20,11 +33,22 @@
   --color-error: #C62828;
   --color-info: #1565C0;
 
-  --shadow-soft: 0 2px 8px #FEF9F1, 0 8px 24px #FEF9F1;
-  --shadow-lift: 0 4px 16px #FEF9F1, 0 16px 48px #FEF9F1;
+  --shadow-soft: 0 1px 2px rgba(13, 27, 42, 0.06), 0 8px 24px rgba(13, 27, 42, 0.06);
+  --shadow-lift: 0 2px 6px rgba(13, 27, 42, 0.08), 0 18px 42px rgba(13, 27, 42, 0.12);
 
   --animate-fade-up: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 0.4s ease both;
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-body: var(--text-body);
+  --color-text-muted: var(--text-muted);
+  --color-text-link: var(--text-link);
+  --color-text-link-hover: var(--text-link-hover);
+  --color-text-success: var(--text-success);
+  --color-text-warning: var(--text-warning);
+  --color-text-danger: var(--text-danger);
+  --color-text-placeholder: var(--text-placeholder);
 }
 
 @keyframes fade-up {
@@ -106,7 +130,7 @@
 
 :root {
   --radius: 0.5rem;
-  --background: #FFFFFF;
+  --background: #FFF7E6;
   --foreground: #0D1B2A;
   --card: #E7E9EE;
   --card-foreground: #0D1B2A;
@@ -122,7 +146,7 @@
   --accent-foreground: #0D1B2A;
   --destructive: #FF6B8B;
   --destructive-foreground: #FFF7E6;
-  --border: #FFFFFF;
+  --border: #E7E9EE;
   --input: #E7E9EE;
   --ring: #5B21B6;
   --chart-1: #0D1B2A;
@@ -597,41 +621,63 @@ td {
   color: var(--foreground) !important;
 }
 
-/* Force light mode body background to pure white */
-body {
+/* Force light mode body background to pure white in dashboard */
+.dashboard-theme {
   background-color: #FFFFFF !important;
 }
 
-.dark body {
+.dark .dashboard-theme, .dashboard-theme.dark {
   background-color: #0D1B2A !important;
 }
 
-/* White cards, panels, and content containers */
-main .bg-white,
-main section,
-main .card-guest,
-main .Panel,
-.PremiumStatCard,
-.bg-white.rounded-xl,
-.bg-white.rounded-2xl,
-.bg-cream,
-.bg-cream\/40,
-.bg-cream\/20,
-.card-guest,
-tbody tr,
-.bg-white.rounded-b-xl,
-form.bg-white {
+/* White cards, panels, and content containers in dashboard */
+.dashboard-theme main .bg-white,
+.dashboard-theme main section,
+.dashboard-theme main .card-guest,
+.dashboard-theme main .Panel,
+.dashboard-theme .PremiumStatCard,
+.dashboard-theme .bg-white.rounded-xl,
+.dashboard-theme .bg-white.rounded-2xl,
+.dashboard-theme .bg-cream,
+.dashboard-theme .bg-cream\/40,
+.dashboard-theme .bg-cream\/20,
+.dashboard-theme .card-guest,
+.dashboard-theme tbody tr,
+.dashboard-theme .bg-white.rounded-b-xl,
+.dashboard-theme form.bg-white {
   background-color: #FFFFFF !important;
 }
 
-/* Set border colors of all cards and panels to pure white */
-.border,
-.border-muted {
+.dark .dashboard-theme main .bg-white,
+.dark .dashboard-theme main section,
+.dark .dashboard-theme main .card-guest,
+.dark .dashboard-theme main .Panel,
+.dark .dashboard-theme .PremiumStatCard,
+.dark .dashboard-theme .bg-white.rounded-xl,
+.dark .dashboard-theme .bg-white.rounded-2xl,
+.dark .dashboard-theme .card-guest,
+.dark .dashboard-theme tbody tr,
+.dark .dashboard-theme .bg-white.rounded-b-xl,
+.dark .dashboard-theme form.bg-white {
+  background-color: #152538 !important;
+}
+
+.bg-card {
+  background-color: #ffffff !important;
+}
+
+.dark .bg-card {
+  background-color: #152538 !important;
+}
+
+/* Set border colors of all cards and panels to pure white in dashboard */
+.dashboard-theme .border,
+.dashboard-theme .border-muted {
   border-color: #FFFFFF !important;
 }
 
-.dark .border,
-.dark .border-muted {
+.dark .dashboard-theme .border,
+.dark .dashboard-theme .border-muted {
   border-color: rgba(231, 233, 238, 0.15) !important;
 }
 
@@ -652,38 +698,220 @@ form.bg-white {
 }
 
 /* Custom dynamic left border for KPI Cards */
-.PremiumStatCard {
-  border-left-width: 3px !important;
+.dashboard-theme .border.PremiumStatCard,
+.dashboard-theme .border-muted.PremiumStatCard,
+.dashboard-theme .PremiumStatCard {
+  border-left-width: 4px !important;
   border-left-style: solid !important;
   border-left-color: var(--accent-color, #0d1b2a) !important;
 }
 
-/* Card shadow overrides using #FEF9F1 for glowing soft warm shadows */
-.shadow-soft,
-.PremiumStatCard,
-.Panel,
-.card-guest,
-.bg-card,
-[class*="shadow-soft"] {
+/* Card shadow overrides using #FEF9F1 for glowing soft warm shadows in dashboard */
+.dashboard-theme .shadow-soft,
+.dashboard-theme .PremiumStatCard,
+.dashboard-theme .Panel,
+.dashboard-theme .card-guest,
+.dashboard-theme .bg-card,
+.dashboard-theme [class*="shadow-soft"] {
   box-shadow: 0 4px 6px -1px rgba(13, 27, 42, 0.02), 0 10px 20px -5px #FEF9F1, 0 10px 25px -5px rgba(212, 192, 160, 0.25) !important;
 }
 
-.shadow-lift:hover,
-[class*="shadow-lift"]:hover {
+.dashboard-theme .shadow-lift:hover,
+.dashboard-theme [class*="shadow-lift"]:hover {
   box-shadow: 0 10px 15px -3px rgba(13, 27, 42, 0.03), 0 20px 30px -10px #FEF9F1, 0 20px 40px -10px rgba(212, 192, 160, 0.35) !important;
   transform: translateY(-4px) !important;
 }
 
-.dark .shadow-soft,
-.dark .PremiumStatCard,
-.dark .Panel,
-.dark .card-guest,
-.dark .bg-card,
-.dark [class*="shadow-soft"] {
+.dark .dashboard-theme .shadow-soft,
+.dark .dashboard-theme .PremiumStatCard,
+.dark .dashboard-theme .Panel,
+.dark .dashboard-theme .card-guest,
+.dark .dashboard-theme .bg-card,
+.dark .dashboard-theme [class*="shadow-soft"] {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15), 0 10px 25px -5px rgba(0, 0, 0, 0.25) !important;
 }
 
-.dark .shadow-lift:hover,
-.dark [class*="shadow-lift"]:hover {
+.dark .dashboard-theme .shadow-lift:hover,
+.dark .dashboard-theme [class*="shadow-lift"]:hover {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25), 0 20px 30px -10px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* 
+ * ==========================================
+ * GLOBAL SUPER ADMIN DASHBOARD TEXT COLOR OVERRIDES
+ * ==========================================
+ */
+.dashboard-theme main,
+.dashboard-theme header,
+.dashboard-theme [role="dialog"],
+.dashboard-theme .fixed,
+.dashboard-theme .absolute {
+  /* Page Titles / Primary Headings */
+  h1, 
+  .font-display.text-sm.font-bold.text-navy,
+  .text-navy, 
+  .text-navy-deep {
+    color: var(--text-primary) !important;
+  }
+
+  /* Secondary Headings / Section Titles / Card Titles */
+  h2, 
+  h3, 
+  h4, 
+  .text-secondary-token {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Body Text / Excerpts / Descriptions */
+  p, 
+  .text-muted-foreground, 
+  .text-body-token {
+    color: var(--text-body) !important;
+  }
+
+  /* Labels */
+  label, 
+  .text-xs.text-navy.font-semibold {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Secondary / Muted Text */
+  .text-muted, 
+  [class*="text-[10px]"].text-muted-foreground, 
+  .text-xs.text-muted-foreground,
+  span.text-muted-foreground, 
+  .font-mono.text-xs.text-muted-foreground {
+    color: var(--text-muted) !important;
+  }
+
+  /* Clickable Links & Hover States */
+  a:not([class*="bg-"]):not([class*="text-gold"]):not([class*="text-white"]),
+  button.text-purple,
+  .text-purple.hover\:underline,
+  .text-link-token {
+    color: var(--text-link) !important;
+    transition: color 150ms ease-in-out;
+  }
+  
+  a:not([class*="bg-"]):not([class*="text-gold"]):not([class*="text-white"]):hover,
+  button.text-purple:hover,
+  .text-purple.hover\:underline:hover,
+  .text-link-token:hover {
+    color: var(--text-link-hover) !important;
+  }
+
+  /* Success Tone text & subtle bg */
+  .text-success,
+  .bg-success\/12.text-success {
+    color: var(--text-success) !important;
+  }
+  .bg-success\/12 {
+    background-color: rgba(21, 128, 61, 0.12) !important;
+    border-color: rgba(21, 128, 61, 0.3) !important;
+  }
+
+  /* Warning / Pending Tone text & subtle bg */
+  .text-warning,
+  .bg-warning\/12.text-warning {
+    color: var(--text-warning) !important;
+  }
+  .bg-warning\/12 {
+    background-color: rgba(180, 83, 9, 0.12) !important;
+    border-color: rgba(180, 83, 9, 0.3) !important;
+  }
+
+  /* Error / Delete Tone text & subtle bg */
+  .text-error,
+  .text-red-600,
+  .bg-error\/12.text-error {
+    color: var(--text-danger) !important;
+  }
+  .bg-error\/12 {
+    background-color: rgba(220, 38, 38, 0.12) !important;
+    border-color: rgba(220, 38, 38, 0.3) !important;
+  }
+
+  /* Dashboard Tables */
+  table th {
+    color: var(--text-secondary) !important;
+    font-weight: 600 !important;
+  }
+  table td {
+    color: var(--text-body) !important;
+  }
+  table td.font-semibold.text-navy, 
+  table td .text-navy.font-semibold {
+    color: var(--text-primary) !important;
+  }
+  table td .text-muted-foreground {
+    color: var(--text-body) !important;
+  }
+  table td .font-mono {
+    color: var(--text-muted) !important;
+  }
+  table td button {
+    color: var(--text-link) !important;
+  }
+  table td button:hover {
+    color: var(--text-link-hover) !important;
+  }
+  table td button.text-error,
+  table td button[title*="Delete"],
+  table td button[title*="Remove"] {
+    color: var(--text-danger) !important;
+  }
+
+  /* Forms & Input fields */
+  input, 
+  select, 
+  textarea {
+    color: var(--text-primary) !important;
+  }
+  input::placeholder, 
+  select::placeholder, 
+  textarea::placeholder {
+    color: var(--text-placeholder) !important;
+  }
+  .text-xs.text-muted-foreground {
+    color: var(--text-muted) !important;
+  }
+}
+
+/* 
+ * ==========================================
+ * SUPER SA SIDEBAR COLOR SCHEME PRESERVATION RESETS
+ * ==========================================
+ */
+.dashboard-theme aside,
+.dashboard-theme aside *,
+.dashboard-theme [class*="lg:hidden"] .fixed,
+.dashboard-theme [class*="lg:hidden"] .fixed * {
+  color: var(--sidebar-foreground);
+}
+
+.dashboard-theme aside a,
+.dashboard-theme [class*="lg:hidden"] .fixed a {
+  color: rgba(255, 247, 230, 0.75) !important;
+  background-color: transparent !important;
+}
+
+.dashboard-theme aside a:hover,
+.dashboard-theme [class*="lg:hidden"] .fixed a:hover {
+  color: #FFF7E6 !important;
+}
+
+.dashboard-theme aside a[class*="text-gold"],
+.dashboard-theme aside a[class*="text-gold"] *,
+.dashboard-theme aside a[class*="font-bold"],
+.dashboard-theme [class*="lg:hidden"] .fixed a[class*="text-gold"],
+.dashboard-theme [class*="lg:hidden"] .fixed a[class*="text-gold"] *,
+.dashboard-theme [class*="lg:hidden"] .fixed a[class*="font-bold"],
+.dashboard-theme aside span[class*="text-[#F5C06A]"],
+.dashboard-theme [class*="lg:hidden"] .fixed span[class*="text-[#F5C06A]"] {
+  color: #F5C06A !important;
+}
+
+.dashboard-theme aside p,
+.dashboard-theme [class*="lg:hidden"] .fixed p {
+  color: rgba(255, 247, 230, 0.4) !important;
 }

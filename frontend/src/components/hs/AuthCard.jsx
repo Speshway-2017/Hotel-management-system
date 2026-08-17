@@ -125,7 +125,7 @@ export function AuthCard({
 
         {/* Centered Logo (Icon Only) */}
         <div className="flex justify-center mt-3 mb-2">
-          <Logo compact={true} className="justify-center mx-auto" />
+          <Logo compact={true} className="justify-center mx-auto" removeBg={true} />
         </div>
 
         <h1 className="mt-4 font-display text-[26px] font-black text-navy text-center leading-tight">{title}</h1>

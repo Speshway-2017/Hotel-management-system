@@ -41,7 +41,8 @@ router.post('/register', async (req, res) => {
           name: user.name,
           email: user.email,
           role: user.role,
-          mobile: user.mobile
+          mobile: user.mobile,
+          propertyId: user.propertyId || null
         }
       }, 'User registered successfully');
     } else {
@@ -70,6 +71,10 @@ router.post('/login', async (req, res) => {
       return sendError(res, 401, 'Invalid email or password');
     }
 
+    if (user.status !== 'Active') {
+      return sendError(res, 403, 'Your account is suspended. Please contact administrator.');
+    }
+
     return sendSuccess(res, 200, {
       token: generateToken(user._id),
       user: {
@@ -77,7 +82,9 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        mobile: user.mobile
+        mobile: user.mobile,
+        status: user.status,
+        propertyId: user.propertyId || null
       }
     }, 'Logged in successfully');
   } catch (error) {
@@ -182,6 +189,20 @@ router.get('/profile', protect, async (req, res) => {
 // @access  Public
 router.post('/logout', (req, res) => {
   return sendSuccess(res, 200, {}, 'Logged out successfully');
+});
+
+import CMS from '../models/cms.model.js';
+
+// @desc    Get public CMS settings and branding
+// @route   GET /api/auth/cms
+// @access  Public
+router.get('/cms', async (req, res) => {
+  try {
+    const cmsItems = await CMS.find({});
+    return sendSuccess(res, 200, cmsItems, 'Public CMS items retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to fetch public CMS');
+  }
 });
 
 export default router;

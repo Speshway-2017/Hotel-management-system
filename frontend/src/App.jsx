@@ -32,14 +32,16 @@ import { Route as AdminChannels } from "./roles/admin/pages/Channels";
 import { Route as AdminFrontDesk } from "./roles/admin/pages/FrontDesk";
 import { Route as AdminGuests } from "./roles/admin/pages/Guests";
 import { Route as AdminNotifications } from "./roles/admin/pages/Notifications";
+import { Route as AdminNotificationDetails } from "./roles/admin/pages/NotificationDetails";
 import { Route as AdminPayments } from "./roles/admin/pages/Payments";
-import { Route as AdminRates } from "./roles/admin/pages/Rates";
 import { Route as AdminReports } from "./roles/admin/pages/Reports";
 import { Route as AdminReservations } from "./roles/admin/pages/Reservations";
 import { Route as AdminRooms } from "./roles/admin/pages/Rooms";
 import { Route as AdminSettings } from "./roles/admin/pages/Settings";
 import { Route as AdminStaff } from "./roles/admin/pages/Staff";
 import { Route as AdminTaxes } from "./roles/admin/pages/Taxes";
+import { Route as AdminCrm } from "./roles/admin/pages/Crm";
+import { Route as AdminProfile } from "./roles/admin/pages/Profile";
 
 // Import Manager Workspace Pages
 import { Route as ManagerLayout } from "./roles/manager/pages/ManagerLayout";
@@ -227,14 +229,16 @@ export default function App() {
             <Route path="/admin/front-desk" element={<RouteWrapper routeObj={AdminFrontDesk} />} />
             <Route path="/admin/guests" element={<RouteWrapper routeObj={AdminGuests} />} />
             <Route path="/admin/notifications" element={<RouteWrapper routeObj={AdminNotifications} />} />
+            <Route path="/admin/notifications/:id" element={<RouteWrapper routeObj={AdminNotificationDetails} />} />
             <Route path="/admin/payments" element={<RouteWrapper routeObj={AdminPayments} />} />
-            <Route path="/admin/rates" element={<RouteWrapper routeObj={AdminRates} />} />
             <Route path="/admin/reports" element={<RouteWrapper routeObj={AdminReports} />} />
             <Route path="/admin/reservations" element={<RouteWrapper routeObj={AdminReservations} />} />
             <Route path="/admin/rooms" element={<RouteWrapper routeObj={AdminRooms} />} />
             <Route path="/admin/settings" element={<RouteWrapper routeObj={AdminSettings} />} />
             <Route path="/admin/staff" element={<RouteWrapper routeObj={AdminStaff} />} />
             <Route path="/admin/taxes" element={<RouteWrapper routeObj={AdminTaxes} />} />
+            <Route path="/admin/crm" element={<RouteWrapper routeObj={AdminCrm} />} />
+            <Route path="/admin/profile" element={<RouteWrapper routeObj={AdminProfile} />} />
           </Route>
 
           {/* Manager Workspace */}

@@ -1,28 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, HorizontalRouteTabs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, Shield, X, Trash2, ShieldCheck, Key, Lock, UserPlus, Building2, UserCog } from "lucide-react";
-
-const platformTabs = [
-  { label: "Properties Portfolio", to: "/super-admin/properties", icon: Building2 },
-  { label: "Users & Staff Directory", to: "/super-admin/users", icon: ShieldCheck },
-  { label: "Property Admins", to: "/super-admin/admins", icon: UserCog }
-];
+import { Plus, Search, Edit2, Shield, X, Trash2, ShieldCheck, Key, Lock, UserPlus, Building2, UserCog, Eye, UserCheck, UserX } from "lucide-react";
 
 function SuperAdminUsers() {
   const [users, setUsers] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
+  const [propertyFilter, setPropertyFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // Modal States
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState("add"); // 'add' | 'edit' | 'delete'
+  const [modalType, setModalType] = useState("add"); // 'add' | 'edit' | 'view' | 'delete'
   const [selectedUser, setSelectedUser] = useState(null);
 
   // Form Fields
@@ -32,25 +31,32 @@ function SuperAdminUsers() {
     password: "",
     role: "manager",
     mobile: "",
-    status: "Active"
+    status: "Active",
+    propertyId: ""
   });
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const res = await superAdminService.getUsers();
-      if (res.success) {
-        setUsers(res.data);
+      const [usersRes, propertiesRes] = await Promise.all([
+        superAdminService.getUsers(),
+        superAdminService.getProperties()
+      ]);
+      if (usersRes.success) {
+        setUsers(usersRes.data);
+      }
+      if (propertiesRes.success) {
+        setProperties(propertiesRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load users list");
+      setError(err.message || "Failed to load directory data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, []);
 
   const openAddModal = () => {
@@ -60,7 +66,8 @@ function SuperAdminUsers() {
       password: "",
       role: "manager",
       mobile: "",
-      status: "Active"
+      status: "Active",
+      propertyId: ""
     });
     setModalType("add");
     setModalOpen(true);
@@ -71,12 +78,28 @@ function SuperAdminUsers() {
     setFormData({
       name: user.name,
       email: user.email,
-      password: "", // hide password field or leave blank
+      password: "",
       role: user.role,
       mobile: user.mobile || "",
-      status: user.status || "Active"
+      status: user.status || "Active",
+      propertyId: user.propertyId || ""
     });
     setModalType("edit");
+    setModalOpen(true);
+  };
+
+  const openViewModal = (user) => {
+    setSelectedUser(user);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      mobile: user.mobile || "",
+      status: user.status || "Active",
+      propertyId: user.propertyId || ""
+    });
+    setModalType("view");
     setModalOpen(true);
   };
 
@@ -93,14 +116,14 @@ function SuperAdminUsers() {
         const res = await superAdminService.createUser(formData);
         if (res.success) {
           setModalOpen(false);
-          loadUsers();
+          loadData();
         }
       } else if (modalType === "edit") {
-        const { name, role, mobile, status } = formData;
-        const res = await superAdminService.updateUser(selectedUser.id || selectedUser._id, { name, role, mobile, status });
+        const { name, role, mobile, status, propertyId } = formData;
+        const res = await superAdminService.updateUser(selectedUser.id || selectedUser._id, { name, role, mobile, status, propertyId });
         if (res.success) {
           setModalOpen(false);
-          loadUsers();
+          loadData();
         }
       }
     } catch (err) {
@@ -113,11 +136,45 @@ function SuperAdminUsers() {
       const res = await superAdminService.deleteUser(selectedUser.id || selectedUser._id);
       if (res.success) {
         setModalOpen(false);
-        loadUsers();
+        loadData();
       }
     } catch (err) {
       setError(err.message || "Failed to delete user");
     }
+  };
+
+  const handleToggleStatus = async (user) => {
+    const newStatus = user.status === "Active" ? "Inactive" : "Active";
+    try {
+      const res = await superAdminService.updateUser(user.id || user._id, {
+        name: user.name,
+        role: user.role,
+        mobile: user.mobile,
+        status: newStatus,
+        propertyId: user.propertyId
+      });
+      if (res.success) {
+        loadData();
+      }
+    } catch (err) {
+      setError(err.message || "Failed to update user status");
+    }
+  };
+
+  const handleRoleChange = (e) => {
+    const role = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      role,
+      propertyId: role === "super-admin" ? "" : prev.propertyId
+    }));
+  };
+
+  // Helper to map property ID to Property Name
+  const getPropertyName = (propertyId) => {
+    if (!propertyId || propertyId === "Global" || propertyId === "All") return "Global / All Properties";
+    const prop = properties.find(p => p.id === propertyId || p._id === propertyId);
+    return prop ? prop.name : "Global / All Properties";
   };
 
   // Filtered Users
@@ -128,17 +185,16 @@ function SuperAdminUsers() {
       (u.mobile && u.mobile.includes(searchQuery));
     
     const matchesRole = roleFilter === "All" || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
 
-  // RBAC Permission Grid Details
-  const rbacRoles = [
-    { name: "super-admin", desc: "Full operational access across all hotel properties, global settings, portfolio management, CMS control, and system audits.", permissions: ["View", "Create", "Edit", "Delete", "Approve"] },
-    { name: "admin", desc: "Full administrative access restricted to their assigned property only. Oversees staff management and financial reporting.", permissions: ["View", "Create", "Edit", "Delete", "Approve"] },
-    { name: "manager", desc: "Daily operation manager for front desk, housekeeping status, customer requests, and generating invoices.", permissions: ["View", "Create", "Edit", "Approve"] },
-    { name: "receptionist", desc: "Front desk reception duties. Perform check-ins, room assignments, view availability, and collect payments.", permissions: ["View", "Create"] },
-    { name: "guest", desc: "Read-only access. View room bookings, request services, and download digital invoices.", permissions: ["View"] }
-  ];
+    const matchesProperty =
+      propertyFilter === "All" ||
+      (propertyFilter === "Global" && (!u.propertyId || u.propertyId === "Global" || u.propertyId === "")) ||
+      u.propertyId === propertyFilter;
+
+    const matchesStatus = statusFilter === "All" || (u.status || "Active") === statusFilter;
+
+    return matchesSearch && matchesRole && matchesProperty && matchesStatus;
+  });
 
   return (
     <div className="space-y-6">
@@ -147,150 +203,173 @@ function SuperAdminUsers() {
         subtitle="Manage user credentials, assign functional roles, and audit RBAC permissions across the group."
         actions={
           <Button onClick={openAddModal} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5">
-            <UserPlus className="size-4 mr-2" /> Add Staff Member
+            <UserPlus className="size-4 mr-2" /> Add User Account
           </Button>
         }
       />
 
-      <HorizontalRouteTabs tabs={platformTabs} />
-
       {error && <Notice tone="error" title="Governance Error" className="text-left">{error}</Notice>}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column - Users list */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card border rounded-xl p-4 shadow-soft">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search name, email, phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 rounded-full border-muted text-xs"
-              />
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto">
-              {["All", "super-admin", "admin", "manager", "receptionist", "guest"].map((role) => (
-                <button
-                  key={role}
-                  onClick={() => setRoleFilter(role)}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all ${
-                    roleFilter === role
-                      ? "bg-purple text-white shadow-soft"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  {role === "All" ? "All Roles" : role}
-                </button>
-              ))}
-            </div>
+      <div className="space-y-4">
+        {/* Toolbar Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-card border rounded-xl p-4 shadow-soft">
+          {/* Search User */}
+          <div className="relative w-full col-span-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search user..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 rounded-full border-muted text-xs bg-white"
+            />
+          </div>
+          
+          {/* Role Filter */}
+          <div>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
+            >
+              <option value="All">All Roles</option>
+              <option value="super-admin">Super Admin</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="receptionist">Receptionist</option>
+              <option value="guest">Guest</option>
+            </select>
           </div>
 
-          <Panel title="User Directory" description={`${filteredUsers.length} staff and guests found`}>
-            {loading ? (
-              <LoadingRows rows={5} />
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">No users found matching filters.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4">Staff Member</th>
-                      <th className="p-4">Role</th>
-                      <th className="p-4">Contact Phone</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredUsers.map((u) => (
-                      <tr key={u.id || u._id} className="hover:bg-muted/20 transition-colors">
-                        <td className="p-4">
-                          <div>
-                            <p className="font-semibold text-navy text-sm">{u.name}</p>
-                            <p className="text-muted-foreground text-xs">{u.email}</p>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <Tag tone={u.role === "super-admin" ? "brand" : "neutral"}>{u.role}</Tag>
-                        </td>
-                        <td className="p-4 font-mono text-xs">{u.mobile || "—"}</td>
-                        <td className="p-4">
-                          <Tag tone={statusTone(u.status || "Active")}>{u.status || "Active"}</Tag>
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex gap-1.5 justify-end">
-                            <button
-                              onClick={() => openEditModal(u)}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
-                              title="Edit User"
-                            >
-                              <Edit2 className="size-3.5" />
-                            </button>
-                            {u.role !== "super-admin" && (
-                              <button
-                                onClick={() => openDeleteModal(u)}
-                                className="p-1.5 rounded-full hover:bg-error/15 text-error"
-                                title="Delete User"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Panel>
+          {/* Property Filter */}
+          <div>
+            <select
+              value={propertyFilter}
+              onChange={(e) => setPropertyFilter(e.target.value)}
+              className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
+            >
+              <option value="All">All Properties</option>
+              <option value="Global">Global / All Properties</option>
+              {properties.map((p) => (
+                <option key={p.id || p._id} value={p.id || p._id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
         </div>
 
-        {/* Right Column - Roles RBAC Detail */}
-        <div className="space-y-4">
-          <Panel title="RBAC Policy Reference" description="Standard system-wide permissions by role.">
-            <div className="p-4 space-y-4">
-              {rbacRoles.map((r) => (
-                <div key={r.name} className="border-b last:border-0 pb-3 last:pb-0 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <strong className="text-xs uppercase tracking-wider text-navy font-bold">{r.name}</strong>
-                    <div className="flex gap-1">
-                      {["View", "Create", "Edit", "Delete", "Approve"].map((p) => {
-                        const hasPerm = r.permissions.includes(p);
-                        return (
-                          <span
-                            key={p}
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
-                              hasPerm ? "bg-success/15 text-success font-semibold" : "bg-muted text-muted-foreground/30 line-through"
-                            }`}
+        <Panel title="User Directory" description={`${filteredUsers.length} users and guests found`}>
+          {loading ? (
+            <LoadingRows rows={5} />
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">No users found matching filters.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
+                    <th className="p-4">User Name</th>
+                    <th className="p-4">Email</th>
+                    <th className="p-4">Phone</th>
+                    <th className="p-4">Role</th>
+                    <th className="p-4">Assigned Property</th>
+                    <th className="p-4">Last Login</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredUsers.map((u) => (
+                    <tr key={u.id || u._id} className="hover:bg-muted/20 transition-colors">
+                      <td className="p-4 font-semibold text-navy text-sm">{u.name}</td>
+                      <td className="p-4 text-muted-foreground text-xs">{u.email}</td>
+                      <td className="p-4 font-mono text-xs">{u.mobile || "—"}</td>
+                      <td className="p-4">
+                        <Tag tone={u.role === "super-admin" ? "brand" : u.role === "admin" ? "success" : "neutral"}>{u.role}</Tag>
+                      </td>
+                      <td className="p-4 text-xs font-semibold text-navy">{getPropertyName(u.propertyId)}</td>
+                      <td className="p-4 text-xs text-muted-foreground">{u.lastLogin || "—"}</td>
+                      <td className="p-4">
+                        <Tag tone={statusTone(u.status || "Active")}>{u.status || "Active"}</Tag>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex gap-1.5 justify-end">
+                          <button
+                            onClick={() => openViewModal(u)}
+                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
+                            title="View Details"
                           >
-                            {p.substring(0, 3)}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{r.desc}</p>
-                </div>
-              ))}
+                            <Eye className="size-3.5" />
+                          </button>
+                          <button
+                            onClick={() => openEditModal(u)}
+                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
+                            title="Edit User"
+                          >
+                            <Edit2 className="size-3.5" />
+                          </button>
+                          {u.role !== "super-admin" ? (
+                            <button
+                              onClick={() => handleToggleStatus(u)}
+                              className={`p-1.5 rounded-full cursor-pointer ${
+                                (u.status || "Active") === "Active" ? "hover:bg-error/15 text-error" : "hover:bg-success/15 text-success"
+                              }`}
+                              title={(u.status || "Active") === "Active" ? "Deactivate Account" : "Activate Account"}
+                            >
+                              {(u.status || "Active") === "Active" ? (
+                                <UserX className="size-3.5" />
+                              ) : (
+                                <UserCheck className="size-3.5" />
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="p-1.5 rounded-full text-muted-foreground/20 cursor-not-allowed"
+                              title="Super Admin status cannot be changed"
+                            >
+                              <UserX className="size-3.5" />
+                            </button>
+                          )}
+                          {u.role !== "super-admin" ? (
+                            <button
+                              onClick={() => openDeleteModal(u)}
+                              className="p-1.5 rounded-full hover:bg-error/15 text-error cursor-pointer"
+                              title="Delete User"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="p-1.5 rounded-full text-muted-foreground/20 cursor-not-allowed"
+                              title="Super Admin cannot be deleted"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </Panel>
-
-          <div className="rounded-xl border border-gold/25 bg-[#FFFDF7] p-5 space-y-3">
-            <div className="flex gap-3 items-start">
-              <ShieldCheck className="size-5 text-gold shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-display font-semibold text-sm text-navy">Security Policy Compliance</h4>
-                <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-                  Hour Stay implements strict role-based access. Staff actions are permanently logged in the secure global audit trail under the Governance dashboard.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+          )}
+        </Panel>
       </div>
 
       {/* Modals */}
@@ -299,8 +378,9 @@ function SuperAdminUsers() {
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(13,27,42,0.35)] relative border border-navy/5">
             <div className="flex items-center justify-between pb-4 border-b border-muted">
               <h3 className="font-display font-bold text-lg text-navy">
-                {modalType === "add" && "Create New Staff Account"}
+                {modalType === "add" && "Create New User Account"}
                 {modalType === "edit" && "Modify User Credentials"}
+                {modalType === "view" && "User Account Details"}
                 {modalType === "delete" && "Remove User Confirmation"}
               </h3>
               <button
@@ -327,6 +407,50 @@ function SuperAdminUsers() {
                   </Button>
                 </div>
               </div>
+            ) : modalType === "view" ? (
+              <div className="py-4 space-y-4 text-left">
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-navy font-semibold">Full Name</Label>
+                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{formData.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-navy font-semibold">Email Address</Label>
+                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{formData.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-navy font-semibold">Mobile Number</Label>
+                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{formData.mobile || "—"}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-navy font-semibold">System Role</Label>
+                      <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1 uppercase tracking-wider font-mono">{formData.role}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-navy font-semibold">Account Status</Label>
+                      <div className="mt-1">
+                        <Tag tone={statusTone(formData.status)}>{formData.status}</Tag>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-navy font-semibold">Assigned Property</Label>
+                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{getPropertyName(formData.propertyId)}</p>
+                  </div>
+                  {selectedUser?.lastLogin && (
+                    <div>
+                      <Label className="text-xs text-navy font-semibold">Last Login Time</Label>
+                      <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1 font-mono">{selectedUser.lastLogin}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-3 justify-end pt-4 border-t border-muted mt-5">
+                  <Button variant="ghost" onClick={() => setModalOpen(false)} className="rounded-full w-24">
+                    Close
+                  </Button>
+                </div>
+              </div>
             ) : (
               <form onSubmit={handleFormSubmit} className="py-4 space-y-4 text-left">
                 <div className="space-y-3">
@@ -337,7 +461,7 @@ function SuperAdminUsers() {
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g.Sneha Deshpande"
+                      placeholder="e.g. Sneha Deshpande"
                       className="mt-1 h-10 text-xs"
                     />
                   </div>
@@ -374,7 +498,7 @@ function SuperAdminUsers() {
                       id="user-mobile"
                       value={formData.mobile}
                       onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                      placeholder="e.g. 98290 12345"
+                      placeholder="e.g. +91 98290 12345"
                       className="mt-1 h-10 text-xs"
                     />
                   </div>
@@ -384,13 +508,14 @@ function SuperAdminUsers() {
                       <select
                         id="user-role"
                         value={formData.role}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                        className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple"
+                        onChange={handleRoleChange}
+                        className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer"
                       >
-                        <option value="admin">Admin / Owner</option>
+                        <option value="super-admin">Super Admin</option>
+                        <option value="admin">Admin</option>
                         <option value="manager">Manager</option>
                         <option value="receptionist">Receptionist</option>
-                        <option value="guest">Regular Guest</option>
+                        <option value="guest">Guest</option>
                       </select>
                     </div>
                     <div>
@@ -399,12 +524,29 @@ function SuperAdminUsers() {
                         id="user-status"
                         value={formData.status}
                         onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                        className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple"
+                        className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer"
                       >
                         <option value="Active">Active</option>
-                        <option value="Suspended">Suspended</option>
+                        <option value="Inactive">Inactive</option>
                       </select>
                     </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="user-property" className="text-xs text-navy font-semibold">Assigned Property</Label>
+                    <select
+                      id="user-property"
+                      value={formData.propertyId}
+                      disabled={formData.role === "super-admin"}
+                      onChange={(e) => setFormData({ ...formData, propertyId: e.target.value })}
+                      className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer mt-1 disabled:bg-muted"
+                    >
+                      <option value="">Global / All Properties</option>
+                      {properties.map((p) => (
+                        <option key={p.id || p._id} value={p.id || p._id}>
+                          {p.name} ({p.city})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end pt-4 border-t border-muted mt-5">

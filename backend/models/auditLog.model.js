@@ -9,7 +9,12 @@ const DATA_FILE = path.join(__dirname, '../data/audit_logs.json');
 
 const auditLogSchema = new mongoose.Schema({
   user: { type: String, required: true },
+  role: { type: String },
   action: { type: String, required: true },
+  module: { type: String },
+  property: { type: String },
+  description: { type: String },
+  status: { type: String },
   entity: { type: String },
   ip: { type: String },
   time: { type: String }
@@ -96,7 +101,12 @@ const MockAuditLog = {
       id: id,
       _id: id,
       user: data.user,
+      role: data.role || 'Super Admin',
       action: data.action,
+      module: data.module || 'System',
+      property: data.property || 'Global',
+      description: data.description || '',
+      status: data.status || 'Success',
       entity: data.entity || '',
       ip: data.ip || '127.0.0.1',
       time: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),

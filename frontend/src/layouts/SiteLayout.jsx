@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, X, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { Logo } from "./Logo";
+import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
@@ -35,7 +36,7 @@ export function SiteHeader() {
         : "bg-cream border-transparent py-4"
     )}>
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 sm:px-6 transition-all duration-300">
-        <Logo />
+        <Logo removeBg={true} />
         <nav className="ml-auto hidden items-center gap-8 lg:flex">
           {links.map((l) =>
           <Link
@@ -119,6 +120,18 @@ export function SiteHeader() {
 }
 
 export function SiteFooter() {
+  const [brandName, setBrandName] = useState("Hour Stay");
+
+  useEffect(() => {
+    publicService.getBranding()
+      .then(res => {
+        if (res.success && res.data) {
+          setBrandName(res.data.name || "Hour Stay");
+        }
+      })
+      .catch(err => {});
+  }, []);
+
   return (
     <footer className="bg-navy text-[#FFF7E6]/75 border-t-2 border-purple/30 pt-16 pb-8 font-ui relative overflow-hidden">
       
@@ -239,7 +252,7 @@ export function SiteFooter() {
       {/* Divider & Bottom Bar */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 mt-16 pt-6 border-t border-[#FFF7E6]/10 relative z-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-[#FFF7E6]/50">
-          <p>© 2026 Hour Stay. All rights reserved.</p>
+          <p>© 2026 {brandName}. All rights reserved.</p>
           <div className="flex justify-center gap-4">
             <Link to="/" className="hover:text-gold transition-colors">Privacy Policy</Link>
             <span>|</span>
@@ -252,6 +265,36 @@ export function SiteFooter() {
 }
 
 export function SiteLayout({ children }) {
+  useEffect(() => {
+    publicService.getBranding()
+      .then(res => {
+        if (res.success && res.data) {
+          const b = res.data;
+
+          // Apply colors dynamically to Tailwind variables
+          if (b.author && /^#[0-9A-F]{6}$/i.test(b.author)) {
+            document.documentElement.style.setProperty('--color-navy', b.author);
+            document.documentElement.style.setProperty('--color-navy-deep', b.author);
+          }
+          if (b.role && /^#[0-9A-F]{6}$/i.test(b.role)) {
+            document.documentElement.style.setProperty('--color-purple', b.role);
+          }
+
+          // Apply Favicon dynamically
+          if (b.readTime) {
+            let faviconLink = document.querySelector("link[rel~='icon']");
+            if (!faviconLink) {
+              faviconLink = document.createElement('link');
+              faviconLink.rel = 'icon';
+              document.getElementsByTagName('head')[0].appendChild(faviconLink);
+            }
+            faviconLink.href = b.readTime;
+          }
+        }
+      })
+      .catch(err => {});
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col bg-cream text-foreground">
       <SiteHeader />
