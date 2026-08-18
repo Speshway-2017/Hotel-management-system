@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HorizontalRouteTabs, Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import {
   Receipt,
@@ -236,38 +237,37 @@ function DiscountsRefundsPage() {
       {/* Filter and Search Bar Toolbar */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+          <div className="w-full sm:max-w-sm">
+            <Input
               type="text"
               placeholder="Search by guest or reason..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted rounded-lg text-sm bg-[#fafafa]/50 focus:outline-none focus:border-navy"
+              icon={Search}
             />
           </div>
 
           <div className="flex flex-wrap gap-2.5">
-            <select
+            <Select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-muted rounded-lg text-sm bg-white text-[#2a2a2a] focus:outline-none focus:border-navy"
+              className="w-40"
             >
               <option value="all">All Types</option>
               <option value="Discount">Discount</option>
               <option value="Refund">Refund</option>
-            </select>
+            </Select>
 
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-muted rounded-lg text-sm bg-white text-[#2a2a2a] focus:outline-none focus:border-navy"
+              className="w-40"
             >
               <option value="all">All Statuses</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
               <option value="Rejected">Rejected</option>
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -388,13 +388,12 @@ function DiscountsRefundsPage() {
               </Button>
             </div>
             <form onSubmit={handleIssueSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Select Guest / Folio</label>
-                <select
+              <FormField label="Select Guest / Folio" required id="formBookingId">
+                <Select
+                  id="formBookingId"
                   required
                   value={formBookingId}
                   onChange={(e) => setFormBookingId(e.target.value)}
-                  className="w-full px-3 py-2 border border-muted rounded-lg text-sm bg-white focus:outline-none focus:border-navy"
                 >
                   <option value="">Select Target Guest</option>
                   {activeBookings.map((b) => (
@@ -402,44 +401,42 @@ function DiscountsRefundsPage() {
                       {b.guest} (Room: {b.room})
                     </option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </FormField>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Adjustment Type</label>
-                  <select
+                <FormField label="Adjustment Type" id="formType">
+                  <Select
+                    id="formType"
                     value={formType}
                     onChange={(e) => setFormType(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm bg-white focus:outline-none focus:border-navy"
                   >
                     <option value="Refund">Refund Payback</option>
                     <option value="Discount">Tariff Discount</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Adjustment Amount (₹)</label>
-                  <input
+                  </Select>
+                </FormField>
+                <FormField label="Adjustment Amount" required id="formAmount">
+                  <Input
+                    id="formAmount"
                     type="number"
                     required
                     value={formAmount}
                     onChange={(e) => setFormAmount(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
+                    suffix="₹"
                   />
-                </div>
+                </FormField>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Reason description</label>
-                <textarea
-                  rows={3}
+              <FormField label="Reason description" required id="formReason">
+                <Textarea
+                  id="formReason"
                   required
                   value={formReason}
                   onChange={(e) => setFormReason(e.target.value)}
                   placeholder="Describe the reason for adjustment (e.g. Guest complaint compensation)"
-                  className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy resize-none"
+                  className="min-h-[80px]"
                 />
-              </div>
+              </FormField>
 
               <div className="pt-4 border-t border-muted flex justify-end gap-2">
                 <Button type="button" variant="ghost" onClick={() => setIsIssueOpen(false)} className="h-10 px-4">

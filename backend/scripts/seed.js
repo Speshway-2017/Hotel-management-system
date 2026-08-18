@@ -298,24 +298,24 @@ export const seedUsers = async () => {
     }
 
     // 2. Seed Properties
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.db.collection('properties').deleteMany({});
-    }
-    for (const p of SEED_PROPERTIES) {
-      await Property.create(p);
-      console.log(`🏨 Seeded property: ${p.name}`);
+    const existingProperties = await Property.find();
+    if (existingProperties.length === 0) {
+      for (const p of SEED_PROPERTIES) {
+        await Property.create(p);
+        console.log(`🏨 Seeded property: ${p.name}`);
+      }
     }
 
     // 3. Seed Bookings
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.db.collection('bookings').deleteMany({});
-    }
-    const props = await Property.find();
-    const defaultPropId = props[0]?._id?.toString() || '669a84a6c4293fcfd4615ff2';
-    
-    for (const b of SEED_BOOKINGS) {
-      await Booking.create({ ...b, propertyId: defaultPropId });
-      console.log(`📅 Seeded booking: ${b.guest}`);
+    const existingBookings = await Booking.find();
+    if (existingBookings.length === 0) {
+      const props = await Property.find();
+      const defaultPropId = props[0]?._id?.toString() || '669a84a6c4293fcfd4615ff2';
+      
+      for (const b of SEED_BOOKINGS) {
+        await Booking.create({ ...b, propertyId: defaultPropId });
+        console.log(`📅 Seeded booking: ${b.guest}`);
+      }
     }
 
     // 4. Seed Audits

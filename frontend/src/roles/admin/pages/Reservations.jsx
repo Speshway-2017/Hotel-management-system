@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HorizontalRouteTabs, PageHeader, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import {
   CalendarCheck,
@@ -58,6 +59,7 @@ const schedulerRooms = [
 ];
 
 function ReservationsPage() {
+  const navigate = useNavigate();
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -312,21 +314,20 @@ function ReservationsPage() {
       {/* Filter and Search Bar Panel */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+          <div className="w-full sm:max-w-md">
+            <Input
               type="text"
               placeholder="Search by guest name or room..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted rounded-lg text-sm bg-[#fafafa]/50 focus:outline-none focus:border-navy focus:bg-white transition-all"
+              icon={Search}
             />
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3.5 py-2 border border-muted rounded-lg text-sm bg-white text-[#2a2a2a] focus:outline-none focus:border-navy transition-all"
+              className="w-40"
             >
               <option value="all">All Statuses</option>
               <option value="Confirmed">Confirmed</option>
@@ -334,12 +335,12 @@ function ReservationsPage() {
               <option value="Checked-out">Checked-out</option>
               <option value="Pending">Pending</option>
               <option value="Cancelled">Cancelled</option>
-            </select>
+            </Select>
 
-            <select
+            <Select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="px-3.5 py-2 border border-muted rounded-lg text-sm bg-white text-[#2a2a2a] focus:outline-none focus:border-navy transition-all"
+              className="w-40"
             >
               <option value="all">All Channels</option>
               <option value="Direct">Direct</option>
@@ -348,7 +349,7 @@ function ReservationsPage() {
               <option value="Agoda">OTA (Agoda)</option>
               <option value="Corporate">Corporate / GDS</option>
               <option value="Walk-in">Walk-in</option>
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -373,11 +374,8 @@ function ReservationsPage() {
             </Button>
           </div>
           <Button
-            onClick={() => {
-              resetForm();
-              setIsCreateOpen(true);
-            }}
-            className="bg-navy hover:bg-navy-deep text-white shadow-soft text-xs h-8.5 px-3.5 font-bold"
+            onClick={() => navigate({ to: "/admin/reservations/add" })}
+            className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-8.5 px-3.5 font-bold rounded-full"
           >
             <Plus className="size-3.5 mr-1" /> New Booking
           </Button>
@@ -485,15 +483,24 @@ function ReservationsPage() {
                                 Check-Out
                               </Button>
                             )}
-                            <Button
-                              onClick={() => openEdit(res)}
-                              size="icon"
-                              variant="ghost"
-                              className="size-8 hover:text-brand"
-                              aria-label="Edit booking"
-                            >
-                              <Edit2 className="size-3.5" />
-                            </Button>
+                             <Button
+                               onClick={() => navigate({ to: `/admin/reservations/view/${res._id || res.id}` })}
+                               size="icon"
+                               variant="ghost"
+                               className="size-8 hover:text-[#4f46e5]"
+                               aria-label="View details"
+                             >
+                               <Eye className="size-3.5" />
+                             </Button>
+                             <Button
+                               onClick={() => navigate({ to: `/admin/reservations/edit/${res._id || res.id}` })}
+                               size="icon"
+                               variant="ghost"
+                               className="size-8 hover:text-brand"
+                               aria-label="Edit booking"
+                             >
+                               <Edit2 className="size-3.5" />
+                             </Button>
                             <Button
                               onClick={() => handleDelete(res._id)}
                               size="icon"

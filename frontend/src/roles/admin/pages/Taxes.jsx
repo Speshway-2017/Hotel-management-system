@@ -41,22 +41,24 @@ function TaxesGstPage() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState("30"); // 'Today' | '7' | '30' | 'Month' | 'Custom'
+  const [dateFilter, setDateFilter] = useState("30"); // "Today" | "7" | "30" | "Month" | "Custom"
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
-  async function loadData() {
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
       const res = await superAdminService.getReservations();
-      setReservations(res.data || []);
+      if (res.success) {
+        setReservations(res.data);
+      }
     } catch (err) {
-      setError(err.message || "Failed to sync tax registry");
+      setError(err.message || "Failed to load tax records.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     loadData();
@@ -164,14 +166,13 @@ function TaxesGstPage() {
       {/* Date Filter & Search Toolbar */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+          <div className="w-full sm:max-w-sm">
+            <Input
               type="text"
               placeholder="Search by guest or invoice..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted rounded-lg text-sm bg-[#fafafa]/50 focus:outline-none focus:border-navy"
+              icon={Search}
             />
           </div>
 
@@ -217,23 +218,23 @@ function TaxesGstPage() {
       </div>
 
       {dateFilter === "Custom" && (
-        <div className="flex items-center gap-3 p-4 bg-white border border-muted rounded-xl shadow-soft">
+        <div className="flex items-center gap-4 p-4 bg-white border border-muted rounded-xl shadow-soft">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-muted-foreground uppercase">Start</span>
-            <input
+            <Input
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="px-2 py-1 border border-muted rounded text-xs"
+              className="h-8 py-1"
             />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-muted-foreground uppercase">End</span>
-            <input
+            <Input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="px-2 py-1 border border-muted rounded text-xs"
+              className="h-8 py-1"
             />
           </div>
         </div>

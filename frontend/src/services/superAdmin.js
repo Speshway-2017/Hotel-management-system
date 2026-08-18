@@ -25,7 +25,10 @@ export const superAdminService = {
     return await request('/super-admin/dashboard-stats');
   },
   getProperties: async () => {
-    return await request('/super-admin/properties');
+    return await request(`/super-admin/properties?t=${Date.now()}`);
+  },
+  getProperty: async (id) => {
+    return await request(`/super-admin/properties/${id}`);
   },
   createProperty: async (data) => {
     return await request('/super-admin/properties', {
@@ -46,7 +49,7 @@ export const superAdminService = {
   },
   
   getUsers: async () => {
-    return await request('/super-admin/users');
+    return await request(`/super-admin/users?t=${Date.now()}`);
   },
   createUser: async (data) => {
     return await request('/super-admin/users', {
@@ -67,7 +70,7 @@ export const superAdminService = {
   },
 
   getReservations: async () => {
-    return await request('/super-admin/reservations');
+    return await request(`/super-admin/reservations?t=${Date.now()}`);
   },
   createReservation: async (data) => {
     return await request('/super-admin/reservations', {
@@ -89,6 +92,9 @@ export const superAdminService = {
 
   getAuditLogs: async () => {
     return await request('/super-admin/audit-logs');
+  },
+  getCommissionReports: async () => {
+    return await request('/super-admin/commission-reports');
   },
 
   getCmsItems: async () => {
@@ -119,6 +125,48 @@ export const superAdminService = {
     return await request('/super-admin/notifications', {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  },
+
+  getSubscriptionPlans: async () => {
+    return await request('/super-admin/plans');
+  },
+  createSubscriptionPlan: async (data) => {
+    return await request('/super-admin/plans', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updateSubscriptionPlan: async (id, data) => {
+    return await request(`/super-admin/plans/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  deleteSubscriptionPlan: async (id) => {
+    return await request(`/super-admin/plans/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  getPromoCoupons: async () => {
+    return await request('/super-admin/coupons');
+  },
+  createPromoCoupon: async (data) => {
+    return await request('/super-admin/coupons', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updatePromoCoupon: async (id, data) => {
+    return await request(`/super-admin/coupons/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  deletePromoCoupon: async (id) => {
+    return await request(`/super-admin/coupons/${id}`, {
+      method: 'DELETE'
     });
   }
 };

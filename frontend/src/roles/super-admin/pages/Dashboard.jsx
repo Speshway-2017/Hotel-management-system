@@ -1,14 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows, Tag, statusTone } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { RevenueChart, OccupancyChart } from "@/components/hs/Charts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { 
   Building2, TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, 
   Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, AlertTriangle, 
-  Play, Bed, RefreshCw, Eye, ExternalLink, ChevronUp, ChevronDown, Search, ArrowRight 
+  Play, Bed, RefreshCw, Eye, ExternalLink, ChevronUp, ChevronDown, Search, ArrowRight,
+  Plus, X, Ticket
 } from "lucide-react";
 
 function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -56,6 +58,8 @@ function SuperAdminDashboard() {
   const [propertyScope, setPropertyScope] = useState("All");
   const [dateRange, setDateRange] = useState("Last 30 Days");
 
+
+
   // Table controls states
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -76,14 +80,7 @@ function SuperAdminDashboard() {
     { name: "RBAC Session Auditor", status: "Healthy", desc: "Audits synchronized" }
   ];
 
-  // Attention Required Alerts
-  const attentionRequiredAlerts = [
-    { id: 1, type: "error", title: "Inactive Property", message: "Hour Stay Candolim Beach Resort is pending onboarding validation.", action: "Activate" },
-    { id: 2, type: "warning", title: "OTA Parity Sync Issue", message: "MakeMyTrip rate discrepancy flagged for Udaipur Lake Palace.", action: "Sync OTA" },
-    { id: 3, type: "error", title: "Payment Gateway Latency", message: "Razorpay UPI gateway response time exceeded 6.5s.", action: "Check API" },
-    { id: 4, type: "info", title: "Pending Admin Action", message: "Approval required for booking refund request above threshold.", action: "Review" },
-    { id: 5, type: "warning", title: "Security Audit Trigger", message: "Unusual login activity detected from IP 192.168.1.105.", action: "Audit Logs" }
-  ];
+
 
   async function loadDashboardData() {
     try {
@@ -186,6 +183,8 @@ function SuperAdminDashboard() {
 
 
       {error && <Notice tone="error" title="Synchronization Error" className="text-left">{error}</Notice>}
+
+
 
       {/* KPI Cards Row - 6 Cards */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
@@ -412,7 +411,7 @@ function SuperAdminDashboard() {
                   onClick={() => setPage(prev => Math.max(prev - 1, 1))}
                   disabled={page === 1}
                   variant="outline"
-                  size="xs"
+                  size="sm"
                   className="rounded-full border-muted hover:bg-muted font-semibold"
                 >
                   Previous
@@ -421,7 +420,7 @@ function SuperAdminDashboard() {
                   onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={page === totalPages}
                   variant="outline"
-                  size="xs"
+                  size="sm"
                   className="rounded-full border-muted hover:bg-muted font-semibold"
                 >
                   Next
@@ -432,63 +431,8 @@ function SuperAdminDashboard() {
         </div>
       </Panel>
 
-      {/* Triple Grid Row: Channel Performance, Alerts, Recent Activity */}
+      {/* Triple Grid Row: Recent Activity, Channel Performance, Quick Actions */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Channel Performance (compact table) */}
-        <Panel title="Channel Performance" description="OTA and direct bookings contributions.">
-          <div className="bg-white rounded-b-xl p-2">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[400px] table-fixed">
-                <thead>
-                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[9px] font-semibold">
-                    <th className="p-3 w-[35%] text-left">Source</th>
-                    <th className="p-3 w-[20%] text-left">Bookings</th>
-                    <th className="p-3 w-[25%] text-left">Revenue</th>
-                    <th className="p-3 w-[20%] text-right">Contrib %</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y font-sans">
-                  {channelPerformanceData.map((ch) => (
-                    <tr key={ch.source} className="hover:bg-muted/15 transition-colors">
-                      <td className="p-3 w-[35%] text-left font-semibold text-navy truncate" title={ch.source}>{ch.source}</td>
-                      <td className="p-3 w-[20%] text-left font-medium text-navy">{ch.count}</td>
-                      <td className="p-3 w-[25%] text-left font-bold text-purple">₹{ch.rev.toLocaleString("en-IN")}</td>
-                      <td className="p-3 w-[20%] text-right font-mono font-bold text-navy">{ch.pct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Panel>
-
-        {/* Attention Required Alerts */}
-        <Panel title="Attention Required" description="System alerts requiring override intervention.">
-          <div className="p-3 bg-white rounded-b-xl space-y-3">
-            {attentionRequiredAlerts.map((alt) => (
-              <div key={alt.id} className="flex gap-2.5 items-start text-xs border-b pb-2.5 last:border-0 last:pb-0">
-                <span className={`grid size-6 place-items-center rounded-lg shrink-0 mt-0.5 ${
-                  alt.type === "error" ? "bg-error/10 text-error" : alt.type === "warning" ? "bg-warning/10 text-warning" : "bg-info/10 text-info"
-                }`}>
-                  <AlertTriangle className="size-3.5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h6 className="font-semibold text-navy text-[11px] leading-tight flex items-center gap-1.5">
-                    {alt.title}
-                    <span className={`inline-block size-1.5 rounded-full ${
-                      alt.type === "error" ? "bg-error" : alt.type === "warning" ? "bg-warning" : "bg-info"
-                    }`} />
-                  </h6>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{alt.message}</p>
-                </div>
-                <Button size="xs" variant="outline" className="text-[9px] px-2 py-0.5 h-6 rounded-full border-muted text-navy-deep shrink-0 flex items-center justify-center font-bold">
-                  {alt.action}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
         {/* Recent Activity Log */}
         <Panel title="Recent Activity" description="Platform audit logs of administrative actions.">
           <div className="bg-white rounded-b-xl p-2">
@@ -518,6 +462,81 @@ function SuperAdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </Panel>
+
+        {/* Channel Performance (compact table) */}
+        <Panel title="Channel Performance" description="OTA and direct bookings contributions.">
+          <div className="bg-white rounded-b-xl p-2">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[400px] table-fixed">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[9px] font-semibold">
+                    <th className="p-3 w-[35%] text-left">Source</th>
+                    <th className="p-3 w-[20%] text-left">Bookings</th>
+                    <th className="p-3 w-[25%] text-left">Revenue</th>
+                    <th className="p-3 w-[20%] text-right">Contrib %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y font-sans">
+                  {channelPerformanceData.map((ch) => (
+                    <tr key={ch.source} className="hover:bg-muted/15 transition-colors">
+                      <td className="p-3 w-[35%] text-left font-semibold text-navy truncate" title={ch.source}>{ch.source}</td>
+                      <td className="p-3 w-[20%] text-left font-medium text-navy">{ch.count}</td>
+                      <td className="p-3 w-[25%] text-left font-bold text-purple">₹{ch.rev.toLocaleString("en-IN")}</td>
+                      <td className="p-3 w-[20%] text-right font-mono font-bold text-navy">{ch.pct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Panel>
+
+        {/* Quick Actions */}
+        <Panel title="Quick Actions" description="Platform administrative shortcuts.">
+          <div className="p-4 bg-white rounded-b-xl space-y-3 text-left">
+            {/* Action 1: Add Property */}
+            <Link
+              to="/super-admin/properties/add"
+              className="flex items-center gap-3 p-3 rounded-lg border border-[#0d1b2a]/15 bg-[#FFF7E6]/5 hover:bg-[#FFF7E6]/15 hover:border-[#0d1b2a]/35 hover:-translate-y-0.5 hover:shadow-soft transition-all duration-300 group cursor-pointer"
+            >
+              <span className="grid size-8 place-items-center rounded-lg bg-[#0d1b2a] text-[#FFF7E6] shrink-0 group-hover:scale-105 transition-transform duration-300">
+                <Building2 className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-[11px] text-navy group-hover:text-purple transition-colors truncate">Onboard Property</h4>
+                <p className="text-[9px] text-muted-foreground truncate">Register hotel profile & rooms</p>
+              </div>
+            </Link>
+
+            {/* Action 2: Add Subscription */}
+            <Link
+              to="/super-admin/subscription"
+              className="flex items-center gap-3 p-3 rounded-lg border border-[#0d1b2a]/15 bg-[#FFF7E6]/5 hover:bg-[#FFF7E6]/15 hover:border-[#0d1b2a]/35 hover:-translate-y-0.5 hover:shadow-soft transition-all duration-300 group cursor-pointer"
+            >
+              <span className="grid size-8 place-items-center rounded-lg bg-[#5B21B6] text-[#FFF7E6] shrink-0 group-hover:scale-105 transition-transform duration-300">
+                <TrendingUp className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-[11px] text-navy group-hover:text-purple transition-colors truncate">Manage Subscriptions</h4>
+                <p className="text-[9px] text-muted-foreground truncate">Pricing plans & billing</p>
+              </div>
+            </Link>
+
+            {/* Action 3: Add Coupons */}
+            <Link
+              to="/super-admin/coupons"
+              className="flex items-center gap-3 p-3 rounded-lg border border-[#0d1b2a]/15 bg-[#FFF7E6]/5 hover:bg-[#FFF7E6]/15 hover:border-[#0d1b2a]/35 hover:-translate-y-0.5 hover:shadow-soft transition-all duration-300 group cursor-pointer"
+            >
+              <span className="grid size-8 place-items-center rounded-lg bg-[#FF6B8B] text-[#FFF7E6] shrink-0 group-hover:scale-105 transition-transform duration-300">
+                <Percent className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-bold text-[11px] text-navy group-hover:text-purple transition-colors truncate">Promo Coupons</h4>
+                <p className="text-[9px] text-muted-foreground truncate">Coupon codes & discounts</p>
+              </div>
+            </Link>
           </div>
         </Panel>
       </div>

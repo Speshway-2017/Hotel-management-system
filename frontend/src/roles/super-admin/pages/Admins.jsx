@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/utils/utils";
-import { Plus, Search, Edit2, X, Building, ShieldCheck, Lock, UserPlus, Building2, UserCog, Eye, Check, ChevronDown } from "lucide-react";
+import { Plus, Search, Edit2, X, Building, ShieldCheck, Lock, UserPlus, Building2, UserCog, Eye, EyeOff, Check, ChevronDown } from "lucide-react";
 
 function SuperAdminAdmins() {
   const [admins, setAdmins] = useState([]);
@@ -21,6 +21,7 @@ function SuperAdminAdmins() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState("add"); // 'add' | 'edit' | 'view'
   const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form Fields
   const [formData, setFormData] = useState({
@@ -387,15 +388,25 @@ function SuperAdminAdmins() {
                   {modalType === "add" && (
                     <div>
                       <Label htmlFor="admin-pass" className="text-xs text-navy font-semibold">Temporary Password</Label>
-                      <Input
-                        id="admin-pass"
-                        type="password"
-                        required
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        placeholder="Min 6 characters"
-                        className="mt-1 h-10 text-xs"
-                      />
+                      <div className="relative mt-1">
+                        <Input
+                          id="admin-pass"
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          placeholder="Min 6 characters"
+                          className="h-10 pr-10 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-navy/40 hover:text-navy/70 transition-colors focus:outline-none cursor-pointer p-1"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div>

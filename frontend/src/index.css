@@ -915,3 +915,29 @@ td {
 .dashboard-theme [class*="lg:hidden"] .fixed p {
   color: rgba(255, 247, 230, 0.4) !important;
 }
+
+/*
+ * ==========================================
+ * GLOBAL DASHBOARD FORM FIELDS BORDER SYSTEM
+ * ==========================================
+ */
+main input:not([type="checkbox"]):not([type="radio"]):not(.border-error):not(.border-success):not(:disabled),
+main select:not(.border-error):not(.border-success):not(:disabled),
+main textarea:not(.border-error):not(.border-success):not(:disabled) {
+  border: 1px solid #E7E9EE !important;
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):not(.border-error):not(.border-success):not(:disabled):hover,
+main select:not(.border-error):not(.border-success):not(:disabled):hover,
+main textarea:not(.border-error):not(.border-success):not(:disabled):hover {
+  border-color: rgba(13, 27, 42, 0.2) !important;
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):not(.border-error):not(.border-success):not(:disabled):focus,
+main select:not(.border-error):not(.border-success):not(:disabled):focus,
+main textarea:not(.border-error):not(.border-success):not(:disabled):focus {
+  border-color: #0D1B2A !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(13, 27, 42, 0.1) !important;
+}
+

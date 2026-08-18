@@ -29,28 +29,24 @@ function useDarkMode(enabled) {
 
 const subModules = {
   "super-admin": {
-    "Property Management": [
-      { label: "Properties", to: "/super-admin/properties" },
-      { label: "Admins", to: "/super-admin/admins" }
-    ],
     "Operations": [
+      { label: "Properties", to: "/super-admin/properties" },
       { label: "Reservations", to: "/super-admin/reservations" },
-      { label: "Rooms & Rates", to: "/super-admin/rooms" }
+      { label: "Channel Manager", to: "/super-admin/channel-manager" }
     ],
     "Analytics & Reports": [
       { label: "Revenue Reports", to: "/super-admin/reports" }
     ],
     "Access & Security": [
-      { label: "Users", to: "/super-admin/users" },
-      { label: "Audit Logs", to: "/super-admin/audit-logs" }
-    ],
-    "Integrations": [
-      { label: "Channel Manager", to: "/super-admin/channel-manager" },
-      { label: "Notifications", to: "/super-admin/notifications" }
+      { label: "Users", to: "/super-admin/users" }
     ],
     "System": [
       { label: "Branding", to: "/super-admin/branding" },
-      { label: "Global Settings", to: "/super-admin/subscription" }
+      { label: "Global Settings", to: "/super-admin/global-settings" }
+    ],
+    "Subscription": [
+      { label: "Plans & Billing", to: "/super-admin/subscription" },
+      { label: "Coupons", to: "/super-admin/coupons" }
     ]
   },
   "admin": {
@@ -72,12 +68,7 @@ const subModules = {
     "Management": [
       { label: "Staff", to: "/admin/staff" },
       { label: "Channel Manager", to: "/admin/channels" },
-      { label: "CRM / Loyalty", to: "/admin/crm" },
-      { label: "Notifications", to: "/admin/notifications" }
-    ],
-    "Settings": [
-      { label: "Settings", to: "/admin/settings" },
-      { label: "Profile", to: "/admin/profile" }
+      { label: "CRM / Loyalty", to: "/admin/crm" }
     ]
   }
 };
@@ -136,7 +127,17 @@ export function DashShell({ role, children }) {
 
   useEffect(() => {
     setOpen(false);
-  }, [pathname]);
+    if (role && subModules[role]) {
+      const activeGroup = Object.keys(subModules[role]).find(groupLabel => 
+        subModules[role][groupLabel].some(sub => 
+          sub.to === `/${role}` ? pathname === sub.to : pathname.startsWith(sub.to)
+        )
+      );
+      if (activeGroup) {
+        setExpandedGroups(prev => ({ ...prev, [activeGroup]: true }));
+      }
+    }
+  }, [pathname, role]);
 
   const isActive = (to) =>
     to === `/${role}` ? pathname === to : pathname.startsWith(to);
@@ -189,9 +190,10 @@ export function DashShell({ role, children }) {
               )}
               <ul className="space-y-1">
                 {g.items.map((item) => {
-                  const active = isActive(item.to);
-                   const hasChildren = (role === "super-admin" || role === "admin") && subModules[role]?.[item.label];
+                  const hasChildren = (role === "super-admin" || role === "admin") && subModules[role]?.[item.label];
                   const isExpanded = expandedGroups[item.label];
+                  const childActive = hasChildren && subModules[role][item.label].some(sub => pathname === sub.to || pathname.startsWith(sub.to + "/"));
+                  const active = isActive(item.to) || childActive;
 
                   return (
                     <li key={item.to} className="space-y-0.5">
@@ -208,7 +210,7 @@ export function DashShell({ role, children }) {
                         className={cn(
                           "flex min-h-10 items-center gap-3 rounded-lg px-3 text-xs font-semibold transition-all duration-200 cursor-pointer",
                           collapsed && "justify-center px-0",
-                          active && !hasChildren
+                          active
                             ? "text-gold"
                             : "text-sidebar-foreground/75 hover:text-sidebar-foreground"
                         )}
@@ -341,10 +343,7 @@ export function DashShell({ role, children }) {
                     subtitle: "Manage, onboard, assign, and audit configurations across hotel properties."
                   };
                 }
-                if (
-                  path.startsWith("/super-admin/users") ||
-                  path.startsWith("/super-admin/admins")
-                ) {
+                if (path.startsWith("/super-admin/users")) {
                   return {
                     title: "Access & Security",
                     subtitle: "Manage platform operators, administrators, and system access."
@@ -368,10 +367,11 @@ export function DashShell({ role, children }) {
                     subtitle: "Reconcile payment transactions and generate GST-compliant tax invoices."
                   };
                 }
-                if (path.startsWith("/super-admin/audit-logs")) {
+
+                if (path.startsWith("/super-admin/coupons")) {
                   return {
-                    title: "Audit Trail Console",
-                    subtitle: "Audit logs of all critical actions, changes, and refunds."
+                    title: "Promo Coupons Console",
+                    subtitle: "Create and manage promotional discount coupons for Hour Stay reservations."
                   };
                 }
                 if (path.startsWith("/super-admin/branding")) {
@@ -552,26 +552,20 @@ export function DashShell({ role, children }) {
                 const prefix = isNotificationDetails[1];
                 const parentUrl = `/${prefix}/notifications`;
                 return (
-                  <div className="flex items-center gap-4 text-xs font-semibold text-navy select-none">
-                    <button
-                      onClick={() => navigate({ to: parentUrl })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-muted hover:bg-muted/40 rounded-lg cursor-pointer transition-all duration-200"
-                    >
-                      <ArrowLeft className="size-3.5 text-navy" />
-                      <span>Back</span>
-                    </button>
-                    <div className="flex items-center gap-1.5 text-muted-foreground flex-wrap">
-                      <Link to={parentUrl} className="hover:text-navy transition-colors">
-                        Notifications
-                      </Link>
-                      <span className="text-muted-foreground/50">/</span>
-                      <span className="text-navy font-bold">Notification Details</span>
-                    </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
+                    <Link to={parentUrl} className="hover:text-navy transition-colors">
+                      Notifications
+                    </Link>
+                    <span className="text-muted-foreground/50">/</span>
+                    <span className="text-navy font-bold">Notification Details</span>
                   </div>
                 );
               }
               const mappings = {
                 "/admin/reservations": ["Operations", "Reservations"],
+                "/admin/reservations/add": ["Operations", "Reservations", "Create Booking"],
+                "/admin/reservations/edit": ["Operations", "Reservations", "Edit Booking"],
+                "/admin/reservations/view": ["Operations", "Reservations", "Reservation Details"],
                 "/admin/rooms": ["Operations", "Rooms & Rates"],
                 "/admin/guests": ["Operations", "Guests"],
                 "/admin/front-desk": ["Operations", "Front Desk"],
@@ -581,26 +575,41 @@ export function DashShell({ role, children }) {
                 "/admin/taxes": ["Finance", "Taxes & GST"],
                 "/admin/reports": ["Analytics", "Reports"],
                 "/admin/staff": ["Management", "Staff"],
+                "/admin/staff/add": ["Management", "Staff", "Register Staff Profile"],
+                "/admin/staff/edit": ["Management", "Staff", "Modify Staff Details"],
+                "/admin/staff/view": ["Management", "Staff", "Staff Profile Diagnostic"],
                 "/admin/channels": ["Management", "OTA Channels"],
                 "/admin/crm": ["Management", "CRM & Loyalty"],
                 "/admin/notifications": ["Management", "Notifications"],
                 "/admin/settings": ["Settings"],
                 "/admin/profile": ["Profile"],
                 "/super-admin/properties": ["Properties"],
+                "/super-admin/properties/add": ["Properties", "Add Property"],
+                "/super-admin/properties/edit": ["Properties", "Edit Property"],
+                "/super-admin/properties/view": ["Properties", "View Property Details"],
                 "/super-admin/users": ["Users"],
-                "/super-admin/admins": ["Admins"],
+                "/super-admin/users/view": ["Users", "Guest Details"],
                 "/super-admin/occupancy": ["Occupancy"],
-                "/super-admin/rooms": ["Rooms & Rates"],
                 "/super-admin/reservations": ["Reservations"],
+                "/super-admin/reservations/view": ["Reservations", "Reservation Details"],
                 "/super-admin/reports": ["Reports"],
                 "/super-admin/channel-manager": ["Channel Manager"],
                 "/super-admin/branding": ["Branding"],
-                "/super-admin/audit-logs": ["Audit Logs"],
-                "/super-admin/subscription": ["Subscription"],
+                "/super-admin/coupons": ["Promo Coupons"],
+                "/super-admin/coupons/add": ["Promo Coupons", "Add Coupon"],
+                "/super-admin/coupons/edit": ["Promo Coupons", "Edit Coupon"],
+                "/super-admin/coupons/view": ["Promo Coupons", "Coupon Details"],
+                "/super-admin/subscription": ["Plans & Billing"],
+                "/super-admin/subscription/add": ["Plans & Billing", "Add Plan"],
+                "/super-admin/subscription/edit": ["Plans & Billing", "Edit Plan"],
+                "/super-admin/subscription/view": ["Plans & Billing", "Plan Details"],
+                "/super-admin/global-settings": ["Global Settings"],
                 "/super-admin/notifications": ["Notifications"],
                 "/super-admin/profile": ["Profile"]
               };
-              const segments = mappings[pathname];
+              const cleanPathname = pathname.replace(/\/view\/[^\/]+$/, "/view")
+                                            .replace(/\/edit\/[^\/]+$/, "/edit");
+              const segments = mappings[cleanPathname];
               if (segments) {
                 return (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">

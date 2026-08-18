@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HorizontalRouteTabs, Panel, Notice, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   User,
@@ -47,7 +49,7 @@ function AdminProfilePage() {
   const [profileData, setProfileData] = useState({
     name: currentUser.name || "Madhu",
     email: currentUser.email || "madhu@speshway.com",
-    phone: currentUser.phone || "+91 99112 23344",
+    phone: currentUser.mobile || currentUser.phone || "+91 99112 23344",
     role: currentUser.role === "admin" ? "Property Admin" : currentUser.role,
     status: "Active"
   });
@@ -70,6 +72,20 @@ function AdminProfilePage() {
       .then((res) => {
         if (res.success && res.data && res.data.length > 0) {
           setUserProperty(res.data[0]);
+        }
+      })
+      .catch(() => {});
+
+    authService.getProfile()
+      .then((res) => {
+        if (res.success && res.data) {
+          setProfileData({
+            name: res.data.name || "",
+            email: res.data.email || "",
+            phone: res.data.mobile || res.data.phone || "",
+            role: res.data.role === "admin" ? "Property Admin" : res.data.role,
+            status: res.data.status || "Active"
+          });
         }
       })
       .catch(() => {});
@@ -220,115 +236,119 @@ function AdminProfilePage() {
             </Panel>
           )}
 
-          {/* Edit Profile details */}
+          {/* Modify Profile Specifications */}
           {isEditing && (
-            <Panel title="Edit Profile Details" description="Update your contact phone and administrator name.">
+            <Panel title="Modify Profile Specifications" description="Change your general personal identity attributes.">
               <form onSubmit={handleProfileSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Full Name</label>
-                    <input
-                      type="text"
-                      required
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-name" className="text-navy font-semibold text-xs">Full Name</Label>
+                    <Input
+                      id="edit-name"
                       value={profileData.name}
                       onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
+                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      required
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Phone Number</label>
-                    <input
-                      type="text"
-                      required
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
+                    <Input
+                      id="edit-phone"
                       value={profileData.phone}
                       onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Email Address (Read-only)</label>
-                    <input
-                      type="email"
-                      disabled
-                      value={profileData.email}
-                      className="w-full px-3.5 py-2 border border-muted bg-[#fafafa] rounded-lg text-sm text-muted-foreground cursor-not-allowed focus:outline-none"
+                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      required
                     />
                   </div>
                 </div>
-
-                <div className="pt-4 border-t border-muted flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsEditing(false)}
-                    className="text-xs h-9 px-4"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft"
-                  >
+                <div className="flex gap-2.5 pt-3">
+                  <Button type="submit" className="bg-purple hover:bg-purple/90 text-cream text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
                     Save Changes
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} className="text-navy text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
+                    Cancel
                   </Button>
                 </div>
               </form>
             </Panel>
           )}
 
-          {/* Change Password details */}
+          {/* Change Password Form Panel */}
           {isChangingPassword && (
-            <Panel title="Change Password Credentials" description="Setup a secure password to protect your administrator privileges.">
+            <Panel title="Change Account Password" description="Update your security passcode.">
               <form onSubmit={handlePasswordSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
-                <div className="space-y-4 text-xs">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Current Password</label>
-                    <input
-                      type="password"
-                      required
+                <div className="space-y-1.5">
+                  <Label htmlFor="current-pw" className="text-navy font-semibold text-xs">Current Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="current-pw"
+                      type={showCurrentPassword ? "text" : "password"}
                       value={passwordData.currentPassword}
                       onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">New Password</label>
-                    <input
-                      type="password"
+                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                      placeholder="••••••••"
                       required
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Confirm New Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={passwordData.confirmNewPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center"
+                    >
+                      {showCurrentPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
                   </div>
                 </div>
-
-                <div className="pt-4 border-t border-muted flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsChangingPassword(false)}
-                    className="text-xs h-9 px-4"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft"
-                  >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-pw" className="text-navy font-semibold text-xs">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="new-pw"
+                        type={showNewPassword ? "text" : "password"}
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center"
+                      >
+                        {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-new-pw" className="text-navy font-semibold text-xs">Confirm New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirm-new-pw"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={passwordData.confirmNewPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center"
+                      >
+                        {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2.5 pt-3">
+                  <Button type="submit" className="bg-purple hover:bg-purple/90 text-cream text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
                     Update Password
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setIsChangingPassword(false)} className="text-navy text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
+                    Cancel
                   </Button>
                 </div>
               </form>

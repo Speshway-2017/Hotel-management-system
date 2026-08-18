@@ -206,6 +206,7 @@ export function AuthCard({
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  hideToggle
                   className="w-full bg-white border-none pl-5 pr-12 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all"
                   placeholder="Password"
                   value={password}
@@ -238,6 +239,7 @@ export function AuthCard({
                 <Input
                   id="new-password"
                   type={showPassword ? "text" : "password"}
+                  hideToggle
                   className="w-full bg-white border-none pl-5 pr-12 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all"
                   placeholder="New Password"
                   value={password}
@@ -258,6 +260,7 @@ export function AuthCard({
                 <Input
                   id="confirm-password"
                   type={showConfirmPassword ? "text" : "password"}
+                  hideToggle
                   className="w-full bg-white border-none pl-5 pr-12 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all"
                   placeholder="Confirm New Password"
                   value={confirmPassword}
@@ -306,44 +309,6 @@ export function AuthCard({
 
         {children}
 
-        {/* Social Accounts Container */}
-        <div className="mt-6 flex flex-col items-center border-t border-navy/5 pt-4">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-            Or Sign in with
-          </span>
-          <div className="mt-2.5 flex justify-center gap-3.5">
-            <button 
-              type="button"
-              className="bg-white border-[3px] border-white ring-1 ring-navy/10 rounded-full size-10 flex items-center justify-center shadow-[rgba(13,27,42,0.06)_0px_10px_10px_-5px] transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer"
-              aria-label="Sign in with Google"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="size-5">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.5 24c0-1.61-.15-3.16-.42-4.69H24v9.09h12.75c-.53 2.87-2.13 5.31-4.59 7.03l7.07 5.48C43.5 36.5 46.5 30.82 46.5 24z"/>
-                <path fill="#FBBC05" d="M10.54 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.98-6.19z"/>
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.07-5.48c-1.97 1.33-4.49 2.12-8.82 2.12-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-              </svg>
-            </button>
-            <button 
-              type="button"
-              className="bg-white border-[3px] border-white ring-1 ring-navy/10 rounded-full size-10 flex items-center justify-center shadow-[rgba(13,27,42,0.06)_0px_10px_10px_-5px] transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer"
-              aria-label="Sign in with Apple"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="size-4 fill-black">
-                <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
-              </svg>
-            </button>
-            <button 
-              type="button"
-              className="bg-white border-[3px] border-white ring-1 ring-navy/10 rounded-full size-10 flex items-center justify-center shadow-[rgba(13,27,42,0.06)_0px_10px_10px_-5px] transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer"
-              aria-label="Sign in with Twitter"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="size-3.5 fill-black">
-                <path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8L200.7 275.5 26.8 48H172.4L272.9 180.9 389.2 48zM364.4 421.8h39.1L151.1 88h-42L364.4 421.8z" />
-              </svg>
-            </button>
-          </div>
-        </div>
 
         {footer && <p className="mt-5 text-center text-xs text-muted-foreground">{footer}</p>}
       </div>

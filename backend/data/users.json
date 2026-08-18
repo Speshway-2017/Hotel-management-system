@@ -206,5 +206,18 @@
     "lastLogin": "08 Aug 2026, 11:15 AM",
     "createdAt": "2026-08-15T11:00:00.000Z",
     "updatedAt": "2026-08-08T11:15:00.000Z"
+  },
+  {
+    "id": "j65xhqicbj8",
+    "_id": "j65xhqicbj8",
+    "name": "Test Admin",
+    "email": "testadmin_7k3dn@hourstay.com",
+    "password": "$2a$10$TF3VB/6Wul7YBB2stvP05u.i7L5NPTNJWkov4uBmBXHLtRecQ9v.W",
+    "role": "admin",
+    "mobile": "9999999999",
+    "propertyId": "HS-XR24S",
+    "status": "Active",
+    "createdAt": "2026-08-18T05:35:56.813Z",
+    "updatedAt": "2026-08-18T05:35:56.825Z"
   }
 ]

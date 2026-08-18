@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, '../data/properties.json');
 
 const propertySchema = new mongoose.Schema({
-  _id: { type: String },
+  _id: { type: String, default: () => "HS-" + Math.random().toString(36).substring(2, 7).toUpperCase() },
   name: { type: String, required: true, trim: true },
   city: { type: String, required: true, trim: true },
   rooms: { type: Number, required: true, default: 0 },
@@ -17,10 +17,51 @@ const propertySchema = new mongoose.Schema({
   revpar: { type: Number, default: 0 },
   status: { type: String, enum: ['Active', 'Suspended', 'Pending', 'Onboarding', 'Rejected'], default: 'Onboarding' },
   gm: { type: String, trim: true },
-  assignedAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  assignedAdmin: { type: String, ref: 'User', default: null },
   subscriptionTier: { type: String, enum: ['Basic', 'Premium', 'Enterprise', 'None'], default: 'None' },
   subscriptionStatus: { type: String, enum: ['Active', 'Unpaid', 'Expired', 'None'], default: 'None' },
-  subscriptionExpiry: { type: Date }
+  subscriptionExpiry: { type: Date },
+  commissionRate: { type: Number, default: 12 },
+  settings: {
+    type: Object,
+    default: () => ({
+      logo: "",
+      address: "",
+      phone: "",
+      email: "",
+      gstin: "",
+      classification: "3-Star",
+      description: "",
+      gstEnabled: true,
+      cgst: 9,
+      sgst: 9,
+      igst: 18,
+      hsnSac: "996311",
+      taxInclusive: true,
+      checkInTime: "12:00",
+      checkOutTime: "11:00",
+      earlyCheckInCharge: 0,
+      lateCheckOutCharge: 0,
+      cancellationPolicy: "Free cancellation up to 24 hours prior to check-in. Cancellation within 24 hours will attract a 1-night tariff penalty.",
+      noShowPolicy: "No-show will attract 100% room charge penalty.",
+      refundPolicy: "Refunds are processed within 5-7 business days.",
+      paymentMethods: ["UPI", "Card", "Cash"],
+      advancePaymentPercent: 100,
+      securityDeposit: 0,
+      bookingRules: "Guests must produce valid identity documentation on arrival.",
+      reservationSettings: "Auto-release unconfirmed rooms after 2 hours.",
+      paymentConfig: "Razorpay Checkout API Integration",
+      notifyOnBooking: true,
+      notifyOnPayment: true,
+      notifyOnCancellation: true,
+      notifyOnCheckInOut: true,
+      notifyOnGuestService: true,
+      channelEmail: true,
+      channelSms: false,
+      channelWhatsApp: true,
+      channelPush: false
+    })
+  }
 }, {
   timestamps: true
 });
@@ -216,9 +257,47 @@ const MockProperty = {
       status: data.status || 'Onboarding',
       gm: data.gm || '—',
       assignedAdmin: data.assignedAdmin || null,
+      commissionRate: data.commissionRate !== undefined ? Number(data.commissionRate) : 12,
       subscriptionTier: data.subscriptionTier || 'None',
       subscriptionStatus: data.subscriptionStatus || 'None',
       subscriptionExpiry: data.subscriptionExpiry || null,
+      settings: data.settings || {
+        logo: "",
+        address: data.city || "",
+        phone: "",
+        email: "",
+        gstin: "",
+        classification: "3-Star",
+        description: "",
+        gstEnabled: true,
+        cgst: 9,
+        sgst: 9,
+        igst: 18,
+        hsnSac: "996311",
+        taxInclusive: true,
+        checkInTime: "12:00",
+        checkOutTime: "11:00",
+        earlyCheckInCharge: 0,
+        lateCheckOutCharge: 0,
+        cancellationPolicy: "Free cancellation up to 24 hours prior to check-in. Cancellation within 24 hours will attract a 1-night tariff penalty.",
+        noShowPolicy: "No-show will attract 100% room charge penalty.",
+        refundPolicy: "Refunds are processed within 5-7 business days.",
+        paymentMethods: ["UPI", "Card", "Cash"],
+        advancePaymentPercent: 100,
+        securityDeposit: 0,
+        bookingRules: "Guests must produce valid identity documentation on arrival.",
+        reservationSettings: "Auto-release unconfirmed rooms after 2 hours.",
+        paymentConfig: "Razorpay Checkout API Integration",
+        notifyOnBooking: true,
+        notifyOnPayment: true,
+        notifyOnCancellation: true,
+        notifyOnCheckInOut: true,
+        notifyOnGuestService: true,
+        channelEmail: true,
+        channelSms: false,
+        channelWhatsApp: true,
+        channelPush: false
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -242,6 +321,13 @@ const MockProperty = {
     if (update.occupancy !== undefined) updated.occupancy = Number(update.occupancy);
     if (update.adr !== undefined) updated.adr = Number(update.adr);
     if (update.revpar !== undefined) updated.revpar = Number(update.revpar);
+    if (update.commissionRate !== undefined) updated.commissionRate = Number(update.commissionRate);
+    if (update.settings !== undefined) {
+      updated.settings = {
+        ...(current.settings || {}),
+        ...update.settings
+      };
+    }
 
     list[idx] = updated;
     writeProperties(list);

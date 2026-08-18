@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";

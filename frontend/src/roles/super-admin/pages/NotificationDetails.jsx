@@ -62,14 +62,6 @@ function SuperAdminNotificationDetails() {
         <PageHeader
           title="Alert Diagnostic Details"
           subtitle="System event logs and incident records."
-          actions={
-            <Button
-              onClick={() => navigate("/super-admin/notifications")}
-              className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 gap-2 cursor-pointer text-xs"
-            >
-              <ArrowLeft className="size-4" /> Back to Console
-            </Button>
-          }
         />
         <Notice tone="error" title="Record Not Found">
           {error}
@@ -91,14 +83,6 @@ function SuperAdminNotificationDetails() {
       <PageHeader
         title="Alert Diagnostic Details"
         subtitle={`System event logs and diagnostic details for incident ${ntf.id}`}
-        actions={
-          <Button
-            onClick={() => navigate("/super-admin/notifications")}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 gap-2 cursor-pointer text-xs"
-          >
-            <ArrowLeft className="size-4" /> Back to Console
-          </Button>
-        }
       />
 
       <div className="max-w-3xl">
