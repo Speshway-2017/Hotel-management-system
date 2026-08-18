@@ -1,55 +1,71 @@
+import { FormField, Input, Select, Textarea, Checkbox, Switch } from "@/components/hs/FormFields";
+import { Label } from "@/components/ui/label";
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, Shield, X, Trash2, ShieldCheck, Key, Lock, UserPlus, Building2, UserCog, Eye, UserCheck, UserX } from "lucide-react";
 
-function SuperAdminUsers() {
-  const [users, setUsers] = useState([]);
+
+import { toast } from "sonner";
+import {
+  Search,
+  Calendar,
+  Building,
+  User,
+  Eye,
+  X,
+  XCircle,
+  AlertTriangle,
+  Mail,
+  Phone,
+  Bookmark,
+  Receipt,
+  Trash2
+} from "lucide-react";
+
+function SuperAdminGuests() {
+  const [bookings, setBookings] = useState([]);
   const [properties, setProperties] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("All");
   const [propertyFilter, setPropertyFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  // Modal States
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState("add"); // 'add' | 'edit' | 'view' | 'delete'
-  const [selectedUser, setSelectedUser] = useState(null);
+  // Pagination
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 6;
 
-  // Form Fields
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "manager",
-    mobile: "",
-    status: "Active",
-    propertyId: ""
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    action: null
   });
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [usersRes, propertiesRes] = await Promise.all([
-        superAdminService.getUsers(),
-        superAdminService.getProperties()
+      const [bookingsRes, propertiesRes, usersRes] = await Promise.all([
+        superAdminService.getReservations(),
+        superAdminService.getProperties(),
+        superAdminService.getUsers()
       ]);
-      if (usersRes.success) {
-        setUsers(usersRes.data);
-      }
-      if (propertiesRes.success) {
-        setProperties(propertiesRes.data);
-      }
+
+      if (bookingsRes.success) setBookings(bookingsRes.data);
+      if (propertiesRes.success) setProperties(propertiesRes.data);
+      if (usersRes.success) setUsers(usersRes.data);
     } catch (err) {
-      setError(err.message || "Failed to load directory data");
+      setError(err.message || "Failed to load guest directory data.");
     } finally {
       setLoading(false);
     }
@@ -59,506 +75,394 @@ function SuperAdminUsers() {
     loadData();
   }, []);
 
-  const openAddModal = () => {
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      role: "manager",
-      mobile: "",
-      status: "Active",
-      propertyId: ""
-    });
-    setModalType("add");
-    setModalOpen(true);
-  };
-
-  const openEditModal = (user) => {
-    setSelectedUser(user);
-    setFormData({
-      name: user.name,
-      email: user.email,
-      password: "",
-      role: user.role,
-      mobile: user.mobile || "",
-      status: user.status || "Active",
-      propertyId: user.propertyId || ""
-    });
-    setModalType("edit");
-    setModalOpen(true);
-  };
-
-  const openViewModal = (user) => {
-    setSelectedUser(user);
-    setFormData({
-      name: user.name,
-      email: user.email,
-      password: "",
-      role: user.role,
-      mobile: user.mobile || "",
-      status: user.status || "Active",
-      propertyId: user.propertyId || ""
-    });
-    setModalType("view");
-    setModalOpen(true);
-  };
-
-  const openDeleteModal = (user) => {
-    setSelectedUser(user);
-    setModalType("delete");
-    setModalOpen(true);
-  };
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (modalType === "add") {
-        const res = await superAdminService.createUser(formData);
-        if (res.success) {
-          setModalOpen(false);
-          loadData();
-        }
-      } else if (modalType === "edit") {
-        const { name, role, mobile, status, propertyId } = formData;
-        const res = await superAdminService.updateUser(selectedUser.id || selectedUser._id, { name, role, mobile, status, propertyId });
-        if (res.success) {
-          setModalOpen(false);
-          loadData();
-        }
-      }
-    } catch (err) {
-      setError(err.message || "Action failed");
-    }
-  };
-
-  const handleDeleteSubmit = async () => {
-    try {
-      const res = await superAdminService.deleteUser(selectedUser.id || selectedUser._id);
-      if (res.success) {
-        setModalOpen(false);
-        loadData();
-      }
-    } catch (err) {
-      setError(err.message || "Failed to delete user");
-    }
-  };
-
-  const handleToggleStatus = async (user) => {
-    const newStatus = user.status === "Active" ? "Inactive" : "Active";
-    try {
-      const res = await superAdminService.updateUser(user.id || user._id, {
-        name: user.name,
-        role: user.role,
-        mobile: user.mobile,
-        status: newStatus,
-        propertyId: user.propertyId
-      });
-      if (res.success) {
-        loadData();
-      }
-    } catch (err) {
-      setError(err.message || "Failed to update user status");
-    }
-  };
-
-  const handleRoleChange = (e) => {
-    const role = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      role,
-      propertyId: role === "super-admin" ? "" : prev.propertyId
-    }));
-  };
-
   // Helper to map property ID to Property Name
   const getPropertyName = (propertyId) => {
-    if (!propertyId || propertyId === "Global" || propertyId === "All") return "Global / All Properties";
     const prop = properties.find(p => p.id === propertyId || p._id === propertyId);
-    return prop ? prop.name : "Global / All Properties";
+    return prop ? prop.name : "Unknown Property";
   };
 
-  // Filtered Users
-  const filteredUsers = users.filter((u) => {
+  // Consolidate Guests list (only those who registered OR made bookings)
+  const getConsolidatedGuests = () => {
+    const list = [];
+    const processedBookingIds = new Set();
+    const guestUsers = users.filter(u => u.role === "guest");
+
+    // 1. Process all bookings
+    bookings.forEach((b) => {
+      processedBookingIds.add(b._id || b.id);
+      
+      // Find matching guest user
+      const matchedUser = guestUsers.find(
+        u => (u.name && b.guest && u.name.toLowerCase() === b.guest.toLowerCase()) || 
+             (u.mobile && b.phone && u.mobile.replace(/\s+/g, '') === b.phone.replace(/\s+/g, ''))
+      );
+
+      list.push({
+        id: b._id || b.id,
+        name: b.guest || "Unknown Guest",
+        email: matchedUser ? matchedUser.email : ((b.guest || "guest").toLowerCase().replace(/[^a-z0-9]/g, '') + "@example.com"),
+        phone: b.phone || (matchedUser ? matchedUser.mobile : "—"),
+        bookingId: b.id || b._id,
+        propertyId: b.propertyId,
+        propertyName: getPropertyName(b.propertyId),
+        room: b.room || "—",
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        bookingStatus: b.status,
+        paymentStatus: b.balance === 0 ? "Paid" : "Pending",
+        booking: b
+      });
+    });
+
+    // 2. Add registered guest users who have no bookings
+    guestUsers.forEach((u) => {
+      const hasBooking = list.some(
+        item => (item.name && u.name && item.name.toLowerCase() === u.name.toLowerCase()) || 
+                (item.phone && item.phone !== "—" && u.mobile && item.phone.replace(/\s+/g, '') === u.mobile.replace(/\s+/g, ''))
+      );
+
+      if (!hasBooking) {
+        list.push({
+          id: u._id || u.id,
+          name: u.name || "Unknown Guest",
+          email: u.email || "",
+          phone: u.mobile || "—",
+          bookingId: "—",
+          propertyId: u.propertyId || "",
+          propertyName: u.propertyId ? getPropertyName(u.propertyId) : "—",
+          room: "—",
+          checkIn: "—",
+          checkOut: "—",
+          bookingStatus: "—",
+          paymentStatus: "—",
+          booking: null
+        });
+      }
+    });
+
+    return list;
+  };
+
+  const consolidatedGuests = getConsolidatedGuests();
+
+  // Filter Consolidated Guests
+  const filteredGuests = consolidatedGuests.filter((item) => {
+    // Search
     const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.mobile && u.mobile.includes(searchQuery));
-    
-    const matchesRole = roleFilter === "All" || u.role === roleFilter;
+      searchQuery === "" ||
+      (item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.email && item.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.phone && item.phone.includes(searchQuery)) ||
+      (item.bookingId && item.bookingId.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesProperty =
-      propertyFilter === "All" ||
-      (propertyFilter === "Global" && (!u.propertyId || u.propertyId === "Global" || u.propertyId === "")) ||
-      u.propertyId === propertyFilter;
+    // Property
+    const matchesProperty = propertyFilter === "All" || item.propertyId === propertyFilter;
 
-    const matchesStatus = statusFilter === "All" || (u.status || "Active") === statusFilter;
+    // Status
+    const matchesStatus = statusFilter === "All" || item.bookingStatus === statusFilter;
 
-    return matchesSearch && matchesRole && matchesProperty && matchesStatus;
+    // Date Range
+    let matchesDate = true;
+    if (startDate || endDate) {
+      if (item.checkIn && item.checkIn !== "—") {
+        const itemDate = new Date(item.checkIn);
+        if (startDate) {
+          const start = new Date(startDate);
+          if (itemDate < start) matchesDate = false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          if (itemDate > end) matchesDate = false;
+        }
+      } else {
+        matchesDate = false;
+      }
+    }
+
+    return matchesSearch && matchesProperty && matchesStatus && matchesDate;
   });
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Governance & Roles"
-        subtitle="Manage user credentials, assign functional roles, and audit RBAC permissions across the group."
-        actions={
-          <Button onClick={openAddModal} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5">
-            <UserPlus className="size-4 mr-2" /> Add User Account
-          </Button>
+  // Pagination
+  const totalPages = Math.ceil(filteredGuests.length / itemsPerPage);
+  const paginatedGuests = filteredGuests.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+
+  const handleCancelBooking = (guestItem) => {
+    setConfirmModal({
+      open: true,
+      title: "Cancel Guest Booking",
+      message: `Are you sure you want to cancel booking "${guestItem.bookingId}" for guest "${guestItem.name}"?`,
+      action: async () => {
+        try {
+          const res = await superAdminService.updateReservation(guestItem.id, {
+            status: "Cancelled"
+          });
+          if (res.success) {
+            toast.success("Booking cancelled successfully.");
+            loadData();
+          }
+        } catch (err) {
+          toast.error(err.message || "Failed to cancel booking.");
+        } finally {
+          setConfirmModal({ open: false, title: "", message: "", action: null });
         }
+      }
+    });
+  };
+
+  const handleDeleteBooking = (guestItem) => {
+    setConfirmModal({
+      open: true,
+      title: "Delete Booking Record",
+      message: `Are you sure you want to permanently delete booking "${guestItem.bookingId}"? This cannot be undone.`,
+      action: async () => {
+        try {
+          const res = await superAdminService.deleteReservation(guestItem.id);
+          if (res.success) {
+            toast.success("Booking deleted successfully.");
+            loadData();
+          }
+        } catch (err) {
+          toast.error(err.message || "Failed to delete booking.");
+        } finally {
+          setConfirmModal({ open: false, title: "", message: "", action: null });
+        }
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-6 text-left">
+
+      <PageHeader
+        title="Guest & Customer Directory"
+        subtitle="View and manage consolidated guest records, active hotel stays, check-in schedules, and redemptions."
       />
 
-      {error && <Notice tone="error" title="Governance Error" className="text-left">{error}</Notice>}
+      {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
-      <div className="space-y-4">
-        {/* Toolbar Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-card border rounded-xl p-4 shadow-soft">
-          {/* Search User */}
-          <div className="relative w-full col-span-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search user..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 rounded-full border-muted text-xs bg-white"
-            />
-          </div>
-          
-          {/* Role Filter */}
-          <div>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
-            >
-              <option value="All">All Roles</option>
-              <option value="super-admin">Super Admin</option>
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="receptionist">Receptionist</option>
-              <option value="guest">Guest</option>
-            </select>
-          </div>
-
-          {/* Property Filter */}
-          <div>
-            <select
-              value={propertyFilter}
-              onChange={(e) => setPropertyFilter(e.target.value)}
-              className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
-            >
-              <option value="All">All Properties</option>
-              <option value="Global">Global / All Properties</option>
-              {properties.map((p) => (
-                <option key={p.id || p._id} value={p.id || p._id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
+      {/* Toolbar Filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-card border rounded-xl p-4 shadow-soft">
+        {/* Search */}
+        <div className="relative w-full">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, email, phone..."
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+            className="pl-9 h-10 rounded-full border-muted text-xs bg-white"
+          />
         </div>
 
-        <Panel title="User Directory" description={`${filteredUsers.length} users and guests found`}>
-          {loading ? (
-            <LoadingRows rows={5} />
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No users found matching filters.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                    <th className="p-4">User Name</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Phone</th>
-                    <th className="p-4">Role</th>
-                    <th className="p-4">Assigned Property</th>
-                    <th className="p-4">Last Login</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredUsers.map((u) => (
-                    <tr key={u.id || u._id} className="hover:bg-muted/20 transition-colors">
-                      <td className="p-4 font-semibold text-navy text-sm">{u.name}</td>
-                      <td className="p-4 text-muted-foreground text-xs">{u.email}</td>
-                      <td className="p-4 font-mono text-xs">{u.mobile || "—"}</td>
-                      <td className="p-4">
-                        <Tag tone={u.role === "super-admin" ? "brand" : u.role === "admin" ? "success" : "neutral"}>{u.role}</Tag>
-                      </td>
-                      <td className="p-4 text-xs font-semibold text-navy">{getPropertyName(u.propertyId)}</td>
-                      <td className="p-4 text-xs text-muted-foreground">{u.lastLogin || "—"}</td>
-                      <td className="p-4">
-                        <Tag tone={statusTone(u.status || "Active")}>{u.status || "Active"}</Tag>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex gap-1.5 justify-end">
-                          <button
-                            onClick={() => openViewModal(u)}
-                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
-                            title="View Details"
-                          >
-                            <Eye className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => openEditModal(u)}
-                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
-                            title="Edit User"
-                          >
-                            <Edit2 className="size-3.5" />
-                          </button>
-                          {u.role !== "super-admin" ? (
-                            <button
-                              onClick={() => handleToggleStatus(u)}
-                              className={`p-1.5 rounded-full cursor-pointer ${
-                                (u.status || "Active") === "Active" ? "hover:bg-error/15 text-error" : "hover:bg-success/15 text-success"
-                              }`}
-                              title={(u.status || "Active") === "Active" ? "Deactivate Account" : "Activate Account"}
-                            >
-                              {(u.status || "Active") === "Active" ? (
-                                <UserX className="size-3.5" />
-                              ) : (
-                                <UserCheck className="size-3.5" />
-                              )}
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="p-1.5 rounded-full text-muted-foreground/20 cursor-not-allowed"
-                              title="Super Admin status cannot be changed"
-                            >
-                              <UserX className="size-3.5" />
-                            </button>
-                          )}
-                          {u.role !== "super-admin" ? (
-                            <button
-                              onClick={() => openDeleteModal(u)}
-                              className="p-1.5 rounded-full hover:bg-error/15 text-error cursor-pointer"
-                              title="Delete User"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="p-1.5 rounded-full text-muted-foreground/20 cursor-not-allowed"
-                              title="Super Admin cannot be deleted"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
+        {/* Property Filter */}
+        <div>
+          <Select
+            value={propertyFilter}
+            onChange={(e) => { setPropertyFilter(e.target.value); setPage(1); }}
+            className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
+          >
+            <option value="All">All Properties</option>
+            {properties.map((p) => (
+              <option key={p.id || p._id} value={p.id || p._id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {/* Status Filter */}
+        <div>
+          <Select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Checked-in">Checked-in</option>
+            <option value="Checked-out">Checked-out</option>
+            <option value="Pending">Pending</option>
+            <option value="Cancelled">Cancelled</option>
+          </Select>
+        </div>
+
+        {/* Date Range Start */}
+        <div>
+          <Input
+            type="date"
+            placeholder="From Date"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+            className="h-10 rounded-full border-muted text-xs bg-white text-muted-foreground"
+          />
+        </div>
+
+        {/* Date Range End */}
+        <div>
+          <Input
+            type="date"
+            placeholder="To Date"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+            className="h-10 rounded-full border-muted text-xs bg-white text-muted-foreground"
+          />
+        </div>
       </div>
 
-      {/* Modals */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-deep/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(13,27,42,0.35)] relative border border-navy/5">
-            <div className="flex items-center justify-between pb-4 border-b border-muted">
-              <h3 className="font-display font-bold text-lg text-navy">
-                {modalType === "add" && "Create New User Account"}
-                {modalType === "edit" && "Modify User Credentials"}
-                {modalType === "view" && "User Account Details"}
-                {modalType === "delete" && "Remove User Confirmation"}
-              </h3>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-muted-foreground hover:text-navy cursor-pointer size-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
-              >
-                <X className="size-4" />
-              </button>
+      {/* Directory Database */}
+      <Panel title="Guest Database Records" description={`Showing ${filteredGuests.length} total guest accounts`}>
+        <div className="p-4 bg-white rounded-b-xl space-y-4">
+          {loading ? (
+            <LoadingRows rows={5} />
+          ) : paginatedGuests.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-xs font-semibold">
+              No matching guests or reservation records found.
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse min-w-[1100px]">
+                  <thead>
+                    <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
+                      <th className="p-4 text-left whitespace-nowrap">Guest Details</th>
+                      <th className="p-4 text-left whitespace-nowrap">Contact</th>
+                      <th className="p-4 text-left whitespace-nowrap">Booking ID</th>
+                      <th className="p-4 text-left whitespace-nowrap">Assigned Property</th>
+                      <th className="p-4 text-left whitespace-nowrap">Room Stays</th>
+                      <th className="p-4 text-left whitespace-nowrap">Check-In</th>
+                      <th className="p-4 text-left whitespace-nowrap">Check-Out</th>
+                      <th className="p-4 text-left whitespace-nowrap">Status</th>
+                      <th className="p-4 text-left whitespace-nowrap">Payment</th>
+                      <th className="p-4 text-right whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y font-sans">
+                    {paginatedGuests.map((g) => (
+                      <tr key={g.id} className="hover:bg-muted/15 transition-colors">
+                        <td className="p-4 whitespace-nowrap text-left">
+                          <div className="font-bold text-navy text-sm flex items-center gap-1.5">
+                            <User className="size-3.5 text-purple shrink-0" />
+                            {g.name}
+                          </div>
+                        </td>
+                        <td className="p-4 whitespace-nowrap text-left">
+                          <div className="text-navy font-semibold">{g.email}</div>
+                          <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{g.phone}</div>
+                        </td>
+                        <td className="p-4 whitespace-nowrap text-left font-mono font-bold text-purple">{g.bookingId}</td>
+                        <td className="p-4 whitespace-nowrap text-left font-semibold text-navy">
+                          <div className="flex items-center gap-1.5">
+                            <Building className="size-3 text-navy/40 shrink-0" />
+                            {g.propertyName}
+                          </div>
+                        </td>
+                        <td className="p-4 whitespace-nowrap text-left font-semibold text-muted-foreground">{g.room}</td>
+                        <td className="p-4 whitespace-nowrap text-left font-semibold text-navy">{g.checkIn}</td>
+                        <td className="p-4 whitespace-nowrap text-left font-semibold text-navy">{g.checkOut}</td>
+                        <td className="p-4 whitespace-nowrap text-left">
+                          <Tag tone={
+                            g.bookingStatus === "Confirmed" || g.bookingStatus === "Checked-in" ? "success" :
+                            g.bookingStatus === "Checked-out" ? "neutral" :
+                            g.bookingStatus === "Cancelled" ? "error" : "warning"
+                          }>
+                            {g.bookingStatus}
+                          </Tag>
+                        </td>
+                        <td className="p-4 whitespace-nowrap text-left">
+                          <Tag tone={g.paymentStatus === "Paid" ? "success" : g.paymentStatus === "—" ? "neutral" : "warning"}>
+                            {g.paymentStatus}
+                          </Tag>
+                        </td>
+                        <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                          <Link
+                            to={`/super-admin/users/view/${g.id}`}
+                            className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer flex items-center justify-center inline-flex"
+                            title="View Guest Record"
+                          >
+                            <Eye className="size-4" />
+                          </Link>
+                          {g.booking && g.bookingStatus !== "Cancelled" && g.bookingStatus !== "Checked-out" && (
+                            <Button
+                              onClick={() => handleCancelBooking(g)}
+                              variant="ghost"
+                              className="size-8 p-0 rounded-full text-warning hover:bg-warning/10 cursor-pointer"
+                              title="Cancel Booking"
+                            >
+                              <XCircle className="size-4" />
+                            </Button>
+                          )}
+                          {g.booking && (
+                            <Button
+                              onClick={() => handleDeleteBooking(g)}
+                              variant="ghost"
+                              className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
+                              title="Delete Booking"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {modalType === "delete" ? (
-              <div className="py-6 space-y-4 text-center">
-                <Shield className="size-12 text-error mx-auto animate-bounce" />
-                <h4 className="font-semibold text-navy text-base">Confirm Account Deletion</h4>
-                <p className="text-muted-foreground text-xs max-w-xs mx-auto">
-                  Are you sure you want to delete <strong className="text-navy">{selectedUser?.name}</strong>? This user will immediately lose access to their Hour Stay workspace.
-                </p>
-                <div className="flex gap-3 justify-center pt-4">
-                  <Button variant="ghost" onClick={() => setModalOpen(false)} className="rounded-full">
-                    Cancel
-                  </Button>
-                  <Button onClick={handleDeleteSubmit} className="bg-error hover:bg-error/90 text-white rounded-full px-5">
-                    Confirm & Delete
-                  </Button>
-                </div>
-              </div>
-            ) : modalType === "view" ? (
-              <div className="py-4 space-y-4 text-left">
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-navy font-semibold">Full Name</Label>
-                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{formData.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-navy font-semibold">Email Address</Label>
-                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{formData.email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-navy font-semibold">Mobile Number</Label>
-                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{formData.mobile || "—"}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-xs text-navy font-semibold">System Role</Label>
-                      <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1 uppercase tracking-wider font-mono">{formData.role}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-navy font-semibold">Account Status</Label>
-                      <div className="mt-1">
-                        <Tag tone={statusTone(formData.status)}>{formData.status}</Tag>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-navy font-semibold">Assigned Property</Label>
-                    <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1">{getPropertyName(formData.propertyId)}</p>
-                  </div>
-                  {selectedUser?.lastLogin && (
-                    <div>
-                      <Label className="text-xs text-navy font-semibold">Last Login Time</Label>
-                      <p className="text-xs text-navy-deep font-medium bg-muted/30 p-2.5 rounded border border-muted mt-1 font-mono">{selectedUser.lastLogin}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-3 justify-end pt-4 border-t border-muted mt-5">
-                  <Button variant="ghost" onClick={() => setModalOpen(false)} className="rounded-full w-24">
-                    Close
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleFormSubmit} className="py-4 space-y-4 text-left">
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="user-name" className="text-xs text-navy font-semibold">Full Name</Label>
-                    <Input
-                      id="user-name"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g. Sneha Deshpande"
-                      className="mt-1 h-10 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="user-email" className="text-xs text-navy font-semibold">Email Address</Label>
-                    <Input
-                      id="user-email"
-                      type="email"
-                      required
-                      disabled={modalType === "edit"}
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="e.g. sneha.d@hourstay.com"
-                      className="mt-1 h-10 text-xs disabled:bg-muted"
-                    />
-                  </div>
-                  {modalType === "add" && (
-                    <div>
-                      <Label htmlFor="user-pass" className="text-xs text-navy font-semibold">Temporary Password</Label>
-                      <Input
-                        id="user-pass"
-                        type="password"
-                        required
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        placeholder="Min 6 characters"
-                        className="mt-1 h-10 text-xs"
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <Label htmlFor="user-mobile" className="text-xs text-navy font-semibold">Mobile Number</Label>
-                    <Input
-                      id="user-mobile"
-                      value={formData.mobile}
-                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                      placeholder="e.g. +91 98290 12345"
-                      className="mt-1 h-10 text-xs"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="user-role" className="text-xs text-navy font-semibold">System Role</Label>
-                      <select
-                        id="user-role"
-                        value={formData.role}
-                        onChange={handleRoleChange}
-                        className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer"
-                      >
-                        <option value="super-admin">Super Admin</option>
-                        <option value="admin">Admin</option>
-                        <option value="manager">Manager</option>
-                        <option value="receptionist">Receptionist</option>
-                        <option value="guest">Guest</option>
-                      </select>
-                    </div>
-                    <div>
-                      <Label htmlFor="user-status" className="text-xs text-navy font-semibold">Account Status</Label>
-                      <select
-                        id="user-status"
-                        value={formData.status}
-                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                        className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="user-property" className="text-xs text-navy font-semibold">Assigned Property</Label>
-                    <select
-                      id="user-property"
-                      value={formData.propertyId}
-                      disabled={formData.role === "super-admin"}
-                      onChange={(e) => setFormData({ ...formData, propertyId: e.target.value })}
-                      className="w-full bg-white border border-muted px-3 h-10 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer mt-1 disabled:bg-muted"
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t pt-4 text-xs font-semibold">
+                  <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                      disabled={page === 1}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full border-muted hover:bg-muted font-bold"
                     >
-                      <option value="">Global / All Properties</option>
-                      {properties.map((p) => (
-                        <option key={p.id || p._id} value={p.id || p._id}>
-                          {p.name} ({p.city})
-                        </option>
-                      ))}
-                    </select>
+                      Previous
+                    </Button>
+                    <Button
+                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={page === totalPages}
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full border-muted hover:bg-muted font-bold"
+                    >
+                      Next
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-3 justify-end pt-4 border-t border-muted mt-5">
-                  <Button variant="ghost" type="button" onClick={() => setModalOpen(false)} className="rounded-full">
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white rounded-full px-5">
-                    {modalType === "add" ? "Create Account" : "Save Settings"}
-                  </Button>
-                </div>
-              </form>
-            )}
+              )}
+            </div>
+          )}
+        </div>
+      </Panel>
+
+
+      {/* Confirmation Modal */}
+      {confirmModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-deep/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-[0_20px_50px_rgba(13,27,42,0.35)] border border-navy/5 relative">
+            <div className="flex items-center gap-2 pb-2 mb-2">
+              <AlertTriangle className="size-5 text-error" />
+              <h4 className="font-display font-bold text-navy text-base">{confirmModal.title}</h4>
+            </div>
+            <p className="text-xs text-muted-foreground leading-normal mb-4 font-medium">{confirmModal.message}</p>
+            <div className="flex gap-2 justify-end border-t pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmModal({ open: false, title: "", message: "", action: null })}
+                className="rounded-full text-xs font-semibold"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmModal.action}
+                className="bg-error hover:bg-error/90 text-cream rounded-full px-5 text-xs font-semibold cursor-pointer"
+              >
+                Confirm Action
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -569,11 +473,9 @@ function SuperAdminUsers() {
 export const Route = createFileRoute("/super-admin/users")({
   head: () => ({
     meta: [
-      { title: "Users & Roles — Hour Stay" },
-      { name: "description", content: "Role assignments across all properties." },
-      { property: "og:title", content: "Users & Roles — Hour Stay" },
-      { property: "og:description", content: "Role assignments across all properties." }
+      { title: "Guest Directory Control Console — Hour Stay" },
+      { name: "description", content: "Manage guest databases and registration accounts across properties." }
     ]
   }),
-  component: SuperAdminUsers
+  component: SuperAdminGuests
 });

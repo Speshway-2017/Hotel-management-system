@@ -116,14 +116,6 @@ function AdminNotificationDetailsPage() {
   if (error) {
     return (
       <div className="space-y-6 text-left animate-fade-in">
-        <div className="flex justify-end select-none">
-          <Button
-            onClick={() => navigate("/admin/notifications")}
-            className="bg-navy hover:bg-navy-deep text-white shadow-soft text-xs h-9 px-4 font-bold"
-          >
-            <ArrowLeft className="size-4 mr-1.5" /> Back to Console
-          </Button>
-        </div>
         <Notice tone="error" title="Record Not Found">
           {error}
         </Notice>
@@ -141,14 +133,6 @@ function AdminNotificationDetailsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <div className="flex justify-end select-none">
-        <Button
-          onClick={() => navigate("/admin/notifications")}
-          className="bg-navy hover:bg-navy-deep text-white shadow-soft text-xs h-9 px-4 font-bold"
-        >
-          <ArrowLeft className="size-4 mr-1.5" /> Back to Console
-        </Button>
-      </div>
 
       <div className="max-w-3xl">
         <Panel title="Diagnostic Report Overview" description={`Incident ID: ${ntf.id}`}>

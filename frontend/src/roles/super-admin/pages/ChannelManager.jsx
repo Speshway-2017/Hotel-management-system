@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Panel, Tag, statusTone, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Activity, Eye, Sliders, CheckCircle2, AlertTriangle, AlertCircle, X, ShieldAlert, Key } from "lucide-react";
+import { RefreshCw, Activity, Sliders, CheckCircle2, AlertTriangle, AlertCircle, X, ShieldAlert, Key, Eye, EyeOff } from "lucide-react";
 
 function SuperAdminChannelManager() {
   const [loading, setLoading] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState("view"); // "view" | "manage"
+  const [showKey, setShowKey] = useState(false);
 
   const [channels, setChannels] = useState([
     {
@@ -328,11 +329,21 @@ function SuperAdminChannelManager() {
                   </div>
                   <div className="space-y-1.5">
                     <span className="block text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Integration Key / Token</span>
-                    <input
-                      type="password"
-                      className="w-full bg-white border border-muted px-3 h-10 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-purple"
-                      placeholder="••••••••••••••••"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showKey ? "text" : "password"}
+                        className="w-full bg-white border border-muted pl-3 pr-10 h-10 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-purple"
+                        placeholder="••••••••••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(!showKey)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-navy/40 hover:text-navy/70 transition-colors focus:outline-none cursor-pointer p-1"
+                        aria-label={showKey ? "Hide key" : "Show key"}
+                      >
+                        {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end pt-4 border-t border-muted mt-5">

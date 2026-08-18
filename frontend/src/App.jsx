@@ -39,9 +39,15 @@ import { Route as AdminReservations } from "./roles/admin/pages/Reservations";
 import { Route as AdminRooms } from "./roles/admin/pages/Rooms";
 import { Route as AdminSettings } from "./roles/admin/pages/Settings";
 import { Route as AdminStaff } from "./roles/admin/pages/Staff";
+import { Route as AdminAddStaff } from "./roles/admin/pages/AddStaff";
+import { Route as AdminEditStaff } from "./roles/admin/pages/EditStaff";
+import { Route as AdminViewStaff } from "./roles/admin/pages/ViewStaff";
 import { Route as AdminTaxes } from "./roles/admin/pages/Taxes";
 import { Route as AdminCrm } from "./roles/admin/pages/Crm";
 import { Route as AdminProfile } from "./roles/admin/pages/Profile";
+import { Route as AdminAddReservation } from "./roles/admin/pages/AddReservation";
+import { Route as AdminEditReservation } from "./roles/admin/pages/EditReservation";
+import { Route as AdminViewReservation } from "./roles/admin/pages/ViewReservation";
 
 // Import Manager Workspace Pages
 import { Route as ManagerLayout } from "./roles/manager/pages/ManagerLayout";
@@ -89,19 +95,29 @@ import { Route as GuestServices } from "./roles/guest/pages/Services";
 // Import Super Admin Workspace Pages
 import { Route as SuperAdminLayout } from "./roles/super-admin/pages/SuperAdminLayout";
 import { Route as SuperAdminDashboard } from "./roles/super-admin/pages/Dashboard";
-import { Route as SuperAdminAdmins } from "./roles/super-admin/pages/Admins";
-import { Route as SuperAdminAuditLogs } from "./roles/super-admin/pages/AuditLogs";
 import { Route as SuperAdminChannelManager } from "./roles/super-admin/pages/ChannelManager";
 import { Route as SuperAdminNotifications } from "./roles/super-admin/pages/Notifications";
 import { Route as SuperAdminNotificationDetails } from "./roles/super-admin/pages/NotificationDetails";
 import { Route as SuperAdminOccupancy } from "./roles/super-admin/pages/Occupancy";
+import { Route as SuperAdminCoupons } from "./roles/super-admin/pages/Coupons";
+import { Route as SuperAdminAddCoupon } from "./roles/super-admin/pages/AddCoupon";
+import { Route as SuperAdminEditCoupon } from "./roles/super-admin/pages/EditCoupon";
+import { Route as SuperAdminViewCoupon } from "./roles/super-admin/pages/ViewCoupon";
 import { Route as SuperAdminProperties } from "./roles/super-admin/pages/Properties";
+import { Route as SuperAdminAddProperty } from "./roles/super-admin/pages/AddProperty";
+import { Route as SuperAdminViewProperty } from "./roles/super-admin/pages/ViewProperty";
+import { Route as SuperAdminEditProperty } from "./roles/super-admin/pages/EditProperty";
 import { Route as SuperAdminReports } from "./roles/super-admin/pages/Reports";
 import { Route as SuperAdminReservations } from "./roles/super-admin/pages/Reservations";
-import { Route as SuperAdminRoomsRates } from "./roles/super-admin/pages/RoomsRates";
+import { Route as SuperAdminViewReservation } from "./roles/super-admin/pages/ViewSuperReservation";
 import { Route as SuperAdminUsers } from "./roles/super-admin/pages/Users";
+import { Route as SuperAdminViewGuest } from "./roles/super-admin/pages/ViewGuest";
 import { Route as SuperAdminBranding } from "./roles/super-admin/pages/Branding";
 import { Route as SuperAdminSubscription } from "./roles/super-admin/pages/Subscription";
+import { Route as SuperAdminAddPlan } from "./roles/super-admin/pages/AddPlan";
+import { Route as SuperAdminEditPlan } from "./roles/super-admin/pages/EditPlan";
+import { Route as SuperAdminViewPlan } from "./roles/super-admin/pages/ViewPlan";
+import { Route as SuperAdminGlobalSettings } from "./roles/super-admin/pages/GlobalSettings";
 import { Route as SuperAdminProfile } from "./roles/super-admin/pages/Profile";
 
 const queryClient = new QueryClient();
@@ -233,9 +249,15 @@ export default function App() {
             <Route path="/admin/payments" element={<RouteWrapper routeObj={AdminPayments} />} />
             <Route path="/admin/reports" element={<RouteWrapper routeObj={AdminReports} />} />
             <Route path="/admin/reservations" element={<RouteWrapper routeObj={AdminReservations} />} />
+            <Route path="/admin/reservations/add" element={<RouteWrapper routeObj={AdminAddReservation} />} />
+            <Route path="/admin/reservations/edit/:id" element={<RouteWrapper routeObj={AdminEditReservation} />} />
+            <Route path="/admin/reservations/view/:id" element={<RouteWrapper routeObj={AdminViewReservation} />} />
             <Route path="/admin/rooms" element={<RouteWrapper routeObj={AdminRooms} />} />
             <Route path="/admin/settings" element={<RouteWrapper routeObj={AdminSettings} />} />
             <Route path="/admin/staff" element={<RouteWrapper routeObj={AdminStaff} />} />
+            <Route path="/admin/staff/add" element={<RouteWrapper routeObj={AdminAddStaff} />} />
+            <Route path="/admin/staff/edit/:id" element={<RouteWrapper routeObj={AdminEditStaff} />} />
+            <Route path="/admin/staff/view/:id" element={<RouteWrapper routeObj={AdminViewStaff} />} />
             <Route path="/admin/taxes" element={<RouteWrapper routeObj={AdminTaxes} />} />
             <Route path="/admin/crm" element={<RouteWrapper routeObj={AdminCrm} />} />
             <Route path="/admin/profile" element={<RouteWrapper routeObj={AdminProfile} />} />
@@ -290,19 +312,29 @@ export default function App() {
           {/* Super Admin Workspace */}
           <Route element={<ProtectedRoute allowedRoles={["super-admin"]}><RouteWrapper routeObj={SuperAdminLayout} /></ProtectedRoute>}>
             <Route path="/super-admin" element={<RouteWrapper routeObj={SuperAdminDashboard} />} />
-            <Route path="/super-admin/admins" element={<RouteWrapper routeObj={SuperAdminAdmins} />} />
-            <Route path="/super-admin/audit-logs" element={<RouteWrapper routeObj={SuperAdminAuditLogs} />} />
             <Route path="/super-admin/channel-manager" element={<RouteWrapper routeObj={SuperAdminChannelManager} />} />
             <Route path="/super-admin/notifications" element={<RouteWrapper routeObj={SuperAdminNotifications} />} />
             <Route path="/super-admin/notifications/:id" element={<RouteWrapper routeObj={SuperAdminNotificationDetails} />} />
             <Route path="/super-admin/occupancy" element={<RouteWrapper routeObj={SuperAdminOccupancy} />} />
             <Route path="/super-admin/properties" element={<RouteWrapper routeObj={SuperAdminProperties} />} />
+            <Route path="/super-admin/properties/add" element={<RouteWrapper routeObj={SuperAdminAddProperty} />} />
+            <Route path="/super-admin/properties/view/:id" element={<RouteWrapper routeObj={SuperAdminViewProperty} />} />
+            <Route path="/super-admin/properties/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditProperty} />} />
             <Route path="/super-admin/reports" element={<RouteWrapper routeObj={SuperAdminReports} />} />
             <Route path="/super-admin/reservations" element={<RouteWrapper routeObj={SuperAdminReservations} />} />
-            <Route path="/super-admin/rooms" element={<RouteWrapper routeObj={SuperAdminRoomsRates} />} />
+            <Route path="/super-admin/reservations/view/:id" element={<RouteWrapper routeObj={SuperAdminViewReservation} />} />
             <Route path="/super-admin/users" element={<RouteWrapper routeObj={SuperAdminUsers} />} />
+            <Route path="/super-admin/users/view/:id" element={<RouteWrapper routeObj={SuperAdminViewGuest} />} />
             <Route path="/super-admin/branding" element={<RouteWrapper routeObj={SuperAdminBranding} />} />
             <Route path="/super-admin/subscription" element={<RouteWrapper routeObj={SuperAdminSubscription} />} />
+            <Route path="/super-admin/subscription/add" element={<RouteWrapper routeObj={SuperAdminAddPlan} />} />
+            <Route path="/super-admin/subscription/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditPlan} />} />
+            <Route path="/super-admin/subscription/view/:id" element={<RouteWrapper routeObj={SuperAdminViewPlan} />} />
+            <Route path="/super-admin/global-settings" element={<RouteWrapper routeObj={SuperAdminGlobalSettings} />} />
+            <Route path="/super-admin/coupons" element={<RouteWrapper routeObj={SuperAdminCoupons} />} />
+            <Route path="/super-admin/coupons/add" element={<RouteWrapper routeObj={SuperAdminAddCoupon} />} />
+            <Route path="/super-admin/coupons/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditCoupon} />} />
+            <Route path="/super-admin/coupons/view/:id" element={<RouteWrapper routeObj={SuperAdminViewCoupon} />} />
             <Route path="/super-admin/profile" element={<RouteWrapper routeObj={SuperAdminProfile} />} />
           </Route>
         </Routes>

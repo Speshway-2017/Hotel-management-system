@@ -80,15 +80,14 @@ export const roleMeta =
 export const navByRole = {
   "super-admin": [
     {
-      group: "Super Admin Panel",
+      group: "",
       items: [
         { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
-        { label: "Property Management", to: "/super-admin/properties", icon: Building2 },
-        { label: "Operations", to: "/super-admin/reservations", icon: CalendarCheck },
-        { label: "Analytics & Reports", to: "/super-admin/occupancy", icon: TrendingUp },
+        { label: "Operations", to: "/super-admin/properties", icon: CalendarCheck },
+        { label: "Analytics & Reports", to: "/super-admin/reports", icon: TrendingUp },
         { label: "Access & Security", to: "/super-admin/users", icon: ShieldCheck },
-        { label: "Integrations", to: "/super-admin/channel-manager", icon: Activity },
-        { label: "System", to: "/super-admin/branding", icon: Settings }
+        { label: "System", to: "/super-admin/branding", icon: Settings },
+        { label: "Subscription", to: "/super-admin/subscription", icon: BadgeIndianRupee }
       ]
     }
   ],
@@ -130,8 +129,7 @@ export const navByRole = {
     { label: "Guests / CRM", to: "/manager/guests", icon: Users },
     { label: "Approvals", to: "/manager/approvals", icon: ClipboardCheck },
     { label: "Staff Shifts", to: "/manager/shifts", icon: UserCog },
-    { label: "Guest Feedback", to: "/manager/feedback", icon: MessageSquareHeart },
-    { label: "Notifications", to: "/manager/notifications", icon: Bell }]
+    { label: "Guest Feedback", to: "/manager/feedback", icon: MessageSquareHeart }]
 
   }],
 
@@ -159,8 +157,7 @@ export const navByRole = {
     items: [
     { label: "Folio & Billing", to: "/reception/folio", icon: Receipt },
     { label: "Payments", to: "/reception/payments", icon: CreditCard },
-    { label: "Maintenance", to: "/reception/maintenance", icon: Wrench },
-    { label: "Notifications", to: "/reception/notifications", icon: Bell }]
+    { label: "Maintenance", to: "/reception/maintenance", icon: Wrench }]
 
   }],
 
@@ -188,8 +185,7 @@ export const navByRole = {
     { label: "Digital Folio", to: "/guest/folio", icon: Receipt },
     { label: "Loyalty", to: "/guest/loyalty", icon: Gift },
     { label: "Reviews", to: "/guest/reviews", icon: Star },
-    { label: "Profile", to: "/guest/profile", icon: Heart },
-    { label: "Notifications", to: "/guest/notifications", icon: Bell }]
+    { label: "Profile", to: "/guest/profile", icon: Heart }]
 
   }]
 

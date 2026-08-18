@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 
@@ -13,23 +13,24 @@ import {
   Search,
   Edit2,
   Trash2,
-  Building,
-  DollarSign,
-  Layers,
-  Sparkles,
-  UserCheck,
+  Ticket,
+  Percent,
+  Calendar,
+  Users,
+  Activity,
   ToggleLeft,
   ToggleRight,
   Eye
 } from "lucide-react";
 
-function SuperAdminSubscription() {
-  const [plans, setPlans] = useState([]);
+function SuperAdminCoupons() {
+  const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter & Search states
+  // Search & Filter states
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -43,56 +44,58 @@ function SuperAdminSubscription() {
     action: null
   });
 
-  const loadPlans = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const res = await superAdminService.getSubscriptionPlans();
-      if (res.success) {
-        setPlans(res.data);
+      const couponsRes = await superAdminService.getPromoCoupons();
+      if (couponsRes.success) {
+        setCoupons(couponsRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load subscription plans.");
+      setError(err.message || "Failed to sync coupons data.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPlans();
+    loadData();
   }, []);
 
-  // Filtered plans
-  const filteredPlans = plans.filter(p => {
-    return p.name.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filtered coupons list
+  const filteredCoupons = coupons.filter(c => {
+    const matchesSearch = c.code.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "All" || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
-  // Paginated plans
-  const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
-  const paginatedPlans = filteredPlans.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  // Paginated coupons
+  const totalPages = Math.ceil(filteredCoupons.length / itemsPerPage);
+  const paginatedCoupons = filteredCoupons.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-  // Statistics calculation
-  const totalPlansCount = plans.length;
-  const activePlansCount = plans.filter(p => p.status === "Active").length;
-  const subscribedPropertiesCount = plans.reduce((sum, p) => sum + (p.activeSubscribers || 0), 0);
-  const monthlyRevenue = plans.reduce((sum, p) => sum + ((p.activeSubscribers || 0) * (p.monthlyPrice || 0)), 0);
+  // Stats counters
+  const totalCouponsCount = coupons.length;
+  const activeCouponsCount = coupons.filter(c => c.status === "Active").length;
+  const totalUsedCount = coupons.reduce((sum, c) => sum + (c.usedCount || 0), 0);
+  const totalDiscountVal = coupons.reduce((sum, c) => sum + ((c.usedCount || 0) * (c.discountValue || 0)), 0);
 
-  const triggerToggleStatus = (plan) => {
-    const nextStatus = plan.status === "Active" ? "Inactive" : "Active";
+  const triggerToggleStatus = (coupon) => {
+    const nextStatus = coupon.status === "Active" ? "Inactive" : "Active";
     setConfirmModal({
       open: true,
-      title: `${nextStatus === "Active" ? "Activate" : "Deactivate"} Plan`,
-      message: `Are you sure you want to change the status of Plan "${plan.name}" to ${nextStatus}?`,
+      title: `${nextStatus === "Active" ? "Activate" : "Deactivate"} Coupon`,
+      message: `Are you sure you want to toggle the status of Coupon "${coupon.code}" to ${nextStatus}?`,
       action: async () => {
         try {
-          const res = await superAdminService.updateSubscriptionPlan(plan._id || plan.id, {
+          const res = await superAdminService.updatePromoCoupon(coupon._id || coupon.id, {
             status: nextStatus
           });
           if (res.success) {
-            toast.success(`Plan "${plan.name}" is now ${nextStatus}.`);
-            loadPlans();
+            toast.success(`Coupon "${coupon.code}" is now ${nextStatus}.`);
+            loadData();
           }
         } catch (err) {
-          toast.error(err.message || "Failed to toggle plan status.");
+          toast.error(err.message || "Failed to toggle status.");
         } finally {
           setConfirmModal({ open: false, title: "", message: "", action: null });
         }
@@ -100,20 +103,20 @@ function SuperAdminSubscription() {
     });
   };
 
-  const triggerDelete = (plan) => {
+  const triggerDelete = (coupon) => {
     setConfirmModal({
       open: true,
-      title: "Delete Plan",
-      message: `Are you sure you want to permanently delete Plan "${plan.name}"? This action is irreversible.`,
+      title: "Delete Promo Coupon",
+      message: `Are you sure you want to permanently delete Coupon "${coupon.code}"? This action is irreversible.`,
       action: async () => {
         try {
-          const res = await superAdminService.deleteSubscriptionPlan(plan._id || plan.id);
+          const res = await superAdminService.deletePromoCoupon(coupon._id || coupon.id);
           if (res.success) {
-            toast.success(`Plan "${plan.name}" deleted.`);
-            loadPlans();
+            toast.success(`Coupon "${coupon.code}" deleted successfully.`);
+            loadData();
           }
         } catch (err) {
-          toast.error(err.message || "Failed to delete subscription plan.");
+          toast.error(err.message || "Failed to delete coupon.");
         } finally {
           setConfirmModal({ open: false, title: "", message: "", action: null });
         }
@@ -123,16 +126,17 @@ function SuperAdminSubscription() {
 
   return (
     <div className="space-y-6 text-left">
+
       <PageHeader
-        title="Subscription Plans Control Center"
-        subtitle="Configure system-wide subscription packages, monthly/yearly pricing parameters, and active platform subscribers."
+        title="Promo Coupons Control Center"
+        subtitle="Manage discounts, promo coupons, usage boundaries, and applicable tier plans for subscriptions."
         actions={
           <Link
-            to="/super-admin/subscription/add"
+            to="/super-admin/coupons/add"
             className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 flex items-center gap-1.5 h-9 font-bold text-xs cursor-pointer"
           >
             <Plus className="size-4" />
-            Add Subscription Plan
+            Add Coupon
           </Link>
         }
       />
@@ -140,91 +144,108 @@ function SuperAdminSubscription() {
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
 
-      <Panel title="Platform Plans Catalog" description="Manage access packages and pricing limits across properties.">
+      <Panel title="Promo Coupons Database" description="Live promo coupons for guest reservations.">
         <div className="p-4 bg-white rounded-b-xl space-y-4">
           {/* Controls */}
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
             <div className="relative w-full max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search plan by name..."
+                placeholder="Search coupon code..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                 className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
               />
             </div>
             
-            <div></div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground font-semibold">Status:</span>
+              <Select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                className="h-9 border border-navy/45 bg-cream/10 rounded-full px-4 text-xs font-semibold text-navy focus:outline-none cursor-pointer"
+              >
+                <option value="All">All Coupons</option>
+                <option value="Active">Active Only</option>
+                <option value="Inactive">Inactive Only</option>
+              </Select>
+            </div>
           </div>
 
           {/* Table */}
           {loading ? (
             <LoadingRows rows={4} />
-          ) : paginatedPlans.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-xs font-medium">No subscription packages found.</div>
+          ) : paginatedCoupons.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-xs font-medium">No promo coupons found.</div>
           ) : (
             <div className="space-y-4">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4">Plan Name</th>
-                      <th className="p-4">Monthly Rate</th>
-                      <th className="p-4">Yearly Rate</th>
-                      <th className="p-4">Property / Room Limits</th>
-                      <th className="p-4">Active Subscribers</th>
+                      <th className="p-4">Coupon Code</th>
+                      <th className="p-4">Discount Details</th>
+                      <th className="p-4">Validity Range</th>
+                      <th className="p-4">Min Spend</th>
+                      <th className="p-4">Usage Limits</th>
+                      <th className="p-4">Used Count</th>
                       <th className="p-4">Status</th>
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
-                    {paginatedPlans.map((p) => (
-                      <tr key={p._id || p.id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4">
-                          <div className="font-bold text-navy">{p.name}</div>
-                          {p.description && <div className="text-[10px] text-muted-foreground mt-0.5">{p.description}</div>}
+                    {paginatedCoupons.map((c) => (
+                      <tr key={c._id || c.id} className="hover:bg-muted/15 transition-colors">
+                        <td className="p-4 font-bold text-navy flex items-center gap-2">
+                          <Ticket className="size-4 text-purple" />
+                          <div>
+                            <div className="font-bold text-navy">{c.code}</div>
+                            {c.description && <div className="text-[9px] text-muted-foreground font-semibold">{c.description}</div>}
+                          </div>
                         </td>
-                        <td className="p-4 font-bold text-navy">₹{p.monthlyPrice.toLocaleString("en-IN")}</td>
-                        <td className="p-4 font-bold text-purple">₹{p.yearlyPrice.toLocaleString("en-IN")}</td>
+                        <td className="p-4 font-semibold text-navy">
+                          {c.discountType === "percentage" ? `${c.discountValue}% Off` : `₹${c.discountValue} Off`}
+                        </td>
                         <td className="p-4 font-semibold text-muted-foreground">
-                          {p.propertyLimit} {p.propertyLimit === 1 ? "Property" : "Properties"} / {p.roomLimit} Rooms
+                          <div className="flex items-center gap-1">
+                            <Calendar className="size-3 text-navy/40" />
+                            <span>{c.validFrom} to {c.validUntil}</span>
+                          </div>
                         </td>
-                        <td className="p-4 font-bold text-navy flex items-center gap-1.5 mt-2">
-                          <UserCheck className="size-4 text-purple" />
-                          {p.activeSubscribers || 0}
-                        </td>
+                        <td className="p-4 font-bold text-navy">₹{(c.minimumSubscriptionAmount || 0).toLocaleString("en-IN")}</td>
+                        <td className="p-4 font-semibold text-navy">{c.usageLimit} Max</td>
+                        <td className="p-4 font-bold text-purple">{c.usedCount || 0} times</td>
                         <td className="p-4">
-                          <Tag tone={p.status === "Active" ? "success" : "neutral"}>{p.status}</Tag>
+                          <Tag tone={c.status === "Active" ? "success" : "neutral"}>{c.status}</Tag>
                         </td>
                         <td className="p-4 text-right space-x-1 whitespace-nowrap">
-
                           <Link
-                            to={`/super-admin/subscription/view/${p._id || p.id}`}
+                            to={`/super-admin/coupons/view/${c._id || c.id}`}
                             className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
-                            title="View Plan Details"
+                            title="View Coupon Details"
                           >
                             <Eye className="size-4" />
                           </Link>
                           <Link
-                            to={`/super-admin/subscription/edit/${p._id || p.id}`}
+                            to={`/super-admin/coupons/edit/${c._id || c.id}`}
                             className="size-8 p-0 rounded-full text-purple hover:bg-purple/10 cursor-pointer inline-flex items-center justify-center"
-                            title="Edit Plan"
+                            title="Edit Coupon"
                           >
                             <Edit2 className="size-4" />
                           </Link>
                           <Button
-                            onClick={() => triggerToggleStatus(p)}
+                            onClick={() => triggerToggleStatus(c)}
                             variant="ghost"
-                            className={`size-8 p-0 rounded-full hover:bg-muted cursor-pointer ${p.status === "Active" ? "text-warning" : "text-success"}`}
-                            title={p.status === "Active" ? "Deactivate Plan" : "Activate Plan"}
+                            className={`size-8 p-0 rounded-full hover:bg-muted cursor-pointer ${c.status === "Active" ? "text-warning" : "text-success"}`}
+                            title={c.status === "Active" ? "Deactivate Coupon" : "Activate Coupon"}
                           >
-                            {p.status === "Active" ? <ToggleLeft className="size-5" /> : <ToggleRight className="size-5" />}
+                            {c.status === "Active" ? <ToggleLeft className="size-5" /> : <ToggleRight className="size-5" />}
                           </Button>
                           <Button
-                            onClick={() => triggerDelete(p)}
+                            onClick={() => triggerDelete(c)}
                             variant="ghost"
                             className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
-                            title="Delete Plan"
+                            title="Delete Coupon"
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -266,7 +287,7 @@ function SuperAdminSubscription() {
         </div>
       </Panel>
 
-      {/* Confirmation Dialog Modal */}
+      {/* Confirmation Modal */}
       {confirmModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-deep/60 backdrop-blur-sm animate-fade-in text-left">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-[0_20px_50px_rgba(13,27,42,0.35)] border border-navy/5 relative">
@@ -294,12 +315,12 @@ function SuperAdminSubscription() {
   );
 }
 
-export const Route = createFileRoute("/super-admin/subscription")({
+export const Route = createFileRoute("/super-admin/coupons")({
   head: () => ({
     meta: [
-      { title: "Subscription Plans & Billing — Hour Stay" },
-      { name: "description", content: "Configure platform billing packages and pricing layers." }
+      { title: "Subscription Coupons Management — Hour Stay" },
+      { name: "description", content: "Manage SaaS subscription discount coupons." }
     ]
   }),
-  component: SuperAdminSubscription
+  component: SuperAdminCoupons
 });

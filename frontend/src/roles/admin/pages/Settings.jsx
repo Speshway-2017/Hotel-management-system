@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { HorizontalRouteTabs, Panel, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { FormField, Input, Select, Textarea, Checkbox } from "@/components/hs/FormFields";
 import { Settings as SettingsIcon, User } from "lucide-react";
 
 const settingsTabs = [
@@ -94,52 +95,48 @@ function AdminSettingsPage() {
             <Panel title="Hotel Profile Information" description="Update property address, support details, and descriptions.">
               <div className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Hotel Name</label>
-                    <input
+                  <FormField label="Hotel Name" required className="col-span-2" id="hotelName">
+                    <Input
+                      id="hotelName"
                       type="text"
                       required
                       value={hotelName}
                       onChange={(e) => setHotelName(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Reservation Email</label>
-                    <input
+                  <FormField label="Reservation Email" required id="hotelEmail">
+                    <Input
+                      id="hotelEmail"
                       type="email"
                       required
                       value={hotelEmail}
                       onChange={(e) => setHotelEmail(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Contact Number</label>
-                    <input
+                  <FormField label="Contact Number" required id="hotelPhone">
+                    <Input
+                      id="hotelPhone"
                       type="text"
                       required
                       value={hotelPhone}
                       onChange={(e) => setHotelPhone(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Physical Address</label>
-                    <textarea
-                      rows={3}
+                  <FormField label="Physical Address" required className="col-span-2" id="hotelAddress">
+                    <Textarea
+                      id="hotelAddress"
                       required
                       value={hotelAddress}
                       onChange={(e) => setHotelAddress(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy resize-none"
+                      className="min-h-[80px]"
                     />
-                  </div>
+                  </FormField>
                 </div>
                 <div className="pt-4 border-t border-muted flex justify-end">
-                  <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft">
+                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer">
                     Save Changes
                   </Button>
                 </div>
@@ -151,41 +148,39 @@ function AdminSettingsPage() {
             <Panel title="Taxation & GST configuration" description="Specify active goods and service tax slabs.">
               <div className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">GSTIN ID</label>
-                    <input
+                  <FormField label="GSTIN ID" required className="col-span-2" id="gstin">
+                    <Input
+                      id="gstin"
                       type="text"
                       required
                       value={gstin}
                       onChange={(e) => setGstin(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm font-mono tracking-wider focus:outline-none focus:border-navy"
+                      className="font-mono uppercase tracking-wider"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">CGST Slabs (%)</label>
-                    <input
+                  <FormField label="CGST Slabs (%)" required id="cgst">
+                    <Input
+                      id="cgst"
                       type="number"
                       required
                       value={cgst}
                       onChange={(e) => setCgst(Number(e.target.value))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">SGST Slabs (%)</label>
-                    <input
+                  <FormField label="SGST Slabs (%)" required id="sgst">
+                    <Input
+                      id="sgst"
                       type="number"
                       required
                       value={sgst}
                       onChange={(e) => setSgst(Number(e.target.value))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
                 </div>
                 <div className="pt-4 border-t border-muted flex justify-end">
-                  <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft">
+                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer">
                     Save Taxation Settings
                   </Button>
                 </div>
@@ -197,41 +192,38 @@ function AdminSettingsPage() {
             <Panel title="Timings & Cancellation Policies" description="Set check-in/out SLA limits and cancellation definitions.">
               <div className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Standard Check-In Time</label>
-                    <input
+                  <FormField label="Standard Check-In Time" required id="checkInTime">
+                    <Input
+                      id="checkInTime"
                       type="time"
                       required
                       value={checkInTime}
                       onChange={(e) => setCheckInTime(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Standard Check-Out Time</label>
-                    <input
+                  <FormField label="Standard Check-Out Time" required id="checkOutTime">
+                    <Input
+                      id="checkOutTime"
                       type="time"
                       required
                       value={checkOutTime}
                       onChange={(e) => setCheckOutTime(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Cancellation Policy Statement</label>
-                    <textarea
-                      rows={4}
+                  <FormField label="Cancellation Policy Statement" required className="col-span-2" id="cancelPolicy">
+                    <Textarea
+                      id="cancelPolicy"
                       required
                       value={cancelPolicy}
                       onChange={(e) => setCancelPolicy(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy resize-none"
+                      className="min-h-[100px]"
                     />
-                  </div>
+                  </FormField>
                 </div>
                 <div className="pt-4 border-t border-muted flex justify-end">
-                  <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft">
+                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer">
                     Save Policy Changes
                   </Button>
                 </div>
@@ -243,45 +235,39 @@ function AdminSettingsPage() {
             <Panel title="Payments & Booking Preferences" description="Configure merchant provider bindings and automation limits.">
               <div className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Payment Merchant Provider</label>
-                    <select
+                  <FormField label="Payment Merchant Provider" id="paymentProvider">
+                    <Select
+                      id="paymentProvider"
                       value={paymentProvider}
                       onChange={(e) => setPaymentProvider(e.target.value)}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm bg-white focus:outline-none focus:border-navy"
                     >
                       <option value="Razorpay">Razorpay Checkout API</option>
                       <option value="Stripe">Stripe GDS integration</option>
                       <option value="Paytm">Paytm Merchant SDK</option>
-                    </select>
-                  </div>
+                    </Select>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Waitlist Max Capacity Limit</label>
-                    <input
+                  <FormField label="Waitlist Max Capacity Limit" required id="waitlistLimit">
+                    <Input
+                      id="waitlistLimit"
                       type="number"
                       required
                       value={waitlistLimit}
                       onChange={(e) => setWaitlistLimit(Number(e.target.value))}
-                      className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
                     />
-                  </div>
+                  </FormField>
 
-                  <div className="col-span-2 flex items-center gap-2.5 pt-2">
-                    <input
-                      type="checkbox"
+                  <div className="col-span-2 pt-2">
+                    <Checkbox
                       id="autoAssign"
                       checked={autoAssign}
                       onChange={(e) => setAutoAssign(e.target.checked)}
-                      className="rounded border-muted text-navy focus:ring-navy"
+                      label="Enable Auto Room Assignment on Confirmed bookings"
                     />
-                    <label htmlFor="autoAssign" className="text-xs font-bold uppercase tracking-wider text-navy select-none">
-                      Enable Auto Room Assignment on Confirmed bookings
-                    </label>
                   </div>
                 </div>
                 <div className="pt-4 border-t border-muted flex justify-end">
-                  <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft">
+                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer">
                     Save Preferences
                   </Button>
                 </div>
@@ -292,51 +278,39 @@ function AdminSettingsPage() {
           {activeSubTab === "notifications" && (
             <Panel title="Property Notification Alerts" description="Configure alert channels for managers and receptionist operators.">
               <div className="p-6 bg-white rounded-b-xl space-y-4">
-                <div className="space-y-3.5">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                <div className="space-y-4">
+                  <div>
+                    <Checkbox
                       id="emailAlerts"
                       checked={emailAlerts}
                       onChange={(e) => setEmailAlerts(e.target.checked)}
-                      className="rounded border-muted text-navy focus:ring-navy"
+                      label="Email Notifications"
                     />
-                    <div>
-                      <label htmlFor="emailAlerts" className="text-xs font-bold uppercase tracking-wider text-navy select-none">Email Notifications</label>
-                      <p className="text-[10px] text-muted-foreground">Send daily ledger summaries and cancellation audits to manager email.</p>
-                    </div>
+                    <p className="text-[10px] text-muted-foreground/80 ml-7">Send daily ledger summaries and cancellation audits to manager email.</p>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                  <div>
+                    <Checkbox
                       id="smsAlerts"
                       checked={smsAlerts}
                       onChange={(e) => setSmsAlerts(e.target.checked)}
-                      className="rounded border-muted text-navy focus:ring-navy"
+                      label="SMS Transaction Alerts"
                     />
-                    <div>
-                      <label htmlFor="smsAlerts" className="text-xs font-bold uppercase tracking-wider text-navy select-none">SMS Transaction Alerts</label>
-                      <p className="text-[10px] text-muted-foreground">Dispatch transaction confirmation texts directly to guests (standard carrier rates apply).</p>
-                    </div>
+                    <p className="text-[10px] text-muted-foreground/80 ml-7">Dispatch transaction confirmation texts directly to guests (standard carrier rates apply).</p>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
+                  <div>
+                    <Checkbox
                       id="parityAlerts"
                       checked={parityAlerts}
                       onChange={(e) => setParityAlerts(e.target.checked)}
-                      className="rounded border-muted text-navy focus:ring-navy"
+                      label="OTA Sync Failure Warning"
                     />
-                    <div>
-                      <label htmlFor="parityAlerts" className="text-xs font-bold uppercase tracking-wider text-navy select-none">OTA Sync Failure Warning</label>
-                      <p className="text-[10px] text-muted-foreground">Enable high-priority console alerts if channel manager fails to sync rates within 2 minutes.</p>
-                    </div>
+                    <p className="text-[10px] text-muted-foreground/80 ml-7">Enable high-priority console alerts if channel manager fails to sync rates within 2 minutes.</p>
                   </div>
                 </div>
                 <div className="pt-4 border-t border-muted flex justify-end">
-                  <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft">
+                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer">
                     Save Notification Prefs
                   </Button>
                 </div>
