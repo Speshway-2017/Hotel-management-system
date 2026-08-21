@@ -10,13 +10,16 @@ const DATA_FILE = path.join(__dirname, '../data/users.json');
 
 // Mongoose User Schema
 const userSchema = new mongoose.Schema({
+  _id: { type: String, default: () => Math.random().toString(36).substring(2, 15) },
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['super-admin', 'admin', 'manager', 'receptionist', 'guest'], default: 'guest' },
   mobile: { type: String, trim: true },
   propertyId: { type: String, default: null },
-  status: { type: String, enum: ['Active', 'Suspended'], default: 'Active' },
+  status: { type: String, enum: ['Active', 'Suspended', 'Inactive'], default: 'Active' },
+  dept: { type: String, default: "Front Desk" },
+  shift: { type: String, default: "Morning (06:00 - 14:00)" },
   otp: { type: String },
   otpExpires: { type: Date }
 }, {
@@ -25,6 +28,7 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
+  if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return next();
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -149,6 +153,8 @@ const MockUser = {
       mobile: data.mobile,
       propertyId: data.propertyId || null,
       status: data.status || 'Active',
+      dept: data.dept || 'Front Desk',
+      shift: data.shift || 'Morning (06:00 - 14:00)',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -249,19 +255,65 @@ const User = {
   },
   create: async (...args) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseUser.create(...args);
+      const created = await MongooseUser.create(...args);
+      try {
+        const instance = new UserInstance({
+          id: created._id.toString(),
+          _id: created._id.toString(),
+          name: created.name,
+          email: created.email,
+          password: created.password,
+          role: created.role,
+          mobile: created.mobile,
+          propertyId: created.propertyId || null,
+          status: created.status || 'Active',
+          createdAt: created.createdAt || new Date().toISOString(),
+          updatedAt: created.updatedAt || new Date().toISOString()
+        });
+        await instance.save();
+      } catch (err) {
+        console.warn('Mock dual-write failed:', err.message);
+      }
+      return created;
     }
     return await MockUser.create(...args);
   },
   findByIdAndUpdate: async (id, update, options) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseUser.findByIdAndUpdate(id, update, { new: true, ...options });
+      const updated = await MongooseUser.findByIdAndUpdate(id, update, { new: true, ...options });
+      if (updated) {
+        try {
+          const instance = new UserInstance({
+            id: updated._id.toString(),
+            _id: updated._id.toString(),
+            name: updated.name,
+            email: updated.email,
+            password: updated.password,
+            role: updated.role,
+            mobile: updated.mobile,
+            propertyId: updated.propertyId || null,
+            status: updated.status || 'Active',
+            createdAt: updated.createdAt,
+            updatedAt: updated.updatedAt
+          });
+          await instance.save();
+        } catch (err) {
+          console.warn('Mock dual-write update failed:', err.message);
+        }
+      }
+      return updated;
     }
     return await MockUser.findByIdAndUpdate(id, update, options);
   },
   findByIdAndDelete: async (id) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseUser.findByIdAndDelete(id);
+      const deleted = await MongooseUser.findByIdAndDelete(id);
+      try {
+        await MockUser.findByIdAndDelete(id);
+      } catch (err) {
+        console.warn('Mock dual-write delete failed:', err.message);
+      }
+      return deleted;
     }
     return await MockUser.findByIdAndDelete(id);
   }

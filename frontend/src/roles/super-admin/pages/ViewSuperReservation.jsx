@@ -59,14 +59,6 @@ function ViewSuperReservation() {
       <PageHeader
         title={selectedBooking ? `Reservation: ${selectedBooking.id || selectedBooking._id}` : "Reservation Details"}
         subtitle="Operational stay records, occupancy configurations, and tariff ledger audit."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/super-admin/reservations" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Reservations
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}

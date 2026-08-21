@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { cn } from "@/utils/utils";
 import { Eye, EyeOff } from "lucide-react";

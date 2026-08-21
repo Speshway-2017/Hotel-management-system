@@ -107,31 +107,18 @@ export const navByRole = {
   ],
 
   manager: [
-  {
-    group: "Today",
-    items: [
-    { label: "Dashboard", to: "/manager", icon: LayoutDashboard },
-    { label: "Arrivals & Departures", to: "/manager/arrivals", icon: CalendarCheck },
-    { label: "Room Status", to: "/manager/room-status", icon: Grid3x3 }]
-
-  },
-  {
-    group: "Performance",
-    items: [
-    { label: "Occupancy & Revenue", to: "/manager/occupancy", icon: TrendingUp },
-    { label: "Reservations", to: "/manager/reservations", icon: CalendarClock },
-    { label: "Reports", to: "/manager/reports", icon: BarChart3 }]
-
-  },
-  {
-    group: "Team & Guests",
-    items: [
-    { label: "Guests / CRM", to: "/manager/guests", icon: Users },
-    { label: "Approvals", to: "/manager/approvals", icon: ClipboardCheck },
-    { label: "Staff Shifts", to: "/manager/shifts", icon: UserCog },
-    { label: "Guest Feedback", to: "/manager/feedback", icon: MessageSquareHeart }]
-
-  }],
+    {
+      group: "Manager Console",
+      items: [
+        { label: "Dashboard", to: "/manager", icon: LayoutDashboard },
+        { label: "Operations", to: "/manager/operations", icon: CalendarCheck },
+        { label: "Management", to: "/manager/approvals", icon: UserCog },
+        { label: "Guest Experience", to: "/manager/feedback", icon: MessageSquareHeart },
+        { label: "Finance", to: "/manager/billing", icon: Receipt },
+        { label: "Reports", to: "/manager/reports", icon: BarChart3 }
+      ]
+    }
+  ],
 
   reception: [
   {

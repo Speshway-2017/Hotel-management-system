@@ -41,14 +41,6 @@ function ViewPlan() {
       <PageHeader
         title={plan ? `Subscription Plan: ${plan.name}` : "Plan Details"}
         subtitle="Tier rates configuration, access permissions limits, and feature permissions index."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/super-admin/subscription" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer flex items-center gap-1.5"
-          >
-            <ChevronLeft className="size-4" /> Back to Plans
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}

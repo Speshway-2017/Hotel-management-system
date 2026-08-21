@@ -57,10 +57,14 @@ import { Route as ManagerArrivals } from "./roles/manager/pages/Arrivals";
 import { Route as ManagerFeedback } from "./roles/manager/pages/Feedback";
 import { Route as ManagerGuests } from "./roles/manager/pages/Guests";
 import { Route as ManagerNotifications } from "./roles/manager/pages/Notifications";
+import { Route as ManagerNotificationDetails } from "./roles/manager/pages/NotificationDetails";
 import { Route as ManagerOccupancy } from "./roles/manager/pages/Occupancy";
 import { Route as ManagerReports } from "./roles/manager/pages/Reports";
 import { Route as ManagerReservations } from "./roles/manager/pages/Reservations";
+import { Route as ManagerViewReservation } from "./roles/manager/pages/ViewReservation";
+import { Route as ManagerEditReservation } from "./roles/manager/pages/EditReservation";
 import { Route as ManagerShifts } from "./roles/manager/pages/Shifts";
+import { Route as ManagerProfile } from "./roles/manager/pages/Profile";
 
 // Import Receptionist Workspace Pages
 import { Route as ReceptionLayout } from "./roles/receptionist/pages/ReceptionLayout";
@@ -118,6 +122,10 @@ import { Route as SuperAdminAddPlan } from "./roles/super-admin/pages/AddPlan";
 import { Route as SuperAdminEditPlan } from "./roles/super-admin/pages/EditPlan";
 import { Route as SuperAdminViewPlan } from "./roles/super-admin/pages/ViewPlan";
 import { Route as SuperAdminGlobalSettings } from "./roles/super-admin/pages/GlobalSettings";
+import { Route as SuperAdminAdmins } from "./roles/super-admin/pages/Admins";
+import { Route as SuperAdminAddAdmin } from "./roles/super-admin/pages/AddAdmin";
+import { Route as SuperAdminEditAdmin } from "./roles/super-admin/pages/EditAdmin";
+import { Route as SuperAdminViewAdmin } from "./roles/super-admin/pages/ViewAdmin";
 import { Route as SuperAdminProfile } from "./roles/super-admin/pages/Profile";
 
 const queryClient = new QueryClient();
@@ -267,14 +275,18 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={["manager"]}><RouteWrapper routeObj={ManagerLayout} /></ProtectedRoute>}>
             <Route path="/manager" element={<RouteWrapper routeObj={ManagerDashboard} />} />
             <Route path="/manager/approvals" element={<RouteWrapper routeObj={ManagerApprovals} />} />
-            <Route path="/manager/arrivals" element={<RouteWrapper routeObj={ManagerArrivals} />} />
+            <Route path="/manager/operations" element={<RouteWrapper routeObj={ManagerArrivals} />} />
             <Route path="/manager/feedback" element={<RouteWrapper routeObj={ManagerFeedback} />} />
             <Route path="/manager/guests" element={<RouteWrapper routeObj={ManagerGuests} />} />
             <Route path="/manager/notifications" element={<RouteWrapper routeObj={ManagerNotifications} />} />
+            <Route path="/manager/notifications/:id" element={<RouteWrapper routeObj={ManagerNotificationDetails} />} />
             <Route path="/manager/occupancy" element={<RouteWrapper routeObj={ManagerOccupancy} />} />
             <Route path="/manager/reports" element={<RouteWrapper routeObj={ManagerReports} />} />
             <Route path="/manager/reservations" element={<RouteWrapper routeObj={ManagerReservations} />} />
+            <Route path="/manager/reservations/view/:id" element={<RouteWrapper routeObj={ManagerViewReservation} />} />
+            <Route path="/manager/reservations/edit/:id" element={<RouteWrapper routeObj={ManagerEditReservation} />} />
             <Route path="/manager/shifts" element={<RouteWrapper routeObj={ManagerShifts} />} />
+            <Route path="/manager/profile" element={<RouteWrapper routeObj={ManagerProfile} />} />
           </Route>
 
           {/* Receptionist Workspace */}
@@ -325,6 +337,10 @@ export default function App() {
             <Route path="/super-admin/reservations/view/:id" element={<RouteWrapper routeObj={SuperAdminViewReservation} />} />
             <Route path="/super-admin/users" element={<RouteWrapper routeObj={SuperAdminUsers} />} />
             <Route path="/super-admin/users/view/:id" element={<RouteWrapper routeObj={SuperAdminViewGuest} />} />
+            <Route path="/super-admin/admins" element={<RouteWrapper routeObj={SuperAdminAdmins} />} />
+            <Route path="/super-admin/admins/add" element={<RouteWrapper routeObj={SuperAdminAddAdmin} />} />
+            <Route path="/super-admin/admins/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditAdmin} />} />
+            <Route path="/super-admin/admins/view/:id" element={<RouteWrapper routeObj={SuperAdminViewAdmin} />} />
             <Route path="/super-admin/branding" element={<RouteWrapper routeObj={SuperAdminBranding} />} />
             <Route path="/super-admin/subscription" element={<RouteWrapper routeObj={SuperAdminSubscription} />} />
             <Route path="/super-admin/subscription/add" element={<RouteWrapper routeObj={SuperAdminAddPlan} />} />

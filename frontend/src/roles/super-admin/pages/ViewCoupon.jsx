@@ -41,14 +41,6 @@ function ViewCoupon() {
       <PageHeader
         title={coupon ? `Promo Coupon: ${coupon.code}` : "Coupon Details"}
         subtitle="Operational parameters, discount slabs, plans coverage, and utilization index."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/super-admin/coupons" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer flex items-center gap-1.5"
-          >
-            <ChevronLeft className="size-4" /> Back to Coupons
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}

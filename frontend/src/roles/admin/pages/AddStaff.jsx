@@ -33,6 +33,8 @@ function AddStaff() {
         role,
         mobile: phone,
         status,
+        dept,
+        shift,
         propertyId: "HS-JAI" // Scoped to admin property Speshway Luxury Hotel
       };
       const res = await superAdminService.createUser(payload);
@@ -52,14 +54,6 @@ function AddStaff() {
       <PageHeader
         title="Register Staff Profile"
         subtitle="Onboard a new employee, set role configurations and shift assignments."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/admin/staff" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Team List
-          </Button>
-        }
       />
 
       <div className="max-w-xl">

@@ -2,6 +2,7 @@
 import { PageHeader, Panel, StatCard, Tag, statusTone, Notice } from "./kit";
 import { DataTable } from "./DataTable";
 import { RevenueChart, OccupancyChart, SourceMixChart } from "./Charts";
+import { authService } from "@/services/auth";
 import {
   auditLogs, channels, feedback, guests, inr, invoices, notifications, payments,
   properties, reservations, roomTypes, staff, serviceRequests, myBookings } from "@/data/hs-data";
@@ -188,9 +189,10 @@ export function WorkspacePage({
   navTabs
 }) {
   const ds = dataset === "none" ? null : datasets[dataset];
+  const isManager = authService.getCurrentUser()?.role === "manager";
   return (
     <>
-      <PageHeader title={title} subtitle={subtitle} actions={actions} />
+      {!isManager && <PageHeader title={title} subtitle={subtitle} actions={actions} />}
       {navTabs && navTabs}
       {notice &&
       <Notice tone={notice.tone} title={notice.title}>

@@ -11,15 +11,16 @@ function AddReservation() {
   const [loading, setLoading] = useState(false);
 
   // Form states
-  const [guest, setGuest] = useState("");
-  const [phone, setPhone] = useState("");
-  const [room, setRoom] = useState("");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  const searchParams = new URLSearchParams(window.location.search);
+  const [guest, setGuest] = useState(searchParams.get("guest") || "");
+  const [phone, setPhone] = useState(searchParams.get("phone") || "");
+  const [room, setRoom] = useState(searchParams.get("room") || "");
+  const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
+  const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [nights, setNights] = useState(1);
   const [pax, setPax] = useState("2 Adults");
   const [source, setSource] = useState("Direct");
-  const [status, setStatus] = useState("Pending");
+  const [status, setStatus] = useState(searchParams.get("status") || "Pending");
   const [amount, setAmount] = useState("");
   const [balance, setBalance] = useState("");
   const [isGroupBooking, setIsGroupBooking] = useState(false);
@@ -62,14 +63,6 @@ function AddReservation() {
       <PageHeader
         title="Create New Reservation"
         subtitle="Book guest rooms, assign stay duration parameters, and log billing rates."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/admin/reservations" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Console
-          </Button>
-        }
       />
 
       <div className="max-w-xl">

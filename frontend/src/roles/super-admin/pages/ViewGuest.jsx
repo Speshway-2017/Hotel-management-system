@@ -92,14 +92,6 @@ function ViewGuest() {
       <PageHeader
         title={guest ? `Guest stay folio: ${guest.name}` : "Guest stay folio"}
         subtitle="Detailed profile verification, stay log index and billing summaries."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/super-admin/users" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Directory
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}

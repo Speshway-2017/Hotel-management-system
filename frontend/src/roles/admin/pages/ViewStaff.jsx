@@ -50,14 +50,6 @@ function ViewStaff() {
       <PageHeader
         title={selectedStaff ? `Staff Profile: ${selectedStaff.name}` : "Staff Profile Diagnostic"}
         subtitle="Detailed shift logging, department assignment, and attendance diagnostics."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/admin/staff" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Team List
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}

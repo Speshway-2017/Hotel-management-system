@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 
@@ -52,25 +52,9 @@ function ViewPlanSubscribers() {
 
   return (
     <div className="space-y-6 text-left">
-      <Crumbs
-        items={[
-          { label: "Super Admin", to: "/super-admin" },
-          { label: "Plans & Billing", to: "/super-admin/subscription" },
-          { label: "View Subscribers" }
-        ]}
-      />
-
       <PageHeader
         title={plan ? `Subscribers: ${plan.name}` : "Plan Subscribers"}
         subtitle="Operational view of hotel properties registered under this subscription level."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/super-admin/subscription" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Plans
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
