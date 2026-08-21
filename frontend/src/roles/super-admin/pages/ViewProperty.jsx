@@ -43,6 +43,11 @@ function ViewProperty() {
     ? users.filter(u => u.propertyId === property._id || u.propertyId === property.id)
     : [];
 
+  const adminUser = property
+    ? (users.find(u => u.id === property.assignedAdmin || u._id === property.assignedAdmin) ||
+       users.find(u => u.name === property.gm || u.name === property.assignedAdmin?.name))
+    : null;
+
   const propertyReservations = property
     ? reservations.filter(r => r.propertyId === property._id || r.propertyId === property.id)
     : [];
@@ -109,8 +114,20 @@ function ViewProperty() {
                     </div>
                     <div className="space-y-1">
                       <strong className="text-navy font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Assigned Admin / Owner</strong>
-                      <p className="text-sm font-semibold text-navy">{property.assignedAdmin?.name || property.gm || "Unassigned"}</p>
+                      <p className="text-sm font-semibold text-navy">{adminUser?.name || property.gm || "Unassigned"}</p>
                     </div>
+                    {adminUser && (
+                      <>
+                        <div className="space-y-1">
+                          <strong className="text-navy font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Admin Email</strong>
+                          <p className="text-sm font-semibold text-navy">{adminUser.email}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <strong className="text-navy font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Admin Contact</strong>
+                          <p className="text-sm font-semibold text-navy">{adminUser.mobile || "—"}</p>
+                        </div>
+                      </>
+                    )}
                     <div className="space-y-1">
                       <strong className="text-navy font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Registered Date</strong>
                       <p className="text-sm font-semibold text-navy">

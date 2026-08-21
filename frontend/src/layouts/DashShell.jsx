@@ -38,7 +38,8 @@ const subModules = {
       { label: "Revenue Reports", to: "/super-admin/reports" }
     ],
     "Access & Security": [
-      { label: "Users", to: "/super-admin/users" }
+      { label: "Guests Portfolio", to: "/super-admin/users" },
+      { label: "Administrators", to: "/super-admin/admins" }
     ],
     "System": [
       { label: "Branding", to: "/super-admin/branding" },
@@ -70,6 +71,25 @@ const subModules = {
       { label: "Channel Manager", to: "/admin/channels" },
       { label: "CRM / Loyalty", to: "/admin/crm" }
     ]
+  },
+  "manager": {
+    "Operations": [
+      { label: "Today's Operations", to: "/manager/operations" },
+      { label: "Reservations", to: "/manager/reservations" },
+      { label: "Rooms", to: "/manager/rooms" },
+      { label: "Guests", to: "/manager/guests" }
+    ],
+    "Management": [
+      { label: "Approvals", to: "/manager/approvals" },
+      { label: "Staff & Shifts", to: "/manager/shifts" },
+      { label: "Attendance", to: "/manager/attendance" }
+    ],
+    "Guest Experience": [
+      { label: "Feedback", to: "/manager/feedback" }
+    ],
+    "Finance": [
+      { label: "Billing Overview", to: "/manager/billing" }
+    ]
   }
 };
 
@@ -77,8 +97,6 @@ export function DashShell({ role, children }) {
   const navigate = useNavigate();
   const groups = navByRole[role];
   const meta = roleMeta[role];
-  const supportsDark = role === "manager";
-  const { dark, setDark } = useDarkMode(supportsDark);
   const [open, setOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -90,16 +108,39 @@ export function DashShell({ role, children }) {
   const [userProperty, setUserProperty] = useState(null);
 
   useEffect(() => {
-    if (role === "admin") {
-      superAdminService.getProperties()
-        .then(res => {
-          if (res.success && res.data && res.data.length > 0) {
-            setUserProperty(res.data[0]);
-          }
+    if (role === "admin" || role === "manager") {
+      authService.getProfile()
+        .then(profileRes => {
+          const freshUser = profileRes.data;
+          return superAdminService.getProperties()
+            .then(res => {
+              if (res.success && res.data) {
+                if (role === "manager") {
+                  const found = res.data.find(p => p._id === freshUser.propertyId || p.id === freshUser.propertyId);
+                  setUserProperty(found || null);
+                } else if (res.data.length > 0) {
+                  setUserProperty(res.data[0]);
+                }
+              }
+            });
         })
-        .catch(() => {});
+        .catch(() => {
+          // Fallback if profile API fails
+          superAdminService.getProperties()
+            .then(res => {
+              if (res.success && res.data) {
+                if (role === "manager") {
+                  const found = res.data.find(p => p._id === user?.propertyId || p.id === user?.propertyId);
+                  setUserProperty(found || null);
+                } else if (res.data.length > 0) {
+                  setUserProperty(res.data[0]);
+                }
+              }
+            })
+            .catch(() => {});
+        });
     }
-  }, [role]);
+  }, [role, user?.propertyId]);
 
   const [tooltip, setTooltip] = useState({
     show: false,
@@ -190,7 +231,7 @@ export function DashShell({ role, children }) {
               )}
               <ul className="space-y-1">
                 {g.items.map((item) => {
-                  const hasChildren = (role === "super-admin" || role === "admin") && subModules[role]?.[item.label];
+                  const hasChildren = (role === "super-admin" || role === "admin" || role === "manager") && subModules[role]?.[item.label];
                   const isExpanded = expandedGroups[item.label];
                   const childActive = hasChildren && subModules[role][item.label].some(sub => pathname === sub.to || pathname.startsWith(sub.to + "/"));
                   const active = isActive(item.to) || childActive;
@@ -328,7 +369,7 @@ export function DashShell({ role, children }) {
             <Menu className="size-5" />
           </button>
 
-          {(role === "super-admin" || role === "admin") && (() => {
+          {(role === "super-admin" || role === "admin" || role === "manager") && (() => {
             const getHeaderContent = (path) => {
               if (role === "super-admin") {
                 if (path === "/super-admin" || path === "/super-admin/") {
@@ -343,7 +384,7 @@ export function DashShell({ role, children }) {
                     subtitle: "Manage, onboard, assign, and audit configurations across hotel properties."
                   };
                 }
-                if (path.startsWith("/super-admin/users")) {
+                if (path.startsWith("/super-admin/users") || path.startsWith("/super-admin/admins")) {
                   return {
                     title: "Access & Security",
                     subtitle: "Manage platform operators, administrators, and system access."
@@ -482,6 +523,85 @@ export function DashShell({ role, children }) {
                     subtitle: "Configure hotel profiles, taxation structures, timings, check-in/out policies, and payment configs."
                   };
                 }
+              } else if (role === "manager") {
+                if (path === "/manager" || path === "/manager/") {
+                  return {
+                    title: `${userProperty?.name || "Rambagh Residency"} Operations`,
+                    subtitle: `Live console for GM ${user?.name || "Rajesh Sharma"} · ${userProperty?.city || "Hyderabad"}`
+                  };
+                }
+                if (path.startsWith("/manager/operations")) {
+                  return {
+                    title: "Today's Operations",
+                    subtitle: "Track real-time room occupancies, check-in schedules, housekeeping, and maintenance logs."
+                  };
+                }
+                if (path.startsWith("/manager/reservations")) {
+                  return {
+                    title: "Reservations Ledger",
+                    subtitle: "Reconcile, filter, and audit active reservations and stay metrics."
+                  };
+                }
+                if (path.startsWith("/manager/rooms")) {
+                  return {
+                    title: "Rooms Grid Layout",
+                    subtitle: "Audit room categories, keys mapping allotments, and direct occupancy indicators."
+                  };
+                }
+                if (path.startsWith("/manager/guests")) {
+                  return {
+                    title: "Guests Profiles Directory",
+                    subtitle: "View repeat guest profiles, lifespaces spent totals, feedback notes, and blacklists."
+                  };
+                }
+                if (path.startsWith("/manager/housekeeping")) {
+                  return {
+                    title: "Housekeeping Schedule App",
+                    subtitle: "Manage room cleanup tasks, supervisor inspections, and staff rosters."
+                  };
+                }
+                if (path.startsWith("/manager/maintenance")) {
+                  return {
+                    title: "Maintenance Tickets Engine",
+                    subtitle: "Create, assign, resolve, and audit out-of-order room maintenance issues."
+                  };
+                }
+                if (path.startsWith("/manager/approvals")) {
+                  return {
+                    title: "Approvals Desk",
+                    subtitle: "Approve, adjust, or decline corporate discount rates and check-out fee waivers."
+                  };
+                }
+                if (path.startsWith("/manager/shifts") || path.startsWith("/manager/staff")) {
+                  return {
+                    title: "Staff & Shifts Directory",
+                    subtitle: "Manage manager staff details, active rosters, department slots, and contact cards."
+                  };
+                }
+                if (path.startsWith("/manager/attendance")) {
+                  return {
+                    title: "Attendance Roster Logs",
+                    subtitle: "Audit supervisor attendance signatures, shift check-ins, and geo-tagged clock logs."
+                  };
+                }
+                if (path.startsWith("/manager/feedback")) {
+                  return {
+                    title: "Guest Feedback Console",
+                    subtitle: "Track live guest survey responses, scores, and review responses logs."
+                  };
+                }
+                if (path.startsWith("/manager/billing")) {
+                  return {
+                    title: "Billing Overview Ledger",
+                    subtitle: "Audit invoicing logs, GST rate slabs compliance, split bills, and pending payments."
+                  };
+                }
+                if (path.startsWith("/manager/reports")) {
+                  return {
+                    title: "Operational Analytics Reports",
+                    subtitle: "Generate and export property occupancies, ADR trends, RevPAR metrics, and channel mixes."
+                  };
+                }
               }
               return {
                 title: "Hour Stay Console",
@@ -503,21 +623,10 @@ export function DashShell({ role, children }) {
           })()}
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {role !== "super-admin" && role !== "admin" && (
+            {role !== "super-admin" && role !== "admin" && role !== "manager" && (
               <span className="mr-1 hidden rounded-full border border-accent/50 bg-accent/15 px-3 py-1 text-[11px] font-medium text-navy sm:inline dark:text-accent">
                 {meta.name}
               </span>
-            )}
-            {supportsDark && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-11"
-                onClick={() => setDark(!dark)}
-                aria-label="Toggle dark mode"
-              >
-                {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
-              </Button>
             )}
             <Link
               to={`/${role}/notifications`}
@@ -528,7 +637,7 @@ export function DashShell({ role, children }) {
               <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-blush" />
             </Link>
             <Link
-              to={role === "super-admin" ? "/super-admin/profile" : (role === "admin" ? "/admin/profile" : "/guest/profile")}
+              to={role === "super-admin" ? "/super-admin/profile" : (role === "admin" ? "/admin/profile" : (role === "manager" ? "/manager/profile" : "/guest/profile"))}
               className="grid size-11 place-items-center rounded-md hover:bg-muted"
               aria-label="Account menu"
             >
@@ -544,10 +653,14 @@ export function DashShell({ role, children }) {
         <main className="min-w-0 flex-1 p-4 sm:p-6">
           <div className="mx-auto w-full max-w-[1400px] space-y-6 animate-fade-up">
             {(() => {
-              if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/admin/" || pathname === "/super-admin/") {
-                return null;
+              if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/manager" || pathname === "/admin/" || pathname === "/super-admin/" || pathname === "/manager/") {
+                return (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
+                    <span className="text-navy font-bold">Dashboard</span>
+                  </div>
+                );
               }
-              const isNotificationDetails = pathname.match(/^\/(admin|super-admin)\/notifications\/([^\/]+)$/);
+              const isNotificationDetails = pathname.match(/^\/(admin|super-admin|manager)\/notifications\/([^\/]+)$/);
               if (isNotificationDetails) {
                 const prefix = isNotificationDetails[1];
                 const parentUrl = `/${prefix}/notifications`;
@@ -562,50 +675,130 @@ export function DashShell({ role, children }) {
                 );
               }
               const mappings = {
-                "/admin/reservations": ["Operations", "Reservations"],
-                "/admin/reservations/add": ["Operations", "Reservations", "Create Booking"],
-                "/admin/reservations/edit": ["Operations", "Reservations", "Edit Booking"],
-                "/admin/reservations/view": ["Operations", "Reservations", "Reservation Details"],
-                "/admin/rooms": ["Operations", "Rooms & Rates"],
-                "/admin/guests": ["Operations", "Guests"],
-                "/admin/front-desk": ["Operations", "Front Desk"],
-                "/admin/billing": ["Finance", "Billing & Invoices"],
-                "/admin/payments": ["Finance", "Payments"],
-                "/admin/approvals": ["Finance", "Discounts & Refunds"],
-                "/admin/taxes": ["Finance", "Taxes & GST"],
-                "/admin/reports": ["Analytics", "Reports"],
-                "/admin/staff": ["Management", "Staff"],
-                "/admin/staff/add": ["Management", "Staff", "Register Staff Profile"],
-                "/admin/staff/edit": ["Management", "Staff", "Modify Staff Details"],
-                "/admin/staff/view": ["Management", "Staff", "Staff Profile Diagnostic"],
-                "/admin/channels": ["Management", "OTA Channels"],
-                "/admin/crm": ["Management", "CRM & Loyalty"],
-                "/admin/notifications": ["Management", "Notifications"],
-                "/admin/settings": ["Settings"],
-                "/admin/profile": ["Profile"],
-                "/super-admin/properties": ["Properties"],
-                "/super-admin/properties/add": ["Properties", "Add Property"],
-                "/super-admin/properties/edit": ["Properties", "Edit Property"],
-                "/super-admin/properties/view": ["Properties", "View Property Details"],
-                "/super-admin/users": ["Users"],
-                "/super-admin/users/view": ["Users", "Guest Details"],
-                "/super-admin/occupancy": ["Occupancy"],
-                "/super-admin/reservations": ["Reservations"],
-                "/super-admin/reservations/view": ["Reservations", "Reservation Details"],
-                "/super-admin/reports": ["Reports"],
-                "/super-admin/channel-manager": ["Channel Manager"],
-                "/super-admin/branding": ["Branding"],
-                "/super-admin/coupons": ["Promo Coupons"],
-                "/super-admin/coupons/add": ["Promo Coupons", "Add Coupon"],
-                "/super-admin/coupons/edit": ["Promo Coupons", "Edit Coupon"],
-                "/super-admin/coupons/view": ["Promo Coupons", "Coupon Details"],
-                "/super-admin/subscription": ["Plans & Billing"],
-                "/super-admin/subscription/add": ["Plans & Billing", "Add Plan"],
-                "/super-admin/subscription/edit": ["Plans & Billing", "Edit Plan"],
-                "/super-admin/subscription/view": ["Plans & Billing", "Plan Details"],
-                "/super-admin/global-settings": ["Global Settings"],
-                "/super-admin/notifications": ["Notifications"],
-                "/super-admin/profile": ["Profile"]
+                "/admin/reservations": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Reservations" }
+                ],
+                "/admin/reservations/add": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Reservations", to: "/admin/reservations" },
+                  { label: "Create Booking" }
+                ],
+                "/admin/reservations/edit": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Reservations", to: "/admin/reservations" },
+                  { label: "Edit Booking" }
+                ],
+                "/admin/reservations/view": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Reservations", to: "/admin/reservations" },
+                  { label: "Reservation Details" }
+                ],
+                "/admin/rooms": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Rooms & Rates" }
+                ],
+                "/admin/guests": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Guests" }
+                ],
+                "/admin/front-desk": [
+                  { label: "Operations", to: "/admin/reservations" },
+                  { label: "Front Desk" }
+                ],
+                "/admin/billing": [
+                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Billing & Invoices" }
+                ],
+                "/admin/payments": [
+                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Payments" }
+                ],
+                "/admin/approvals": [
+                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Discounts & Refunds" }
+                ],
+                "/admin/taxes": [
+                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Taxes & GST" }
+                ],
+                "/admin/reports": [
+                  { label: "Analytics", to: "/admin/reports" },
+                  { label: "Reports" }
+                ],
+                "/admin/staff": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Staff" }
+                ],
+                "/admin/staff/add": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Staff", to: "/admin/staff" },
+                  { label: "Register Staff Profile" }
+                ],
+                "/admin/staff/edit": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Staff", to: "/admin/staff" },
+                  { label: "Modify Staff Details" }
+                ],
+                "/admin/staff/view": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Staff", to: "/admin/staff" },
+                  { label: "Staff Profile Diagnostic" }
+                ],
+                "/admin/channels": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "OTA Channels" }
+                ],
+                "/admin/crm": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "CRM & Loyalty" }
+                ],
+                "/admin/notifications": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Notifications" }
+                ],
+                "/admin/settings": [{ label: "Settings" }],
+                "/admin/profile": [{ label: "Profile" }],
+                "/super-admin/properties": [{ label: "Properties" }],
+                "/super-admin/properties/add": [{ label: "Properties", to: "/super-admin/properties" }, { label: "Add Property" }],
+                "/super-admin/properties/edit": [{ label: "Properties", to: "/super-admin/properties" }, { label: "Edit Property" }],
+                "/super-admin/properties/view": [{ label: "Properties", to: "/super-admin/properties" }, { label: "View Property Details" }],
+                "/super-admin/users": [{ label: "Users" }],
+                "/super-admin/users/view": [{ label: "Users", to: "/super-admin/users" }, { label: "Guest Details" }],
+                "/super-admin/admins": [{ label: "Admin Management" }],
+                "/super-admin/admins/add": [{ label: "Admin Management", to: "/super-admin/admins" }, { label: "Add Admin" }],
+                "/super-admin/admins/edit": [{ label: "Admin Management", to: "/super-admin/admins" }, { label: "Edit Admin" }],
+                "/super-admin/admins/view": [{ label: "Admin Management", to: "/super-admin/admins" }, { label: "Admin Details" }],
+                "/super-admin/occupancy": [{ label: "Occupancy" }],
+                "/super-admin/reservations": [{ label: "Reservations" }],
+                "/super-admin/reservations/view": [{ label: "Reservations", to: "/super-admin/reservations" }, { label: "Reservation Details" }],
+                "/super-admin/reports": [{ label: "Reports" }],
+                "/super-admin/channel-manager": [{ label: "Channel Manager" }],
+                "/super-admin/branding": [{ label: "Branding" }],
+                "/super-admin/coupons": [{ label: "Promo Coupons" }],
+                "/super-admin/coupons/add": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Add Coupon" }],
+                "/super-admin/coupons/edit": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Edit Coupon" }],
+                "/super-admin/coupons/view": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Coupon Details" }],
+                "/super-admin/subscription": [{ label: "Plans & Billing" }],
+                "/super-admin/subscription/add": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Add Plan" }],
+                "/super-admin/subscription/edit": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Edit Plan" }],
+                "/super-admin/subscription/view": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Plan Details" }],
+                "/super-admin/global-settings": [{ label: "Global Settings" }],
+                "/super-admin/notifications": [{ label: "Notifications" }],
+                "/super-admin/profile": [{ label: "Profile" }],
+                "/manager/operations": [{ label: "Operations" }, { label: "Today's Operations" }],
+                "/manager/reservations": [{ label: "Operations" }, { label: "Reservations" }],
+                "/manager/rooms": [{ label: "Operations" }, { label: "Rooms" }],
+                "/manager/guests": [{ label: "Operations" }, { label: "Guests" }],
+                "/manager/housekeeping": [{ label: "Operations" }, { label: "Housekeeping" }],
+                "/manager/maintenance": [{ label: "Operations" }, { label: "Maintenance" }],
+                "/manager/approvals": [{ label: "Management" }, { label: "Approvals" }],
+                "/manager/shifts": [{ label: "Management" }, { label: "Staff & Shifts" }],
+                "/manager/staff": [{ label: "Management" }, { label: "Staff & Shifts" }],
+                "/manager/attendance": [{ label: "Management" }, { label: "Attendance" }],
+                "/manager/feedback": [{ label: "Guest Experience" }, { label: "Feedback" }],
+                "/manager/billing": [{ label: "Finance" }, { label: "Billing Overview" }],
+                "/manager/reports": [{ label: "Reports" }]
               };
               const cleanPathname = pathname.replace(/\/view\/[^\/]+$/, "/view")
                                             .replace(/\/edit\/[^\/]+$/, "/edit");
@@ -613,17 +806,28 @@ export function DashShell({ role, children }) {
               if (segments) {
                 return (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
-                    <Link to={role === "super-admin" ? "/super-admin" : "/admin"} className="hover:text-navy transition-colors">
+                    <Link to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : "/admin")} className="hover:text-navy transition-colors">
                       Dashboard
                     </Link>
-                    {segments.map((seg, idx) => (
-                      <React.Fragment key={idx}>
-                        <span className="text-muted-foreground/45">/</span>
-                        <span className={idx === segments.length - 1 ? "text-navy font-bold" : ""}>
-                          {seg}
-                        </span>
-                      </React.Fragment>
-                    ))}
+                    {segments.map((seg, idx) => {
+                      const isLast = idx === segments.length - 1;
+                      const label = typeof seg === "object" ? seg.label : seg;
+                      const to = typeof seg === "object" ? seg.to : null;
+                      return (
+                        <React.Fragment key={idx}>
+                          <span className="text-muted-foreground/45">/</span>
+                          {to && !isLast ? (
+                            <Link to={to} className="hover:text-navy transition-colors">
+                              {label}
+                            </Link>
+                          ) : (
+                            <span className={isLast ? "text-navy font-bold" : ""}>
+                              {label}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                 );
               }

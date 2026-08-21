@@ -1,18 +1,22 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
+import { ChevronLeft } from "lucide-react";
 
-function EditReservation() {
+function ManagerEditReservation() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Form states
   const [guest, setGuest] = useState("");
@@ -27,8 +31,18 @@ function EditReservation() {
   const [amount, setAmount] = useState("");
   const [balance, setBalance] = useState("");
   const [isGroupBooking, setIsGroupBooking] = useState(false);
+  const [propertyId, setPropertyId] = useState("");
 
   useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+
+    if (!user || user.role !== "manager") {
+      setIsAuthorized(false);
+      setLoading(false);
+      return;
+    }
+
     const loadBooking = async () => {
       setLoading(true);
       setError(null);
@@ -37,18 +51,24 @@ function EditReservation() {
         if (res.success) {
           const match = res.data.find(r => r._id === id || r.id === id);
           if (match) {
-            setGuest(match.guest || "");
-            setPhone(match.phone || "");
-            setRoom(match.room || "");
-            if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
-            if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
-            setNights(match.nights || 1);
-            setPax(match.pax || "2 Adults");
-            setSource(match.source || "Direct");
-            setStatus(match.status || "Pending");
-            setAmount(match.amount || "");
-            setBalance(match.balance || "");
-            setIsGroupBooking(!!match.isGroupBooking);
+            // Verify property scope
+            if (match.propertyId !== user.propertyId && match.property !== user.propertyId) {
+              setIsAuthorized(false);
+            } else {
+              setGuest(match.guest || "");
+              setPhone(match.phone || "");
+              setRoom(match.room || "");
+              if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
+              if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
+              setNights(match.nights || 1);
+              setPax(match.pax || "2 Adults");
+              setSource(match.source || "Direct");
+              setStatus(match.status || "Pending");
+              setAmount(match.amount || "");
+              setBalance(match.balance || "");
+              setIsGroupBooking(!!match.isGroupBooking);
+              setPropertyId(match.propertyId || user.propertyId);
+            }
           } else {
             setError("Reservation details not found.");
           }
@@ -78,13 +98,14 @@ function EditReservation() {
         status,
         amount: Number(amount),
         balance: Number(balance || 0),
-        isGroupBooking
+        isGroupBooking,
+        propertyId: propertyId || currentUser.propertyId
       };
 
       const res = await superAdminService.updateReservation(id, payload);
       if (res.success) {
         toast.success("Reservation details updated.");
-        navigate({ to: "/admin/reservations" });
+        navigate({ to: "/manager/reservations" });
       } else {
         toast.error(res.message || "Failed to save adjustments.");
       }
@@ -95,12 +116,31 @@ function EditReservation() {
     }
   };
 
+  if (!isAuthorized) {
+    return (
+      <div className="space-y-6 text-left">
+        <PageHeader title="Access Denied" subtitle="Security and privilege validation." />
+        <Notice tone="error" title="Unauthorized Access">
+          You are not authorized to edit reservations for this property. Access is strictly scoped to your assigned hotel branch.
+        </Notice>
+        <Link to="/manager/reservations" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
+          <ChevronLeft className="size-3.5" /> Back to Reservations
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 text-left">
-      <PageHeader
-        title="Edit Reservation"
-        subtitle="Update guest folio stay dates, room parameters, and cost slab metrics."
-      />
+    <div className="space-y-6 text-left animate-fade-in">
+      <div className="flex items-center gap-3">
+        <Link to="/manager/reservations" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
+          <ChevronLeft className="size-4" />
+        </Link>
+        <PageHeader
+          title="Edit Reservation"
+          subtitle="Update guest stay parameters, room assignments, and ledger balances."
+        />
+      </div>
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
@@ -142,30 +182,42 @@ function EditReservation() {
                     onChange={(e) => setRoom(e.target.value)}
                   >
                     <option value="">Select Room</option>
-                    <option value="101">Room 101 (Villa Suite)</option>
-                    <option value="104">Room 104 (Heritage Luxury)</option>
-                    <option value="205">Room 205 (Heritage Luxury)</option>
-                    <option value="302">Room 302 (Maharaja Suite)</option>
+                    <option value="101">Room 101</option>
+                    <option value="102">Room 102</option>
+                    <option value="103">Room 103</option>
+                    <option value="104">Room 104</option>
+                    <option value="201">Room 201</option>
+                    <option value="202">Room 202</option>
+                    <option value="203">Room 203</option>
+                    <option value="204">Room 204</option>
+                    <option value="301">Room 301</option>
+                    <option value="302">Room 302</option>
+                    <option value="303">Room 303</option>
+                    <option value="312">Room 312</option>
+                    <option value="501">Room 501</option>
+                    <option value="602">Room 602</option>
                   </Select>
                 </FormField>
 
                 <FormField label="Check-In Date" required id="checkIn">
                   <Input
                     id="checkIn"
-                    type="date"
+                    type="text"
                     required
                     value={checkIn}
                     onChange={(e) => setCheckIn(e.target.value)}
+                    placeholder="E.g. 12 Aug 2026 or YYYY-MM-DD"
                   />
                 </FormField>
 
                 <FormField label="Check-Out Date" required id="checkOut">
                   <Input
                     id="checkOut"
-                    type="date"
+                    type="text"
                     required
                     value={checkOut}
                     onChange={(e) => setCheckOut(e.target.value)}
+                    placeholder="E.g. 15 Aug 2026 or YYYY-MM-DD"
                   />
                 </FormField>
 
@@ -255,12 +307,12 @@ function EditReservation() {
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => navigate({ to: "/admin/reservations" })}
-                  className="h-10 px-4"
+                  onClick={() => navigate({ to: "/manager/reservations" })}
+                  className="h-10 px-4 cursor-pointer"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving} className="bg-navy hover:bg-navy/90 text-white h-10 px-6 font-bold rounded-full">
+                <Button type="submit" disabled={saving} className="bg-navy hover:bg-navy/90 text-white h-10 px-6 font-bold rounded-full cursor-pointer">
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
@@ -272,6 +324,6 @@ function EditReservation() {
   );
 }
 
-export const Route = createFileRoute("/admin/reservations/edit/$id")({
-  component: EditReservation
+export const Route = createFileRoute("/manager/reservations/edit/$id")({
+  component: ManagerEditReservation
 });

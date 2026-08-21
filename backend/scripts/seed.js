@@ -289,10 +289,40 @@ export const seedUsers = async () => {
     setBlogMedia(27, mediaMapping.palace);
     setBlogMedia(28, mediaMapping.jaipur);
     // 1. Seed Users
-    for (const u of SEED_USERS) {
+    const usersData = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/users.json'), 'utf8'));
+    for (const u of usersData) {
       const exists = await User.findOne({ email: u.email });
-      if (!exists) {
-        await User.create(u);
+      const targetId = u.id || u._id;
+      if (exists) {
+        if (exists._id.toString() !== targetId) {
+          if (mongoose.connection.readyState === 1) {
+            await mongoose.model('User').deleteMany({ $or: [{ email: u.email }, { _id: targetId }] });
+          } else {
+            await User.findByIdAndDelete(exists._id || exists.id);
+          }
+          await User.create({
+            _id: targetId,
+            name: u.name,
+            email: u.email,
+            password: u.password,
+            role: u.role,
+            mobile: u.mobile,
+            propertyId: u.propertyId || null,
+            status: u.status || 'Active'
+          });
+          console.log(`🔄 Re-seeded user with correct string ID: ${u.email}`);
+        }
+      } else {
+        await User.create({
+          _id: targetId,
+          name: u.name,
+          email: u.email,
+          password: u.password,
+          role: u.role,
+          mobile: u.mobile,
+          propertyId: u.propertyId || null,
+          status: u.status || 'Active'
+        });
         console.log(`🌱 Seeded user: ${u.email}`);
       }
     }

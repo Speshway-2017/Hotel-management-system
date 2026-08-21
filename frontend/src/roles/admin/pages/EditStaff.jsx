@@ -20,6 +20,8 @@ function EditStaff() {
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("receptionist");
   const [status, setStatus] = useState("Active");
+  const [dept, setDept] = useState("Front Desk");
+  const [shift, setShift] = useState("Morning (06:00 - 14:00)");
 
   useEffect(() => {
     const loadStaffMember = async () => {
@@ -35,6 +37,8 @@ function EditStaff() {
             setPhone(match.mobile === "—" ? "" : (match.mobile || ""));
             setRole(match.role || "receptionist");
             setStatus(match.status || "Active");
+            setDept(match.dept || "Front Desk");
+            setShift(match.shift || "Morning (06:00 - 14:00)");
           } else {
             setError("Employee not found.");
           }
@@ -56,7 +60,9 @@ function EditStaff() {
         name,
         role,
         mobile: phone,
-        status
+        status,
+        dept,
+        shift
       };
       const res = await superAdminService.updateUser(id, payload);
       if (res.success) {
@@ -75,14 +81,6 @@ function EditStaff() {
       <PageHeader
         title={name ? `Modify Staff: ${name}` : "Modify Staff Details"}
         subtitle="Update employee designations, permission roles, and account statuses."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/admin/staff" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-9 font-bold text-xs cursor-pointer"
-          >
-            Back to Team List
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
@@ -146,6 +144,32 @@ function EditStaff() {
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
+                  </Select>
+                </FormField>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Department" id="dept">
+                  <Select
+                    id="dept"
+                    value={dept}
+                    onChange={(e) => setDept(e.target.value)}
+                  >
+                    <option value="Front Desk">Front Desk</option>
+                    <option value="Management">Management</option>
+                    <option value="Operations">Operations</option>
+                  </Select>
+                </FormField>
+                <FormField label="Shift Assignment" id="shift">
+                  <Select
+                    id="shift"
+                    value={shift}
+                    onChange={(e) => setShift(e.target.value)}
+                  >
+                    <option value="Morning (06:00 - 14:00)">Morning (06:00 - 14:00)</option>
+                    <option value="Evening (14:00 - 22:00)">Evening (14:00 - 22:00)</option>
+                    <option value="Night (22:00 - 06:00)">Night (22:00 - 06:00)</option>
+                    <option value="General (09:00 - 17:00)">General (09:00 - 17:00)</option>
                   </Select>
                 </FormField>
               </div>

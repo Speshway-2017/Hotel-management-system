@@ -214,6 +214,7 @@ router.get('/properties/:id', checkPropertyStatus, async (req, res) => {
 });
 
 router.post('/properties', authorize('super-admin'), async (req, res) => {
+  console.log('[API] POST /properties request payload:', req.body);
   try {
     const { name, city, rooms, status, gm, subscriptionTier, assignedAdmin, adminName, adminEmail, adminPassword, adminMobile } = req.body;
     if (!name || !city) {
@@ -269,6 +270,7 @@ router.post('/properties', authorize('super-admin'), async (req, res) => {
     await logAction(req.user, 'Created Property', `${name} (${city})`, req);
     return sendSuccess(res, 201, property, 'Property created successfully');
   } catch (error) {
+    console.error('[API] POST /properties error:', error);
     return sendError(res, 500, error.message || 'Failed to create property');
   }
 });

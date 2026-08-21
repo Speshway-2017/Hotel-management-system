@@ -409,19 +409,81 @@ const Property = {
   },
   create: async (data) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseProperty.create(data);
+      const created = await MongooseProperty.create(data);
+      if (created) {
+        try {
+          const instance = new PropertyInstance({
+            id: created._id.toString(),
+            _id: created._id.toString(),
+            name: created.name,
+            city: created.city,
+            rooms: created.rooms,
+            occupancy: created.occupancy,
+            adr: created.adr,
+            revpar: created.revpar,
+            status: created.status,
+            gm: created.gm,
+            assignedAdmin: created.assignedAdmin,
+            subscriptionTier: created.subscriptionTier,
+            subscriptionStatus: created.subscriptionStatus,
+            subscriptionExpiry: created.subscriptionExpiry,
+            commissionRate: created.commissionRate,
+            settings: created.settings,
+            createdAt: created.createdAt || new Date().toISOString(),
+            updatedAt: created.updatedAt || new Date().toISOString()
+          });
+          await instance.save();
+        } catch (err) {
+          console.warn('Mock dual-write failed:', err.message);
+        }
+      }
+      return created;
     }
     return await MockProperty.create(data);
   },
   findByIdAndUpdate: async (id, update, options) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseProperty.findByIdAndUpdate(id, update, { new: true, ...options });
+      const updated = await MongooseProperty.findByIdAndUpdate(id, update, { new: true, ...options });
+      if (updated) {
+        try {
+          const instance = new PropertyInstance({
+            id: updated._id.toString(),
+            _id: updated._id.toString(),
+            name: updated.name,
+            city: updated.city,
+            rooms: updated.rooms,
+            occupancy: updated.occupancy,
+            adr: updated.adr,
+            revpar: updated.revpar,
+            status: updated.status,
+            gm: updated.gm,
+            assignedAdmin: updated.assignedAdmin,
+            subscriptionTier: updated.subscriptionTier,
+            subscriptionStatus: updated.subscriptionStatus,
+            subscriptionExpiry: updated.subscriptionExpiry,
+            commissionRate: updated.commissionRate,
+            settings: updated.settings,
+            createdAt: updated.createdAt,
+            updatedAt: updated.updatedAt
+          });
+          await instance.save();
+        } catch (err) {
+          console.warn('Mock dual-write update failed:', err.message);
+        }
+        return updated;
+      }
     }
     return await MockProperty.findByIdAndUpdate(id, update, options);
   },
   findByIdAndDelete: async (id) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseProperty.findByIdAndDelete(id);
+      const deleted = await MongooseProperty.findByIdAndDelete(id);
+      try {
+        await MockProperty.findByIdAndDelete(id);
+      } catch (err) {
+        console.warn('Mock dual-write delete failed:', err.message);
+      }
+      return deleted;
     }
     return await MockProperty.findByIdAndDelete(id);
   }

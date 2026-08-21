@@ -72,25 +72,6 @@ function ReservationsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
 
-  // Modal states
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState(null);
-
-  // Form states
-  const [formGuest, setFormGuest] = useState("");
-  const [formPhone, setFormPhone] = useState("");
-  const [formRoom, setFormRoom] = useState("");
-  const [formCheckIn, setFormCheckIn] = useState("");
-  const [formCheckOut, setFormCheckOut] = useState("");
-  const [formNights, setFormNights] = useState(1);
-  const [formPax, setFormPax] = useState("2 Adults");
-  const [formSource, setFormSource] = useState("Direct");
-  const [formStatus, setFormStatus] = useState("Pending");
-  const [formAmount, setFormAmount] = useState("");
-  const [formBalance, setFormBalance] = useState("");
-  const [isGroupBooking, setIsGroupBooking] = useState(false);
-
   // Waitlist state
   const [waitlist, setWaitlist] = useState([
     { id: "WTL-01", guest: "Devendra Shastri", phone: "+91 93450 09912", roomType: "Maharaja Suite", dates: "18 Aug - 20 Aug" },
@@ -114,61 +95,6 @@ function ReservationsPage() {
     loadReservations();
   }, []);
 
-  // Save / Edit / Cancel Reservation
-  async function handleCreate(e) {
-    e.preventDefault();
-    try {
-      const payload = {
-        guest: formGuest,
-        phone: formPhone,
-        room: formRoom,
-        checkIn: formCheckIn,
-        checkOut: formCheckOut,
-        nights: Number(formNights),
-        pax: formPax,
-        source: formSource,
-        status: formStatus,
-        amount: Number(formAmount),
-        balance: Number(formBalance || 0),
-        groupBooking: isGroupBooking
-      };
-      await superAdminService.createReservation(payload);
-      setIsCreateOpen(false);
-      resetForm();
-      loadReservations();
-    } catch (err) {
-      alert("Error: " + err.message);
-    }
-  }
-
-  async function handleEdit(e) {
-    e.preventDefault();
-    if (!selectedBooking) return;
-    try {
-      const payload = {
-        guest: formGuest,
-        phone: formPhone,
-        room: formRoom,
-        checkIn: formCheckIn,
-        checkOut: formCheckOut,
-        nights: Number(formNights),
-        pax: formPax,
-        source: formSource,
-        status: formStatus,
-        amount: Number(formAmount),
-        balance: Number(formBalance || 0),
-        groupBooking: isGroupBooking
-      };
-      await superAdminService.updateReservation(selectedBooking._id, payload);
-      setIsEditOpen(false);
-      setSelectedBooking(null);
-      resetForm();
-      loadReservations();
-    } catch (err) {
-      alert("Error: " + err.message);
-    }
-  }
-
   async function handleStatusChange(booking, newStatus) {
     try {
       await superAdminService.updateReservation(booking._id, { status: newStatus });
@@ -188,53 +114,17 @@ function ReservationsPage() {
     }
   }
 
-  function openEdit(booking) {
-    setSelectedBooking(booking);
-    setFormGuest(booking.guest);
-    setFormPhone(booking.phone || "");
-    setFormRoom(booking.room || "");
-    setFormCheckIn(booking.checkIn);
-    setFormCheckOut(booking.checkOut);
-    setFormNights(booking.nights || 1);
-    setFormPax(booking.pax || "2 Adults");
-    setFormSource(booking.source || "Direct");
-    setFormStatus(booking.status || "Pending");
-    setFormAmount(booking.amount || "");
-    setFormBalance(booking.balance || "");
-    setIsGroupBooking(booking.groupBooking || false);
-    setIsEditOpen(true);
-  }
-
-  function resetForm() {
-    setFormGuest("");
-    setFormPhone("");
-    setFormRoom("");
-    setFormCheckIn("");
-    setFormCheckOut("");
-    setFormNights(1);
-    setFormPax("2 Adults");
-    setFormSource("Direct");
-    setFormStatus("Pending");
-    setFormAmount("");
-    setFormBalance("");
-    setIsGroupBooking(false);
-  }
-
   function handleAddFromWaitlist(item) {
-    resetForm();
-    setFormGuest(item.guest);
-    setFormPhone(item.phone);
-    setFormStatus("Confirmed");
-    setFormSource("Direct");
-    // Parse dates
-    if (item.dates.includes("-")) {
-      const parts = item.dates.split("-");
-      setFormCheckIn("2026-08-18");
-      setFormCheckOut("2026-08-20");
-    }
-    setFormRoom(item.roomType === "Maharaja Suite" ? "302" : "101");
+    const checkInDate = "2026-08-18";
+    const checkOutDate = "2026-08-20";
+    const roomNum = item.roomType === "Maharaja Suite" ? "302" : "101";
+    
+    // Remove from waitlist locally
     setWaitlist(prev => prev.filter(w => w.id !== item.id));
-    setIsCreateOpen(true);
+
+    navigate({
+      to: `/admin/reservations/add?guest=${encodeURIComponent(item.guest)}&phone=${encodeURIComponent(item.phone)}&room=${roomNum}&checkIn=${checkInDate}&checkOut=${checkOutDate}&status=Confirmed`
+    });
   }
 
   // Filter computations
@@ -632,189 +522,6 @@ function ReservationsPage() {
           </div>
         )}
       </div>
-
-      {/* Create / Edit Reservation Modal Overlay */}
-      {(isCreateOpen || isEditOpen) && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in">
-          <div className="bg-white rounded-xl border border-muted max-w-lg w-full shadow-lift overflow-hidden text-left flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-display font-black text-navy text-md">
-                {isCreateOpen ? "Create New Reservation" : "Modify Booking Info"}
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                onClick={() => {
-                  setIsCreateOpen(false);
-                  setIsEditOpen(false);
-                }}
-              >
-                <XCircle className="size-4" />
-              </Button>
-            </div>
-            <form onSubmit={isCreateOpen ? handleCreate : handleEdit} className="p-6 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Guest Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formGuest}
-                    onChange={(e) => setFormGuest(e.target.value)}
-                    placeholder="Enter guest's full name"
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Phone Number</label>
-                  <input
-                    type="text"
-                    required
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    placeholder="+91 XXXXX XXXXX"
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Room Designation</label>
-                  <select
-                    value={formRoom}
-                    onChange={(e) => setFormRoom(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="">Select Room</option>
-                    <option value="101">Room 101 (Villa Suite)</option>
-                    <option value="104">Room 104 (Heritage Luxury)</option>
-                    <option value="205">Room 205 (Heritage Luxury)</option>
-                    <option value="302">Room 302 (Maharaja Suite)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Check-In Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={formCheckIn}
-                    onChange={(e) => setFormCheckIn(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Check-Out Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={formCheckOut}
-                    onChange={(e) => setFormCheckOut(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Nights Count</label>
-                  <input
-                    type="number"
-                    required
-                    value={formNights}
-                    onChange={(e) => setFormNights(e.target.value)}
-                    min={1}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Pax Details</label>
-                  <input
-                    type="text"
-                    required
-                    value={formPax}
-                    onChange={(e) => setFormPax(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Booking Channel</label>
-                  <select
-                    value={formSource}
-                    onChange={(e) => setFormSource(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="Direct">Direct Booking</option>
-                    <option value="Corporate">Corporate / GDS Contract</option>
-                    <option value="MakeMyTrip">MakeMyTrip OTA</option>
-                    <option value="Booking.com">Booking.com OTA</option>
-                    <option value="Agoda">Agoda OTA</option>
-                    <option value="Walk-in">Walk-in Rate Plan</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Workflow Status</label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Checked-in">Checked-in</option>
-                    <option value="Checked-out">Checked-out</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Total Amount (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    value={formAmount}
-                    onChange={(e) => setFormAmount(e.target.value)}
-                    placeholder="Total tariff cost"
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Remaining Balance (₹)</label>
-                  <input
-                    type="number"
-                    value={formBalance}
-                    onChange={(e) => setFormBalance(e.target.value)}
-                    placeholder="0 if fully prepaid"
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-sm focus:outline-none focus:border-navy"
-                  />
-                </div>
-                <div className="col-span-2 flex items-center gap-2 pt-2.5">
-                  <input
-                    type="checkbox"
-                    id="isGroup"
-                    checked={isGroupBooking}
-                    onChange={(e) => setIsGroupBooking(e.target.checked)}
-                    className="rounded border-muted text-navy focus:ring-navy"
-                  />
-                  <label htmlFor="isGroup" className="text-xs font-bold uppercase tracking-wider text-navy select-none">
-                    Identify as Group Booking (Master Ledger Integration)
-                  </label>
-                </div>
-              </div>
-              <div className="pt-4 border-t border-muted flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setIsCreateOpen(false);
-                    setIsEditOpen(false);
-                  }}
-                  className="h-10 px-4"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-navy hover:bg-navy-deep text-white h-10 px-6">
-                  {isCreateOpen ? "Create Booking" : "Save Changes"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
