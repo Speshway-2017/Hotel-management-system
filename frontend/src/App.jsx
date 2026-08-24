@@ -31,12 +31,18 @@ import { Route as AdminBilling } from "./roles/admin/pages/Billing";
 import { Route as AdminChannels } from "./roles/admin/pages/Channels";
 import { Route as AdminFrontDesk } from "./roles/admin/pages/FrontDesk";
 import { Route as AdminGuests } from "./roles/admin/pages/Guests";
+import { Route as AdminAddGuest } from "./roles/admin/pages/AddGuest";
+import { Route as AdminEditGuest } from "./roles/admin/pages/EditGuest";
+import { Route as AdminViewGuest } from "./roles/admin/pages/ViewGuest";
 import { Route as AdminNotifications } from "./roles/admin/pages/Notifications";
 import { Route as AdminNotificationDetails } from "./roles/admin/pages/NotificationDetails";
 import { Route as AdminPayments } from "./roles/admin/pages/Payments";
 import { Route as AdminReports } from "./roles/admin/pages/Reports";
 import { Route as AdminReservations } from "./roles/admin/pages/Reservations";
 import { Route as AdminRooms } from "./roles/admin/pages/Rooms";
+import { Route as AdminAddRoom } from "./roles/admin/pages/AddRoom";
+import { Route as AdminViewRoom } from "./roles/admin/pages/ViewRoom";
+import { Route as AdminEditRoom } from "./roles/admin/pages/EditRoom";
 import { Route as AdminSettings } from "./roles/admin/pages/Settings";
 import { Route as AdminStaff } from "./roles/admin/pages/Staff";
 import { Route as AdminAddStaff } from "./roles/admin/pages/AddStaff";
@@ -48,6 +54,8 @@ import { Route as AdminProfile } from "./roles/admin/pages/Profile";
 import { Route as AdminAddReservation } from "./roles/admin/pages/AddReservation";
 import { Route as AdminEditReservation } from "./roles/admin/pages/EditReservation";
 import { Route as AdminViewReservation } from "./roles/admin/pages/ViewReservation";
+import { Route as AdminAssignRoomDesk } from "./roles/admin/pages/AssignRoomDesk";
+import { Route as AdminCollectPaymentDesk } from "./roles/admin/pages/CollectPaymentDesk";
 
 // Import Manager Workspace Pages
 import { Route as ManagerLayout } from "./roles/manager/pages/ManagerLayout";
@@ -55,16 +63,27 @@ import { Route as ManagerDashboard } from "./roles/manager/pages/Dashboard";
 import { Route as ManagerApprovals } from "./roles/manager/pages/Approvals";
 import { Route as ManagerArrivals } from "./roles/manager/pages/Arrivals";
 import { Route as ManagerFeedback } from "./roles/manager/pages/Feedback";
+import { Route as ManagerViewFeedback } from "./roles/manager/pages/ViewFeedback";
+import { Route as ManagerBilling } from "./roles/manager/pages/Billing";
+import { Route as ManagerViewBilling } from "./roles/manager/pages/ViewBilling";
 import { Route as ManagerGuests } from "./roles/manager/pages/Guests";
 import { Route as ManagerNotifications } from "./roles/manager/pages/Notifications";
 import { Route as ManagerNotificationDetails } from "./roles/manager/pages/NotificationDetails";
 import { Route as ManagerOccupancy } from "./roles/manager/pages/Occupancy";
 import { Route as ManagerReports } from "./roles/manager/pages/Reports";
+import { Route as ManagerViewReport } from "./roles/manager/pages/ViewReport";
 import { Route as ManagerReservations } from "./roles/manager/pages/Reservations";
 import { Route as ManagerViewReservation } from "./roles/manager/pages/ViewReservation";
 import { Route as ManagerEditReservation } from "./roles/manager/pages/EditReservation";
 import { Route as ManagerShifts } from "./roles/manager/pages/Shifts";
 import { Route as ManagerProfile } from "./roles/manager/pages/Profile";
+import { Route as ManagerRooms } from "./roles/manager/pages/Rooms";
+import { Route as ManagerViewGuest } from "./roles/manager/pages/ViewGuest";
+import { Route as ManagerViewApproval } from "./roles/manager/pages/ViewApproval";
+import { Route as ManagerViewStaff } from "./roles/manager/pages/ViewStaff";
+import { Route as ManagerViewShift } from "./roles/manager/pages/ViewShift";
+import { Route as ManagerAttendance } from "./roles/manager/pages/Attendance";
+import { Route as ManagerViewAttendance } from "./roles/manager/pages/ViewAttendance";
 
 // Import Receptionist Workspace Pages
 import { Route as ReceptionLayout } from "./roles/receptionist/pages/ReceptionLayout";
@@ -251,7 +270,14 @@ export default function App() {
             <Route path="/admin/billing" element={<RouteWrapper routeObj={AdminBilling} />} />
             <Route path="/admin/channels" element={<RouteWrapper routeObj={AdminChannels} />} />
             <Route path="/admin/front-desk" element={<RouteWrapper routeObj={AdminFrontDesk} />} />
+            <Route path="/admin/front-desk/assign/:id" element={<RouteWrapper routeObj={AdminAssignRoomDesk} />} />
+            <Route path="/admin/front-desk/assign" element={<RouteWrapper routeObj={AdminAssignRoomDesk} />} />
+            <Route path="/admin/front-desk/payment/:id" element={<RouteWrapper routeObj={AdminCollectPaymentDesk} />} />
+            <Route path="/admin/front-desk/payment" element={<RouteWrapper routeObj={AdminCollectPaymentDesk} />} />
             <Route path="/admin/guests" element={<RouteWrapper routeObj={AdminGuests} />} />
+            <Route path="/admin/guests/add" element={<RouteWrapper routeObj={AdminAddGuest} />} />
+            <Route path="/admin/guests/edit/:id" element={<RouteWrapper routeObj={AdminEditGuest} />} />
+            <Route path="/admin/guests/view/:id" element={<RouteWrapper routeObj={AdminViewGuest} />} />
             <Route path="/admin/notifications" element={<RouteWrapper routeObj={AdminNotifications} />} />
             <Route path="/admin/notifications/:id" element={<RouteWrapper routeObj={AdminNotificationDetails} />} />
             <Route path="/admin/payments" element={<RouteWrapper routeObj={AdminPayments} />} />
@@ -261,6 +287,9 @@ export default function App() {
             <Route path="/admin/reservations/edit/:id" element={<RouteWrapper routeObj={AdminEditReservation} />} />
             <Route path="/admin/reservations/view/:id" element={<RouteWrapper routeObj={AdminViewReservation} />} />
             <Route path="/admin/rooms" element={<RouteWrapper routeObj={AdminRooms} />} />
+            <Route path="/admin/rooms/add" element={<RouteWrapper routeObj={AdminAddRoom} />} />
+            <Route path="/admin/rooms/view/:id" element={<RouteWrapper routeObj={AdminViewRoom} />} />
+            <Route path="/admin/rooms/edit/:id" element={<RouteWrapper routeObj={AdminEditRoom} />} />
             <Route path="/admin/settings" element={<RouteWrapper routeObj={AdminSettings} />} />
             <Route path="/admin/staff" element={<RouteWrapper routeObj={AdminStaff} />} />
             <Route path="/admin/staff/add" element={<RouteWrapper routeObj={AdminAddStaff} />} />
@@ -275,17 +304,28 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={["manager"]}><RouteWrapper routeObj={ManagerLayout} /></ProtectedRoute>}>
             <Route path="/manager" element={<RouteWrapper routeObj={ManagerDashboard} />} />
             <Route path="/manager/approvals" element={<RouteWrapper routeObj={ManagerApprovals} />} />
+            <Route path="/manager/approvals/view/:id" element={<RouteWrapper routeObj={ManagerViewApproval} />} />
             <Route path="/manager/operations" element={<RouteWrapper routeObj={ManagerArrivals} />} />
             <Route path="/manager/feedback" element={<RouteWrapper routeObj={ManagerFeedback} />} />
+            <Route path="/manager/feedback/view/:id" element={<RouteWrapper routeObj={ManagerViewFeedback} />} />
+            <Route path="/manager/billing" element={<RouteWrapper routeObj={ManagerBilling} />} />
+            <Route path="/manager/billing/view/:id" element={<RouteWrapper routeObj={ManagerViewBilling} />} />
             <Route path="/manager/guests" element={<RouteWrapper routeObj={ManagerGuests} />} />
+            <Route path="/manager/guests/view/:id" element={<RouteWrapper routeObj={ManagerViewGuest} />} />
             <Route path="/manager/notifications" element={<RouteWrapper routeObj={ManagerNotifications} />} />
             <Route path="/manager/notifications/:id" element={<RouteWrapper routeObj={ManagerNotificationDetails} />} />
             <Route path="/manager/occupancy" element={<RouteWrapper routeObj={ManagerOccupancy} />} />
             <Route path="/manager/reports" element={<RouteWrapper routeObj={ManagerReports} />} />
+            <Route path="/manager/reports/view/:id" element={<RouteWrapper routeObj={ManagerViewReport} />} />
             <Route path="/manager/reservations" element={<RouteWrapper routeObj={ManagerReservations} />} />
             <Route path="/manager/reservations/view/:id" element={<RouteWrapper routeObj={ManagerViewReservation} />} />
             <Route path="/manager/reservations/edit/:id" element={<RouteWrapper routeObj={ManagerEditReservation} />} />
+            <Route path="/manager/rooms" element={<RouteWrapper routeObj={ManagerRooms} />} />
             <Route path="/manager/shifts" element={<RouteWrapper routeObj={ManagerShifts} />} />
+            <Route path="/manager/attendance" element={<RouteWrapper routeObj={ManagerAttendance} />} />
+            <Route path="/manager/attendance/view/:id" element={<RouteWrapper routeObj={ManagerViewAttendance} />} />
+            <Route path="/manager/staff/view/:id" element={<RouteWrapper routeObj={ManagerViewStaff} />} />
+            <Route path="/manager/shifts/view/:id" element={<RouteWrapper routeObj={ManagerViewShift} />} />
             <Route path="/manager/profile" element={<RouteWrapper routeObj={ManagerProfile} />} />
           </Route>
 

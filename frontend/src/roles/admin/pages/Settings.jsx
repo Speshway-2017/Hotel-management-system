@@ -20,10 +20,11 @@ export const Route = createFileRoute("/admin/settings")({
   component: AdminSettingsPage
 });
 
+import { superAdminService } from "@/services/superAdmin";
+
 function AdminSettingsPage() {
-  const [activeSubTab, setActiveSubTab] = useState("hotel-info"); // 'hotel-info' | 'tax-gst' | 'policies' | 'payments' | 'notifications'
+  const [activeSubTab, setActiveSubTab] = useState("hotel-info");
   
-  // Settings Form States (Initialized with realistic Speshway Luxury Hotel data)
   const [hotelName, setHotelName] = useState("Speshway Luxury Hotel");
   const [hotelAddress, setHotelAddress] = useState("Speshway Heights, Hitech City Main Rd, Madhapur, Hyderabad, Telangana 500081");
   const [hotelPhone, setHotelPhone] = useState("+91 40 4495 1022");
@@ -46,11 +47,72 @@ function AdminSettingsPage() {
   const [parityAlerts, setParityAlerts] = useState(true);
 
   const [successMsg, setSuccessMsg] = useState("");
+  const [property, setProperty] = useState(null);
 
-  function handleSave(e) {
+  useEffect(() => {
+    async function init() {
+      try {
+        const res = await superAdminService.getProperties();
+        if (res.success && res.data && res.data.length > 0) {
+          const prop = res.data[0];
+          setProperty(prop);
+          setHotelName(prop.name || "Speshway Luxury Hotel");
+          setHotelAddress(prop.address || "");
+          setHotelEmail(prop.email || "");
+          setHotelPhone(prop.phone || "");
+
+          const settings = prop.settings || {};
+          if (settings.gstin) setGstin(settings.gstin);
+          if (settings.cgst) setCgst(settings.cgst);
+          if (settings.sgst) setSgst(settings.sgst);
+          if (settings.checkInTime) setCheckInTime(settings.checkInTime);
+          if (settings.checkOutTime) setCheckOutTime(settings.checkOutTime);
+          if (settings.cancelPolicy) setCancelPolicy(settings.cancelPolicy);
+          if (settings.autoAssign !== undefined) setAutoAssign(settings.autoAssign);
+          if (settings.waitlistLimit) setWaitlistLimit(settings.waitlistLimit);
+          if (settings.paymentProvider) setPaymentProvider(settings.paymentProvider);
+          if (settings.emailAlerts !== undefined) setEmailAlerts(settings.emailAlerts);
+          if (settings.smsAlerts !== undefined) setSmsAlerts(settings.smsAlerts);
+          if (settings.parityAlerts !== undefined) setParityAlerts(settings.parityAlerts);
+        }
+      } catch (err) {}
+    }
+    init();
+  }, []);
+
+  async function handleSave(e) {
     e.preventDefault();
-    setSuccessMsg("Property configuration saved successfully.");
-    setTimeout(() => setSuccessMsg(""), 3000);
+    if (!property) return;
+    try {
+      const nextSettings = {
+        ...(property.settings || {}),
+        gstin,
+        cgst: Number(cgst),
+        sgst: Number(sgst),
+        checkInTime,
+        checkOutTime,
+        cancelPolicy,
+        autoAssign,
+        waitlistLimit: Number(waitlistLimit),
+        paymentProvider,
+        emailAlerts,
+        smsAlerts,
+        parityAlerts
+      };
+
+      await superAdminService.updateProperty(property._id || property.id, {
+        name: hotelName,
+        address: hotelAddress,
+        email: hotelEmail,
+        phone: hotelPhone,
+        settings: nextSettings
+      });
+
+      setSuccessMsg("Property configuration saved successfully.");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      toast.error(err.message || "Failed to save property configuration.");
+    }
   }
 
   return (

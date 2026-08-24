@@ -99,7 +99,6 @@ export const navByRole = {
         { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
         { label: "Operations", to: "/admin/reservations", icon: CalendarCheck },
         { label: "Finance", to: "/admin/billing", icon: Receipt },
-        { label: "Analytics", to: "/admin/reports", icon: BarChart3 },
         { label: "Management", to: "/admin/staff", icon: UserCog },
         { label: "Settings", to: "/admin/settings", icon: Settings }
       ]
@@ -114,8 +113,7 @@ export const navByRole = {
         { label: "Operations", to: "/manager/operations", icon: CalendarCheck },
         { label: "Management", to: "/manager/approvals", icon: UserCog },
         { label: "Guest Experience", to: "/manager/feedback", icon: MessageSquareHeart },
-        { label: "Finance", to: "/manager/billing", icon: Receipt },
-        { label: "Reports", to: "/manager/reports", icon: BarChart3 }
+        { label: "Finance", to: "/manager/billing", icon: Receipt }
       ]
     }
   ],

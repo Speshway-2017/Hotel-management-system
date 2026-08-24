@@ -1,0 +1,108 @@
+import mongoose from 'mongoose';
+
+// ==========================================
+// ROOM MODEL
+// ==========================================
+const roomSchema = new mongoose.Schema({
+  roomNumber: { type: String, required: true },
+  category: { type: String, required: true },
+  status: { type: String, enum: ['Available', 'Occupied', 'Dirty', 'Cleaning', 'Out of Order', 'Blocked'], default: 'Available' },
+  propertyId: { type: String, required: true }
+}, { timestamps: true });
+
+// Ensure unique index per property
+roomSchema.index({ roomNumber: 1, propertyId: 1 }, { unique: true });
+
+export const Room = mongoose.models.Room || mongoose.model('Room', roomSchema);
+
+// ==========================================
+// STAFF SHIFT ROSTER MODEL
+// ==========================================
+const shiftSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  username: { type: String, required: true },
+  shiftType: { type: String, default: 'Off' }, // Morning, Evening, Night, Off
+  propertyId: { type: String, required: true }
+}, { timestamps: true });
+
+export const Shift = mongoose.models.Shift || mongoose.model('Shift', shiftSchema);
+
+// ==========================================
+// ATTENDANCE LOG MODEL
+// ==========================================
+const attendanceSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  username: { type: String, required: true },
+  date: { type: String, required: true }, // YYYY-MM-DD
+  checkIn: { type: String, default: '--:--' },
+  checkOut: { type: String, default: '--:--' },
+  workingHours: { type: Number, default: 0 },
+  status: { type: String, enum: ['Present', 'Absent', 'Late', 'Half Day', 'On Leave'], default: 'Absent' },
+  propertyId: { type: String, required: true }
+}, { timestamps: true });
+
+export const Attendance = mongoose.models.Attendance || mongoose.model('Attendance', attendanceSchema);
+
+// ==========================================
+// APPROVAL REQUEST MODEL
+// ==========================================
+const approvalSchema = new mongoose.Schema({
+  category: { type: String, required: true },
+  requestedBy: { type: String, required: true },
+  amount: { type: Number, default: 0 },
+  reason: { type: String, required: true },
+  status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+  propertyId: { type: String, required: true },
+  decisionReason: { type: String, default: '' },
+  decidedBy: { type: String, default: '' },
+  decidedAt: { type: Date, default: null }
+}, { timestamps: true });
+
+export const Approval = mongoose.models.Approval || mongoose.model('Approval', approvalSchema);
+
+// ==========================================
+// GUEST FEEDBACK / REVIEWS MODEL
+// ==========================================
+const feedbackSchema = new mongoose.Schema({
+  bookingId: { type: String, required: true },
+  guestName: { type: String, required: true },
+  room: { type: String, default: '' },
+  ratings: {
+    cleanliness: { type: Number, default: 5 },
+    service: { type: Number, default: 5 },
+    room: { type: Number, default: 5 }
+  },
+  comment: { type: String, default: '' },
+  response: { type: String, default: '' },
+  respondedAt: { type: Date, default: null },
+  propertyId: { type: String, required: true }
+}, { timestamps: true });
+
+export const Feedback = mongoose.models.Feedback || mongoose.model('Feedback', feedbackSchema);
+
+// ==========================================
+// MANAGER NOTIFICATIONS MODEL
+// ==========================================
+const managerNotificationSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  message: { type: String, required: true },
+  category: { type: String, default: 'General' },
+  isRead: { type: Boolean, default: false },
+  propertyId: { type: String, required: true }
+}, { timestamps: true });
+
+export const ManagerNotification = mongoose.models.ManagerNotification || mongoose.model('ManagerNotification', managerNotificationSchema);
+
+// ==========================================
+// PAYMENTS MODEL
+// ==========================================
+const paymentSchema = new mongoose.Schema({
+  bookingId: { type: String, required: true },
+  guestName: { type: String, required: true },
+  amount: { type: Number, required: true },
+  paymentMethod: { type: String, default: 'UPI' },
+  status: { type: String, default: 'Settled' }, // Settled, Refunded, Pending
+  propertyId: { type: String, required: true }
+}, { timestamps: true });
+
+export const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);

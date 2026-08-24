@@ -7,7 +7,7 @@ import { cn } from "@/utils/utils";
 import { Button } from "@/components/ui/button";
 import { authService } from "../services/auth";
 import { superAdminService } from "@/services/superAdmin";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,16 +60,18 @@ const subModules = {
     "Finance": [
       { label: "Billing", to: "/admin/billing" },
       { label: "Payments", to: "/admin/payments" },
-      { label: "Discounts & Refunds", to: "/admin/approvals" },
-      { label: "Taxes & GST", to: "/admin/taxes" }
-    ],
-    "Analytics": [
       { label: "Reports", to: "/admin/reports" }
     ],
     "Management": [
       { label: "Staff", to: "/admin/staff" },
+      { label: "Approvals", to: "/admin/approvals" },
       { label: "Channel Manager", to: "/admin/channels" },
-      { label: "CRM / Loyalty", to: "/admin/crm" }
+      { label: "CRM & Loyalty", to: "/admin/crm" }
+    ],
+    "Settings": [
+      { label: "Hotel Profile", to: "/admin/profile" },
+      { label: "Policies & Timings", to: "/admin/settings" },
+      { label: "Payments & Bookings", to: "/admin/settings" }
     ]
   },
   "manager": {
@@ -88,7 +90,8 @@ const subModules = {
       { label: "Feedback", to: "/manager/feedback" }
     ],
     "Finance": [
-      { label: "Billing Overview", to: "/manager/billing" }
+      { label: "Billing Overview", to: "/manager/billing" },
+      { label: "Reports", to: "/manager/reports" }
     ]
   }
 };
@@ -100,12 +103,21 @@ export function DashShell({ role, children }) {
   const [open, setOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState({});
-  const user = authService.getCurrentUser();
-  const initials = user?.name 
-    ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2) 
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const user = currentUser;
+  const initials = currentUser?.name 
+    ? currentUser.name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2) 
     : meta.initials;
 
   const [userProperty, setUserProperty] = useState(null);
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      setCurrentUser(authService.getCurrentUser());
+    };
+    window.addEventListener('user-profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('user-profile-updated', handleProfileUpdate);
+  }, []);
 
   useEffect(() => {
     if (role === "admin" || role === "manager") {
@@ -642,6 +654,7 @@ export function DashShell({ role, children }) {
               aria-label="Account menu"
             >
               <Avatar className="size-8">
+                <AvatarImage src={currentUser?.avatar || ""} alt={currentUser?.name} className="object-cover" />
                 <AvatarFallback className="bg-navy text-[11px] font-semibold text-cream">
                   {initials}
                 </AvatarFallback>
@@ -715,15 +728,15 @@ export function DashShell({ role, children }) {
                   { label: "Payments" }
                 ],
                 "/admin/approvals": [
-                  { label: "Finance", to: "/admin/billing" },
-                  { label: "Discounts & Refunds" }
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Approvals" }
                 ],
                 "/admin/taxes": [
                   { label: "Finance", to: "/admin/billing" },
                   { label: "Taxes & GST" }
                 ],
                 "/admin/reports": [
-                  { label: "Analytics", to: "/admin/reports" },
+                  { label: "Finance", to: "/admin/billing" },
                   { label: "Reports" }
                 ],
                 "/admin/staff": [

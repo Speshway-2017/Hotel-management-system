@@ -1,454 +1,550 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { HorizontalRouteTabs, PageHeader, Notice } from "@/components/hs/kit";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import {
-  CalendarCheck,
-  Bed,
-  Users,
-  ConciergeBell,
-  Search,
-  Lock,
-  Eye,
-  Award,
-  Sparkles,
-  Heart,
-  History,
-  XCircle,
-  EyeOff,
-  MessageSquareWarning,
-  CheckCircle2,
-  AlertCircle
+import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { toast } from "sonner";
+import { 
+  Users, UserCheck, CalendarDays, RefreshCw, Star, 
+  Search, SlidersHorizontal, Plus, ArrowRight, Eye, Edit2, PlusCircle, FileText, ChevronLeft, ChevronRight, XCircle
 } from "lucide-react";
-
-const operationsTabs = [
-  { label: "Reservations", to: "/admin/reservations", icon: CalendarCheck },
-  { label: "Rooms & Rates", to: "/admin/rooms", icon: Bed },
-  { label: "Guests", to: "/admin/guests", icon: Users },
-  { label: "Front Desk", to: "/admin/front-desk", icon: ConciergeBell }
-];
 
 export const Route = createFileRoute("/admin/guests")({
   head: () => ({
     meta: [
-      { title: "Guests CRM — Speshway Luxury Hotel" },
-      { name: "description", content: "Access property guest profiles, stay history, preferences, and secure ID documents." }
+      { title: "Guests CRM Workspace — Speshway Luxury Hotel" },
+      { name: "description", content: "Comprehensive guest profile metrics, history, regulatory docs, and ledger accounts." }
     ]
   }),
   component: GuestsCrmPage
 });
 
-// Mock guest CRM records with feedback/complaints logs
-const initialGuests = [
+// Premium stat card component
+function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left"
+    >
+      <div>
+        <div className="h-6 flex items-start">
+          <p className="text-[9.5px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+        </div>
+        <h3 className="mt-1 font-display text-lg font-black text-navy leading-none">{value}</h3>
+      </div>
+      <div className="mt-auto pt-2 text-[9.5px] text-muted-foreground truncate">
+        {hint}
+      </div>
+    </div>
+  );
+}
+
+const defaultGuests = [
   {
     id: "GST-1001",
+    _id: "GST-1001",
     name: "Karan Malhotra",
     email: "karan.m@gmail.com",
     phone: "+91 98765 43210",
-    city: "Mumbai, Maharashtra",
-    tier: "Platinum",
+    city: "Mumbai",
+    state: "Maharashtra",
+    country: "India",
+    address: "Flat 402, Sea Breeze Apts, Bandra West",
+    tier: "VIP",
+    type: "VIP",
     stays: 12,
     spend: 184500,
     preferences: ["High floor", "King size bed", "Extra feather pillows"],
     idDocType: "Passport",
     idDocNumber: "Z-8849502",
-    feedback: [
-      { stay: "Aug 2026", rating: 4, comment: "Beautiful heritage vibe, though room service was slightly delayed on day 2." }
-    ],
-    complaints: [
-      { stay: "Aug 2026", issue: "AC Remote battery dead", status: "Resolved", details: "batteries replaced by staff within 10 mins." }
-    ],
+    status: "Staying-In",
+    currentStay: "Palace Udaipur - Villa Suite 101",
+    room: "101",
+    balance: 0,
+    loyaltyPoints: 1200,
+    notes: "Regular high-end profile guest. Enjoys silent rooms.",
     history: [
-      { checkIn: "2026-08-13", checkOut: "2026-08-15", room: "Suite Room 302", amount: 15400 }
+      { id: "BKG-9081", checkIn: "2026-08-13", checkOut: "2026-08-15", room: "101", amount: 15400, status: "Completed" }
+    ],
+    billing: [
+      { invoiceId: "INV-4829", amount: 15400, date: "2026-08-15", status: "Paid" }
     ]
   },
   {
     id: "GST-1002",
+    _id: "GST-1002",
     name: "Aisha Sharma",
     email: "aisha.sharma@yahoo.com",
     phone: "+91 99112 23344",
-    city: "Delhi, NCR",
-    tier: "Gold",
+    city: "Delhi",
+    state: "NCR",
+    country: "India",
+    address: "C-12, Green Park Extension",
+    tier: "Regular",
+    type: "Regular",
     stays: 8,
     spend: 92400,
     preferences: ["Soft beverages only", "Late check-out"],
     idDocType: "Aadhaar Card",
     idDocNumber: "9820-1122-3344",
-    feedback: [
-      { stay: "Jul 2026", rating: 5, comment: "Superb check-in workflow! Love the pool villas." }
-    ],
-    complaints: [
-      { stay: "Jul 2026", issue: "Requested non-alcoholic mini-fridge but found beer", status: "Resolved", details: "Cleaned and replaced immediately by F&B." }
-    ],
+    status: "Checked-out",
+    currentStay: "Jaipur Resort - Deluxe Room 104",
+    room: "104",
+    balance: 4500,
+    loyaltyPoints: 800,
+    notes: "Requires late checkout preferences whenever available.",
     history: [
-      { checkIn: "2026-08-13", checkOut: "2026-08-14", room: "Deluxe Room 104", amount: 8900 }
+      { id: "BKG-9082", checkIn: "2026-08-10", checkOut: "2026-08-12", room: "104", amount: 8900, status: "Completed" }
+    ],
+    billing: [
+      { invoiceId: "INV-4830", amount: 8900, date: "2026-08-12", status: "Partial" }
     ]
   },
   {
     id: "GST-1003",
+    _id: "GST-1003",
     name: "Rohan Varma",
     email: "rohan.varma@outlook.com",
     phone: "+91 98300 12345",
-    city: "Kolkata, West Bengal",
-    tier: "Silver",
+    city: "Kolkata",
+    state: "West Bengal",
+    country: "India",
+    address: "24B, Ballygunge Circular Road",
+    tier: "Regular",
+    type: "Regular",
     stays: 4,
     spend: 44200,
     preferences: ["Newspaper in morning", "Near elevator"],
     idDocType: "PAN Card",
     idDocNumber: "ABCDE1234F",
-    feedback: [
-      { stay: "Jun 2026", rating: 3.5, comment: "Decent stay. WiFi was patchy near the courtyard." }
-    ],
-    complaints: [
-      { stay: "Jun 2026", issue: "WiFi latency at peak hours", status: "Compensated", details: "Offered complimentary high-speed voucher for next stay." }
-    ],
+    status: "Expected",
+    currentStay: "Goa Beach - Executive Room 205",
+    room: "205",
+    balance: 0,
+    loyaltyPoints: 400,
+    notes: "Prefers morning newspaper selection and room placement close to the lobby elevator.",
     history: [
-      { checkIn: "2026-08-12", checkOut: "2026-08-14", room: "Executive Room 205", amount: 12500 }
+      { id: "BKG-9083", checkIn: "2026-08-12", checkOut: "2026-08-14", room: "205", amount: 12500, status: "Completed" }
+    ],
+    billing: [
+      { invoiceId: "INV-4831", amount: 12500, date: "2026-08-14", status: "Paid" }
     ]
   },
   {
     id: "GST-1004",
+    _id: "GST-1004",
     name: "Meera Nair",
     email: "meera.nair@gmail.com",
     phone: "+91 97777 88888",
-    city: "Bangalore, Karnataka",
-    tier: "Platinum",
+    city: "Bangalore",
+    state: "Karnataka",
+    country: "India",
+    address: "12, Outer Ring Road, HSR Layout",
+    tier: "Corporate",
+    type: "Corporate",
     stays: 16,
     spend: 215000,
-    preferences: ["Airport pickup", "Vegetarian food only", "Silent room"],
+    preferences: ["Airport pickup", "Silent room"],
     idDocType: "Passport",
     idDocNumber: "X-2244950",
-    feedback: [
-      { stay: "May 2026", rating: 5, comment: "Always my preferred hotel. Top hospitality." }
-    ],
-    complaints: [],
+    status: "Staying-In",
+    currentStay: "Kerala Retreat - Villa Suite 101",
+    room: "101",
+    balance: 12000,
+    loyaltyPoints: 1600,
+    notes: "Requires silent rooms and corporate travel vouchers.",
     history: [
-      { checkIn: "2026-08-14", checkOut: "2026-08-17", room: "Villa Suite 101", amount: 4500 }
+      { id: "BKG-9084", checkIn: "2026-08-14", checkOut: "2026-08-17", room: "101", amount: 4500, status: "Completed" }
+    ],
+    billing: [
+      { invoiceId: "INV-4832", amount: 4500, date: "2026-08-17", status: "Unpaid" }
     ]
   }
 ];
 
 function GuestsCrmPage() {
-  const [guestsList, setGuestsList] = useState(initialGuests);
-  const [selectedGuest, setSelectedGuest] = useState(initialGuests[0]);
+  const navigate = useNavigate();
+
+  const [guests, setGuests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Search & Filters state
   const [searchQuery, setSearchQuery] = useState("");
+  const [propertyFilter, setPropertyFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
 
-  // Secure ID document passcode states
-  const [isPasscodeOpen, setIsPasscodeOpen] = useState(false);
-  const [passcode, setPasscode] = useState("");
-  const [passcodeError, setPasscodeError] = useState(false);
-  const [isDocRevealed, setIsDocRevealed] = useState(false);
+  // Sort & Pagination
+  const [sortField, setSortField] = useState("name");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
-  function handleVerifyPasscode(e) {
-    e.preventDefault();
-    if (passcode === "admin123") {
-      setIsDocRevealed(true);
-      setIsPasscodeOpen(false);
-      setPasscode("");
-      setPasscodeError(false);
-    } else {
-      setPasscodeError(true);
+  // Add note modal inline state
+  const [noteTargetGuest, setNoteTargetGuest] = useState(null);
+  const [newNoteText, setNewNoteText] = useState("");
+
+  const loadGuests = async () => {
+    setLoading(true);
+    try {
+      const res = await superAdminService.getUsers();
+      if (res.success && res.data) {
+        setGuests(res.data.filter(u => u.role === "guest"));
+      }
+    } catch (err) {
+      toast.error("Failed to load guests from database.");
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  const filteredGuests = guestsList.filter(
-    (g) =>
+  useEffect(() => {
+    loadGuests();
+  }, []);
+
+  const syncGuests = (updatedList) => {
+    setGuests(updatedList);
+  };
+
+  // Filter calculations
+  const filteredList = guests.filter(g => {
+    const matchesSearch = 
       g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       g.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.city.toLowerCase().includes(searchQuery.toLowerCase())
+      g.phone.includes(searchQuery) ||
+      g.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesProperty = 
+      propertyFilter === "all" || 
+      g.currentStay.toLowerCase().includes(propertyFilter.toLowerCase());
+
+    const matchesStatus = 
+      statusFilter === "all" || 
+      g.status === statusFilter;
+
+    const matchesDate = 
+      !dateFilter || 
+      g.history.some(h => h.checkIn === dateFilter || h.checkOut === dateFilter);
+
+    return matchesSearch && matchesProperty && matchesStatus && matchesDate;
+  });
+
+  // Sort logic
+  const sortedList = [...filteredList].sort((a, b) => {
+    let valA = a[sortField];
+    let valB = b[sortField];
+    if (typeof valA === "string") {
+      valA = valA.toLowerCase();
+      valB = valB.toLowerCase();
+    }
+    if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+    if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedList.length / itemsPerPage);
+  const paginatedList = sortedList.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
+  // Statistics computations
+  const totalGuestsCount = guests.length;
+  const stayingGuestsCount = guests.filter(g => g.status === "Staying-In").length;
+  const upcomingGuestsCount = guests.filter(g => g.status === "Expected").length;
+  const returningGuestsCount = guests.filter(g => g.stays > 5).length;
+  const vipGuestsCount = guests.filter(g => g.type === "VIP").length;
+
+  const handleSaveNote = async (e) => {
+    e.preventDefault();
+    if (!noteTargetGuest) return;
+
+    try {
+      const targetId = noteTargetGuest._id || noteTargetGuest.id;
+      await superAdminService.updateUser(targetId, { notes: newNoteText });
+      toast.success(`Note profile updated for ${noteTargetGuest.name}`);
+      loadGuests();
+      setNoteTargetGuest(null);
+      setNewNoteText("");
+    } catch (err) {
+      toast.error(err.message || "Failed to update guest notes.");
+    }
+  };
+
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
   return (
-    <div className="space-y-6 text-left animate-fade-in">
-      <HorizontalRouteTabs tabs={operationsTabs} />
-
-      {/* Main Split Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Left column: Guests listing */}
-        <div className="md:col-span-1 bg-white border border-muted rounded-xl p-4 shadow-soft flex flex-col space-y-4 max-h-[750px] overflow-hidden">
-          <div className="relative shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search guests by name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy"
-            />
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {filteredGuests.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-8">No guest profiles found.</p>
-            ) : (
-              filteredGuests.map((g) => {
-                const isSelected = selectedGuest?.id === g.id;
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => {
-                      setSelectedGuest(g);
-                      setIsDocRevealed(false); // Relock secure ID document when switching guests
-                    }}
-                    className={`w-full text-left p-3.5 rounded-lg border transition-all flex items-start justify-between gap-3 ${
-                      isSelected
-                        ? "border-navy bg-navy/5 shadow-sm"
-                        : "border-muted hover:border-navy/40 hover:bg-muted/15"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <h4 className="font-semibold text-navy text-sm truncate">{g.name}</h4>
-                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{g.email}</p>
-                      <p className="text-[10px] text-muted-foreground/85 mt-1">{g.city}</p>
-                    </div>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                        g.tier === "Platinum"
-                          ? "bg-[#9b59b6]/10 text-[#9b59b6]"
-                          : g.tier === "Gold"
-                          ? "bg-gold/15 text-[#b8860b]"
-                          : "bg-muted text-navy"
-                      }`}
-                    >
-                      {g.tier}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Right columns: Guest profile details panel */}
-        {selectedGuest ? (
-          <div className="md:col-span-2 space-y-5">
-            
-            {/* Top overview card */}
-            <div className="bg-white border border-muted rounded-xl p-6 shadow-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="grid size-12 place-items-center rounded-full bg-navy/5 text-navy font-bold text-lg select-none">
-                  {selectedGuest.name.split(" ").map((n) => n[0]).join("")}
-                </div>
-                <div>
-                  <h3 className="font-display font-black text-navy text-lg">{selectedGuest.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{selectedGuest.phone} · {selectedGuest.email}</p>
-                </div>
-              </div>
-
-              {/* Loyalty Tier Status */}
-              <div className="p-3 bg-muted/30 border border-muted rounded-xl flex items-center gap-2.5 sm:self-center shrink-0">
-                <span className="grid size-8 place-items-center rounded-lg bg-navy/10 text-navy">
-                  <Award className="size-4.5" />
-                </span>
-                <div>
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Loyalty Status Tier</div>
-                  <div className="text-xs font-black text-navy-deep">{selectedGuest.tier} Member ({selectedGuest.stays * 100} Points)</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Middle split: Preferences & Secure ID Check */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              
-              {/* Preferences */}
-              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-                <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                  <Heart className="size-4 text-brand" />
-                  <h4 className="font-semibold text-navy text-sm">Guest Preferences</h4>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedGuest.preferences.map((p, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 rounded-full bg-muted/65 border border-muted/80 px-2.5 py-1 text-xs font-semibold text-navy">
-                      <Sparkles className="size-3 text-gold" /> {p}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Secure ID documents checking */}
-              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-                <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                  <Lock className="size-4 text-navy" />
-                  <h4 className="font-semibold text-navy text-sm">Restricted ID Document</h4>
-                </div>
-
-                <div className="p-3.5 bg-[#fafafa]/50 border border-muted rounded-lg flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase">{selectedGuest.idDocType}</div>
-                    <div className="font-mono text-sm font-semibold tracking-wider text-navy mt-0.5">
-                      {isDocRevealed ? selectedGuest.idDocNumber : "••••-••••-••••"}
-                    </div>
-                  </div>
-                  
-                  {isDocRevealed ? (
-                    <Button
-                      onClick={() => setIsDocRevealed(false)}
-                      size="icon"
-                      variant="ghost"
-                      className="size-9 text-muted-foreground hover:text-navy"
-                      aria-label="Hide ID"
-                    >
-                      <EyeOff className="size-4.5" />
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => setIsPasscodeOpen(true)}
-                      size="sm"
-                      className="bg-navy hover:bg-navy-deep text-white shadow-soft shrink-0 text-xs px-3 h-8.5"
-                    >
-                      <Eye className="size-3.5 mr-1" /> Reveal
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-            </div>
-
-            {/* Stay Incidents: Feedback & Operational Complaints Log */}
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                <MessageSquareWarning className="size-4.5 text-warning" />
-                <h4 className="font-semibold text-navy text-sm">Feedback & Complaints History</h4>
-              </div>
-
-              <div className="space-y-3">
-                {/* Render Feedback rating comments */}
-                {selectedGuest.feedback?.map((f, i) => (
-                  <div key={i} className="p-3 rounded-lg border border-[#e2e8f0] bg-[#fafafa]/45 space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-navy">Rating: {f.rating}/5 ({f.stay})</span>
-                      <span className="text-muted-foreground text-[10px]">Guest Review</span>
-                    </div>
-                    <p className="text-xs text-[#2a2a2a] italic">"{f.comment}"</p>
-                  </div>
-                ))}
-
-                {/* Render Complaints log */}
-                {selectedGuest.complaints && selectedGuest.complaints.length > 0 ? (
-                  selectedGuest.complaints.map((c, i) => (
-                    <div key={i} className="p-3 rounded-lg border border-[#fdd6d6] bg-[#fff5f5]/65 flex justify-between items-start gap-3">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <AlertCircle className="size-3.5 text-destructive" />
-                          <h5 className="font-semibold text-xs text-navy">{c.issue} ({c.stay})</h5>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-1">Resolution: {c.details}</p>
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                        c.status === "Resolved"
-                          ? "bg-success/10 text-success border border-success/20"
-                          : "bg-brand/10 text-brand border border-brand/20"
-                      }`}>
-                        {c.status}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground italic pl-1.5 select-none">No active or resolved complaints logged for this guest profile.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Section: Stay History list */}
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                <History className="size-4 text-[#9b59b6]" />
-                <h4 className="font-semibold text-navy text-sm">Historical Stays ({selectedGuest.history.length})</h4>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      <th className="py-2.5 px-3">Stay Date Range</th>
-                      <th className="py-2.5 px-3">Room Assigned</th>
-                      <th className="py-2.5 px-3 text-right">Revenue spent</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-muted text-xs text-[#2a2a2a]">
-                    {selectedGuest.history.map((hist, i) => (
-                      <tr key={i} className="hover:bg-[#fcfcfc]">
-                        <td className="py-3 px-3 font-semibold text-navy">{hist.checkIn} → {hist.checkOut}</td>
-                        <td className="py-3 px-3">{hist.room}</td>
-                        <td className="py-3 px-3 text-right font-bold text-navy">₹{hist.amount.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-[#fcfcfc] font-bold text-navy">
-                      <td colSpan="2" className="py-3 px-3 text-right">Lifetime spend:</td>
-                      <td className="py-3 px-3 text-right text-brand">₹{selectedGuest.spend.toLocaleString()}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-        ) : (
-          <div className="md:col-span-2 bg-white border border-muted rounded-xl p-16 shadow-soft text-center grid place-items-center">
-            <Users className="size-12 text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground">Select a guest from the panel to view stay records, preferences and CRM metrics.</p>
-          </div>
-        )}
+    <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
+      
+      {/* KPI metrics cards grid */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <PremiumStatCard
+          label="Total Guests"
+          value={totalGuestsCount.toString()}
+          hint="All registered profiles"
+          accentColor="#0d1b2a"
+        />
+        <PremiumStatCard
+          label="Currently Staying"
+          value={stayingGuestsCount.toString()}
+          hint="Checked-in guests"
+          accentColor="#10b981"
+        />
+        <PremiumStatCard
+          label="Upcoming Stays"
+          value={upcomingGuestsCount.toString()}
+          hint="Expected check-ins"
+          accentColor="#3b82f6"
+        />
+        <PremiumStatCard
+          label="Returning Guests"
+          value={returningGuestsCount.toString()}
+          hint="More than 5 stays"
+          accentColor="#8b5cf6"
+        />
+        <PremiumStatCard
+          label="VIP Stays"
+          value={vipGuestsCount.toString()}
+          hint="High priority guests"
+          accentColor="#eab308"
+        />
       </div>
 
-      {/* Restricted Passcode Prompt Modal */}
-      {isPasscodeOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in">
-          <div className="bg-white rounded-xl border border-muted max-w-xs w-full shadow-lift overflow-hidden text-left flex flex-col">
+      {/* Filters and Query Parameters Section */}
+      <Panel title="Dossier Directories Filters">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+          <FormField label="Search Guest Details" id="search">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                id="search"
+                type="text"
+                className="pl-9 h-10 text-xs font-bold"
+                placeholder="Name, phone, email, ID..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+          </FormField>
+
+          <FormField label="Property Location" id="property">
+            <Select
+              id="property"
+              value={propertyFilter}
+              onChange={(e) => { setPropertyFilter(e.target.value); setCurrentPage(1); }}
+              className="h-10 text-xs font-bold"
+            >
+              <option value="all">All Properties</option>
+              <option value="Udaipur">Palace Udaipur</option>
+              <option value="Jaipur">Jaipur Resort</option>
+              <option value="Goa">Goa Beach</option>
+              <option value="Kerala">Kerala Retreat</option>
+            </Select>
+          </FormField>
+
+          <FormField label="Stay Status" id="status">
+            <Select
+              id="status"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              className="h-10 text-xs font-bold"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Staying-In">Staying-In</option>
+              <option value="Expected">Expected</option>
+              <option value="Checked-out">Checked-out</option>
+            </Select>
+          </FormField>
+
+          <FormField label="Stay Activity Date" id="date">
+            <Input
+              id="date"
+              type="date"
+              className="h-10 text-xs font-bold"
+              value={dateFilter}
+              onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
+            />
+          </FormField>
+
+          <div className="flex justify-end select-none">
+            <Button
+              className="bg-navy hover:bg-navy-deep text-white text-xs h-10 px-6 font-bold rounded-full shadow-soft flex items-center gap-1.5 w-full justify-center"
+              onClick={() => navigate({ to: "/admin/guests/add" })}
+            >
+              <Plus className="size-4" /> Add Guest
+            </Button>
+          </div>
+        </div>
+      </Panel>
+
+      {/* Guest Directory listing */}
+      <Panel title="Guest Directory Catalog">
+        {paginatedList.length === 0 ? (
+          <div className="p-8 text-center text-xs text-muted-foreground select-none">No guest profiles match the current query parameters.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("name")}>Guest</th>
+                  <th className="py-3 px-4">Contact</th>
+                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("type")}>Guest Type</th>
+                  <th className="py-3 px-4">Current/Last Stay</th>
+                  <th className="py-3 px-4">Room</th>
+                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("stays")}>Total Stays</th>
+                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("balance")}>Balance</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-left font-bold" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-muted/30">
+                {paginatedList.map((g) => (
+                  <tr key={g._id} className="hover:bg-muted/5">
+                    <td className="py-3.5 px-4 font-bold text-navy">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-8 rounded-full bg-navy/5 text-navy font-bold text-xs grid place-items-center shrink-0 select-none">
+                          {g.name.split(" ").map(n => n[0]).join("")}
+                        </div>
+                        <div>
+                          <p className="font-bold text-navy leading-snug">{g.name}</p>
+                          <span className="text-[9.5px] text-muted-foreground font-semibold">{g.id}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-muted-foreground space-y-0.5">
+                      <p className="font-semibold text-navy select-all">{g.phone}</p>
+                      <p className="text-[10px] select-all">{g.email}</p>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-navy">{g.type}</td>
+                    <td className="py-3.5 px-4 font-medium text-navy truncate max-w-[150px]">{g.currentStay}</td>
+                    <td className="py-3.5 px-4 font-mono font-bold">#{g.room}</td>
+                    <td className="py-3.5 px-4 font-bold text-center">{g.stays} Stays</td>
+                    <td className={`py-3.5 px-4 font-black ${g.balance > 0 ? "text-destructive" : "text-success"}`}>
+                      ₹{(g.balance || 0).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Tag tone={g.status === "Staying-In" ? "success" : g.status === "Expected" ? "warning" : "neutral"}>
+                        {g.status}
+                      </Tag>
+                    </td>
+                    <td className="py-3 px-4 text-left" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
+                      <div className="flex items-center justify-start gap-1 select-none">
+                        <Button
+                          onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
+                          variant="ghost"
+                          className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full"
+                          title="View Profile"
+                        >
+                          <Eye className="size-4" />
+                        </Button>
+                        <Button
+                          onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
+                          variant="ghost"
+                          className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full"
+                          title="Edit Profile"
+                        >
+                          <Edit2 className="size-4" />
+                        </Button>
+                        <Button
+                          onClick={() => { setNoteTargetGuest(g); setNewNoteText(g.notes || ""); }}
+                          variant="ghost"
+                          className="h-7 w-7 p-0 hover:text-navy hover:bg-muted/15 flex items-center justify-center rounded-full"
+                          title="Add Note"
+                        >
+                          <FileText className="size-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-muted/50 flex items-center justify-between select-none">
+            <span className="text-xs text-muted-foreground">
+              Showing page {currentPage} of {totalPages} ({filteredList.length} guests matching)
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={currentPage === 1}
+                className="size-8 rounded-full"
+                onClick={() => setCurrentPage(currentPage - 1)}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={currentPage === totalPages}
+                className="size-8 rounded-full"
+                onClick={() => setCurrentPage(currentPage + 1)}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+
+      {/* Add / Edit Note dialog Modal popup */}
+      {noteTargetGuest && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
+          <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col">
             <div className="p-4.5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-semibold text-navy text-sm">Security Verification</h3>
+              <h3 className="font-semibold text-navy text-sm">Add Note: {noteTargetGuest.name}</h3>
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7"
-                onClick={() => {
-                  setIsPasscodeOpen(false);
-                  setPasscode("");
-                  setPasscodeError(false);
-                }}
+                className="size-7 rounded-full"
+                onClick={() => { setNoteTargetGuest(null); setNewNoteText(""); }}
               >
                 <XCircle className="size-4" />
               </Button>
             </div>
-            <form onSubmit={handleVerifyPasscode} className="p-5 space-y-3.5">
-              <p className="text-[11px] text-muted-foreground">Viewing sensitive guest documentation requires security authorization. Enter administrator passcode:</p>
+            <form onSubmit={handleSaveNote} className="p-5 space-y-4">
+              <p className="text-[11px] text-muted-foreground">Append administrative notes regarding check-in preferences or regulatory exemptions:</p>
               
-              <div>
-                <input
-                  type="password"
-                  required
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Enter passcode (admin123)"
-                  className="w-full px-3.5 py-2 border border-muted rounded-lg text-sm bg-[#fafafa]/50 focus:outline-none focus:border-navy"
-                />
-                {passcodeError && (
-                  <p className="text-[10px] text-destructive font-bold mt-1.5">Incorrect passcode. Access Denied.</p>
-                )}
-              </div>
+              <textarea
+                required
+                rows={4}
+                value={newNoteText}
+                onChange={(e) => setNewNoteText(e.target.value)}
+                placeholder="Write guest preferences or check-in instructions here..."
+                className="w-full p-3 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy"
+              />
 
               <div className="pt-2 flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => {
-                    setIsPasscodeOpen(false);
-                    setPasscode("");
-                    setPasscodeError(false);
-                  }}
-                  className="h-8 px-3 text-xs"
+                  onClick={() => { setNoteTargetGuest(null); setNewNoteText(""); }}
+                  className="h-8.5 px-4 text-xs rounded-full"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-navy hover:bg-navy-deep text-white h-8 px-4 text-xs">
-                  Verify Credentials
+                <Button type="submit" className="bg-navy hover:bg-navy-deep text-white h-8.5 px-5 text-xs font-bold rounded-full">
+                  Save Note
                 </Button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }

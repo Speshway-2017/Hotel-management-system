@@ -91,33 +91,55 @@ function getToneForType(type) {
   }
 }
 
-// Load notifications from localStorage or use defaults
-const getSavedNotifications = () => {
-  const saved = localStorage.getItem("hms_admin_notifications");
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return initialNotifications;
-    }
-  }
-  localStorage.setItem("hms_admin_notifications", JSON.stringify(initialNotifications));
-  return initialNotifications;
-};
+import { managerService } from "@/services/manager";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 function AdminNotificationsPage() {
-  const [notifications, setNotifications] = useState(() => getSavedNotifications());
-  const [filterType, setFilterType] = useState("All"); // 'All' | 'Unread' | 'Sync' | 'Audit'
+  const [notifications, setNotifications] = useState([]);
+  const [filterType, setFilterType] = useState("All");
+  const [loading, setLoading] = useState(true);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true }));
-      localStorage.setItem("hms_admin_notifications", JSON.stringify(updated));
-      return updated;
-    });
+  const loadNotifications = async () => {
+    setLoading(true);
+    try {
+      const res = await managerService.getNotifications();
+      if (res.success && res.data) {
+        const mapped = res.data.map(n => ({
+          id: n._id || n.id,
+          _id: n._id || n.id,
+          title: n.title,
+          message: n.message,
+          type: n.category || "General",
+          date: n.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+          timestamp: n.createdAt ? new Date(n.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+          read: n.isRead || false,
+          propertyName: "Speshway Luxury Hotel"
+        }));
+        setNotifications(mapped.length > 0 ? mapped : initialNotifications);
+      }
+    } catch (err) {
+      toast.error("Failed to load alerts feed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Filtered dataset
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const unreads = notifications.filter(n => !n.read);
+      await Promise.all(unreads.map(n => managerService.markNotificationRead(n._id || n.id)));
+      toast.success("All announcements marked as read.");
+      loadNotifications();
+    } catch (err) {
+      toast.error("Failed to mark all as read.");
+    }
+  };
+
   const filteredNotifications = notifications.filter((n) => {
     let matchesType = true;
     if (filterType === "Unread") {

@@ -20,8 +20,19 @@ const userSchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'Suspended', 'Inactive'], default: 'Active' },
   dept: { type: String, default: "Front Desk" },
   shift: { type: String, default: "Morning (06:00 - 14:00)" },
+  avatar: { type: String, default: null },
   otp: { type: String },
-  otpExpires: { type: Date }
+  otpExpires: { type: Date },
+  city: { type: String, trim: true },
+  state: { type: String, trim: true },
+  country: { type: String, trim: true, default: "India" },
+  address: { type: String, trim: true },
+  type: { type: String, default: "Regular" },
+  preferences: { type: String, trim: true },
+  idDocType: { type: String, default: "Aadhaar Card" },
+  idDocNumber: { type: String, trim: true },
+  loyaltyPoints: { type: Number, default: 0 },
+  notes: { type: String, trim: true }
 }, {
   timestamps: true
 });
@@ -155,6 +166,17 @@ const MockUser = {
       status: data.status || 'Active',
       dept: data.dept || 'Front Desk',
       shift: data.shift || 'Morning (06:00 - 14:00)',
+      avatar: data.avatar || null,
+      city: data.city || '',
+      state: data.state || '',
+      country: data.country || 'India',
+      address: data.address || '',
+      type: data.type || 'Regular',
+      preferences: data.preferences || '',
+      idDocType: data.idDocType || 'Aadhaar Card',
+      idDocNumber: data.idDocNumber || '',
+      loyaltyPoints: Number(data.loyaltyPoints) || 0,
+      notes: data.notes || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -267,6 +289,19 @@ const User = {
           mobile: created.mobile,
           propertyId: created.propertyId || null,
           status: created.status || 'Active',
+          dept: created.dept || 'Front Desk',
+          shift: created.shift || 'Morning (06:00 - 14:00)',
+          avatar: created.avatar || null,
+          city: created.city || '',
+          state: created.state || '',
+          country: created.country || 'India',
+          address: created.address || '',
+          type: created.type || 'Regular',
+          preferences: created.preferences || '',
+          idDocType: created.idDocType || 'Aadhaar Card',
+          idDocNumber: created.idDocNumber || '',
+          loyaltyPoints: created.loyaltyPoints || 0,
+          notes: created.notes || '',
           createdAt: created.createdAt || new Date().toISOString(),
           updatedAt: created.updatedAt || new Date().toISOString()
         });
@@ -293,6 +328,19 @@ const User = {
             mobile: updated.mobile,
             propertyId: updated.propertyId || null,
             status: updated.status || 'Active',
+            dept: updated.dept || 'Front Desk',
+            shift: updated.shift || 'Morning (06:00 - 14:00)',
+            avatar: updated.avatar || null,
+            city: updated.city || '',
+            state: updated.state || '',
+            country: updated.country || 'India',
+            address: updated.address || '',
+            type: updated.type || 'Regular',
+            preferences: updated.preferences || '',
+            idDocType: updated.idDocType || 'Aadhaar Card',
+            idDocNumber: updated.idDocNumber || '',
+            loyaltyPoints: updated.loyaltyPoints || 0,
+            notes: updated.notes || '',
             createdAt: updated.createdAt,
             updatedAt: updated.updatedAt
           });

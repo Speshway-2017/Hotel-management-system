@@ -15,7 +15,7 @@ import {
   Users
 } from "lucide-react";
 import { authService } from "@/services/auth";
-import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 
 const managementTabs = [
   { label: "Approvals", to: "/manager/approvals", icon: UserCog },
@@ -64,108 +64,30 @@ function ManagerNotificationsPage() {
         const user = authService.getCurrentUser();
         if (!user) return;
 
-        // Fetch properties to get current assigned hotel name
-        const propRes = await superAdminService.getProperties();
+        const [propRes, notificationsRes] = await Promise.all([
+          managerService.getProperty(),
+          managerService.getNotifications()
+        ]);
+
         let propertyName = "Rambagh Residency";
         if (propRes.success && propRes.data) {
-          const found = propRes.data.find(p => p._id === user.propertyId || p.id === user.propertyId);
-          if (found) {
-            setUserProperty(found);
-            propertyName = found.name;
-          }
+          setUserProperty(propRes.data);
+          propertyName = propRes.data.name;
         }
 
-        // Fetch real backend announcements
-        const annRes = await superAdminService.getAnnouncements();
-        const announcements = annRes.success && annRes.data ? annRes.data : [];
-
-        // Build dynamic manager notifications based on mock database records
-        const dynamicAlerts = [
-          {
-            id: "NTF-M01",
-            title: "New Reservation Captured",
-            message: "Karan Malhotra booked a Maharaja Suite for 2 nights.",
-            type: "New Reservation",
-            propertyId: user.propertyId,
+        if (notificationsRes.success && notificationsRes.data) {
+          const compiled = notificationsRes.data.map((n, idx) => ({
+            id: n._id || n.id,
+            title: n.title,
+            message: n.message,
+            type: n.category || "General",
+            propertyId: n.propertyId,
             propertyName,
-            timestamp: "5 mins ago",
-            read: false,
-            body: `Reservation confirmed for Karan Malhotra. Room assigned: Maharaja Suite 302. Stay dates: August 21 → August 23. Booking channel: MakeMyTrip.`
-          },
-          {
-            id: "NTF-M02",
-            title: "Discount Approval Request",
-            message: "10% void for Corporate stay requested by Rajesh Sharma.",
-            type: "Pending Approval",
-            propertyId: user.propertyId,
-            propertyName,
-            timestamp: "30 mins ago",
-            read: false,
-            body: `A rate overrule was requested for Rohan Deshmukh. Details: 10% discount check-out fee waiver. Status: Awaiting manager authorization.`
-          },
-          {
-            id: "NTF-M03",
-            title: "Maintenance Issue Reported",
-            message: "AC fan noise override reported in Room 302.",
-            type: "Maintenance Alert",
-            propertyId: user.propertyId,
-            propertyName,
-            timestamp: "1 hour ago",
-            read: false,
-            body: `Room 302 reported: AC fan noise override. Assigned operator: Maintenance Desk. Priority: Medium.`
-          },
-          {
-            id: "NTF-M04",
-            title: "Guest Complaint Escalated",
-            message: "Room 205 reported slow Wifi connection speeds.",
-            type: "Guest Complaint",
-            propertyId: user.propertyId,
-            propertyName,
-            timestamp: "2 hours ago",
-            read: true,
-            body: `A complaint was registered for Room 205 regarding Wifi connectivity speeds. Network tests show 2 Mbps vs 50 Mbps SLA.`
-          },
-          {
-            id: "NTF-M05",
-            title: "Overbooking Check-in Guard",
-            message: "Automated check: Parity aligned, 0 conflicts found.",
-            type: "Overbooking Alert",
-            propertyId: user.propertyId,
-            propertyName,
-            timestamp: "1 day ago",
-            read: true,
-            body: `The system completed a parity audits sync check. No overlapping check-ins or overbooking conflicts detected on active room types.`
-          }
-        ];
-
-        // Format backend announcements into manager notifications
-        const formattedAnnouncements = announcements.map((ann, idx) => ({
-          id: `NTF-A${idx}`,
-          title: ann.title,
-          message: ann.body,
-          type: "System Notice",
-          propertyId: user.propertyId,
-          propertyName: "Hour Stay Platform",
-          timestamp: "Recently",
-          read: false,
-          body: ann.body
-        }));
-
-        const merged = [...dynamicAlerts, ...formattedAnnouncements];
-        
-        // Cache read state locally if not already set
-        const cacheKey = `hms_manager_notifications_${user.propertyId}`;
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          const parsedCache = JSON.parse(cached);
-          const aligned = merged.map(m => {
-            const match = parsedCache.find(c => c.id === m.id);
-            return match ? { ...m, read: match.read } : m;
-          });
-          setNotifications(aligned);
-        } else {
-          setNotifications(merged);
-          localStorage.setItem(cacheKey, JSON.stringify(merged));
+            timestamp: new Date(n.createdAt).toLocaleDateString(),
+            read: n.isRead,
+            body: n.message
+          }));
+          setNotifications(compiled);
         }
 
       } catch (err) {
@@ -178,16 +100,30 @@ function ManagerNotificationsPage() {
     loadNotifications();
   }, []);
 
-  const handleMarkAllAsRead = () => {
-    const user = authService.getCurrentUser();
-    if (!user) return;
-    const cacheKey = `hms_manager_notifications_${user.propertyId}`;
-
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true }));
-      localStorage.setItem(cacheKey, JSON.stringify(updated));
-      return updated;
-    });
+  const handleMarkAllAsRead = async () => {
+    try {
+      await Promise.all(notifications.filter(n => !n.read).map(n => managerService.markNotificationRead(n.id)));
+      
+      // Reload alerts
+      const notificationsRes = await managerService.getNotifications();
+      if (notificationsRes.success && notificationsRes.data) {
+        const propertyName = userProperty?.name || "assigned hotel";
+        const compiled = notificationsRes.data.map((n, idx) => ({
+          id: n._id || n.id,
+          title: n.title,
+          message: n.message,
+          type: n.category || "General",
+          propertyId: n.propertyId,
+          propertyName,
+          timestamp: new Date(n.createdAt).toLocaleDateString(),
+          read: n.isRead,
+          body: n.message
+        }));
+        setNotifications(compiled);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const filteredNotifications = notifications.filter((n) => {

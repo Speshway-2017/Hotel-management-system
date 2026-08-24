@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 
 const router = express.Router();
 
@@ -182,6 +183,43 @@ router.post('/reset-password', async (req, res) => {
 // @access  Private
 router.get('/profile', protect, async (req, res) => {
   return sendSuccess(res, 200, req.user, 'Profile details retrieved');
+});
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
+  const { name, mobile } = req.body;
+  const updateData = {};
+  if (name !== undefined) updateData.name = name;
+  if (mobile !== undefined) updateData.mobile = mobile;
+
+  try {
+    if (req.file) {
+      const uploadResult = await uploadImageToCloudinary(req.file.path);
+      updateData.avatar = uploadResult.url;
+    }
+
+    const userId = req.user._id || req.user.id;
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
+    if (!updatedUser) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    return sendSuccess(res, 200, {
+      id: updatedUser.id || updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      mobile: updatedUser.mobile,
+      status: updatedUser.status,
+      propertyId: updatedUser.propertyId || null,
+      avatar: updatedUser.avatar || null
+    }, 'Profile updated successfully');
+  } catch (error) {
+    console.error('Update Profile Error:', error);
+    return sendError(res, 500, error.message || 'Failed to update profile');
+  }
 });
 
 // @desc    Sign out / logout (mock endpoint or token block if wanted)

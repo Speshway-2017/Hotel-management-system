@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
-import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import {
@@ -75,19 +75,16 @@ function ManagerReservationsPage() {
       }
 
       const [propRes, resRes] = await Promise.all([
-        superAdminService.getProperties(),
-        superAdminService.getReservations()
+        managerService.getProperty(),
+        managerService.getReservations()
       ]);
 
       if (propRes.success && propRes.data) {
-        const found = propRes.data.find(p => p._id === user.propertyId || p.id === user.propertyId);
-        setProperty(found || null);
+        setProperty(propRes.data);
       }
 
       if (resRes.success && resRes.data) {
-        // Enforce property scoping: filter data to manager's propertyId
-        const scoped = resRes.data.filter(r => r.propertyId === user.propertyId || r.property === user.propertyId);
-        setReservations(scoped);
+        setReservations(resRes.data);
       }
     } catch (err) {
       setError(err.message || "Failed to load reservation dataset");
@@ -227,10 +224,7 @@ function ManagerReservationsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <PageHeader
-        title="Reservations Console"
-        subtitle={`Manage bookings, check-in operations, and guest folios for ${property?.name || "assigned hotel branch"}.`}
-      />
+
 
       {error && <Notice tone="error" title="Dataset Sync Error">{error}</Notice>}
 
@@ -255,12 +249,12 @@ function ManagerReservationsPage() {
 
       {/* Summary Stat Grid */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <PremiumStatCard label="Total Bookings" value={totalCount.toString()} hint="All-time bookings log" accentColor="#0d1b2a" />
+        <PremiumStatCard label="Total Reservations" value={totalCount.toString()} hint="All-time bookings log" accentColor="#0d1b2a" />
         <PremiumStatCard label="Confirmed" value={confirmedCount.toString()} hint="Upcoming reservations" accentColor="#3b82f6" />
-        <PremiumStatCard label="Checked-In" value={checkedInCount.toString()} hint="Active in-house stays" accentColor="#10b981" />
-        <PremiumStatCard label="Checked-Out" value={checkedOutCount.toString()} hint="Completed stays log" accentColor="#6b7280" />
+        <PremiumStatCard label="Checked-in" value={checkedInCount.toString()} hint="Active in-house stays" accentColor="#10b981" />
+        <PremiumStatCard label="Checked-out" value={checkedOutCount.toString()} hint="Completed stays log" accentColor="#6b7280" />
         <PremiumStatCard label="Cancelled" value={cancelledCount.toString()} hint="Revoked stay files" accentColor="#ef4444" />
-        <PremiumStatCard label="No-Show" value={noShowCount.toString()} hint="Failed arrivals log" accentColor="#f59e0b" />
+        <PremiumStatCard label="No-show" value={noShowCount.toString()} hint="Failed arrivals log" accentColor="#f59e0b" />
       </div>
 
       {/* Filters & Search toolbar */}
@@ -293,13 +287,13 @@ function ManagerReservationsPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-muted/50 text-[10px] font-semibold text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <span>Reservation Status:</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5 border-t border-muted/50">
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Reservation Status</span>
             <Select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="w-36 text-[10px] h-7 py-0 font-bold"
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
             >
               <option value="all">All statuses</option>
               <option value="Confirmed">Confirmed</option>
@@ -310,12 +304,12 @@ function ManagerReservationsPage() {
             </Select>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span>Payment Status:</span>
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Payment Status</span>
             <Select
               value={paymentFilter}
               onChange={(e) => { setPaymentFilter(e.target.value); setCurrentPage(1); }}
-              className="w-36 text-[10px] h-7 py-0 font-bold"
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
             >
               <option value="all">All payment levels</option>
               <option value="Paid">Fully Paid</option>
@@ -324,12 +318,12 @@ function ManagerReservationsPage() {
             </Select>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span>Booking Channel:</span>
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Booking Channel</span>
             <Select
               value={sourceFilter}
               onChange={(e) => { setSourceFilter(e.target.value); setCurrentPage(1); }}
-              className="w-36 text-[10px] h-7 py-0 font-bold"
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
             >
               <option value="all">All Channels</option>
               <option value="Direct">Direct</option>
@@ -356,15 +350,14 @@ function ManagerReservationsPage() {
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
                   <th className="py-4.5 px-6">Booking ID</th>
-                  <th className="py-4.5 px-4">Guest</th>
-                  <th className="py-4.5 px-4">Property</th>
-                  <th className="py-4.5 px-4">Room / Type</th>
-                  <th className="py-4.5 px-4">Check-In</th>
-                  <th className="py-4.5 px-4">Check-Out</th>
-                  <th className="py-4.5 px-4 text-center">Pax</th>
-                  <th className="py-4.5 px-4">Source</th>
-                  <th className="py-4.5 px-4 text-right">Payment</th>
-                  <th className="py-4.5 px-4 text-center">Status</th>
+                  <th className="py-4.5 px-4">Guest Name</th>
+                  <th className="py-4.5 px-4">Room / Room Type</th>
+                  <th className="py-4.5 px-4">Check-in</th>
+                  <th className="py-4.5 px-4">Check-out</th>
+                  <th className="py-4.5 px-4 text-center">Number of Guests</th>
+                  <th className="py-4.5 px-4">Booking Source</th>
+                  <th className="py-4.5 px-4 text-right">Payment Status</th>
+                  <th className="py-4.5 px-4 text-center">Reservation Status</th>
                   <th className="py-4.5 px-6 text-right">Actions</th>
                 </tr>
               </thead>
@@ -382,9 +375,6 @@ function ManagerReservationsPage() {
                         <div>{res.guest}</div>
                         <div className="text-[10px] font-normal text-muted-foreground mt-0.5">{res.phone}</div>
                       </td>
-                      <td className="py-4 px-4 font-bold text-brand">
-                        {property?.name || "Hotel Branch"}
-                      </td>
                       <td className="py-4 px-4">
                         <div className="font-bold text-brand">{res.room ? `Room ${res.room}` : "Not Assigned"}</div>
                         <div className="text-[9px] text-muted-foreground mt-0.5">{res.roomType || "Standard Suite"}</div>
@@ -399,8 +389,10 @@ function ManagerReservationsPage() {
                       </td>
                       <td className="py-4 px-4 text-right">
                         <div className="font-semibold text-navy">₹{res.amount?.toLocaleString()}</div>
-                        <div className={`text-[10px] font-bold ${isPaid ? "text-success" : "text-destructive"}`}>
-                          {isPaid ? "Fully Paid" : `Due: ₹${balanceVal.toLocaleString()}`}
+                        <div className="mt-1 flex justify-end">
+                          <Tag tone={isPaid ? "success" : "error"}>
+                            {isPaid ? "Fully Paid" : `Due: ₹${balanceVal.toLocaleString()}`}
+                          </Tag>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-center">

@@ -1,22 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader, Panel, Notice, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Shield, Lock, LogOut, Mail, Phone, Edit3, Eye, EyeOff } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { User, Shield, Lock, LogOut, Mail, Phone, Edit3, Eye, EyeOff, Camera } from "lucide-react";
 import { authService } from "@/services/auth";
 
 function SuperAdminProfile() {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [profileData, setProfileData] = useState({
+  const currentUser = authService.getCurrentUser() || {
     name: "Nandini Rao",
     email: "superadmin@hourstay.com",
     phone: "9999999999",
     role: "Super Admin",
     status: "Active"
+  };
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: currentUser.name || "Nandini Rao",
+    email: currentUser.email || "superadmin@hourstay.com",
+    phone: currentUser.mobile || currentUser.phone || "9999999999",
+    role: currentUser.role === "super-admin" ? "Super Admin" : (currentUser.role || "Super Admin"),
+    status: currentUser.status || "Active",
+    avatar: currentUser.avatar || null
   });
   
   const [passwordData, setPasswordData] = useState({
@@ -33,14 +42,90 @@ function SuperAdminProfile() {
   
   const [notification, setNotification] = useState(null);
 
-  const handleProfileSubmit = (e) => {
+  useEffect(() => {
+    authService.getProfile()
+      .then((res) => {
+        if (res.success && res.data) {
+          const fresh = res.data;
+          setProfileData({
+            name: fresh.name || "",
+            email: fresh.email || "",
+            phone: fresh.mobile || fresh.phone || "",
+            role: fresh.role === "super-admin" ? "Super Admin" : fresh.role,
+            status: fresh.status || "Active",
+            avatar: fresh.avatar || null
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setNotification({
+      tone: "neutral",
+      title: "Uploading...",
+      body: "Uploading profile image..."
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await authService.updateProfile(formData);
+      if (res.success && res.data) {
+        setProfileData(prev => ({
+          ...prev,
+          avatar: res.data.avatar || null
+        }));
+        setNotification({
+          tone: "success",
+          title: "Avatar Updated",
+          body: "Your profile picture has been updated successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Upload Failed",
+        body: err.message || "Could not upload profile picture."
+      });
+    }
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleProfileSubmit = async (e) => {
     e.preventDefault();
     setIsEditing(false);
-    setNotification({
-      tone: "success",
-      title: "Profile Updated",
-      body: "Your personal details have been saved successfully."
-    });
+    
+    try {
+      const formData = new FormData();
+      formData.append("name", profileData.name);
+      formData.append("mobile", profileData.phone);
+
+      const res = await authService.updateProfile(formData);
+      if (res.success && res.data) {
+        setProfileData(prev => ({
+          ...prev,
+          name: res.data.name,
+          phone: res.data.mobile || res.data.phone || "",
+          avatar: res.data.avatar || null
+        }));
+        setNotification({
+          tone: "success",
+          title: "Profile Updated",
+          body: "Your personal details have been saved successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Update Failed",
+        body: err.message || "Could not update profile details."
+      });
+    }
     setTimeout(() => setNotification(null), 4000);
   };
 
@@ -69,6 +154,10 @@ function SuperAdminProfile() {
     window.location.href = "/login";
   };
 
+  const initials = profileData.name
+    ? profileData.name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2)
+    : "NR";
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -86,11 +175,28 @@ function SuperAdminProfile() {
         {/* Left Side: Avatar & Summary Card */}
         <div className="md:col-span-1 space-y-6">
           <div className="bg-white rounded-xl border border-muted p-6 shadow-soft text-center flex flex-col items-center">
-            <Avatar className="size-24 border-[3px] border-purple/10">
-              <AvatarFallback className="bg-navy text-2xl font-bold text-cream">
-                NR
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative group">
+              <Avatar className="size-24 border-[3px] border-purple/10">
+                <AvatarImage src={profileData.avatar || ""} alt={profileData.name} className="object-cover" />
+                <AvatarFallback className="bg-navy text-2xl font-bold text-cream select-none">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <label
+                htmlFor="avatar-upload"
+                className="absolute bottom-0 right-0 bg-gold hover:bg-gold/90 text-navy rounded-full p-2 cursor-pointer shadow-md transition-all hover:scale-105 flex items-center justify-center border-2 border-white size-8"
+                title="Upload new photo"
+              >
+                <Camera className="size-4" />
+              </label>
+              <input
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+            </div>
             <h3 className="mt-4 font-display text-lg font-black text-navy">{profileData.name}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">{profileData.email}</p>
             

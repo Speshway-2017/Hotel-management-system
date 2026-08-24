@@ -1,20 +1,427 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WorkspacePage } from "@/components/hs/WorkspacePage";
+import { useEffect, useState } from "react";
+import { Panel, Notice, Tag } from "@/components/hs/kit";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  User,
+  Shield,
+  Lock,
+  LogOut,
+  Mail,
+  Phone,
+  Key,
+  Calendar,
+  Eye,
+  EyeOff,
+  Camera,
+  Star
+} from "lucide-react";
+import { authService } from "@/services/auth";
 
 export const Route = createFileRoute("/guest/profile")({
   head: () => ({
     meta: [
-    { title: "Profile — Hour Stay" },
-    { name: "description", content: "Personal details, preferences and documents." },
-    { property: "og:title", content: "Profile — Hour Stay" },
-    { property: "og:description", content: "Personal details, preferences and documents." }]
-
+      { title: "Profile — Hour Stay" },
+      { name: "description", content: "Personal details, preferences and documents." },
+      { property: "og:title", content: "Profile — Hour Stay" },
+      { property: "og:description", content: "Personal details, preferences and documents." }
+    ]
   }),
-  component: () =>
-  <WorkspacePage
-    title="Profile"
-    subtitle="Personal details, preferences and documents."
-    dataset="none" />
-
-
+  component: GuestProfilePage
 });
+
+function GuestProfilePage() {
+  const currentUser = authService.getCurrentUser() || {
+    name: "Aarav",
+    email: "aarav@hourstay.com",
+    role: "guest"
+  };
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
+  const [profileData, setProfileData] = useState({
+    name: currentUser.name || "Aarav",
+    email: currentUser.email || "aarav@hourstay.com",
+    phone: currentUser.mobile || currentUser.phone || "+91 98765 43210",
+    role: "Premium Guest",
+    status: "Active",
+    avatar: currentUser.avatar || null
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmNewPassword: ""
+  });
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [notification, setNotification] = useState(null);
+
+  useEffect(() => {
+    // Sync fresh user profile
+    authService.getProfile()
+      .then((res) => {
+        if (res.success && res.data) {
+          const fresh = res.data;
+          setProfileData({
+            name: fresh.name || "",
+            email: fresh.email || "",
+            phone: fresh.mobile || fresh.phone || "",
+            role: fresh.role === "guest" ? "Premium Guest" : fresh.role,
+            status: fresh.status || "Active",
+            avatar: fresh.avatar || null
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setNotification({
+      tone: "neutral",
+      title: "Uploading...",
+      body: "Uploading profile image..."
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await authService.updateProfile(formData);
+      if (res.success && res.data) {
+        setProfileData(prev => ({
+          ...prev,
+          avatar: res.data.avatar || null
+        }));
+        setNotification({
+          tone: "success",
+          title: "Avatar Updated",
+          body: "Your profile picture has been updated successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Upload Failed",
+        body: err.message || "Could not upload profile picture."
+      });
+    }
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    setIsEditing(false);
+    
+    try {
+      const formData = new FormData();
+      formData.append("name", profileData.name);
+      formData.append("mobile", profileData.phone);
+
+      const res = await authService.updateProfile(formData);
+      if (res.success && res.data) {
+        setProfileData(prev => ({
+          ...prev,
+          name: res.data.name,
+          phone: res.data.mobile || res.data.phone || "",
+          avatar: res.data.avatar || null
+        }));
+        setNotification({
+          tone: "success",
+          title: "Profile Saved",
+          body: "Guest profile details have been updated successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Update Failed",
+        body: err.message || "Could not update profile details."
+      });
+    }
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+      setNotification({
+        tone: "error",
+        title: "Password Mismatch",
+        body: "Confirm password does not match new password."
+      });
+      return;
+    }
+    setIsChangingPassword(false);
+    setPasswordData({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+    setNotification({
+      tone: "success",
+      title: "Credentials Saved",
+      body: "Security password credentials updated successfully."
+    });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    window.location.href = "/login";
+  };
+
+  const initials = profileData.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
+
+  return (
+    <div className="space-y-6 text-left animate-fade-in">
+      {notification && (
+        <Notice tone={notification.tone} title={notification.title}>
+          {notification.body}
+        </Notice>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Left column summary card */}
+        <div className="md:col-span-1 space-y-6">
+          <div className="bg-white rounded-xl border border-muted p-6 shadow-soft text-center flex flex-col items-center">
+            <div className="relative group">
+              <Avatar className="size-24 border-[3px] border-navy/10">
+                <AvatarImage src={profileData.avatar || ""} alt={profileData.name} className="object-cover" />
+                <AvatarFallback className="bg-navy text-2xl font-bold text-cream select-none">
+                  {initials || "GT"}
+                </AvatarFallback>
+              </Avatar>
+              <label
+                htmlFor="avatar-upload"
+                className="absolute bottom-0 right-0 bg-gold hover:bg-gold/90 text-navy rounded-full p-2 cursor-pointer shadow-md transition-all hover:scale-105 flex items-center justify-center border-2 border-white size-8"
+                title="Upload new photo"
+              >
+                <Camera className="size-4" />
+              </label>
+              <input
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+            </div>
+            <h3 className="mt-4 font-display text-lg font-black text-navy">{profileData.name}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{profileData.email}</p>
+            
+            <div className="mt-4 flex flex-wrap gap-1.5 justify-center">
+              <Tag tone="brand">{profileData.role}</Tag>
+              <Tag tone="success">Platinum Member</Tag>
+            </div>
+            
+            <div className="w-full border-t border-muted my-5 pt-5 text-left text-xs space-y-3.5">
+              <div className="flex items-center gap-2 text-navy-deep font-semibold">
+                <Star className="size-4 text-gold fill-gold" />
+                <span>Loyalty tier: <strong className="text-brand">Platinum (48,200 pts)</strong></span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Mail className="size-4 text-navy/70" />
+                <span>{profileData.email}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Phone className="size-4 text-navy/70" />
+                <span>{profileData.phone}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="size-4 text-navy/70" />
+                <span>Member since: August 2026</span>
+              </div>
+            </div>
+
+            <Button
+              variant="destructive"
+              onClick={handleLogout}
+              className="w-full h-10 rounded-full font-bold gap-2 text-xs uppercase tracking-wide cursor-pointer"
+            >
+              <LogOut className="size-4" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+
+        {/* Right column details and update actions */}
+        <div className="md:col-span-2 space-y-6">
+          
+          {/* View Details */}
+          {!isEditing && !isChangingPassword && (
+            <Panel title="Personal Guest Details" description="Your core guest contact profile details on Hour Stay.">
+              <div className="p-6 bg-white rounded-b-xl space-y-5 text-xs">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">Full Name</p>
+                    <p className="font-semibold text-navy text-sm">{profileData.name}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">Contact Phone</p>
+                    <p className="font-semibold text-navy text-sm">{profileData.phone}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">Email Address</p>
+                    <p className="font-semibold text-navy text-sm">{profileData.email}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">Status / Loyalty Tier</p>
+                    <p className="font-semibold text-navy text-sm">{profileData.status} (Platinum Member)</p>
+                  </div>
+                </div>
+
+                <div className="pt-5 border-t border-muted flex flex-wrap gap-2 justify-end">
+                  <Button
+                    onClick={() => setIsChangingPassword(true)}
+                    variant="outline"
+                    className="border-muted text-navy hover:bg-muted/10 text-xs h-9 px-5 font-bold"
+                  >
+                    <Key className="size-3.5 mr-1" /> Change Password
+                  </Button>
+                  <Button
+                    onClick={() => setIsEditing(true)}
+                    className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-6 font-bold shadow-soft"
+                  >
+                    Edit Profile Details
+                  </Button>
+                </div>
+              </div>
+            </Panel>
+          )}
+
+          {/* Edit Profile */}
+          {isEditing && (
+            <Panel title="Modify Profile Specifications" description="Change your general personal identity attributes.">
+              <form onSubmit={handleProfileSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-name" className="text-navy font-semibold text-xs">Full Name</Label>
+                    <Input
+                      id="edit-name"
+                      value={profileData.name}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
+                    <Input
+                      id="edit-phone"
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2.5 pt-3">
+                  <Button type="submit" className="bg-purple hover:bg-purple/90 text-cream text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
+                    Save Changes
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} className="text-navy text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Panel>
+          )}
+
+          {/* Change Password */}
+          {isChangingPassword && (
+            <Panel title="Change Account Password" description="Update your security passcode.">
+              <form onSubmit={handlePasswordSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="current-pw" className="text-navy font-semibold text-xs">Current Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="current-pw"
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center border-none bg-transparent"
+                    >
+                      {showCurrentPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-pw" className="text-navy font-semibold text-xs">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="new-pw"
+                        type={showNewPassword ? "text" : "password"}
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center border-none bg-transparent"
+                      >
+                        {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-new-pw" className="text-navy font-semibold text-xs">Confirm New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirm-new-pw"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={passwordData.confirmNewPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
+                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center border-none bg-transparent"
+                      >
+                        {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2.5 pt-3">
+                  <Button type="submit" className="bg-purple hover:bg-purple/90 text-cream text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
+                    Update Password
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setIsChangingPassword(false)} className="text-navy text-xs font-bold rounded-full px-5 h-9 cursor-pointer">
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Panel>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
