@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, User, Home, CreditCard, ChevronLeft } from "lucide-react";
 
 function ViewReservation() {
-  const { id } = useParams();
+  const { id } = Route.useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,14 +18,17 @@ function ViewReservation() {
       setLoading(true);
       setError(null);
       try {
+        let matched = null;
+
         const res = await superAdminService.getReservations();
-        if (res.success) {
-          const matched = res.data.find(b => b._id === id || b.id === id);
-          if (matched) {
-            setBooking(matched);
-          } else {
-            setError("Reservation record not found.");
-          }
+        if (res && res.data) {
+          matched = res.data.find(b => b._id === id || b.id === id);
+        }
+
+        if (matched) {
+          setBooking(matched);
+        } else {
+          setError("Reservation record not found.");
         }
       } catch (err) {
         setError(err.message || "Failed to load reservation details.");

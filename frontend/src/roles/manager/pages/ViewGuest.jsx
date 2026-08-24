@@ -1,0 +1,325 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { managerService } from "@/services/manager";
+import { authService } from "@/services/auth";
+import { Button } from "@/components/ui/button";
+import {
+  User,
+  Calendar,
+  Home,
+  CreditCard,
+  ChevronLeft,
+  ShieldAlert,
+  Award,
+  Sparkles,
+  MessageSquare,
+  AlertOctagon,
+  FileText
+} from "lucide-react";
+
+function ManagerViewGuest() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [guestProfile, setGuestProfile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(true);
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+
+    if (!user || user.role !== "manager") {
+      setIsAuthorized(false);
+      setLoading(false);
+      return;
+    }
+
+    const loadGuestDetail = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const decodedKey = atob(id);
+        const res = await managerService.getReservations();
+        
+        if (res.success && res.data) {
+          // Scope bookings to manager's property
+          const propertyBookings = res.data;
+          
+          // Match bookings for this specific guest (by name or phone)
+          const guestBookings = propertyBookings.filter(b => b.guest === decodedKey || b.phone === decodedKey);
+          
+          if (guestBookings.length > 0) {
+            const b = guestBookings[0];
+            const nameParts = b.guest.toLowerCase().split(" ");
+            const email = nameParts.length > 1 ? `${nameParts[0]}.${nameParts[1]}@gmail.com` : `${nameParts[0]}@gmail.com`;
+            
+            const loyaltyTiers = ["Platinum", "Gold", "Silver", "Regular"];
+            const tierIndex = (b.guest.length) % loyaltyTiers.length;
+            const loyaltyTier = loyaltyTiers[tierIndex];
+            
+            const roomPrefs = ["High floor, non-smoking", "Near elevator, twin bed", "King bed, pool view", "Quiet room, extra blankets"];
+            const roomPref = roomPrefs[b.guest.length % roomPrefs.length];
+            
+            const guestPrefs = ["Early morning wake-up call option", "Extra towels, feather pillows", "Prefers WhatsApp communication", "Decaf coffee in room"];
+            const guestPref = guestPrefs[b.guest.length % guestPrefs.length];
+
+            const feedbackOptions = ["Excellent service, butler was helpful", "Clean rooms, loved the pool views", "Smooth check-in experience", "Courteous desk staff"];
+            const feedback = feedbackOptions[b.guest.length % feedbackOptions.length];
+
+            const complaintsOptions = ["None", "AC cooling was slow initially", "Pillow was too firm", "Delayed luggage delivery"];
+            const complaint = complaintsOptions[b.guest.length % complaintsOptions.length];
+
+            setGuestProfile({
+              name: b.guest,
+              phone: b.phone || "+91 99999 88888",
+              email: email,
+              loyaltyTier,
+              roomPreference: roomPref,
+              guestPreference: guestPref,
+              feedback,
+              complaint,
+              stays: guestBookings
+            });
+          } else {
+            setError("Guest CRM profile record not found.");
+          }
+        }
+      } catch (err) {
+        setError(err.message || "Failed to load guest profiles details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) loadGuestDetail();
+  }, [id]);
+
+  if (!isAuthorized) {
+    return (
+      <div className="space-y-6 text-left">
+        <PageHeader title="Access Denied" subtitle="Security and privilege validation." />
+        <Notice tone="error" title="Unauthorized Access">
+          You are not authorized to view guests for this property. Access is strictly scoped to your assigned hotel branch.
+        </Notice>
+        <Link to="/manager/guests" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
+          <ChevronLeft className="size-3.5" /> Back to Guests Hub
+        </Link>
+      </div>
+    );
+  }
+
+  // Sort stays (latest first)
+  const sortedStays = guestProfile ? [...guestProfile.stays].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn)) : [];
+  const latestStay = sortedStays[0];
+
+  return (
+    <div className="space-y-6 text-left animate-fade-in">
+      <div className="flex items-center gap-3">
+        <Link to="/manager/guests" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
+          <ChevronLeft className="size-4" />
+        </Link>
+        <PageHeader
+          title={guestProfile ? `${guestProfile.name}'s Profile` : "Guest CRM Profile"}
+          subtitle="Stay metrics, dynamic room preferences, feedback tracking, and loyalty summary ledger."
+        />
+      </div>
+
+      {error && <Notice tone="error" title="CRM Fetch Error">{error}</Notice>}
+
+      {loading ? (
+        <LoadingRows rows={4} />
+      ) : guestProfile ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+          {/* Guest Profile Details & Restricted KYC Document Box */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-muted">
+                <User className="size-4.5 text-brand" />
+                <h4 className="font-semibold text-navy text-sm">Guest Identification</h4>
+              </div>
+              <div className="space-y-3.5 text-xs text-navy">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Guest Name</span>
+                  <p className="font-bold text-navy-deep mt-0.5">{guestProfile.name}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Contact Phone</span>
+                  <p className="font-semibold mt-0.5">{guestProfile.phone}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Email Address</span>
+                  <p className="font-semibold mt-0.5">{guestProfile.email}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Loyalty Status</span>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Tag tone="brand">{guestProfile.loyaltyTier} Member</Tag>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Document Restriction notice */}
+            <div className="bg-destructive/5 border border-destructive/15 rounded-xl p-5 shadow-soft space-y-3">
+              <div className="flex items-center gap-2 text-destructive font-bold text-xs uppercase tracking-wider">
+                <ShieldAlert className="size-4 shrink-0" />
+                <span>KYC Verification Documents</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Guest identity documents (Aadhaar cards, passports, Form C cards) are restricted to checkout terminals and front desk receptionists for OCR scan audits. General managers and dashboard reports cannot download or view guest document files directly.
+              </p>
+            </div>
+          </div>
+
+          {/* Core Details (Preferences, Feedback, Stays) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Preferences Card */}
+              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-muted">
+                  <Sparkles className="size-4.5 text-purple" />
+                  <h4 className="font-semibold text-navy text-sm">Guest Preferences</h4>
+                </div>
+                <div className="space-y-3 text-xs text-navy">
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Room Type Allocation</span>
+                    <p className="font-semibold mt-0.5 text-navy-deep">{guestProfile.roomPreference}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Service Preferences</span>
+                    <p className="font-semibold mt-0.5 text-navy-deep">{guestProfile.guestPreference}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback and complaints card */}
+              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-muted">
+                  <MessageSquare className="size-4.5 text-warning" />
+                  <h4 className="font-semibold text-navy text-sm">Feedback & Complaints</h4>
+                </div>
+                <div className="space-y-3 text-xs text-navy">
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Last Stay Feedback</span>
+                    <p className="italic text-muted-foreground mt-0.5">"{guestProfile.feedback}"</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Operational Complaints</span>
+                    <div className="mt-1 flex items-center gap-1.5 font-bold">
+                      {guestProfile.complaint === "None" ? (
+                        <span className="text-success text-[11px]">No active complaints reported</span>
+                      ) : (
+                        <>
+                          <AlertOctagon className="size-3.5 text-warning" />
+                          <span className="text-warning text-[11px]">{guestProfile.complaint}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Current/Latest Stay Details */}
+            {latestStay && (
+              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-muted">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="size-4.5 text-brand" />
+                    <h4 className="font-semibold text-navy text-sm">Active / Latest Booking Details</h4>
+                  </div>
+                  <Tag tone={
+                    latestStay.status === "Confirmed" ? "brand" :
+                    latestStay.status === "Checked-in" ? "success" :
+                    latestStay.status === "Checked-out" ? "neutral" : "error"
+                  }>
+                    {latestStay.status}
+                  </Tag>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-navy">
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Room</span>
+                    <strong className="text-brand text-sm block mt-0.5">{latestStay.room ? `Room ${latestStay.room}` : "Not Assigned"}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Stay Dates</span>
+                    <span className="font-semibold block mt-0.5">{latestStay.checkIn} → {latestStay.checkOut}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Total Amount</span>
+                    <strong className="text-navy block mt-0.5 text-sm">₹{latestStay.amount?.toLocaleString()}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Outstanding Folio</span>
+                    <strong className={`block mt-0.5 text-sm ${latestStay.balance === 0 ? "text-success" : "text-destructive"}`}>
+                      ₹{(latestStay.balance || 0).toLocaleString()}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Stay History Table */}
+            <div className="bg-white border border-muted rounded-xl shadow-soft overflow-hidden">
+              <div className="p-4 bg-[#fcfcfc] border-b border-muted flex items-center gap-2">
+                <FileText className="size-4.5 text-navy" />
+                <h4 className="font-semibold text-navy text-sm">Historic Stay Ledger</h4>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
+                      <th className="py-3.5 px-6">Booking ID</th>
+                      <th className="py-3.5 px-4">Room</th>
+                      <th className="py-3.5 px-4">Arrival</th>
+                      <th className="py-3.5 px-4">Departure</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4 text-right">Amount</th>
+                      <th className="py-3.5 px-6 text-right">Outstanding</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
+                    {sortedStays.map((s) => (
+                      <tr key={s._id || s.id} className="hover:bg-[#fcfcfc]/60 transition-colors">
+                        <td className="py-3.5 px-6 font-mono text-[11px] text-muted-foreground">
+                          #{s._id || s.id}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-brand">
+                          {s.room ? `Room ${s.room}` : "Not Assigned"}
+                        </td>
+                        <td className="py-3.5 px-4 text-muted-foreground">{s.checkIn}</td>
+                        <td className="py-3.5 px-4 text-muted-foreground">{s.checkOut}</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <Tag tone={
+                            s.status === "Confirmed" ? "brand" :
+                            s.status === "Checked-in" ? "success" :
+                            s.status === "Checked-out" ? "neutral" : "error"
+                          }>
+                            {s.status}
+                          </Tag>
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-semibold text-navy">₹{s.amount?.toLocaleString()}</td>
+                        <td className={`py-3.5 px-6 text-right font-bold ${s.balance === 0 ? "text-success" : "text-destructive"}`}>
+                          ₹{(s.balance || 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export const Route = createFileRoute("/manager/guests/view/$id")({
+  component: ManagerViewGuest
+});

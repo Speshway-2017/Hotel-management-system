@@ -1,420 +1,395 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { HorizontalRouteTabs, Panel, Tag, Notice } from "@/components/hs/kit";
-import { superAdminService } from "@/services/superAdmin";
+import { Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { toast } from "sonner";
+import { superAdminService } from "@/services/superAdmin";
 import {
-  UserCog,
-  Activity,
-  Gift,
-  Bell,
-  RefreshCw,
-  Sliders,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  XCircle,
-  TrendingUp,
-  Percent,
-  Check,
-  Ban
+  Activity, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Sliders,
+  Eye, Check, Ban, DollarSign, Server, KeyRound, AlertCircle, Clock
 } from "lucide-react";
-
-const managementTabs = [
-  { label: "Staff Management", to: "/admin/staff", icon: UserCog },
-  { label: "OTA / Channels", to: "/admin/channels", icon: Activity },
-  { label: "CRM / Loyalty", to: "/admin/crm", icon: Gift },
-  { label: "Notifications", to: "/admin/notifications", icon: Bell }
-];
 
 export const Route = createFileRoute("/admin/channels")({
   head: () => ({
     meta: [
-      { title: "OTA Channels Manager — Speshway Luxury Hotel" },
-      { name: "description", content: "Audit rates parity and room availability sync parities." }
+      { title: "OTA Channels Synchronization — Speshway Luxury Hotel" },
+      { name: "description", content: "Synchronize room tariffs and availability counts across GDS and OTA distribution systems." }
     ]
   }),
   component: AdminChannelsPage
 });
 
+function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          <h3 className="mt-2.5 font-display text-base font-black text-navy leading-none">{value}</h3>
+        </div>
+        {Icon && (
+          <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
+            <Icon className="size-3.5" />
+          </span>
+        )}
+      </div>
+      <div className="mt-auto pt-2 text-[9.5px] text-muted-foreground truncate">
+        {hint}
+      </div>
+    </div>
+  );
+}
+
+const initialChannels = [
+  {
+    name: "MakeMyTrip",
+    status: "Connected",
+    lastSync: "2 min ago",
+    inventorySync: "Synced",
+    rateSync: "In Parity",
+    reservationSync: "Active",
+    commission: 15,
+    stopSell: false,
+    closeOut: false,
+    logs: [
+      { time: "17:05:12", event: "Availability push: 42 rooms sync successful", type: "success" },
+      { time: "16:48:00", event: "Rate update: Standard Deluxe ₹6,500 pushed", type: "success" },
+      { time: "15:30:24", event: "Reservation download: MMT-89021 check-in captured", type: "success" }
+    ]
+  },
+  {
+    name: "Booking.com",
+    status: "Connected",
+    lastSync: "5 min ago",
+    inventorySync: "Synced",
+    rateSync: "In Parity",
+    reservationSync: "Active",
+    commission: 15,
+    stopSell: false,
+    closeOut: false,
+    logs: [
+      { time: "17:00:00", event: "Inventory push: 42 rooms sync successful", type: "success" },
+      { time: "16:12:44", event: "Reservation download: BKG-11928 check-in captured", type: "success" }
+    ]
+  },
+  {
+    name: "Expedia",
+    status: "Sync Warning",
+    lastSync: "15 min ago",
+    inventorySync: "Synced",
+    rateSync: "Rate Mismatch",
+    reservationSync: "Active",
+    commission: 18,
+    stopSell: false,
+    closeOut: false,
+    logs: [
+      { time: "16:50:00", event: "Rate mismatch alert: Expedia listing ₹6,100 vs PMS ₹6,500", type: "warning" },
+      { time: "16:00:15", event: "Availability push: 42 rooms sync successful", type: "success" }
+    ]
+  },
+  {
+    name: "Agoda",
+    status: "Disconnected",
+    lastSync: "1 day ago",
+    inventorySync: "—",
+    rateSync: "—",
+    reservationSync: "Inactive",
+    commission: 15,
+    stopSell: true,
+    closeOut: true,
+    logs: [
+      { time: "August 16, 11:30", event: "Channel deactivated by user override. STOP SELL initialized.", type: "error" }
+    ]
+  }
+];
+
 function AdminChannelsPage() {
-  const [userProperty, setUserProperty] = useState({ id: "HS-JAI", name: "Speshway Luxury Hotel" });
-  const [loading, setLoading] = useState(false);
-  const [notification, setNotification] = useState(null);
+  const [channels, setChannels] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Modals
-  const [logModalOpen, setLogModalOpen] = useState(false);
-  const [selectedLogs, setSelectedLogs] = useState([]);
-  const [logChannelName, setLogChannelName] = useState("");
+  // Sync Log Modal popup
+  const [selectedLogs, setSelectedLogs] = useState(null);
 
-  const [channels, setChannels] = useState([
-    {
-      name: "MakeMyTrip",
-      status: "Connected",
-      lastSync: "2 min ago",
-      inventorySync: "Synced",
-      rateSync: "In Parity",
-      reservationSync: "Active",
-      commission: 15,
-      stopSell: false,
-      closeOut: false,
-      logs: [
-        { time: "17:05:12", event: "Availability push: 42 rooms sync successful" },
-        { time: "16:48:00", event: "Rate update: Standard Deluxe ₹6,500 pushed" },
-        { time: "15:30:24", event: "Reservation download: MMT-89021 guest check-in captured" }
-      ]
-    },
-    {
-      name: "Goibibo",
-      status: "Failed",
-      lastSync: "15 min ago",
-      inventorySync: "Synced",
-      rateSync: "Rate Mismatch",
-      reservationSync: "Active",
-      commission: 18,
-      stopSell: false,
-      closeOut: false,
-      logs: [
-        { time: "16:50:00", event: "Rate validation failed: Goibibo listing ₹6,100 vs PMS ₹6,500 (Mismatch flag)" },
-        { time: "16:00:15", event: "Availability push: 42 rooms sync successful" }
-      ]
-    },
-    {
-      name: "Booking.com",
-      status: "Connected",
-      lastSync: "5 min ago",
-      inventorySync: "Synced",
-      rateSync: "In Parity",
-      reservationSync: "Active",
-      commission: 15,
-      stopSell: false,
-      closeOut: false,
-      logs: [
-        { time: "17:00:00", event: "Inventory push: 42 rooms sync successful" },
-        { time: "16:12:44", event: "Reservation download: BKG-11928 check-in captured" }
-      ]
-    },
-    {
-      name: "Agoda",
-      status: "Disconnected",
-      lastSync: "1 day ago",
-      inventorySync: "—",
-      rateSync: "—",
-      reservationSync: "Inactive",
-      commission: 15,
-      stopSell: true,
-      closeOut: true,
-      logs: [
-        { time: "August 16, 11:30", event: "Channel deactivated by user override. STOP SELL initialized." }
-      ]
-    }
-  ]);
+  const [properties, setProperties] = useState([]);
 
   useEffect(() => {
-    superAdminService.getProperties()
-      .then((res) => {
+    async function init() {
+      try {
+        const res = await superAdminService.getProperties();
         if (res.success && res.data && res.data.length > 0) {
-          setUserProperty({ id: res.data[0].id || res.data[0]._id, name: res.data[0].name });
+          setProperties(res.data);
+          const settings = res.data[0].settings || {};
+          if (settings.otaChannels) {
+            setChannels(settings.otaChannels);
+          } else {
+            setChannels(initialChannels);
+          }
         }
-      })
-      .catch(() => {});
+      } catch (err) {}
+      setLoading(false);
+    }
+    init();
   }, []);
 
-  const handleSync = (name) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.name === name ? { ...c, status: "Syncing", lastSync: "Syncing..." } : c))
-    );
+  const syncChannels = async (list) => {
+    try {
+      if (properties.length > 0) {
+        const prop = properties[0];
+        const nextSettings = {
+          ...(prop.settings || {}),
+          otaChannels: list
+        };
+        await superAdminService.updateProperty(prop._id || prop.id, { settings: nextSettings });
+      }
+      setChannels(list);
+    } catch (err) {
+      toast.error(err.message || "Failed to update channel configs.");
+    }
+  };
 
+  const handleSyncNow = (name) => {
+    toast.info(`Triggering API Sync push for ${name}...`);
     setTimeout(() => {
-      setChannels((prev) =>
-        prev.map((c) =>
-          c.name === name
-            ? {
-                ...c,
-                status: "Connected",
-                lastSync: "Just now",
-                inventorySync: "Synced",
-                rateSync: "In Parity"
-              }
-            : c
-        )
-      );
-      setNotification({ tone: "success", title: "Channel Synced", body: `${name} has been synchronized successfully.` });
-      setTimeout(() => setNotification(null), 3000);
+      const updated = channels.map(c => {
+        if (c.name === name) {
+          toast.success(`${name} channels synchronization complete.`);
+          return {
+            ...c,
+            lastSync: "Just now",
+            logs: [{ time: new Date().toLocaleTimeString(), event: "Manual API Sync Trigger: pushed parity successfully", type: "success" }, ...c.logs]
+          };
+        }
+        return c;
+      });
+      syncChannels(updated);
     }, 1000);
   };
 
-  const handleSyncAll = () => {
-    setLoading(true);
-    setChannels((prev) =>
-      prev.map((c) =>
-        c.status !== "Disconnected" ? { ...c, status: "Syncing", lastSync: "Syncing..." } : c
-      )
-    );
-
-    setTimeout(() => {
-      setChannels((prev) =>
-        prev.map((c) =>
-          c.status !== "Disconnected"
-            ? {
-                ...c,
-                status: "Connected",
-                lastSync: "Just now",
-                inventorySync: "Synced",
-                rateSync: "In Parity"
-              }
-            : c
-        )
-      );
-      setLoading(false);
-      setNotification({ tone: "success", title: "Global Sync Completed", body: "All active channels updated successfully." });
-      setTimeout(() => setNotification(null), 3000);
-    }, 1200);
-  };
-
-  const handleToggleConnect = (name) => {
-    setChannels((prev) =>
-      prev.map((c) => {
-        if (c.name !== name) return c;
-        const isConnecting = c.status === "Disconnected";
+  const handleToggleStopSell = (name) => {
+    const updated = channels.map(c => {
+      if (c.name === name) {
+        const nextStopSell = !c.stopSell;
+        toast.warning(`${name} Stop Sell override ${nextStopSell ? "Enabled" : "Disabled"}`);
         return {
           ...c,
-          status: isConnecting ? "Connected" : "Disconnected",
-          lastSync: isConnecting ? "Just now" : "—",
-          inventorySync: isConnecting ? "Synced" : "—",
-          rateSync: isConnecting ? "In Parity" : "—",
-          reservationSync: isConnecting ? "Active" : "Inactive"
+          stopSell: nextStopSell,
+          status: nextStopSell ? "Disconnected" : "Connected",
+          logs: [{ time: new Date().toLocaleTimeString(), event: `Stop Sell status toggled: ${nextStopSell ? "Active" : "Inactive"}`, type: "warning" }, ...c.logs]
         };
-      })
-    );
+      }
+      return c;
+    });
+    syncChannels(updated);
   };
 
-  const handleToggleField = (name, field) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.name === name ? { ...c, [field]: !c[field] } : c))
-    );
-  };
-
-  const handleCommissionChange = (name, val) => {
-    setChannels((prev) =>
-      prev.map((c) => (c.name === name ? { ...c, commission: Number(val) } : c))
-    );
-  };
-
-  const openLogs = (channel) => {
-    setLogChannelName(channel.name);
-    setSelectedLogs(channel.logs);
-    setLogModalOpen(true);
-  };
-
-  const activeCount = channels.filter(c => c.status !== "Disconnected").length;
-  const parityIssues = channels.filter(c => c.rateSync === "Rate Mismatch").length;
+  // KPIs
+  const totalChannels = channels.length;
+  const connectedChannels = channels.filter(c => c.status === "Connected").length;
+  const activeMappings = 6; // Mock mappings count
 
   return (
-    <div className="space-y-6 text-left animate-fade-in">
-      <HorizontalRouteTabs tabs={managementTabs} />
-
-      {notification && (
-        <Notice tone={notification.tone} title={notification.title}>
-          {notification.body}
-        </Notice>
-      )}
-
-      {/* Sync Error Alert Banner */}
-      {parityIssues > 0 && (
-        <Notice tone="warning" title="Rate Parity Discrepancy Alert">
-          A rate discrepancy of ₹400 was logged on Goibibo. The channel is configured to block overbookings, but manual parity adjustment is recommended.
-        </Notice>
-      )}
-
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-muted p-4.5 shadow-soft flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#6366f1]">Active Channels</span>
-          <h3 className="mt-2.5 font-display text-xl font-black text-navy leading-none">{activeCount} / 4</h3>
-          <p className="mt-3.5 text-[10px] text-muted-foreground">MMT, Booking, Goibibo connected</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-muted p-4.5 shadow-soft flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-brand">Parity Conflicts</span>
-          <h3 className="mt-2.5 font-display text-xl font-black text-navy leading-none">{parityIssues} Flagged</h3>
-          <p className="mt-3.5 text-[10px] text-muted-foreground">OTA discrepancy count</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-muted p-4.5 shadow-soft flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-success">Active Gateway</span>
-          <h3 className="mt-2.5 font-display text-xl font-black text-navy leading-none">XML 2-Way</h3>
-          <p className="mt-3.5 text-[10px] text-muted-foreground">Latency &lt; 2 seconds</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-muted p-4.5 shadow-soft flex flex-col justify-between min-h-[110px]">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-warning">Stop-Sells Active</span>
-          <h3 className="mt-2.5 font-display text-xl font-black text-navy leading-none">
-            {channels.filter(c => c.stopSell).length} OTAs
-          </h3>
-          <p className="mt-3.5 text-[10px] text-muted-foreground">Tariff locks configured</p>
-        </div>
+    <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
+      
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <PremiumStatCard
+          label="Active Connected channels"
+          value={`${connectedChannels} / ${totalChannels}`}
+          hint="Connected OTA partner channels"
+          icon={Server}
+          accentColor="#10b981"
+        />
+        <PremiumStatCard
+          label="OTA Room Mappings"
+          value={activeMappings.toString()}
+          hint="Total room category mappings synced"
+          icon={KeyRound}
+          accentColor="#3b82f6"
+        />
+        <PremiumStatCard
+          label="Sync Parity Rate"
+          value="98.4%"
+          hint="API sync error rate"
+          icon={Activity}
+          accentColor="#6366f1"
+        />
+        <PremiumStatCard
+          label="Parity warnings"
+          value="1"
+          hint="Rate parity mapping warnings"
+          icon={AlertCircle}
+          accentColor="#f59e0b"
+        />
       </div>
 
-      {/* Global Toolbar */}
-      <div className="bg-white border border-muted rounded-xl p-4 shadow-soft flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="text-xs">
-          <p className="font-bold text-navy">Property Scope: {userProperty.name}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Property ID: {userProperty.id}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Mapped Channels Table */}
+        <div className="lg:col-span-2 space-y-4">
+          <Panel title="OTA Channels Connection Directory">
+            {loading ? (
+              <LoadingRows rows={4} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[750px]">
+                  <thead>
+                    <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+                      <th className="py-3 px-4 text-left">Distribution Channel</th>
+                      <th className="py-3 px-4 text-center">Room Mappings</th>
+                      <th className="py-3 px-4 text-left">Inventory Sync</th>
+                      <th className="py-3 px-4 text-left">Rates Parity</th>
+                      <th className="py-3 px-4 text-right">Commission fee</th>
+                      <th className="py-3 px-4 text-left">Sync status</th>
+                      <th className="py-3 px-4 text-center font-bold" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-muted/30 whitespace-nowrap">
+                    {channels.map((c) => (
+                      <tr key={c.name} className="hover:bg-muted/5">
+                        <td className="py-3.5 px-4">
+                          <div>
+                            <p className="font-bold text-navy">{c.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-semibold">Last Synced: {c.lastSync}</p>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-navy">6 Mapped</td>
+                        <td className="py-3.5 px-4 font-semibold text-navy">{c.inventorySync}</td>
+                        <td className="py-3.5 px-4">
+                          <Tag tone={c.rateSync === "In Parity" ? "success" : c.rateSync === "Rate Mismatch" ? "warning" : "neutral"}>
+                            {c.rateSync}
+                          </Tag>
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-navy">{c.commission}%</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold inline-flex items-center gap-1 ${
+                            c.status === "Connected" ? "bg-success/15 text-success" : c.status === "Sync Warning" ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"
+                          }`}>
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
+                          <div className="flex justify-center gap-1.5 select-none">
+                            <Button
+                              onClick={() => setSelectedLogs(c)}
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 rounded-full flex items-center justify-center"
+                              title="Audit Sync logs"
+                            >
+                              <Eye className="size-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleSyncNow(c.name)}
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:text-success hover:bg-success/10 rounded-full flex items-center justify-center"
+                              title="Sync Now"
+                              disabled={c.stopSell}
+                            >
+                              <RefreshCw className="size-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleToggleStopSell(c.name)}
+                              variant="ghost"
+                              className={`h-7 w-7 p-0 rounded-full flex items-center justify-center ${
+                                c.stopSell ? "text-success hover:bg-success/10" : "text-destructive hover:bg-destructive/10"
+                              }`}
+                              title={c.stopSell ? "Deactivate Stop Sell" : "Initialize Stop Sell"}
+                            >
+                              <Ban className="size-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
         </div>
 
-        <Button
-          onClick={handleSyncAll}
-          disabled={loading}
-          className="bg-navy hover:bg-navy-deep text-white shadow-soft text-xs h-8.5 px-4 font-bold gap-2"
-        >
-          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} /> Sync All Portals
-        </Button>
-      </div>
-
-      {/* Channel Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {channels.map((chan) => (
-          <Panel
-            key={chan.name}
-            title={chan.name}
-            description="2-Way XML Distribution Channel Config"
-            headerAddon={
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-bold text-[9px] uppercase tracking-wider ${
-                chan.status === "Connected"
-                  ? "bg-success/10 text-success border border-success/20"
-                  : chan.status === "Syncing"
-                  ? "bg-brand/10 text-brand border border-brand/20 animate-pulse"
-                  : chan.status === "Failed"
-                  ? "bg-warning/10 text-warning border border-warning/20"
-                  : "bg-muted text-muted-foreground border border-muted-foreground/25"
-              }`}>
-                {chan.status}
-              </span>
-            }
-          >
-            <div className="p-5 bg-white rounded-b-xl space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 pb-3 border-b border-muted">
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Last Sync</span>
-                  <p className="font-semibold text-navy mt-0.5">{chan.lastSync}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider text-right block">Inventory Sync</span>
-                  <p className="font-semibold text-navy text-right mt-0.5">{chan.inventorySync}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Rate Sync</span>
-                  <p className={`font-semibold mt-0.5 ${chan.rateSync === "Rate Mismatch" ? "text-error font-black" : "text-navy"}`}>
-                    {chan.rateSync}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider text-right block">Reservation Sync</span>
-                  <p className="font-semibold text-navy text-right mt-0.5">{chan.reservationSync}</p>
+        {/* Sync Status Info */}
+        <div className="lg:col-span-1">
+          <Panel title="Synchronization Configuration Guidelines" description="API Channel limits.">
+            <div className="p-4 space-y-4 text-xs font-semibold text-navy leading-relaxed text-left">
+              <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-2">
+                <div className="flex gap-2">
+                  <CheckCircle2 className="size-4 text-success shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-navy">Auto-Rate Sync (2-way)</p>
+                    <p className="text-[11px] text-muted-foreground font-normal mt-0.5">PMS changes instantly adjust active inventory levels across MMT, Agoda, and Booking.com APIs.</p>
+                  </div>
                 </div>
               </div>
-
-              {/* Commission tracking, stop-sell, close-out switches */}
-              <div className="grid grid-cols-3 gap-3 items-center">
-                <div>
-                  <label className="block text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-1">Commission %</label>
-                  <input
-                    type="number"
-                    value={chan.commission}
-                    onChange={(e) => handleCommissionChange(chan.name, e.target.value)}
-                    className="w-16 px-2 py-1 border border-muted rounded text-center font-bold text-navy focus:outline-none"
-                  />
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-1">Stop Sell</span>
-                  <button
-                    onClick={() => handleToggleField(chan.name, "stopSell")}
-                    className={`size-6 rounded-full flex items-center justify-center border transition-colors ${
-                      chan.stopSell ? "bg-error text-white border-error" : "bg-white border-muted text-muted-foreground"
-                    }`}
-                  >
-                    <Ban className="size-3.5" />
-                  </button>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-1">Close Out</span>
-                  <button
-                    onClick={() => handleToggleField(chan.name, "closeOut")}
-                    className={`size-6 rounded-full flex items-center justify-center border transition-colors ${
-                      chan.closeOut ? "bg-navy text-white border-navy" : "bg-white border-muted text-muted-foreground"
-                    }`}
-                  >
-                    <XCircle className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="pt-4 border-t border-muted flex justify-between gap-1.5 select-none">
-                <Button
-                  onClick={() => handleToggleConnect(chan.name)}
-                  variant="ghost"
-                  className="text-[10px] h-8 text-navy font-bold px-2 hover:bg-muted/30"
-                >
-                  {chan.status === "Disconnected" ? "Connect Link" : "Disconnect Link"}
-                </Button>
-                
-                <div className="flex gap-1.5">
-                  <Button
-                    onClick={() => openLogs(chan)}
-                    variant="outline"
-                    className="text-[10px] h-8 border-muted text-navy font-semibold px-2.5"
-                  >
-                    Sync Logs
-                  </Button>
-                  {chan.status !== "Disconnected" && (
-                    <Button
-                      onClick={() => handleSync(chan.name)}
-                      className="bg-navy hover:bg-navy-deep text-white text-[10px] h-8 px-3 font-bold"
-                    >
-                      {chan.status === "Failed" ? "Retry Sync" : "Sync Now"}
-                    </Button>
-                  )}
+              <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-2">
+                <div className="flex gap-2">
+                  <CheckCircle2 className="size-4 text-success shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-navy">Inventory Parity Shield</p>
+                    <p className="text-[11px] text-muted-foreground font-normal mt-0.5">Locks distribution rates parity when check-ins lower remaining counts to prevent double over-bookings.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </Panel>
-        ))}
+        </div>
+
       </div>
 
-      {/* Sync Logs Modal */}
-      {logModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in">
-          <div className="bg-white rounded-xl border border-muted max-w-md w-full shadow-lift overflow-hidden text-left flex flex-col">
-            <div className="p-5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-display font-black text-navy text-md">{logChannelName} Sync Audit logs</h3>
-              <Button variant="ghost" size="icon" className="size-8" onClick={() => setLogModalOpen(false)}>
+      {/* Sync Log detail overlay Modal */}
+      {selectedLogs && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
+          <div className="bg-white rounded-xl border border-muted max-w-md w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
+            
+            <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-navy text-sm">{selectedLogs.name} API Sync Audit logs</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-0.5">Channel Commission: {selectedLogs.commission}%</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 rounded-full text-muted-foreground hover:text-navy"
+                onClick={() => setSelectedLogs(null)}
+              >
                 <XCircle className="size-4" />
               </Button>
             </div>
-            <div className="p-6 space-y-4 max-h-[300px] overflow-y-auto">
-              {selectedLogs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No sync history logged.</p>
-              ) : (
-                <div className="space-y-3.5">
-                  {selectedLogs.map((log, idx) => (
-                    <div key={idx} className="flex gap-3 text-xs border-b border-muted/50 pb-2.5 last:border-0 last:pb-0">
-                      <span className="font-mono text-muted-foreground shrink-0 select-none">[{log.time}]</span>
-                      <span className="text-navy font-semibold leading-tight">{log.event}</span>
-                    </div>
-                  ))}
+
+            {/* Logs list body */}
+            <div className="p-5 max-h-[300px] overflow-y-auto space-y-3">
+              {selectedLogs.logs.map((l, i) => (
+                <div key={i} className="p-3 border border-muted bg-muted/10 rounded-lg space-y-1 text-xs">
+                  <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                    <span className="font-mono flex items-center gap-1">
+                      <Clock className="size-3" /> {l.time}
+                    </span>
+                    <span className={`px-1.5 py-0.5 rounded font-bold uppercase tracking-wider text-[8px] ${
+                      l.type === "error" ? "bg-destructive/15 text-destructive" : l.type === "warning" ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
+                    }`}>{l.type || "success"}</span>
+                  </div>
+                  <p className="font-semibold text-navy leading-relaxed">{l.event}</p>
                 </div>
-              )}
+              ))}
             </div>
+
             <div className="p-4 border-t border-muted bg-[#fcfcfc] flex justify-end">
-              <Button onClick={() => setLogModalOpen(false)} className="bg-navy hover:bg-navy-deep text-white text-xs h-8 px-4 font-bold">
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedLogs(null)}
+                className="h-8 px-4 text-xs rounded-full"
+              >
                 Close Logs
               </Button>
             </div>
+
           </div>
         </div>
       )}
+
     </div>
   );
 }

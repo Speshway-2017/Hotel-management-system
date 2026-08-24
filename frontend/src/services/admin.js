@@ -48,5 +48,34 @@ export const adminService = {
       throw new Error(data.message || 'Image upload failed');
     }
     return data;
+  },
+  getRooms: async () => {
+    return await request('/manager/rooms');
+  },
+  createRoom: async (data) => {
+    return await request('/manager/rooms', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updateRoom: async (id, data) => {
+    return await request(`/manager/rooms/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  deleteRoom: async (id) => {
+    return await request(`/manager/rooms/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  getPayments: async () => {
+    return await request('/manager/payments');
+  },
+  createPayment: async (data) => {
+    return await request('/manager/payments', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 };

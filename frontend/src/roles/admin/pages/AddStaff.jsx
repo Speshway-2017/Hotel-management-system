@@ -35,7 +35,7 @@ function AddStaff() {
         status,
         dept,
         shift,
-        propertyId: "HS-JAI" // Scoped to admin property Speshway Luxury Hotel
+        propertyId: "HS-9HQ8P" // Scoped to admin property Speshway Luxury Hotel
       };
       const res = await superAdminService.createUser(payload);
       if (res.success) {

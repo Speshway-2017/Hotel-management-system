@@ -10,6 +10,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { authService } from "@/services/auth";
+import { managerService } from "@/services/manager";
 
 export const Route = createFileRoute("/manager/notifications/$id")({
   head: () => ({
@@ -47,28 +48,37 @@ function ManagerNotificationDetailsPage() {
   useEffect(() => {
     const user = authService.getCurrentUser();
     if (!user) return;
-    const cacheKey = `hms_manager_notifications_${user.propertyId}`;
 
-    const saved = localStorage.getItem(cacheKey);
-    let list = [];
-    if (saved) {
+    const loadNotificationDetail = async () => {
       try {
-        list = JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse manager notifications cache");
+        const res = await managerService.getNotifications();
+        if (res.success && res.data) {
+          const matched = res.data.find(n => n._id === id || n.id === id);
+          if (matched) {
+            if (!matched.isRead) {
+              await managerService.markNotificationRead(matched._id || matched.id);
+            }
+            setNtf({
+              id: matched._id || matched.id,
+              title: matched.title,
+              message: matched.message,
+              type: matched.category || "General",
+              propertyId: matched.propertyId,
+              propertyName: "assigned branch",
+              timestamp: new Date(matched.createdAt).toLocaleDateString(),
+              read: true,
+              body: matched.message
+            });
+          } else {
+            setError(`Notification with ID ${id} not found.`);
+          }
+        }
+      } catch (err) {
+        setError(err.message || "Failed to load notification details.");
       }
-    }
+    };
 
-    const item = list.find((n) => n.id === id);
-    if (item) {
-      if (!item.read) {
-        item.read = true;
-        localStorage.setItem(cacheKey, JSON.stringify(list));
-      }
-      setNtf(item);
-    } else {
-      setError(`Notification with ID ${id} not found.`);
-    }
+    if (id) loadNotificationDetail();
   }, [id]);
 
   if (error) {

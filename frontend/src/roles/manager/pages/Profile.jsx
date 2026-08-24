@@ -4,7 +4,7 @@ import { HorizontalRouteTabs, Panel, Notice, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   User,
   Shield,
@@ -18,10 +18,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Camera
 } from "lucide-react";
 import { authService } from "@/services/auth";
-import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 
 const settingsTabs = [
   { label: "Profile", to: "/manager/profile", icon: User }
@@ -52,7 +53,8 @@ function ManagerProfilePage() {
     email: currentUser.email || "meghana@hourstay.com",
     phone: currentUser.mobile || currentUser.phone || "+91 73676 75676",
     role: "Hotel Manager",
-    status: "Active"
+    status: "Active",
+    avatar: currentUser.avatar || null
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -83,16 +85,14 @@ function ManagerProfilePage() {
             email: fresh.email || "",
             phone: fresh.mobile || fresh.phone || "",
             role: fresh.role === "manager" ? "Hotel Manager" : fresh.role,
-            status: fresh.status || "Active"
+            status: fresh.status || "Active",
+            avatar: fresh.avatar || null
           });
           
-          superAdminService.getProperties()
+          managerService.getProperty()
             .then((propRes) => {
               if (propRes.success && propRes.data) {
-                const found = propRes.data.find(p => p._id === fresh.propertyId || p.id === fresh.propertyId);
-                if (found) {
-                  setUserProperty(found);
-                }
+                setUserProperty(propRes.data);
               }
             })
             .catch(() => {});
@@ -101,23 +101,72 @@ function ManagerProfilePage() {
       .catch(() => {});
   }, []);
 
-  const handleProfileSubmit = (e) => {
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setNotification({
+      tone: "neutral",
+      title: "Uploading...",
+      body: "Uploading profile image..."
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await authService.updateProfile(formData);
+      if (res.success && res.data) {
+        setProfileData(prev => ({
+          ...prev,
+          avatar: res.data.avatar || null
+        }));
+        setNotification({
+          tone: "success",
+          title: "Avatar Updated",
+          body: "Your profile picture has been updated successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Upload Failed",
+        body: err.message || "Could not upload profile picture."
+      });
+    }
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const handleProfileSubmit = async (e) => {
     e.preventDefault();
     setIsEditing(false);
     
-    // Save updated info locally to mimic successful save
-    const updatedUser = {
-      ...currentUser,
-      name: profileData.name,
-      mobile: profileData.phone
-    };
-    localStorage.setItem("hms_user", JSON.stringify(updatedUser));
+    try {
+      const formData = new FormData();
+      formData.append("name", profileData.name);
+      formData.append("mobile", profileData.phone);
 
-    setNotification({
-      tone: "success",
-      title: "Profile Saved",
-      body: "Manager account details have been updated successfully."
-    });
+      const res = await authService.updateProfile(formData);
+      if (res.success && res.data) {
+        setProfileData(prev => ({
+          ...prev,
+          name: res.data.name,
+          phone: res.data.mobile || res.data.phone || "",
+          avatar: res.data.avatar || null
+        }));
+        setNotification({
+          tone: "success",
+          title: "Profile Saved",
+          body: "Manager account details have been updated successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Update Failed",
+        body: err.message || "Could not update profile details."
+      });
+    }
     setTimeout(() => setNotification(null), 4000);
   };
 
@@ -166,11 +215,28 @@ function ManagerProfilePage() {
         {/* Left column summary card */}
         <div className="md:col-span-1 space-y-6">
           <div className="bg-white rounded-xl border border-muted p-6 shadow-soft text-center flex flex-col items-center">
-            <Avatar className="size-24 border-[3px] border-navy/10">
-              <AvatarFallback className="bg-navy text-2xl font-bold text-cream select-none">
-                {initials || "MG"}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative group">
+              <Avatar className="size-24 border-[3px] border-navy/10">
+                <AvatarImage src={profileData.avatar || ""} alt={profileData.name} className="object-cover" />
+                <AvatarFallback className="bg-navy text-2xl font-bold text-cream select-none">
+                  {initials || "MG"}
+                </AvatarFallback>
+              </Avatar>
+              <label
+                htmlFor="avatar-upload"
+                className="absolute bottom-0 right-0 bg-gold hover:bg-gold/90 text-navy rounded-full p-2 cursor-pointer shadow-md transition-all hover:scale-105 flex items-center justify-center border-2 border-white size-8"
+                title="Upload new photo"
+              >
+                <Camera className="size-4" />
+              </label>
+              <input
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+            </div>
             <h3 className="mt-4 font-display text-lg font-black text-navy">{profileData.name}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">{profileData.email}</p>
             

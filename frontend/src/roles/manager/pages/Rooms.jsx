@@ -1,0 +1,467 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/hs/FormFields";
+import { managerService } from "@/services/manager";
+import { authService } from "@/services/auth";
+import { toast } from "sonner";
+import {
+  Bed,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Sparkles,
+  Lock,
+  Search,
+  Eye,
+  Edit2,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Layers,
+  Wrench,
+  Ban
+} from "lucide-react";
+
+// Premium stat card component
+function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full"
+    >
+      <div>
+        <div className="h-8 flex items-start">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+        </div>
+        <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none">{value}</h3>
+      </div>
+      <div className="mt-auto pt-2 text-[10px] text-muted-foreground truncate">
+        {hint}
+      </div>
+    </div>
+  );
+}
+
+const ROOM_DEFINITIONS = [
+  { room: "101", roomType: "Villa Suite", floor: "Floor 1" },
+  { room: "102", roomType: "Villa Suite", floor: "Floor 1" },
+  { room: "103", roomType: "Deluxe Room", floor: "Floor 1" },
+  { room: "104", roomType: "Deluxe Room", floor: "Floor 1" },
+  { room: "105", roomType: "Standard Room", floor: "Floor 1" },
+  { room: "106", roomType: "Standard Room", floor: "Floor 1" },
+  { room: "201", roomType: "Executive Room", floor: "Floor 2" },
+  { room: "202", roomType: "Executive Room", floor: "Floor 2" },
+  { room: "203", roomType: "Deluxe Room", floor: "Floor 2" },
+  { room: "204", roomType: "Deluxe Room", floor: "Floor 2" },
+  { room: "205", roomType: "Executive Room", floor: "Floor 2" },
+  { room: "206", roomType: "Standard Room", floor: "Floor 2" },
+  { room: "301", roomType: "Presidential Suite", floor: "Floor 3" },
+  { room: "302", roomType: "Suite Room", floor: "Floor 3" },
+  { room: "303", roomType: "Suite Room", floor: "Floor 3" },
+  { room: "304", roomType: "Deluxe Room", floor: "Floor 3" },
+  { room: "305", roomType: "Deluxe Room", floor: "Floor 3" },
+  { room: "306", roomType: "Standard Room", floor: "Floor 3" }
+];
+
+function ManagerRoomsPage() {
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
+  const [property, setProperty] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(true);
+
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [floorFilter, setFloorFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  async function loadData() {
+    try {
+      setLoading(true);
+      setError(null);
+      const user = authService.getCurrentUser();
+      setCurrentUser(user);
+
+      if (!user || user.role !== "manager") {
+        setIsAuthorized(false);
+        setLoading(false);
+        return;
+      }
+
+      const [propRes, resRes, roomsRes] = await Promise.all([
+        managerService.getProperty(),
+        managerService.getReservations(),
+        managerService.getRooms()
+      ]);
+
+      if (propRes.success && propRes.data) {
+        setProperty(propRes.data);
+      }
+
+      if (resRes.success && resRes.data) {
+        setBookings(resRes.data);
+      }
+
+      if (roomsRes.success && roomsRes.data) {
+        setRooms(roomsRes.data);
+      }
+
+    } catch (err) {
+      setError(err.message || "Failed to load rooms dataset");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Set manual operational status override via backend API
+  const handleOverrideStatus = async (roomNumber, newStatus) => {
+    try {
+      const res = await managerService.updateRoomStatus(roomNumber, newStatus);
+      if (res.success) {
+        toast.success(`Room ${roomNumber} operational status changed to ${newStatus}`);
+        // Reload rooms database records
+        const roomsRes = await managerService.getRooms();
+        if (roomsRes.success && roomsRes.data) {
+          setRooms(roomsRes.data);
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to update room status");
+    }
+  };
+
+  const getActiveBooking = (roomNumber) => {
+    return bookings.find(b => {
+      if (b.status === "Cancelled" || b.status === "Checked-out") return false;
+      const bRoom = (b.room || "").toLowerCase();
+      const rNum = roomNumber.toLowerCase();
+      return bRoom.includes(rNum) || rNum.includes(bRoom);
+    });
+  };
+
+  // Compile full Rooms array with status
+  const compiledRooms = rooms.map(r => {
+    const activeBooking = getActiveBooking(r.roomNumber);
+    let status = r.status;
+    if (activeBooking && activeBooking.status === "Checked-in") {
+      status = "Occupied";
+    }
+    return {
+      room: r.roomNumber,
+      roomType: r.category,
+      floor: `Floor ${r.roomNumber[0] || '1'}`,
+      activeBooking,
+      status
+    };
+  });
+
+  // Statistics Computations
+  const totalCount = compiledRooms.length;
+  const availableCount = compiledRooms.filter(r => r.status === "Available").length;
+  const occupiedCount = compiledRooms.filter(r => r.status === "Occupied").length;
+  const dirtyCount = compiledRooms.filter(r => r.status === "Dirty").length;
+  const cleaningCount = compiledRooms.filter(r => r.status === "Cleaning").length;
+  const oooCount = compiledRooms.filter(r => r.status === "Out of Order").length;
+  const blockedCount = compiledRooms.filter(r => r.status === "Blocked").length;
+
+  // Filter Computations
+  const filteredRooms = compiledRooms.filter(rm => {
+    const matchesSearch =
+      rm.room.includes(searchQuery) ||
+      rm.roomType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (rm.activeBooking?.guest || "").toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
+    const matchesType = typeFilter === "all" || rm.roomType === typeFilter;
+    const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
+
+    return matchesSearch && matchesFloor && matchesType && matchesStatus;
+  });
+
+  // Pagination computations
+  const totalPages = Math.ceil(filteredRooms.length / itemsPerPage) || 1;
+  const paginatedRooms = filteredRooms.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Status mapping constants
+  const statusMeta = {
+    Available: { tone: "success", icon: CheckCircle, label: "Available", color: "#10b981" },
+    Occupied: { tone: "brand", icon: Bed, label: "Occupied", color: "#0d1b2a" },
+    Dirty: { tone: "warning", icon: AlertTriangle, label: "Dirty", color: "#f59e0b" },
+    Cleaning: { tone: "purple", icon: Sparkles, label: "Cleaning", color: "#8b5cf6" },
+    "Out of Order": { tone: "error", icon: XCircle, label: "Out of Order", color: "#ef4444" },
+    Blocked: { tone: "neutral", icon: Lock, label: "Blocked", color: "#6b7280" }
+  };
+
+  if (!isAuthorized) {
+    return (
+      <div className="space-y-6 text-left">
+        <PageHeader title="Access Denied" subtitle="Security and privilege validation." />
+        <Notice tone="error" title="Unauthorized Access">
+          You are not authorized to view the Manager Console. Access is restricted to property managers.
+        </Notice>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 text-left">
+        <PageHeader title="Rooms Console" subtitle="Loading scoped property room configurations..." />
+        <LoadingRows rows={5} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 text-left animate-fade-in">
+      {/* Summary Stat Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+        <PremiumStatCard label="Total Rooms" value={totalCount.toString()} hint="Assigned property capacity" accentColor="#0d1b2a" />
+        <PremiumStatCard label="Available" value={availableCount.toString()} hint="Clean & vacant" accentColor="#10b981" />
+        <PremiumStatCard label="Occupied" value={occupiedCount.toString()} hint="In-house guests stays" accentColor="#0d1b2a" />
+        <PremiumStatCard label="Dirty" value={dirtyCount.toString()} hint="Awaiting housekeeping turnaround" accentColor="#f59e0b" />
+        <PremiumStatCard label="Cleaning" value={cleaningCount.toString()} hint="Active cleaning sessions" accentColor="#8b5cf6" />
+        <PremiumStatCard label="Out of Order" value={oooCount.toString()} hint="Maintenance downtime" accentColor="#ef4444" />
+        <PremiumStatCard label="Blocked" value={blockedCount.toString()} hint="Precheck allocations" accentColor="#6b7280" />
+      </div>
+
+      {/* Search & Filters */}
+      <div className="bg-white border border-muted rounded-xl p-4 shadow-soft space-y-3.5">
+        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full md:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search by Room #, Room Type, or Guest Name..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-9 h-9 text-xs font-semibold bg-cream/10 border-muted w-full"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5 border-t border-muted/50">
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Floor Designation</span>
+            <Select
+              value={floorFilter}
+              onChange={(e) => { setFloorFilter(e.target.value); setCurrentPage(1); }}
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
+            >
+              <option value="all">All Floors</option>
+              <option value="Floor 1">Floor 1</option>
+              <option value="Floor 2">Floor 2</option>
+              <option value="Floor 3">Floor 3</option>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Room Category</span>
+            <Select
+              value={typeFilter}
+              onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
+            >
+              <option value="all">All Room Types</option>
+              <option value="Standard Room">Standard Room</option>
+              <option value="Deluxe Room">Deluxe Room</option>
+              <option value="Executive Room">Executive Room</option>
+              <option value="Villa Suite">Villa Suite</option>
+              <option value="Presidential Suite">Presidential Suite</option>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Room Status</span>
+            <Select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Available">Available</option>
+              <option value="Occupied">Occupied</option>
+              <option value="Dirty">Dirty</option>
+              <option value="Cleaning">Cleaning</option>
+              <option value="Out of Order">Out of Order</option>
+              <option value="Blocked">Blocked</option>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Rooms Table */}
+      <div className="bg-white border border-muted rounded-xl shadow-soft overflow-hidden">
+        {paginatedRooms.length === 0 ? (
+          <div className="p-16 text-center">
+            <Bed className="size-12 text-muted-foreground/45 mx-auto mb-3" />
+            <h3 className="font-semibold text-navy">No rooms matching search filters</h3>
+            <p className="text-xs text-muted-foreground mt-1">Try updating filter configurations.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
+                  <th className="py-4.5 px-6">Room Number</th>
+                  <th className="py-4.5 px-4">Room Type</th>
+                  <th className="py-4.5 px-4">Floor</th>
+                  <th className="py-4.5 px-4">Current Status</th>
+                  <th className="py-4.5 px-4">Guest Name</th>
+                  <th className="py-4.5 px-4">Check-In</th>
+                  <th className="py-4.5 px-4">Check-Out</th>
+                  <th className="py-4.5 px-4">Current Booking</th>
+                  <th className="py-4.5 px-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
+                {paginatedRooms.map((rm) => {
+                  const meta = statusMeta[rm.status] || statusMeta.Available;
+                  const StatusIcon = meta.icon;
+                  const active = rm.activeBooking;
+
+                  return (
+                    <tr key={rm.room} className="hover:bg-[#fcfcfc]/60 transition-colors group">
+                      <td className="py-4 px-6 font-bold text-navy-deep text-sm">
+                        Room {rm.room}
+                      </td>
+                      <td className="py-4 px-4 font-bold text-brand">
+                        {rm.roomType}
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        {rm.floor}
+                      </td>
+                      <td className="py-4 px-4">
+                        <Tag tone={meta.tone} className="flex items-center gap-1 w-fit select-none">
+                          <StatusIcon className="size-3" />
+                          <span>{meta.label}</span>
+                        </Tag>
+                      </td>
+                      <td className="py-4 px-4 font-semibold text-navy">
+                        {active ? active.guest : <span className="text-muted-foreground/45">—</span>}
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        {active ? active.checkIn : <span className="text-muted-foreground/45">—</span>}
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        {active ? active.checkOut : <span className="text-muted-foreground/45">—</span>}
+                      </td>
+                      <td className="py-4 px-4 font-mono text-[11px] text-muted-foreground">
+                        {active ? (
+                          <Link
+                            to={`/manager/reservations/view/${active._id || active.id}`}
+                            className="text-brand hover:underline font-bold"
+                          >
+                            #{active._id || active.id}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground/45">—</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-1.5 select-none">
+                          {active && (
+                            <>
+                              <Button
+                                onClick={() => navigate({ to: `/manager/reservations/view/${active._id || active.id}` })}
+                                size="icon"
+                                variant="ghost"
+                                className="size-7 hover:text-brand cursor-pointer"
+                                title="View Stay Details"
+                              >
+                                <Eye className="size-3.5" />
+                              </Button>
+                              <Button
+                                onClick={() => navigate({ to: `/manager/reservations/edit/${active._id || active.id}` })}
+                                size="icon"
+                                variant="ghost"
+                                className="size-7 hover:text-brand cursor-pointer"
+                                title="Reassign Room / Modify Booking"
+                              >
+                                <Edit2 className="size-3.5" />
+                              </Button>
+                            </>
+                          )}
+                          {!active && (
+                            <Button
+                              onClick={() => navigate({ to: `/manager/reservations` })}
+                              size="xs"
+                              variant="outline"
+                              className="text-brand border-brand/40 hover:bg-brand/5 h-6 text-[10px] font-bold px-2 cursor-pointer"
+                            >
+                              Assign Guest
+                            </Button>
+                          )}
+                          
+                          {/* Operational status override selector */}
+                          <Select
+                            value={overrides[rm.room] || "normal"}
+                            onChange={(e) => handleOverrideStatus(rm.room, e.target.value)}
+                            className="w-24 text-[9px] h-6 py-0 font-bold ml-1.5"
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="Available">Available</option>
+                            <option value="Dirty">Dirty</option>
+                            <option value="Cleaning">Cleaning</option>
+                            <option value="Out of Order">Out of Order</option>
+                            <option value="Blocked">Blocked</option>
+                          </Select>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Pagination Panel */}
+            <div className="p-4 border-t border-muted flex items-center justify-between gap-3 text-muted-foreground text-[10px] font-bold select-none">
+              <span>Page {currentPage} of {totalPages} (Total: {filteredRooms.length})</span>
+              <div className="flex gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="h-7 w-7 p-0 flex items-center justify-center border-muted cursor-pointer"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="h-7 w-7 p-0 flex items-center justify-center border-muted cursor-pointer"
+                >
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export const Route = createFileRoute("/manager/rooms")({
+  component: ManagerRoomsPage
+});

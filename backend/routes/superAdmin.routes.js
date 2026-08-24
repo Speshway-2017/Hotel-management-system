@@ -337,6 +337,9 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
     if (req.user.role !== 'super-admin') {
       query.propertyId = req.user.propertyId;
     }
+    if (req.query.role) {
+      query.role = req.query.role;
+    }
     const users = await User.find(query);
     const sanitized = users.map(u => ({
       id: u.id || u._id,
@@ -347,7 +350,17 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
       mobile: u.mobile || '—',
       status: u.status || 'Active',
       propertyId: u.propertyId || null,
-      lastLogin: u.lastLogin || '—'
+      lastLogin: u.lastLogin || '—',
+      city: u.city || '',
+      state: u.state || '',
+      country: u.country || 'India',
+      address: u.address || '',
+      type: u.type || 'Regular',
+      preferences: u.preferences || '',
+      idDocType: u.idDocType || 'Aadhaar Card',
+      idDocNumber: u.idDocNumber || '',
+      loyaltyPoints: u.loyaltyPoints || 0,
+      notes: u.notes || ''
     }));
     return sendSuccess(res, 200, sanitized, 'Users list retrieved');
   } catch (error) {
@@ -357,7 +370,7 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
 
 router.post('/users', checkPropertyStatus, async (req, res) => {
   try {
-    const { name, email, password, role, mobile, propertyId, status } = req.body;
+    const { name, email, password, role, mobile, propertyId, status, dept, shift } = req.body;
     if (!name || !email || !password || !role) {
       return sendError(res, 400, 'All fields (name, email, password, role) are required');
     }
@@ -380,7 +393,9 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       role,
       mobile: mobile || '',
       propertyId: targetPropertyId,
-      status: status || 'Active'
+      status: status || 'Active',
+      dept: dept || 'Front Desk',
+      shift: shift || 'Morning (06:00 - 14:00)'
     });
 
     await logAction(req.user, 'Created User', `${name} (${role})`, req);
@@ -392,6 +407,8 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       mobile: newUser.mobile,
       propertyId: newUser.propertyId,
       status: newUser.status,
+      dept: newUser.dept,
+      shift: newUser.shift,
       lastLogin: newUser.lastLogin || '—'
     }, 'User created successfully');
   } catch (error) {
@@ -402,7 +419,7 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
 router.put('/users/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, mobile, status, propertyId } = req.body;
+    const { name, role, mobile, status, propertyId, dept, shift } = req.body;
 
     const targetUser = await User.findById(id);
     if (!targetUser) return sendError(res, 404, 'User not found');
@@ -413,7 +430,7 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
       }
     }
 
-    const updateFields = { name, role, mobile, status };
+    const updateFields = { name, role, mobile, status, dept, shift };
     if (req.user.role === 'super-admin') {
       updateFields.propertyId = propertyId || null;
     }
@@ -430,6 +447,8 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
       mobile: updated.mobile,
       status: updated.status,
       propertyId: updated.propertyId,
+      dept: updated.dept,
+      shift: updated.shift,
       lastLogin: updated.lastLogin || '—'
     }, 'User updated successfully');
   } catch (error) {

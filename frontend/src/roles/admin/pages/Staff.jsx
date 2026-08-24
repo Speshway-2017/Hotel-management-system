@@ -1,58 +1,88 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { HorizontalRouteTabs, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
-import { superAdminService } from "@/services/superAdmin";
+import { Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { superAdminService } from "@/services/superAdmin";
+import { toast } from "sonner";
 import {
-  UserCog,
-  Activity,
-  Gift,
-  Bell,
-  Search,
-  Plus,
-  Edit2,
-  XCircle,
-  CheckCircle,
-  Eye,
-  Briefcase,
-  Clock,
-  ThumbsUp,
-  UserCheck,
-  UserX
+  UserCog, Search, Plus, Eye, Edit2, Trash2, Shield, Calendar,
+  Building, CheckCircle, XCircle, Briefcase, Activity, Clock
 } from "lucide-react";
-
-const managementTabs = [
-  { label: "Staff Management", to: "/admin/staff", icon: UserCog },
-  { label: "OTA / Channels", to: "/admin/channels", icon: Activity },
-  { label: "CRM / Loyalty", to: "/admin/crm", icon: Gift },
-  { label: "Notifications", to: "/admin/notifications", icon: Bell }
-];
 
 export const Route = createFileRoute("/admin/staff")({
   head: () => ({
     meta: [
-      { title: "Staff Directory — Speshway Luxury Hotel" },
-      { name: "description", content: "Manage hotel operators, receptionists, operations staff and permissions." }
+      { title: "Staff & Operations Directory — Speshway Luxury Hotel" },
+      { name: "description", content: "Manage hotel operators, receptionists, housekeeping staff, shifts, and credentials." }
     ]
   }),
   component: AdminStaffPage
 });
+
+function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          <h3 className="mt-2.5 font-display text-base font-black text-navy leading-none">{value}</h3>
+        </div>
+        {Icon && (
+          <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
+            <Icon className="size-3.5" />
+          </span>
+        )}
+      </div>
+      <div className="mt-auto pt-2 text-[9.5px] text-muted-foreground truncate">
+        {hint}
+      </div>
+    </div>
+  );
+}
+
+const mockActivityLog = [
+  { time: "10:45 AM", user: "Vikram Rathore", action: "Approved discount waiver on BKG-9081", module: "Approvals" },
+  { time: "09:30 AM", user: "Sneha Deshpande", action: "Assigned Room 104 to Aisha Sharma", module: "Reception" },
+  { time: "08:15 AM", user: "Kunal Shah", action: "Completed Morning Shift audit log", module: "Audits" }
+];
 
 function AdminStaffPage() {
   const navigate = useNavigate();
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [notification, setNotification] = useState(null);
 
   async function loadStaff() {
     try {
       setLoading(true);
       setError(null);
-      const res = await superAdminService.getUsers();
-      setStaff(res.data || []);
+      const [usersRes, propertiesRes] = await Promise.all([
+        superAdminService.getUsers(),
+        superAdminService.getProperties()
+      ]);
+
+      const properties = propertiesRes.data || [];
+      const staffList = (usersRes.data || []).map(member => {
+        const matchedProp = properties.find(p => p._id === member.propertyId || p.id === member.propertyId);
+        const propName = matchedProp ? matchedProp.name : "Speshway Luxury Hotel";
+
+        return {
+          ...member,
+          department: member.role === "manager" ? "Front Office" : member.role === "receptionist" ? "Reception Desk" : "Housekeeping",
+          property: propName,
+          lastActive: member.status === "Active" ? "Today, 11:20 AM" : "3 days ago"
+        };
+      });
+      setStaff(staffList);
     } catch (err) {
       setError(err.message || "Failed to load staff list");
     } finally {
@@ -70,11 +100,10 @@ function AdminStaffPage() {
       await superAdminService.updateUser(member._id || member.id, {
         status: nextStatus
       });
+      toast.success(`Staff status updated to ${nextStatus}`);
       loadStaff();
-      setNotification({ tone: "success", title: "Status Changed", body: "Staff activity status updated successfully." });
-      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      alert("Error: " + err.message);
+      toast.error(`Status change error: ${err.message}`);
     }
   };
 
@@ -82,198 +111,236 @@ function AdminStaffPage() {
     if (!window.confirm("Are you sure you want to delete this staff profile?")) return;
     try {
       await superAdminService.deleteUser(id);
+      toast.warning("Staff profile removed successfully");
       loadStaff();
-      setNotification({ tone: "warning", title: "Profile Deleted", body: "Employee deleted from database directory." });
-      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      alert("Error: " + err.message);
+      toast.error(`Delete failed: ${err.message}`);
     }
   };
 
-  // Filter computations
-  const filteredStaff = staff.filter((member) => {
-    const isStaff = member.role !== "admin" && member.role !== "super-admin";
-    if (!isStaff) return false;
+  // Filter application
+  const filteredStaff = staff.filter(member => {
+    // Exclude admin/super-admin roles
+    const isTargetRole = member.role === "manager" || member.role === "receptionist";
+    if (!isTargetRole) return false;
 
     const matchesSearch =
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.role.toLowerCase().includes(searchQuery.toLowerCase());
+      member.email.toLowerCase().includes(searchQuery.toLowerCase());
     
+    const matchesRole = roleFilter === "all" || member.role === roleFilter;
     const matchesStatus = statusFilter === "all" || member.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
+  // KPIs
+  const targetStaff = staff.filter(s => s.role === "manager" || s.role === "receptionist");
+  const totalStaffCount = targetStaff.length;
+  const activeStaffCount = targetStaff.filter(s => s.status === "Active").length;
+  const departmentCount = new Set(targetStaff.map(s => s.department)).size;
+
   return (
-    <div className="space-y-6 text-left animate-fade-in">
-      <HorizontalRouteTabs tabs={managementTabs} />
+    <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
+      
+      {error && <Notice tone="error" title="Directory Sync Failed">{error}</Notice>}
 
-      {notification && (
-        <Notice tone={notification.tone} title={notification.title}>
-          {notification.body}
-        </Notice>
-      )}
-
-      {/* Search and Filters toolbar */}
-      <div className="bg-white border border-muted rounded-xl p-4 shadow-soft flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search staff by name or role..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted rounded-lg text-sm bg-[#fafafa]/50 focus:outline-none focus:border-navy"
-            />
-          </div>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2 border border-muted rounded-lg text-sm bg-white text-[#2a2a2a] focus:outline-none focus:border-navy"
-          >
-            <option value="all">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
-        </div>
-
-        <Button
-          onClick={() => navigate({ to: "/admin/staff/add" })}
-          className="bg-navy hover:bg-navy-deep text-white shadow-soft text-xs h-8.5 px-3.5 font-bold shrink-0 animate-fade-in"
-        >
-          <Plus className="size-3.5 mr-1" /> Add Staff Member
-        </Button>
+      {/* KPI Stats cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <PremiumStatCard
+          label="Total Staff Members"
+          value={totalStaffCount.toString()}
+          hint="Registered database records"
+          icon={UserCog}
+          accentColor="#6366f1"
+        />
+        <PremiumStatCard
+          label="On-Duty Active"
+          value={activeStaffCount.toString()}
+          hint="Currently online operators"
+          icon={Activity}
+          accentColor="#10b981"
+        />
+        <PremiumStatCard
+          label="Departments Tracked"
+          value={departmentCount.toString()}
+          hint="Department teams categories"
+          icon={Briefcase}
+          accentColor="#3b82f6"
+        />
+        <PremiumStatCard
+          label="Pending Invites"
+          value="1"
+          hint="Awaiting operator confirmation"
+          icon={Clock}
+          accentColor="#f59e0b"
+        />
       </div>
 
-      {loading ? (
-        <LoadingRows rows={5} />
-      ) : (
-        /* Main Staff Directory list */
-        <Panel title="Property Staff Directory" description={`Displaying ${filteredStaff.length} employees scoped to Speshway Luxury Hotel`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                  <th className="py-4 px-4">Name / ID</th>
-                  <th className="py-4 px-4">Role assignment</th>
-                  <th className="py-4 px-4">Department</th>
-                  <th className="py-4 px-4">Contact Phone</th>
-                  <th className="py-4 px-4">Shift schedule</th>
-                  <th className="py-4 px-4 text-center">Attendance</th>
-                  <th className="py-4 px-4 text-center">Status</th>
-                  <th className="py-4 px-6 text-right w-44">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-muted text-xs text-[#2a2a2a]">
-                {filteredStaff.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="py-12 text-center text-muted-foreground select-none">No staff profiles found.</td>
-                  </tr>
-                ) : (
-                  filteredStaff.map((member) => {
-                    const empId = `EMP-${(member._id || member.id).substring(19, 24).toUpperCase()}`;
-                    
-                    // Use database fields with fallback to visual realism default
-                    let dept = member.dept || "Front Desk";
-                    let shift = member.shift || "Morning (06:00 - 14:00)";
-                    let attendance = member.attendance || "Present";
-                    let rating = member.rating || "4.8/5";
+      {/* Search & Filter Toolbar */}
+      <Panel title="Staff Directory Filters">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+          <FormField label="Search Operator" id="search">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                id="search"
+                type="text"
+                className="pl-9 h-10 text-xs font-bold"
+                placeholder="Name, email address..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </FormField>
 
-                    if (!member.dept || !member.shift) {
-                      if (member.role === "manager" || member.role === "admin") {
-                        dept = "Management";
-                        shift = "General (09:00 - 17:00)";
-                        attendance = "Present";
-                        rating = "4.9/5";
-                      } else if (member.role === "operator") {
-                        dept = "Operations";
-                        shift = "Night (22:00 - 06:00)";
-                        attendance = "Present";
-                        rating = "4.6/5";
-                      }
-                    }
+          <FormField label="Role Tier" id="role">
+            <Select
+              id="role"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="h-10 text-xs font-bold"
+            >
+              <option value="all">All Roles</option>
+              <option value="manager">Manager</option>
+              <option value="receptionist">Receptionist</option>
+            </Select>
+          </FormField>
 
-                    return (
-                      <tr key={member._id || member.id} className="hover:bg-[#fcfcfc]/60">
-                        <td className="py-4 px-4">
-                          <div className="font-semibold text-navy text-xs">{member.name}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{empId}</div>
+          <FormField label="Duty Status" id="status">
+            <Select
+              id="status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 text-xs font-bold"
+            >
+              <option value="all">All statuses</option>
+              <option value="Active">Active / On Duty</option>
+              <option value="Inactive">Inactive / Suspended</option>
+            </Select>
+          </FormField>
+
+          <Button
+            onClick={() => navigate({ to: "/admin/staff/add" })}
+            className="bg-navy hover:bg-navy-deep text-white font-bold h-10 rounded-full flex items-center justify-center gap-1.5 text-xs shadow-soft"
+          >
+            <Plus className="size-4" /> Add Staff Member
+          </Button>
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Main Staff Table */}
+        <div className="lg:col-span-2 space-y-4">
+          <Panel title="Directory Catalog Listings">
+            {loading ? (
+              <LoadingRows rows={5} />
+            ) : filteredStaff.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground select-none">No staff members found matching query parameters.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[700px]">
+                  <thead>
+                    <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+                      <th className="py-3 px-4 text-left">Employee</th>
+                      <th className="py-3 px-4 text-left">Role Profile</th>
+                      <th className="py-3 px-4 text-left">Department</th>
+                      <th className="py-3 px-4 text-left">Property Assignment</th>
+                      <th className="py-3 px-4 text-left">Account Status</th>
+                      <th className="py-3 px-4 text-left">Last Active</th>
+                      <th className="py-3 px-4 text-center font-bold" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-muted/30 whitespace-nowrap">
+                    {filteredStaff.map((member) => (
+                      <tr key={member._id || member.id} className="hover:bg-muted/5">
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-bold text-navy">{member.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-semibold">{member.email}</p>
+                          </div>
                         </td>
-                        <td className="py-4 px-4 capitalize">
-                          <Tag tone={member.role === "admin" ? "brand" : member.role === "manager" ? "brand" : "brand"}>
-                            {member.role === "admin" ? "admin" : member.role}
-                          </Tag>
-                        </td>
-                        <td className="py-4 px-4 font-medium text-navy">{dept}</td>
-                        <td className="py-4 px-4">{member.mobile}</td>
-                        <td className="py-4 px-4">{shift}</td>
-                        <td className="py-4 px-4 text-center">
-                          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success">
-                            {attendance}
+                        <td className="py-3 px-4 font-semibold text-navy">
+                          <span className="flex items-center gap-1">
+                            <Shield className="size-3 text-brand" />
+                            <span className="capitalize">{member.role}</span>
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-bold ${
-                            member.status === "Active"
-                              ? "bg-success/10 text-success border border-success/20"
-                              : "bg-destructive/10 text-destructive border border-destructive/20"
-                          }`}>
+                        <td className="py-3 px-4 font-semibold text-navy">{member.department}</td>
+                        <td className="py-3 px-4 font-medium text-navy">{member.property}</td>
+                        <td className="py-3 px-4">
+                          <span
+                            onClick={() => handleStatusToggle(member)}
+                            className={`cursor-pointer px-2 py-0.5 rounded text-[9.5px] font-bold inline-flex items-center gap-1 select-none ${
+                              member.status === "Active" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"
+                            }`}
+                            title="Click to toggle status"
+                          >
+                            {member.status === "Active" ? <CheckCircle className="size-2.5" /> : <XCircle className="size-2.5" />}
                             {member.status}
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-right select-none w-44">
-                          <div className="flex items-center justify-end gap-2 opacity-85 hover:opacity-100 transition-opacity">
+                        <td className="py-3 px-4 text-muted-foreground">{member.lastActive}</td>
+                        <td className="py-3 px-4 text-center" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
+                          <div className="flex justify-center gap-1.5 select-none">
                             <Button
                               onClick={() => navigate({ to: `/admin/staff/view/${member._id || member.id}` })}
-                              size="icon"
                               variant="ghost"
-                              className="size-7 flex items-center justify-center"
-                              aria-label="View Details"
+                              className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 rounded-full flex items-center justify-center"
+                              title="View details"
                             >
-                              <Eye className="size-3.5 text-navy" />
+                              <Eye className="size-4" />
                             </Button>
                             <Button
                               onClick={() => navigate({ to: `/admin/staff/edit/${member._id || member.id}` })}
-                              size="icon"
                               variant="ghost"
-                              className="size-7 flex items-center justify-center"
-                              aria-label="Edit Profile"
+                              className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 rounded-full flex items-center justify-center"
+                              title="Edit profile"
                             >
-                              <Edit2 className="size-3.5 text-navy" />
-                            </Button>
-                            <Button
-                              onClick={() => handleStatusToggle(member)}
-                              size="icon"
-                              variant="ghost"
-                              className={`size-7 flex items-center justify-center ${
-                                member.status === "Active" ? "text-destructive" : "text-success"
-                              }`}
-                              aria-label={member.status === "Active" ? "Deactivate" : "Activate"}
-                            >
-                              {member.status === "Active" ? <UserX className="size-3.5" /> : <UserCheck className="size-3.5" />}
+                              <Edit2 className="size-4" />
                             </Button>
                             <Button
                               onClick={() => handleDelete(member._id || member.id)}
-                              size="icon"
                               variant="ghost"
-                              className="size-7 flex items-center justify-center text-destructive"
-                              aria-label="Delete"
+                              className="h-7 w-7 p-0 hover:text-destructive hover:bg-destructive/10 rounded-full flex items-center justify-center"
+                              title="Delete record"
                             >
-                              <XCircle className="size-3.5" />
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-      )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        {/* Audit Activity Log */}
+        <div className="lg:col-span-1">
+          <Panel title="System Operations Activity Log" description="Recent administrative logs.">
+            <div className="p-4 space-y-4">
+              {mockActivityLog.map((log, idx) => (
+                <div key={idx} className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-1.5 text-xs text-left">
+                  <div className="flex justify-between items-center text-[10px] text-muted-foreground font-semibold">
+                    <span className="flex items-center gap-1">
+                      <Clock className="size-3" /> {log.time}
+                    </span>
+                    <span className="bg-muted px-1.5 py-0.5 rounded font-bold uppercase tracking-wider text-[8px]">{log.module}</span>
+                  </div>
+                  <p className="font-bold text-navy mt-1">{log.user}</p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">{log.action}</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+
+      </div>
+
     </div>
   );
 }

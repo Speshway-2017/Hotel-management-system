@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
-import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { 
@@ -91,22 +91,19 @@ function ManagerDashboard() {
 
       // Fetch all required resources
       const [propRes, bookingsRes, staffRes] = await Promise.all([
-        superAdminService.getProperties(),
-        superAdminService.getReservations(),
-        superAdminService.getUsers()
+        managerService.getProperty(),
+        managerService.getReservations(),
+        managerService.getStaff()
       ]);
 
       if (propRes.success) {
-        const found = propRes.data.find(p => p._id === propertyId || p.id === propertyId);
-        setProperty(found || null);
+        setProperty(propRes.data);
       }
       if (bookingsRes.success) {
-        const scoped = bookingsRes.data.filter(b => b.propertyId === propertyId);
-        setBookings(scoped);
+        setBookings(bookingsRes.data);
       }
       if (staffRes.success) {
-        const scoped = staffRes.data.filter(s => s.propertyId === propertyId);
-        setStaff(scoped);
+        setStaff(staffRes.data);
       }
     } catch (err) {
       setError(err.message || "Failed to load dashboard data.");
@@ -194,7 +191,7 @@ function ManagerDashboard() {
 
   const recentFeedback = [
     { id: "FDB-01", guest: "Karan Malhotra", score: 5, comment: "Fabulous service, clean rooms and friendly receptionist" },
-    { id: "FDB-02", guest: "Aisha Sharma", score: 4, comment: "Spacious luxury room, but dining order took longer than usual" }
+    { id: "FDB-02", guest: "Aisha Sharma", score: 4, comment: "Spacious luxury room, but front desk check-in queue took longer than usual" }
   ];
 
   const serviceRequests = [

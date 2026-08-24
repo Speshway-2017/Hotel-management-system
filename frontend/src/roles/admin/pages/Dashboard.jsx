@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, statusTone } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
 import { 
   Area, AreaChart, Line, LineChart, Pie, PieChart, Cell, 
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid 
@@ -12,7 +13,9 @@ import { revenueTrend, sourceMix } from "@/data/hs-data";
 import { 
   Bed, Calendar, DollarSign, Percent, ArrowUpRight, CheckCircle2,
   AlertTriangle, Wrench, ShieldAlert, Sparkles, User, RefreshCw,
-  TrendingUp, CreditCard, Users, ArrowRight, Activity, Plus
+  TrendingUp, CreditCard, Users, ArrowRight, Activity, Plus, Clock, Star,
+  Check, X, ChevronRight, ShieldCheck, Building, UserPlus, CalendarCheck,
+  Receipt, Settings
 } from "lucide-react";
 
 const axis = {
@@ -24,11 +27,10 @@ const axis = {
 
 const tooltipStyle = {
   contentStyle: {
-    background: "var(--color-card)",
-    border: "1px solid var(--color-border)",
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
     borderRadius: 8,
-    fontSize: 11,
-    color: "var(--color-foreground)"
+    fontSize: 11
   }
 };
 
@@ -39,12 +41,15 @@ const pieColors = [
   "var(--color-chart-4)"
 ];
 
+import { managerService } from "@/services/manager";
+import { toast } from "sonner";
+
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
   const isPositive = delta >= 0;
   return (
     <div
       style={{ "--accent-color": accentColor }}
-      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full"
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
@@ -75,24 +80,35 @@ function AdminDashboard() {
   const [error, setError] = useState(null);
   const [property, setProperty] = useState(null);
   const [reservations, setReservations] = useState([]);
+  const [staffList, setStaffList] = useState([]);
+  const [chartTab, setChartTab] = useState("revenue"); // revenue | occupancy | adr | revpar | channels
+  const [opTab, setOpTab] = useState("property"); // property | occupancy | reservations | revenue | approvals | staff | channels | alerts
+  const [approvalsList, setApprovalsList] = useState([]);
 
   async function loadDashboardData() {
     try {
+      setError(null);
       const user = authService.getCurrentUser();
       if (!user) throw new Error("No authenticated user found.");
 
-      const [propertiesRes, reservationsRes] = await Promise.all([
+      const [propertiesRes, reservationsRes, staffRes, approvalsRes] = await Promise.all([
         superAdminService.getProperties(),
-        superAdminService.getReservations()
+        superAdminService.getReservations(),
+        superAdminService.getUsers(),
+        managerService.getApprovals().catch(() => ({ success: true, data: [] }))
       ]);
 
       if (propertiesRes.success && propertiesRes.data.length > 0) {
-        // Since backend automatically filters properties list based on active propertyId for Admin,
-        // we can take the first element as the active property
         setProperty(propertiesRes.data[0]);
       }
-      if (reservationsRes.success) {
+      if (reservationsRes.success && reservationsRes.data) {
         setReservations(reservationsRes.data);
+      }
+      if (staffRes.success && staffRes.data) {
+        setStaffList(staffRes.data.filter(u => u.role === "receptionist"));
+      }
+      if (approvalsRes.success && approvalsRes.data) {
+        setApprovalsList(approvalsRes.data);
       }
     } catch (err) {
       setError(err.message || "Failed to load dashboard statistics.");
@@ -111,9 +127,33 @@ function AdminDashboard() {
     loadDashboardData();
   };
 
+  const handleApproveApproval = async (id) => {
+    try {
+      const target = approvalsList.find(a => (a.id || a._id) === id);
+      const targetId = target?._id || target?.id || id;
+      await managerService.updateApproval(targetId, 'Approve', 'Approved via Admin Dashboard');
+      toast.success("Override request approved.");
+      loadDashboardData();
+    } catch (err) {
+      toast.error(err.message || "Approval decision failed.");
+    }
+  };
+
+  const handleDenyApproval = async (id) => {
+    try {
+      const target = approvalsList.find(a => (a.id || a._id) === id);
+      const targetId = target?._id || target?.id || id;
+      await managerService.updateApproval(targetId, 'Reject', 'Rejected via Admin Dashboard');
+      toast.error("Override request rejected.");
+      loadDashboardData();
+    } catch (err) {
+      toast.error(err.message || "Rejection decision failed.");
+    }
+  };
+
   // Property Details Fallbacks
   const propName = property?.name || "Speshway Luxury Hotel";
-  const propCity = property?.city || "Madhapur,Hyderabad";
+  const propCity = property?.city || "Madhapur, Hyderabad";
   const totalRooms = property?.rooms || 128;
   const occupancyRate = property?.occupancy || 78;
   const adr = property?.adr || 11400;
@@ -124,9 +164,10 @@ function AdminDashboard() {
   const availableRooms = totalRooms - occupiedRooms;
   const dirtyRooms = Math.max(1, Math.round(occupiedRooms * 0.1));
   const outOfOrderRooms = Math.max(1, Math.round(totalRooms * 0.02));
-  const activeBookings = reservations.length || 142;
+  const activeBookingsCount = reservations.length || 142;
   const revenueToday = Math.round(occupiedRooms * adr);
   const pendingPayments = reservations.filter(r => r.status === "Pending").reduce((sum, r) => sum + (r.amount || 0), 0) || 45000;
+  
   const arrivalsCount = reservations.filter(r => r.status === "Confirmed" || r.status === "Pending").length || 48;
   const departuresCount = reservations.filter(r => r.status === "Checked-in").length || 32;
 
@@ -167,92 +208,130 @@ function AdminDashboard() {
     { type: "success", title: "Daily Audit Cleared", msg: "Front desk ledger synchronized with Atlas DB.", time: "5 hours ago" }
   ];
 
-  return (
-    <div className="space-y-6 text-left">
-      {error && <Notice tone="error" title="Dashboard Sync Error">{error}</Notice>}
+  // Booking sources breakdown
+  const sourcePerformanceData = [
+    { name: "Direct / Walk-in", value: sourceMix.find(s => s.name === "Direct")?.value || 35, color: "#8b5cf6" },
+    { name: "MakeMyTrip", value: sourceMix.find(s => s.name === "MakeMyTrip")?.value || 25, color: "#f5c06a" },
+    { name: "Booking.com", value: sourceMix.find(s => s.name === "Booking.com")?.value || 20, color: "#3b82f6" },
+    { name: "Agoda", value: sourceMix.find(s => s.name === "Agoda")?.value || 20, color: "#ef4444" }
+  ];
 
-      {loading ? (
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <PageHeader title="Admin Console" subtitle="Synchronizing stay logs and shift diagnostics..." />
         <LoadingRows rows={5} />
-      ) : (
-        <>
-          {/* Consolidated Critical KPIs Grid */}
-          <div className="space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pl-1">Key Performance Indicators</h4>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-              <PremiumStatCard label="Occupancy Rate" value={`${occupancyRate}%`} hint="Property capacity" icon={Percent} accentColor="#FF6B8B" />
-              <PremiumStatCard label="Today's Revenue" value={`₹${revenueToday.toLocaleString("en-IN")}`} hint="Room billing logs" icon={DollarSign} accentColor="#F5C06A" />
-              <PremiumStatCard label="Average ADR" value={`₹${adr.toLocaleString("en-IN")}`} hint="Daily room rate" icon={TrendingUp} accentColor="#FF7A59" />
-              <PremiumStatCard label="Yield RevPAR" value={`₹${revpar.toLocaleString("en-IN")}`} hint="Rev per available key" icon={Activity} accentColor="#071420" />
-              <PremiumStatCard label="Occupied Rooms" value={`${occupiedRooms} Rooms`} hint="In-stay guests" icon={Users} accentColor="#5B21B6" />
-              <PremiumStatCard label="Available Rooms" value={`${availableRooms} Rooms`} hint="Ready to sell" icon={CheckCircle2} accentColor="#2E7D32" />
-            </div>
-          </div>
+      </div>
+    );
+  }
 
-          {/* Graphical Analytics Section */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Revenue Analytics (Area Chart) */}
-            <Panel title="Revenue Analytics" description="Room billing revenue logs over the calendar months.">
-              <div className="p-5 bg-white rounded-b-xl">
-                <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={localRevenueTrend} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="admin-rev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="m" {...axis} />
-                    <YAxis {...axis} tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} />
-                    <Tooltip {...tooltipStyle} formatter={(v) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]} />
-                    <Area type="monotone" dataKey="revenue" stroke="var(--color-chart-1)" strokeWidth={2} fill="url(#admin-rev)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+  return (
+    <div className="space-y-6 text-left animate-fade-in">
+      
+      {/* Consolidated Critical KPIs Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 font-ui">
+        <PremiumStatCard label="Occupancy Rate" value={`${occupancyRate}%`} hint="Property capacity" icon={Percent} accentColor="#FF6B8B" />
+        <PremiumStatCard label="Today's Revenue" value={`₹${revenueToday.toLocaleString("en-IN")}`} hint="Room billing logs" icon={DollarSign} accentColor="#F5C06A" />
+        <PremiumStatCard label="Average ADR" value={`₹${adr.toLocaleString("en-IN")}`} hint="Daily room rate" icon={TrendingUp} accentColor="#FF7A59" />
+        <PremiumStatCard label="Yield RevPAR" value={`₹${revpar.toLocaleString("en-IN")}`} hint="Rev per available key" icon={Activity} accentColor="#071420" />
+        <PremiumStatCard label="Occupied Rooms" value={`${occupiedRooms} Rooms`} hint="In-stay guests" icon={Users} accentColor="#5B21B6" />
+        <PremiumStatCard label="Available Rooms" value={`${availableRooms} Rooms`} hint="Ready to sell" icon={CheckCircle2} accentColor="#2E7D32" />
+      </div>
+
+      {/* Main Row: Operational Performance Trends & Right Operations Column */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-ui">
+        
+        {/* Left Side: Combined Recharts Panel */}
+        <div className="lg:col-span-2">
+          <Panel 
+            title="Operational Performance Trends" 
+            description="Historical analysis of room metrics, occupancy, and distribution channels"
+            actions={
+              <div className="flex rounded-lg border border-muted bg-[#fcfcfc] p-1 gap-1">
+                {["revenue", "occupancy", "adr", "revpar", "channels"].map((t) => (
+                  <Button
+                    key={t}
+                    size="sm"
+                    variant={chartTab === t ? "secondary" : "ghost"}
+                    className="h-7 text-[10px] font-bold px-2.5 capitalize"
+                    onClick={() => setChartTab(t)}
+                  >
+                    {t === "adr" || t === "revpar" ? t.toUpperCase() : t}
+                  </Button>
+                ))}
               </div>
-            </Panel>
+            }
+          >
+            <div className="p-4">
+              {chartTab === "revenue" && (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="adminRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.6} />
+                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "Revenue"]} />
+                      <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2} fill="url(#adminRev)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
-            {/* Occupancy Trend (Line Graph) */}
-            <Panel title="Occupancy Analytics" description="Monthly property occupancy rates (area trend line).">
-              <div className="p-5 bg-white rounded-b-xl">
-                <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={localRevenueTrend} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="m" {...axis} />
-                    <YAxis {...axis} unit="%" />
-                    <Tooltip {...tooltipStyle} formatter={(v) => [`${v}%`, "Occupancy"]} />
-                    <Line type="monotone" dataKey="occupancy" stroke="var(--color-chart-3)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Panel>
-          </div>
+              {chartTab === "occupancy" && (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} unit="%" />
+                      <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v}%`, "Occupancy"]} />
+                      <Line type="monotone" dataKey="occupancy" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* ADR & RevPAR Comparison Line Chart */}
-            <Panel title="ADR & RevPAR Trends" description="Average Daily Rate vs Revenue Per Available Room over calendar months.">
-              <div className="p-5 bg-white rounded-b-xl">
-                <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={adrRevparTrend} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="m" {...axis} />
-                    <YAxis {...axis} tickFormatter={(v) => `₹${v}`} />
-                    <Tooltip {...tooltipStyle} />
-                    <Line type="monotone" dataKey="adr" name="ADR" stroke="var(--color-chart-1)" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="revpar" name="RevPAR" stroke="var(--color-chart-4)" strokeWidth={2} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Panel>
+              {chartTab === "adr" && (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={adrRevparTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
+                      <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "ADR"]} />
+                      <Line type="monotone" dataKey="adr" stroke="#f5c06a" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
-            {/* Booking Source Breakdown (Pie Chart) */}
-            <Panel title="Distribution Booking Sources" description="Tariff booking channel percentage allocation mix.">
-              <div className="p-5 bg-white rounded-b-xl flex flex-col justify-center">
-                <div className="flex flex-col items-center gap-6 sm:flex-row">
-                  <div className="w-full sm:w-1/2">
+              {chartTab === "revpar" && (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={adrRevparTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
+                      <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "RevPAR"]} />
+                      <Line type="monotone" dataKey="revpar" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {chartTab === "channels" && (
+                <div className="h-[280px] flex flex-col md:flex-row items-center justify-center gap-8">
+                  <div className="w-full md:w-1/2">
                     <ResponsiveContainer width="100%" height={200}>
                       <PieChart>
                         <Pie
-                          data={sourceMix}
+                          data={sourcePerformanceData}
                           dataKey="value"
                           nameKey="name"
                           innerRadius="55%"
@@ -260,127 +339,355 @@ function AdminDashboard() {
                           paddingAngle={3}
                           stroke="none"
                         >
-                          {sourceMix.map((_, i) => (
-                            <Cell key={i} fill={pieColors[i % pieColors.length]} />
+                          {sourcePerformanceData.map((s, idx) => (
+                            <Cell key={idx} fill={s.color} />
                           ))}
                         </Pie>
-                        <Tooltip {...tooltipStyle} formatter={(v) => [`${v}%`, "Tariff Share"]} />
+                        <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <ul className="w-full space-y-2 sm:w-1/2 text-xs">
-                    {sourceMix.map((s, i) => (
-                      <li key={s.name} className="flex items-center justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="size-2.5 shrink-0 rounded-full" style={{ background: pieColors[i % pieColors.length] }} />
-                          <span className="truncate font-semibold text-navy">{s.name}</span>
+                  <ul className="w-full md:w-1/2 space-y-2 text-xs font-semibold">
+                    {sourcePerformanceData.map((s, idx) => (
+                      <li key={idx} className="flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <span className="size-3 rounded-full" style={{ background: s.color }} />
+                          {s.name}
                         </span>
-                        <span className="shrink-0 font-bold tabular-nums text-muted-foreground">{s.value}%</span>
+                        <span>{s.value}% Share</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-              </div>
-            </Panel>
-          </div>
+              )}
+            </div>
+          </Panel>
+        </div>
 
-          {/* Performance & Operations Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Room Type Performance */}
-            <Panel title="Room Inventory Performance" description="Category occupancy levels and tariff rates." className="lg:col-span-2">
-              <div className="bg-white rounded-b-xl overflow-hidden border-t">
-                <table className="w-full text-left text-xs border-collapse">
+        {/* Right Side: Operations stack */}
+        <div className="lg:col-span-1 space-y-6">
+          <Panel title="Today's Front Desk" description="Check-in flows and expected stays">
+            <div className="space-y-3.5 text-xs font-semibold text-navy">
+              <div className="flex items-center justify-between py-1.5 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-indigo shrink-0" /> Expected Arrivals</span>
+                <span className="font-bold text-navy">{arrivalsCount} booking(s)</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-purple shrink-0" /> Expected Departures</span>
+                <span className="font-bold text-navy">{departuresCount} booking(s)</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Users className="size-4 text-success shrink-0" /> Occupied Rooms</span>
+                <span className="font-bold text-navy">{occupiedRooms} Rooms</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-warning shrink-0" /> Available Rooms</span>
+                <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-success font-bold text-[10px]">{availableRooms} remaining</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-pink shrink-0" /> Out of Order</span>
+                <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-destructive font-bold text-[10px]">{outOfOrderRooms} Rooms</span>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Quick Console Actions moved here inside right column */}
+          <Panel title="Console Quick Actions" description="Fast operational shortcuts.">
+            <div className="grid grid-cols-3 gap-2 p-3 bg-white rounded-b-xl font-ui">
+              <Link to="/admin/staff/add" className="flex flex-col items-center justify-center p-2 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[72px]">
+                <UserPlus className="size-5 text-indigo group-hover:scale-115 transition-transform" />
+                <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Staff</span>
+              </Link>
+              <Link to="/admin/reservations/add" className="flex flex-col items-center justify-center p-2 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[72px]">
+                <CalendarCheck className="size-5 text-warning group-hover:scale-115 transition-transform" />
+                <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Booking</span>
+              </Link>
+              <Link to="/admin/approvals" className="flex flex-col items-center justify-center p-2 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[72px]">
+                <Percent className="size-5 text-success group-hover:scale-115 transition-transform" />
+                <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Coupons</span>
+              </Link>
+            </div>
+          </Panel>
+        </div>
+      </div>
+
+      {/* Broad Administrative Workspace */}
+      <Panel
+        title="Administrative Workspace"
+        description="Property overview, occupancy status, stays list, payouts, approvals, staff directory, channels, and system alert logs."
+        actions={
+          <div className="flex flex-wrap gap-1 bg-[#fcfcfc] border border-muted p-1 rounded-lg">
+            {[
+              { id: "property", label: "Property Info" },
+              { id: "occupancy", label: "Occupancy Grid" },
+              { id: "reservations", label: "Reservations" },
+              { id: "revenue", label: "Revenue Ledger" },
+              { id: "approvals", label: "Approvals Logs" },
+              { id: "staff", label: "Staff List" },
+              { id: "channels", label: "OTA Parity" },
+              { id: "alerts", label: "System Alerts" }
+            ].map((tab) => (
+              <Button
+                key={tab.id}
+                size="sm"
+                variant={opTab === tab.id ? "secondary" : "ghost"}
+                className="h-8 text-[11px] font-bold px-3"
+                onClick={() => setOpTab(tab.id)}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
+        }
+      >
+        <div className="p-4 font-ui">
+          
+          {/* 1. Property Info Tab */}
+          {opTab === "property" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-2 rounded-xl text-xs">
+              <div className="space-y-3.5 border-r border-muted/50 pr-4">
+                <h4 className="text-sm font-bold text-navy-deep flex items-center gap-2"><Building className="size-4.5 text-purple" /> {propName}</h4>
+                <p className="text-muted-foreground leading-relaxed">Located in <strong className="text-navy">{propCity}</strong>. Scoped property configurations, taxation rules and operator shift checklists are synchronized dynamically with MongoDB collections.</p>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="bg-muted/20 border border-muted rounded-xl p-3">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground block">City Scope</span>
+                    <strong className="text-navy mt-1 block">{propCity}</strong>
+                  </div>
+                  <div className="bg-muted/20 border border-muted rounded-xl p-3">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground block">Branch Code</span>
+                    <strong className="text-navy mt-1 block">{(property?.code || "JAI").toUpperCase()}</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2.5">
+                <h5 className="font-bold text-navy">Administrative Scope</h5>
+                <ul className="space-y-2 text-muted-foreground">
+                  <li className="flex justify-between border-b border-muted/30 pb-1.5"><span>Total Registered Keys:</span> <strong className="text-navy">{totalRooms} Keys</strong></li>
+                  <li className="flex justify-between border-b border-muted/30 pb-1.5"><span>Contact Support Line:</span> <strong className="text-navy">{property?.phone || "+91 40 4495 1022"}</strong></li>
+                  <li className="flex justify-between border-b border-muted/30 pb-1.5"><span>E-mail Interface:</span> <strong className="text-navy">{property?.email || "reservations@hourstay.com"}</strong></li>
+                  <li className="flex justify-between"><span>Yield Optimization RevPAR:</span> <strong className="text-navy">₹{revpar.toLocaleString("en-IN")}</strong></li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* 2. Occupancy Grid Tab */}
+          {opTab === "occupancy" && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <th className="pb-3 px-3">Room Category</th>
+                    <th className="pb-3 px-3">Total Keys</th>
+                    <th className="pb-3 px-3">Occupied Rooms</th>
+                    <th className="pb-3 px-3 text-right">Daily Tariff</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-muted font-sans">
+                  {roomTypeStats.map((item) => (
+                    <tr key={item.type} className="hover:bg-muted/5 transition-colors">
+                      <td className="py-3 px-3 font-semibold text-navy text-sm">{item.type}</td>
+                      <td className="py-3 px-3 text-muted-foreground">{item.count} Keys</td>
+                      <td className="py-3 px-3 text-muted-foreground">
+                        <Tag tone={item.occupied > 5 ? "success" : "info"}>{item.occupied} Occupied</Tag>
+                      </td>
+                      <td className="py-3 px-3 text-right font-bold text-navy">₹{item.rate.toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 3. Reservations Tab */}
+          {opTab === "reservations" && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
+                    <th className="pb-3 px-3">Guest Name</th>
+                    <th className="pb-3 px-3">Room Number</th>
+                    <th className="pb-3 px-3">Stay Dates</th>
+                    <th className="pb-3 px-3">Source Channel</th>
+                    <th className="pb-3 px-3 text-right">Invoice Amount</th>
+                    <th className="pb-3 px-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-muted">
+                  {reservations.length === 0 ? (
+                    <tr><td colSpan="6" className="py-6 text-center text-muted-foreground">No reservations loaded.</td></tr>
+                  ) : (
+                    reservations.slice(0, 8).map((item, idx) => (
+                      <tr key={idx} className="hover:bg-[#fcfcfc] transition-colors">
+                        <td className="py-3 px-3 font-semibold text-navy">{item.guestName || "Walk-in Guest"}</td>
+                        <td className="py-3 px-3 font-mono">{item.roomNumber || "Unassigned"}</td>
+                        <td className="py-3 px-3">{item.checkIn} → {item.checkOut}</td>
+                        <td className="py-3 px-3"><Tag tone="brand">{item.source || "Direct"}</Tag></td>
+                        <td className="py-3 px-3 text-right font-bold">₹{(item.amount || 0).toLocaleString()}</td>
+                        <td className="py-3 px-3 text-center">
+                          <Tag tone={item.status === "Confirmed" || item.status === "Checked-in" ? "success" : "warning"}>{item.status}</Tag>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 4. Revenue Ledger Tab */}
+          {opTab === "revenue" && (
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="border border-muted rounded-xl p-4 bg-muted/10">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Today's Billing Revenue</span>
+                  <p className="text-xl font-bold text-navy mt-1">₹{revenueToday.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="border border-muted rounded-xl p-4 bg-muted/10">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Outstanding Pending Payments</span>
+                  <p className="text-xl font-bold text-warning mt-1">₹{pendingPayments.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="border border-muted rounded-xl p-4 bg-muted/10">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Average Room Rate (ADR)</span>
+                  <p className="text-xl font-bold text-purple mt-1">₹{adr.toLocaleString("en-IN")}</p>
+                </div>
+              </div>
+              <h5 className="font-bold text-navy pt-2">Recent Invoiced Folios</h5>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-muted/40 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      <th className="p-4">Room Category</th>
-                      <th className="p-4">Total Keys</th>
-                      <th className="p-4">Occupied Rooms</th>
-                      <th className="p-4 text-right">Daily Tariff</th>
+                    <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
+                      <th className="pb-2">Folio ID</th>
+                      <th className="pb-2">Guest</th>
+                      <th className="pb-2">Method</th>
+                      <th className="pb-2 text-right">Invoiced</th>
+                      <th className="pb-2 text-center">Payment Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y font-sans">
-                    {roomTypeStats.map((item) => (
-                      <tr key={item.type} className="hover:bg-muted/5 transition-colors">
-                        <td className="p-4 font-semibold text-navy text-sm">{item.type}</td>
-                        <td className="p-4 text-muted-foreground">{item.count} Keys</td>
-                        <td className="p-4 text-muted-foreground">
-                          <Tag tone={item.occupied > 5 ? "success" : "info"}>{item.occupied} Occupied</Tag>
-                        </td>
-                        <td className="p-4 text-right font-bold text-navy">₹{item.rate.toLocaleString("en-IN")}</td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-muted/40">
+                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-8839</td><td>Karan Malhotra</td><td>Razorpay GDS</td><td className="text-right font-bold">₹24,500</td><td className="text-center"><Tag tone="success">Paid</Tag></td></tr>
+                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-4739</td><td>Aisha Sharma</td><td>UPI QR Code</td><td className="text-right font-bold">₹11,400</td><td className="text-center"><Tag tone="success">Paid</Tag></td></tr>
+                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-1029</td><td>Rohan Varma</td><td>Paytm Wallet</td><td className="text-right font-bold">₹4,500</td><td className="text-center"><Tag tone="warning">Pending</Tag></td></tr>
+                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-9988</td><td>Meera Nair</td><td>Card Swipe</td><td className="text-right font-bold">₹11,400</td><td className="text-center"><Tag tone="success">Paid</Tag></td></tr>
                   </tbody>
                 </table>
               </div>
-            </Panel>
+            </div>
+          )}
 
-            {/* Quick Action Panel */}
-            <Panel title="Console Quick Actions" description="Fast operational shortcuts.">
-              <div className="p-4 bg-white rounded-b-xl space-y-2.5">
-                <Button className="w-full bg-navy hover:bg-navy/90 text-white rounded-xl text-xs py-5" onClick={() => window.location.href = "/admin/reservations"}>
-                  <Plus className="size-4 mr-2" /> Book New Guest Walk-in
-                </Button>
-                <Button className="w-full bg-purple hover:bg-purple/90 text-white rounded-xl text-xs py-5" onClick={() => window.location.href = "/admin/front-desk"}>
-                  <CheckCircle2 className="size-4 mr-2" /> Open Front Desk Check-in
-                </Button>
-                <Button variant="outline" className="w-full border-muted text-navy rounded-xl text-xs py-5" onClick={() => window.location.href = "/admin/rooms"}>
-                  <Sparkles className="size-4 mr-2" /> Configure Calendar Rates & Tariffs
-                </Button>
-                <Button variant="outline" className="w-full border-muted text-navy rounded-xl text-xs py-5" onClick={() => window.location.href = "/admin/staff"}>
-                  <Users className="size-4 mr-2" /> Audit Operator Shift Handover
-                </Button>
-              </div>
-            </Panel>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Today's Operations summary */}
-            <Panel title="Today's Front Desk Operations" description="Expected arrivals, departures and holds." className="lg:col-span-2">
-              <div className="p-4 bg-white rounded-b-xl space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="border border-muted rounded-xl p-3 bg-muted/10">
-                    <strong className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Expected Arrivals</strong>
-                    <p className="text-xl font-bold text-navy mt-1">{arrivalsCount}</p>
-                  </div>
-                  <div className="border border-muted rounded-xl p-3 bg-muted/10">
-                    <strong className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Expected Departures</strong>
-                    <p className="text-xl font-bold text-navy mt-1">{departuresCount}</p>
-                  </div>
-                  <div className="border border-muted rounded-xl p-3 bg-muted/10">
-                    <strong className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Out of Order Rooms</strong>
-                    <p className="text-xl font-bold text-navy mt-1">{outOfOrderRooms}</p>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground leading-relaxed pl-1 pt-1">
-                  Today's operation targets <strong>{arrivalsCount + departuresCount} guest transfers</strong>. Ensure guest registration Form C data is captured via Aadhaar OCR reader inside the check-in screen prior to folio checkout.
-                </div>
-              </div>
-            </Panel>
-
-            {/* Alerts & Notifications */}
-            <Panel title="Real-time System Alerts" description="Alert notifications requiring review.">
-              <div className="p-3 bg-white rounded-b-xl space-y-2">
-                {activeAlerts.map((alert, index) => (
-                  <div key={index} className="flex gap-3 items-start border rounded-xl p-2.5 hover:bg-muted/15 transition-colors">
-                    {alert.type === "error" && <ShieldAlert className="size-4 text-destructive shrink-0 mt-0.5" />}
-                    {alert.type === "warning" && <AlertTriangle className="size-4 text-warning shrink-0 mt-0.5" />}
-                    {alert.type === "info" && <Activity className="size-4 text-info shrink-0 mt-0.5" />}
-                    {alert.type === "success" && <CheckCircle2 className="size-4 text-success shrink-0 mt-0.5" />}
-                    
-                    <div className="min-w-0 text-left">
-                      <div className="flex justify-between items-baseline gap-2">
-                        <h5 className="font-bold text-navy text-[11px] truncate">{alert.title}</h5>
-                        <span className="text-[8px] font-semibold text-muted-foreground/60 shrink-0 font-sans">{alert.time}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{alert.msg}</p>
+          {/* 5. Approvals Logs Tab */}
+          {opTab === "approvals" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {approvalsList.map((item) => (
+                <div key={item.id} className="p-4 rounded-xl border border-muted hover:bg-muted/15 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded bg-accent/15 px-2 py-0.5 text-[9px] font-bold text-navy uppercase">{item.type}</span>
+                      <Tag tone={item.status === "Approved" ? "success" : item.status === "Rejected" ? "error" : "warning"}>{item.status}</Tag>
                     </div>
+                    <h4 className="font-semibold text-navy mt-1.5 text-xs truncate">{item.reason}</h4>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Guest: {item.guest} · Amount: ₹{item.amount.toLocaleString()}</p>
+                    <p className="text-[9px] text-muted-foreground font-mono mt-0.5">Requested by: {item.requestedBy}</p>
                   </div>
-                ))}
+                  {item.status === "Pending" && (
+                    <div className="flex gap-2 shrink-0">
+                      <Button size="xs" className="bg-navy hover:bg-navy-deep text-white text-[10px] font-bold px-2.5 h-7" onClick={() => handleApproveApproval(item.id)}>Approve</Button>
+                      <Button size="xs" variant="ghost" className="text-destructive hover:bg-destructive/5 text-[10px] px-2 h-7" onClick={() => handleDenyApproval(item.id)}>Deny</Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 6. Staff List Tab */}
+          {opTab === "staff" && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
+                    <th className="pb-3 px-3">Name</th>
+                    <th className="pb-3 px-3">Email Address</th>
+                    <th className="pb-3 px-3">Assigned Role</th>
+                    <th className="pb-3 px-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-muted">
+                  {staffList.length === 0 ? (
+                    <tr><td colSpan="4" className="py-6 text-center text-muted-foreground">No active operators found.</td></tr>
+                  ) : (
+                    staffList.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-[#fcfcfc] transition-colors">
+                        <td className="py-3 px-3 font-semibold text-navy">{item.name}</td>
+                        <td className="py-3 px-3 font-mono">{item.email}</td>
+                        <td className="py-3 px-3"><Tag tone="brand">{item.role === "receptionist" ? "Front Desk Operator" : item.role}</Tag></td>
+                        <td className="py-3 px-3 text-center">
+                          <Tag tone={item.status === "Active" ? "success" : "error"}>{item.status || "Active"}</Tag>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 7. OTA Parity Tab */}
+          {opTab === "channels" && (
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="border border-muted rounded-xl p-4 bg-white shadow-soft text-center">
+                  <strong className="text-navy block text-sm">MakeMyTrip</strong>
+                  <span className="text-[10px] text-muted-foreground mt-1 block">Parity: <strong className="text-success">99.8% Sync</strong></span>
+                  <Tag tone="success" className="mt-2">Connected</Tag>
+                </div>
+                <div className="border border-muted rounded-xl p-4 bg-white shadow-soft text-center">
+                  <strong className="text-navy block text-sm">Booking.com</strong>
+                  <span className="text-[10px] text-muted-foreground mt-1 block">Parity: <strong className="text-success">99.9% Sync</strong></span>
+                  <Tag tone="success" className="mt-2">Connected</Tag>
+                </div>
+                <div className="border border-muted rounded-xl p-4 bg-white shadow-soft text-center">
+                  <strong className="text-navy block text-sm">Goibibo</strong>
+                  <span className="text-[10px] text-muted-foreground mt-1 block">Parity: <strong className="text-warning">Rate Shift</strong></span>
+                  <Tag tone="warning" className="mt-2">Action Required</Tag>
+                </div>
+                <div className="border border-muted rounded-xl p-4 bg-white shadow-soft text-center">
+                  <strong className="text-navy block text-sm">Agoda</strong>
+                  <span className="text-[10px] text-muted-foreground mt-1 block">Parity: <strong className="text-success">99.1% Sync</strong></span>
+                  <Tag tone="success" className="mt-2">Connected</Tag>
+                </div>
               </div>
-            </Panel>
-          </div>
-        </>
-      )}
+              <p className="text-[11px] text-muted-foreground text-left leading-relaxed">
+                Rates & Inventory channel updates are synchronized hourly with the Global Distribution system. Goibibo parity warning indicates active rate is ₹950 below the baseline limit defined inside the calendar dashboard.
+              </p>
+            </div>
+          )}
+
+          {/* 8. System Alerts Tab */}
+          {opTab === "alerts" && (
+            <div className="space-y-2">
+              {activeAlerts.map((alert, index) => (
+                <div key={index} className="flex gap-3 items-start border border-muted rounded-xl p-3 bg-white hover:bg-muted/15 transition-all text-xs">
+                  {alert.type === "error" && <ShieldAlert className="size-4 text-destructive shrink-0 mt-0.5" />}
+                  {alert.type === "warning" && <AlertTriangle className="size-4 text-warning shrink-0 mt-0.5" />}
+                  {alert.type === "info" && <Activity className="size-4 text-info shrink-0 mt-0.5" />}
+                  {alert.type === "success" && <CheckCircle2 className="size-4 text-success shrink-0 mt-0.5" />}
+                  
+                  <div className="min-w-0 text-left flex-1">
+                    <div className="flex justify-between items-baseline gap-2">
+                      <h5 className="font-bold text-navy text-[11px] truncate">{alert.title}</h5>
+                      <span className="text-[9px] font-semibold text-muted-foreground/60 shrink-0 font-sans">{alert.time}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{alert.msg}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+        </div>
+      </Panel>
+
     </div>
   );
 }

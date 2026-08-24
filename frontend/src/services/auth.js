@@ -13,6 +13,10 @@ async function request(path, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  if (options.body instanceof FormData) {
+    delete headers['Content-Type'];
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers
@@ -83,6 +87,20 @@ export const authService = {
     const res = await request('/auth/profile');
     if (res.success && res.data) {
       localStorage.setItem('hms_user', JSON.stringify(res.data));
+      window.dispatchEvent(new Event('user-profile-updated'));
+    }
+    return res;
+  },
+
+  // Update profile details and upload avatar
+  updateProfile: async (formData) => {
+    const res = await request('/auth/profile', {
+      method: 'PUT',
+      body: formData
+    });
+    if (res.success && res.data) {
+      localStorage.setItem('hms_user', JSON.stringify(res.data));
+      window.dispatchEvent(new Event('user-profile-updated'));
     }
     return res;
   },
