@@ -53,12 +53,14 @@ function SuperAdminDashboard() {
   const [reservations, setReservations] = useState([]);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
+  const [subscriptionRequests, setSubscriptionRequests] = useState([]);
+  const [decidingId, setDecidingId] = useState(null);
+  const [rejectionModalId, setRejectionModalId] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   // Scope & Date states
   const [propertyScope, setPropertyScope] = useState("All");
   const [dateRange, setDateRange] = useState("Last 30 Days");
-
-
 
   // Table controls states
   const [search, setSearch] = useState("");
@@ -80,21 +82,21 @@ function SuperAdminDashboard() {
     { name: "RBAC Session Auditor", status: "Healthy", desc: "Audits synchronized" }
   ];
 
-
-
   async function loadDashboardData() {
     try {
-      const [statsRes, propertiesRes, reservationsRes, logsRes] = await Promise.all([
+      const [statsRes, propertiesRes, reservationsRes, logsRes, requestsRes] = await Promise.all([
         superAdminService.getDashboardStats(),
         superAdminService.getProperties(),
         superAdminService.getReservations(),
-        superAdminService.getAuditLogs()
+        superAdminService.getAuditLogs(),
+        superAdminService.getSubscriptionRequests()
       ]);
       
       if (statsRes.success) setStats(statsRes.data.stats);
       if (propertiesRes.success) setProperties(propertiesRes.data);
       if (reservationsRes.success) setReservations(reservationsRes.data);
       if (logsRes.success) setLogs(logsRes.data);
+      if (requestsRes.success) setSubscriptionRequests(requestsRes.data);
     } catch (err) {
       setError(err.message || "Failed to sync dashboard data.");
     } finally {
@@ -110,6 +112,25 @@ function SuperAdminDashboard() {
   const handleRefresh = () => {
     setRefreshing(true);
     loadDashboardData();
+  };
+
+  const handleDecide = async (id, action, reason = "") => {
+    setDecidingId(id);
+    try {
+      const res = await superAdminService.decideSubscriptionRequest(id, action, reason);
+      if (res.success) {
+        toast.success(`Subscription request ${action === 'Approve' ? 'approved' : 'rejected'} successfully.`);
+        setRejectionModalId(null);
+        setRejectionReason("");
+        await loadDashboardData();
+      } else {
+        toast.error(res.message || "Failed to process decision.");
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to process decision.");
+    } finally {
+      setDecidingId(null);
+    }
   };
 
   // Compute live KPIs
@@ -540,6 +561,123 @@ function SuperAdminDashboard() {
           </div>
         </Panel>
       </div>
+
+      {/* Subscription Approvals Board Panel */}
+      <Panel title="SaaS Subscription Approvals Board" description="Review property-level plan activation requests, approve upgrades, or reject with feedback.">
+        <div className="bg-white rounded-b-xl p-4">
+          {subscriptionRequests.length === 0 ? (
+            <div className="p-8 text-center text-xs text-muted-foreground select-none">
+              No subscription request records found on the system.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[750px]">
+                <thead>
+                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-bold select-none">
+                    <th className="p-3">Property Branch</th>
+                    <th className="p-3">Requested Plan</th>
+                    <th className="p-3">Admin</th>
+                    <th className="p-3 text-right">Pricing</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3">Date Requested</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y font-sans">
+                  {subscriptionRequests.map((req) => (
+                    <tr key={req._id || req.id} className="hover:bg-muted/15 transition-colors">
+                      <td className="p-3 font-bold text-navy">{req.propertyName}</td>
+                      <td className="p-3 font-semibold text-navy-deep">{req.planName}</td>
+                      <td className="p-3 text-muted-foreground">{req.adminName}</td>
+                      <td className="p-3 text-right font-bold text-navy">₹{req.price.toLocaleString("en-IN")}/mo</td>
+                      <td className="p-3 text-center">
+                        <Tag tone={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'}>
+                          {req.status}
+                        </Tag>
+                      </td>
+                      <td className="p-3 text-muted-foreground font-semibold">
+                        {new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="p-3 text-right">
+                        {req.status === 'Pending' ? (
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              disabled={decidingId !== null}
+                              onClick={() => handleDecide(req._id || req.id, 'Approve')}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              disabled={decidingId !== null}
+                              onClick={() => {
+                                setRejectionModalId(req._id || req.id);
+                                setRejectionReason("");
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground font-semibold">
+                            {req.status === 'Approved' ? `Approved by ${req.decidedBy}` : `Rejected: "${req.rejectionReason}"`}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      {/* Rejection Modal */}
+      {rejectionModalId && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
+          <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
+            <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
+              <h3 className="font-bold text-navy text-sm">Provide Rejection Reason</h3>
+              <button
+                className="text-muted-foreground hover:text-navy cursor-pointer"
+                onClick={() => setRejectionModalId(null)}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Feedback / Reason for rejection</label>
+                <textarea
+                  className="w-full border border-muted rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-navy resize-none min-h-[80px]"
+                  placeholder="E.g., Requested tier does not match target property rooms count limit."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-muted bg-[#fcfcfc] flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setRejectionModalId(null)}
+                className="h-8 px-4 text-xs rounded-full cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!rejectionReason.trim()}
+                onClick={() => handleDecide(rejectionModalId, 'Reject', rejectionReason)}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 px-4 text-xs rounded-full cursor-pointer"
+              >
+                Submit Rejection
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -1,4 +1,4 @@
-
+import { useState, useEffect } from "react";
 import { PageHeader, Panel, StatCard, Tag, statusTone, Notice } from "./kit";
 import { DataTable } from "./DataTable";
 import { RevenueChart, OccupancyChart, SourceMixChart } from "./Charts";
@@ -190,6 +190,57 @@ export function WorkspacePage({
 }) {
   const ds = dataset === "none" ? null : datasets[dataset];
   const isManager = authService.getCurrentUser()?.role === "manager";
+  const [rows, setRows] = useState(ds ? ds.rows : []);
+
+  useEffect(() => {
+    if (dataset === "notifications") {
+      const fetchGuestNotifications = async () => {
+        try {
+          const token = localStorage.getItem('hms_token');
+          if (!token) return;
+          const res = await fetch('http://localhost:5000/api/notifications', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await res.json();
+          if (data.success && data.data) {
+            const mapped = data.data.map(n => ({
+              title: n.title,
+              body: n.message,
+              tone: n.category === 'Security Warning' ? 'error' : (n.category === 'OTA Sync' || n.category === 'Payment Alert' ? 'warning' : 'brand'),
+              time: new Date(n.createdAt).toLocaleDateString()
+            }));
+            setRows(mapped);
+          }
+        } catch (err) {
+          console.error("Failed to load guest alerts:", err);
+        }
+      };
+      fetchGuestNotifications();
+    } else if (dataset === "myBookings") {
+      const fetchGuestBookings = async () => {
+        try {
+          const token = localStorage.getItem('hms_token');
+          if (!token) return;
+          const res = await fetch('http://localhost:5000/api/guest/bookings', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await res.json();
+          if (data.success && data.data) {
+            setRows(data.data);
+          }
+        } catch (err) {
+          console.error("Failed to load guest bookings:", err);
+        }
+      };
+      fetchGuestBookings();
+    } else if (ds) {
+      setRows(ds.rows);
+    }
+  }, [dataset, ds]);
   return (
     <>
       {!isManager && <PageHeader title={title} subtitle={subtitle} actions={actions} />}
@@ -232,7 +283,7 @@ export function WorkspacePage({
       {children}
       {ds &&
       <Panel title={tableTitle ?? title}>
-          <DataTable columns={ds.columns} rows={ds.rows} />
+          <DataTable columns={ds.columns} rows={rows} />
         </Panel>
       }
     </>);

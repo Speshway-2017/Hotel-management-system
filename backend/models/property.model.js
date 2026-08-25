@@ -19,7 +19,7 @@ const propertySchema = new mongoose.Schema({
   gm: { type: String, trim: true },
   assignedAdmin: { type: String, ref: 'User', default: null },
   subscriptionTier: { type: String, enum: ['Basic', 'Premium', 'Enterprise', 'None'], default: 'None' },
-  subscriptionStatus: { type: String, enum: ['Active', 'Unpaid', 'Expired', 'None'], default: 'None' },
+  subscriptionStatus: { type: String, enum: ['Active', 'Unpaid', 'Expired', 'None', 'Pending', 'Rejected'], default: 'None' },
   subscriptionExpiry: { type: Date },
   commissionRate: { type: Number, default: 12 },
   settings: {

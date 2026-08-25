@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { notificationsService } from "@/services/notifications";
-import { Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -10,123 +9,92 @@ import {
   Calendar,
   CheckCircle2
 } from "lucide-react";
+import { authService } from "@/services/auth";
+import { notificationsService } from "@/services/notifications";
+import { receptionistService } from "@/services/receptionist";
 
-export const Route = createFileRoute("/admin/notifications/$id")({
+export const Route = createFileRoute("/reception/notifications/$id")({
   head: () => ({
     meta: [
-      { title: "Alert Diagnostic Details — Speshway Luxury Hotel" },
+      { title: "Alert Details — Hour Stay" },
       { name: "description", content: "Platform alerts, check-in requests, OTA sync notifications." }
     ]
   }),
-  component: AdminNotificationDetailsPage
+  component: ReceptionistNotificationDetailsPage
 });
-
-// Mock Initial Notifications Dataset Scoped to Speshway Luxury Hotel (Property ID: HS-JAI)
-const initialNotifications = [
-  {
-    id: "NTF-101",
-    title: "OTA Parity Sync Warning",
-    message: "Booking.com connection returned timeout error during room availability sync for Suite rooms.",
-    type: "OTA Sync",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "10 mins ago",
-    read: false,
-    body: "The OTA connection channel manager reported a parity discrepancy for Speshway Luxury Hotel Standard Room pricing between Agoda and Booking.com. Automated sync was retried 3 times and timed out. Action required to verify rate parity settings manually."
-  },
-  {
-    id: "NTF-102",
-    title: "Security Alert: Unauthorized Console login",
-    message: "Multiple failed login attempts detected on admin dashboard from IP 192.168.1.105.",
-    type: "Security Warning",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "2 hours ago",
-    read: false,
-    body: "Security systems logged 5 consecutive failed authorization requests for GM account on Speshway Luxury Hotel dashboard panel. Device fingerprint: Chrome on Linux. Recommended actions: Trigger password reset or IP access check."
-  },
-  {
-    id: "NTF-103",
-    title: "Overbooking Check-in Alert",
-    message: "Overbooking conflict detected for Maharaja Suite Room 302 on August 18.",
-    type: "Property Audit",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "4 hours ago",
-    read: true,
-    body: "The reservation engine flagged overlapping Confirmed bookings for Room 302 (Karan Malhotra & Vikram Gokhale) check-ins. Please reassign the waitlist guest to prevent double occupancy disputes."
-  },
-  {
-    id: "NTF-104",
-    title: "Razorpay Webhook Latency",
-    message: "UPI transaction captured successfully but ledger webhook response delayed by 7 seconds.",
-    type: "Payment Alert",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "1 day ago",
-    read: true,
-    body: "Transaction capture hook FOL-9022 returned 502 Bad Gateway response. Payment confirmed on Razorpay Dashboard. Folio outstanding balance manually cleared to 0."
-  }
-];
 
 function getToneForType(type) {
   switch (type) {
-    case "OTA Sync":
+    case "New Reservation":
     case "Payment Alert":
-      return "warning";
-    case "Property Audit":
       return "success";
-    case "Security Warning":
+    case "Pending Approval":
+    case "Maintenance Alert":
+    case "Service Request":
+      return "warning";
+    case "Guest Complaint":
+    case "Overbooking Alert":
       return "error";
     default:
       return "brand";
   }
 }
 
-function AdminNotificationDetailsPage() {
+function ReceptionistNotificationDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [ntf, setNtf] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    notificationsService.getNotifications()
-      .then(res => {
+    const user = authService.getCurrentUser();
+    if (!user) return;
+
+    const loadNotificationDetail = async () => {
+      try {
+        const [propRes, res] = await Promise.all([
+          receptionistService.getProperty(),
+          notificationsService.getNotifications()
+        ]);
+        
+        let propName = "assigned branch";
+        if (propRes.success && propRes.data) {
+          propName = propRes.data.name;
+        }
+
         if (res.success && res.data) {
-          const item = res.data.find(n => (n._id || n.id) === id);
-          if (item) {
-            const mapped = {
-              id: item._id || item.id,
-              title: item.title,
-              message: item.message,
-              type: item.category || 'General',
-              propertyName: "Speshway Luxury Hotel",
-              timestamp: new Date(item.createdAt).toLocaleDateString(),
-              read: item.isRead,
-              body: item.message
-            };
-            setNtf(mapped);
-            if (!item.isRead) {
-              notificationsService.markNotificationRead(item._id || item.id)
-                .then(() => {
-                  window.dispatchEvent(new Event('refresh-unread-notifications-count'));
-                })
-                .catch(err => console.error(err));
+          const matched = res.data.find(n => n._id === id || n.id === id);
+          if (matched) {
+            if (!matched.isRead) {
+              await notificationsService.markNotificationRead(matched._id || matched.id);
+              window.dispatchEvent(new Event('refresh-unread-notifications-count'));
             }
+            setNtf({
+              id: matched._id || matched.id,
+              title: matched.title,
+              message: matched.message,
+              type: matched.category || "General",
+              propertyId: matched.propertyId,
+              propertyName: propName,
+              timestamp: new Date(matched.createdAt).toLocaleDateString(),
+              read: true,
+              body: matched.message
+            });
           } else {
-            setError(`Notification record not found.`);
+            setError(`Notification with ID ${id} not found.`);
           }
         }
-      })
-      .catch(err => {
-        console.error(err);
-        setError("Failed to fetch notification incident record details.");
-      });
+      } catch (err) {
+        setError(err.message || "Failed to load notification details.");
+      }
+    };
+
+    if (id) loadNotificationDetail();
   }, [id]);
 
   if (error) {
     return (
-      <div className="space-y-6 text-left animate-fade-in">
+      <div className="space-y-6 text-left animate-fade-in p-6">
         <Notice tone="error" title="Record Not Found">
           {error}
         </Notice>
@@ -143,8 +111,8 @@ function AdminNotificationDetailsPage() {
   }
 
   return (
-    <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs items={[{ label: "Alert Center", to: "/admin/notifications" }, { label: "Incident Diagnostic Details" }]} />
+    <div className="space-y-6 text-left animate-fade-in p-6 text-navy font-sans">
+      <Crumbs items={[{ label: "Alert Center", to: "/reception/notifications" }, { label: "Incident Diagnostic Details" }]} />
 
       <div className="max-w-3xl">
         <Panel title="Diagnostic Report Overview" description={`Incident ID: ${ntf.id}`}>

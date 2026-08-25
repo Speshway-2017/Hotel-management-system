@@ -170,7 +170,7 @@ function ManagerProfilePage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmNewPassword) {
       setNotification({
@@ -180,13 +180,25 @@ function ManagerProfilePage() {
       });
       return;
     }
-    setIsChangingPassword(false);
-    setPasswordData({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
-    setNotification({
-      tone: "success",
-      title: "Credentials Saved",
-      body: "Security password credentials updated successfully."
-    });
+    
+    try {
+      const res = await authService.changePassword(passwordData.currentPassword, passwordData.newPassword);
+      if (res.success) {
+        setIsChangingPassword(false);
+        setPasswordData({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+        setNotification({
+          tone: "success",
+          title: "Credentials Saved",
+          body: "Security password credentials updated successfully."
+        });
+      }
+    } catch (err) {
+      setNotification({
+        tone: "error",
+        title: "Change Password Failed",
+        body: err.message || "Failed to update your credentials."
+      });
+    }
     setTimeout(() => setNotification(null), 4000);
   };
 

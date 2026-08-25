@@ -20,7 +20,8 @@ import {
   ShieldAlert,
   Phone,
   Mail,
-  Home
+  Home,
+  Calendar
 } from "lucide-react";
 
 // Premium stat card component
@@ -43,6 +44,33 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
   );
 }
 
+// Utility helpers for date handling
+const formatDateToYYYYMMDD = (dateStr) => {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatDateToString = (date) => {
+  const day = date.getDate();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+};
+
+const getAdditionalNights = (currentOutStr, newOutStr) => {
+  const currentOut = new Date(currentOutStr);
+  const newOut = new Date(newOutStr);
+  if (isNaN(currentOut.getTime()) || isNaN(newOut.getTime())) return 0;
+  const diffTime = newOut - currentOut;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 0;
+};
+
 function ManagerGuestsPage() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
@@ -58,6 +86,56 @@ function ManagerGuestsPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Extend Stay modal state
+  const [extendingBooking, setExtendingBooking] = useState(null);
+  const [newCheckOutDate, setNewCheckOutDate] = useState("");
+  const [dailyRate, setDailyRate] = useState(0);
+  const [extendingSubmit, setExtendingSubmit] = useState(false);
+
+  const handleOpenExtendModal = (b) => {
+    setExtendingBooking(b);
+    const currentOut = new Date(b.checkOut);
+    const nextDay = new Date(currentOut.getTime() + 24 * 60 * 60 * 1000);
+    setNewCheckOutDate(formatDateToYYYYMMDD(nextDay));
+    const avgNightWithTax = b.amount / (b.nights || 1);
+    setDailyRate(Math.round(avgNightWithTax / 1.18));
+  };
+
+  const handleConfirmExtend = async () => {
+    if (!extendingBooking || !newCheckOutDate) return;
+    const additionalNights = getAdditionalNights(extendingBooking.checkOut, newCheckOutDate);
+    if (additionalNights <= 0) {
+      toast.error("New check-out date must be after current check-out date.");
+      return;
+    }
+    
+    setExtendingSubmit(true);
+    try {
+      const roomCharges = dailyRate * additionalNights;
+      const gst = Math.round(roomCharges * 0.18);
+      const totalAdditionalAmount = roomCharges + gst;
+      
+      const payload = {
+        newCheckOut: formatDateToString(new Date(newCheckOutDate)),
+        additionalNights,
+        additionalAmount: totalAdditionalAmount
+      };
+      
+      const res = await managerService.extendReservation(extendingBooking._id || extendingBooking.id, payload);
+      if (res.success) {
+        toast.success(`Stay extended successfully until ${payload.newCheckOut}!`);
+        setExtendingBooking(null);
+        loadData();
+      } else {
+        toast.error(res.message || "Failed to extend stay.");
+      }
+    } catch (err) {
+      toast.error(err.message || "An error occurred while extending stay.");
+    } finally {
+      setExtendingSubmit(false);
+    }
+  };
 
   async function loadData() {
     try {
@@ -326,7 +404,17 @@ function ManagerGuestsPage() {
                         #{b._id || b.id}
                       </td>
                       <td className="py-4 px-4 text-muted-foreground">{b.checkIn}</td>
-                      <td className="py-4 px-4 text-muted-foreground">{b.checkOut}</td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        <div>{b.checkOut}</div>
+                        {b.status === "Checked-in" && (
+                          <button
+                            onClick={() => handleOpenExtendModal(b)}
+                            className="text-[10px] text-brand hover:underline font-bold block mt-1 cursor-pointer"
+                          >
+                            Extend Stay
+                          </button>
+                        )}
+                      </td>
                       <td className="py-4 px-4 text-center">
                         <Tag tone={
                           b.status === "Confirmed" ? "brand" :
@@ -391,6 +479,107 @@ function ManagerGuestsPage() {
           </div>
         )}
       </div>
+
+      {/* Extend Stay Modal */}
+      {extendingBooking && (
+        <div className="fixed inset-0 bg-[#071420]/75 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-muted shadow-lift w-full max-w-md overflow-hidden animate-scale-up text-left font-sans">
+            
+            {/* Modal Header */}
+            <div className="bg-navy p-5 text-white flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-bold">Extend Stay Duration</h3>
+                <p className="text-[10px] text-[#A5F3FC] font-semibold mt-1">Guest: {extendingBooking.guest} · Room: {extendingBooking.room}</p>
+              </div>
+              <button
+                onClick={() => setExtendingBooking(null)}
+                className="text-white/60 hover:text-white cursor-pointer text-xs"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4 text-xs text-navy">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Current Checkout</label>
+                  <p className="font-semibold text-navy-deep bg-muted/20 border border-muted/50 p-2.5 rounded-lg text-[11px]">{extendingBooking.checkOut}</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">New Checkout Date</label>
+                  <input
+                    type="date"
+                    min={formatDateToYYYYMMDD(new Date(new Date(extendingBooking.checkOut).getTime() + 24 * 60 * 60 * 1000))}
+                    value={newCheckOutDate}
+                    onChange={(e) => setNewCheckOutDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy text-navy font-semibold h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Additional Nights</label>
+                  <p className="font-bold text-navy bg-muted/20 border border-muted/50 p-2.5 rounded-lg text-xs">
+                    {getAdditionalNights(extendingBooking.checkOut, newCheckOutDate)} Nights
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Daily Charge (Excl. GST)</label>
+                  <input
+                    type="number"
+                    value={dailyRate}
+                    onChange={(e) => setDailyRate(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy text-navy font-bold h-9"
+                  />
+                </div>
+              </div>
+
+              {/* Price Breakdown Ledger */}
+              <div className="border-t border-muted pt-4 space-y-2 select-none">
+                <div className="flex justify-between font-semibold text-muted-foreground">
+                  <span>Room Charges (Excl. GST):</span>
+                  <span>₹{(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate)).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-muted-foreground">
+                  <span>GST (18%):</span>
+                  <span>₹{Math.round(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) * 0.18).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-black text-navy text-sm pt-2 border-t border-muted/50">
+                  <span>Total Additional Amount:</span>
+                  <span className="text-brand">
+                    ₹{(
+                      dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) +
+                      Math.round(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) * 0.18)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 flex justify-end gap-2 border-t border-muted/30">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setExtendingBooking(null)}
+                  className="h-9 px-4 text-xs font-bold rounded-md"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmExtend}
+                  disabled={extendingSubmit || getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) <= 0}
+                  className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-5 rounded-md cursor-pointer"
+                >
+                  {extendingSubmit ? "Processing..." : "Confirm Extension"}
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

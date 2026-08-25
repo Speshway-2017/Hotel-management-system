@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
-
 import { toast } from "sonner";
 import {
   Plus,
@@ -20,20 +19,33 @@ import {
   UserCheck,
   ToggleLeft,
   ToggleRight,
-  Eye
+  Eye,
+  X,
+  Clock,
+  AlertOctagon
 } from "lucide-react";
 
 function SuperAdminSubscription() {
+  const [activeTab, setActiveTab] = useState("plans"); // "plans" or "requests"
   const [plans, setPlans] = useState([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter & Search states
+  // Plans Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Pagination states
   const [page, setPage] = useState(1);
   const itemsPerPage = 5;
+
+  // Requests Filter & Search states
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestStatusFilter, setRequestStatusFilter] = useState("all");
+
+  // Decisions states
+  const [decidingId, setDecidingId] = useState(null);
+  const [rejectionModalId, setRejectionModalId] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -43,22 +55,29 @@ function SuperAdminSubscription() {
     action: null
   });
 
-  const loadPlans = async () => {
+  const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await superAdminService.getSubscriptionPlans();
-      if (res.success) {
-        setPlans(res.data);
+      const [plansRes, reqsRes] = await Promise.all([
+        superAdminService.getSubscriptionPlans(),
+        superAdminService.getSubscriptionRequests()
+      ]);
+      if (plansRes.success) {
+        setPlans(plansRes.data);
+      }
+      if (reqsRes.success) {
+        setSubscriptionRequests(reqsRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load subscription plans.");
+      setError(err.message || "Failed to load data.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPlans();
+    loadData();
   }, []);
 
   // Filtered plans
@@ -66,15 +85,20 @@ function SuperAdminSubscription() {
     return p.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  // Filtered requests
+  const filteredRequests = subscriptionRequests.filter(r => {
+    const matchesSearch =
+      r.propertyName.toLowerCase().includes(requestSearch.toLowerCase()) ||
+      r.adminName.toLowerCase().includes(requestSearch.toLowerCase()) ||
+      r.planName.toLowerCase().includes(requestSearch.toLowerCase());
+    
+    const matchesStatus = requestStatusFilter === "all" || r.status === requestStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   // Paginated plans
   const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
   const paginatedPlans = filteredPlans.slice((page - 1) * itemsPerPage, page * itemsPerPage);
-
-  // Statistics calculation
-  const totalPlansCount = plans.length;
-  const activePlansCount = plans.filter(p => p.status === "Active").length;
-  const subscribedPropertiesCount = plans.reduce((sum, p) => sum + (p.activeSubscribers || 0), 0);
-  const monthlyRevenue = plans.reduce((sum, p) => sum + ((p.activeSubscribers || 0) * (p.monthlyPrice || 0)), 0);
 
   const triggerToggleStatus = (plan) => {
     const nextStatus = plan.status === "Active" ? "Inactive" : "Active";
@@ -89,7 +113,7 @@ function SuperAdminSubscription() {
           });
           if (res.success) {
             toast.success(`Plan "${plan.name}" is now ${nextStatus}.`);
-            loadPlans();
+            loadData();
           }
         } catch (err) {
           toast.error(err.message || "Failed to toggle plan status.");
@@ -110,7 +134,7 @@ function SuperAdminSubscription() {
           const res = await superAdminService.deleteSubscriptionPlan(plan._id || plan.id);
           if (res.success) {
             toast.success(`Plan "${plan.name}" deleted.`);
-            loadPlans();
+            loadData();
           }
         } catch (err) {
           toast.error(err.message || "Failed to delete subscription plan.");
@@ -119,6 +143,25 @@ function SuperAdminSubscription() {
         }
       }
     });
+  };
+
+  const handleDecide = async (id, action, reason = "") => {
+    setDecidingId(id);
+    try {
+      const res = await superAdminService.decideSubscriptionRequest(id, action, reason);
+      if (res.success) {
+        toast.success(`Subscription request ${action === 'Approve' ? 'approved' : 'rejected'} successfully.`);
+        setRejectionModalId(null);
+        setRejectionReason("");
+        await loadData();
+      } else {
+        toast.error(res.message || "Failed to process decision.");
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to process decision.");
+    } finally {
+      setDecidingId(null);
+    }
   };
 
   return (
@@ -139,132 +182,256 @@ function SuperAdminSubscription() {
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
+      {/* Tab Switcher */}
+      <div className="flex gap-2 border-b border-muted pb-px select-none mb-6">
+        <button
+          onClick={() => setActiveTab("plans")}
+          className={`px-4 py-2 border-b-2 font-bold text-xs transition-all ${
+            activeTab === "plans"
+              ? "border-navy text-navy"
+              : "border-transparent text-muted-foreground hover:text-navy"
+          }`}
+        >
+          Subscription Plans
+        </button>
+        <button
+          onClick={() => setActiveTab("requests")}
+          className={`px-4 py-2 border-b-2 font-bold text-xs transition-all ${
+            activeTab === "requests"
+              ? "border-navy text-navy"
+              : "border-transparent text-muted-foreground hover:text-navy"
+          }`}
+        >
+          Subscription Requests
+        </button>
+      </div>
 
-      <Panel title="Platform Plans Catalog" description="Manage access packages and pricing limits across properties.">
-        <div className="p-4 bg-white rounded-b-xl space-y-4">
-          {/* Controls */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-            <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search plan by name..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
-              />
+      {loading ? (
+        <LoadingRows rows={4} />
+      ) : activeTab === "plans" ? (
+        <Panel title="Platform Plans Catalog" description="Manage access packages and pricing limits across properties.">
+          <div className="p-4 bg-white rounded-b-xl space-y-4">
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+              <div className="relative w-full max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search plan by name..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                  className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
+                />
+              </div>
+              
+              <div></div>
             </div>
-            
-            <div></div>
-          </div>
 
-          {/* Table */}
-          {loading ? (
-            <LoadingRows rows={4} />
-          ) : paginatedPlans.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-xs font-medium">No subscription packages found.</div>
-          ) : (
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse min-w-[900px]">
-                  <thead>
-                    <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4">Plan Name</th>
-                      <th className="p-4">Monthly Rate</th>
-                      <th className="p-4">Yearly Rate</th>
-                      <th className="p-4">Property / Room Limits</th>
-                      <th className="p-4">Active Subscribers</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y font-sans">
-                    {paginatedPlans.map((p) => (
-                      <tr key={p._id || p.id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4">
-                          <div className="font-bold text-navy">{p.name}</div>
-                          {p.description && <div className="text-[10px] text-muted-foreground mt-0.5">{p.description}</div>}
-                        </td>
-                        <td className="p-4 font-bold text-navy">₹{p.monthlyPrice.toLocaleString("en-IN")}</td>
-                        <td className="p-4 font-bold text-purple">₹{p.yearlyPrice.toLocaleString("en-IN")}</td>
-                        <td className="p-4 font-semibold text-muted-foreground">
-                          {p.propertyLimit} {p.propertyLimit === 1 ? "Property" : "Properties"} / {p.roomLimit} Rooms
-                        </td>
-                        <td className="p-4 font-bold text-navy flex items-center gap-1.5 mt-2">
-                          <UserCheck className="size-4 text-purple" />
-                          {p.activeSubscribers || 0}
-                        </td>
-                        <td className="p-4">
-                          <Tag tone={p.status === "Active" ? "success" : "neutral"}>{p.status}</Tag>
-                        </td>
-                        <td className="p-4 text-right space-x-1 whitespace-nowrap">
-
-                          <Link
-                            to={`/super-admin/subscription/view/${p._id || p.id}`}
-                            className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
-                            title="View Plan Details"
-                          >
-                            <Eye className="size-4" />
-                          </Link>
-                          <Link
-                            to={`/super-admin/subscription/edit/${p._id || p.id}`}
-                            className="size-8 p-0 rounded-full text-purple hover:bg-purple/10 cursor-pointer inline-flex items-center justify-center"
-                            title="Edit Plan"
-                          >
-                            <Edit2 className="size-4" />
-                          </Link>
-                          <Button
-                            onClick={() => triggerToggleStatus(p)}
-                            variant="ghost"
-                            className={`size-8 p-0 rounded-full hover:bg-muted cursor-pointer ${p.status === "Active" ? "text-warning" : "text-success"}`}
-                            title={p.status === "Active" ? "Deactivate Plan" : "Activate Plan"}
-                          >
-                            {p.status === "Active" ? <ToggleLeft className="size-5" /> : <ToggleRight className="size-5" />}
-                          </Button>
-                          <Button
-                            onClick={() => triggerDelete(p)}
-                            variant="ghost"
-                            className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
-                            title="Delete Plan"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </td>
+            {/* Table */}
+            {paginatedPlans.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-xs font-medium">No subscription packages found.</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
+                        <th className="p-4">Plan Name</th>
+                        <th className="p-4">Monthly Rate</th>
+                        <th className="p-4">Yearly Rate</th>
+                        <th className="p-4">Property / Room Limits</th>
+                        <th className="p-4">Active Subscribers</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4 text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y font-sans">
+                      {paginatedPlans.map((p) => (
+                        <tr key={p._id || p.id} className="hover:bg-muted/15 transition-colors">
+                          <td className="p-4">
+                            <div className="font-bold text-navy">{p.name}</div>
+                            {p.description && <div className="text-[10px] text-muted-foreground mt-0.5">{p.description}</div>}
+                          </td>
+                          <td className="p-4 font-bold text-navy">₹{p.monthlyPrice.toLocaleString("en-IN")}</td>
+                          <td className="p-4 font-bold text-purple">₹{p.yearlyPrice.toLocaleString("en-IN")}</td>
+                          <td className="p-4 font-semibold text-muted-foreground">
+                            {p.propertyLimit} {p.propertyLimit === 1 ? "Property" : "Properties"} / {p.roomLimit} Rooms
+                          </td>
+                          <td className="p-4 font-bold text-navy flex items-center gap-1.5 mt-2">
+                            <UserCheck className="size-4 text-purple" />
+                            {p.activeSubscribers || 0}
+                          </td>
+                          <td className="p-4">
+                            <Tag tone={p.status === "Active" ? "success" : "neutral"}>{p.status}</Tag>
+                          </td>
+                          <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                            <Link
+                              to={`/super-admin/subscription/view/${p._id || p.id}`}
+                              className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
+                              title="View Plan Details"
+                            >
+                              <Eye className="size-4" />
+                            </Link>
+                            <Link
+                              to={`/super-admin/subscription/edit/${p._id || p.id}`}
+                              className="size-8 p-0 rounded-full text-purple hover:bg-purple/10 cursor-pointer inline-flex items-center justify-center"
+                              title="Edit Plan"
+                            >
+                              <Edit2 className="size-4" />
+                            </Link>
+                            <Button
+                              onClick={() => triggerToggleStatus(p)}
+                              variant="ghost"
+                              className={`size-8 p-0 rounded-full hover:bg-muted cursor-pointer ${p.status === "Active" ? "text-warning" : "text-success"}`}
+                              title={p.status === "Active" ? "Deactivate Plan" : "Activate Plan"}
+                            >
+                              {p.status === "Active" ? <ToggleLeft className="size-5" /> : <ToggleRight className="size-5" />}
+                            </Button>
+                            <Button
+                              onClick={() => triggerDelete(p)}
+                              variant="ghost"
+                              className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
+                              title="Delete Plan"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between border-t pt-4 text-xs">
+                    <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                        disabled={page === 1}
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full border-muted hover:bg-muted font-semibold"
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={page === totalPages}
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full border-muted hover:bg-muted font-semibold"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Panel>
+      ) : (
+        <div className="space-y-6">
+          <Panel title="Subscription Requests Directory" description="Review property-level plan activation requests, approve upgrades, or reject with feedback.">
+            <div className="p-4 bg-white rounded-b-xl space-y-4">
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+                <div className="relative w-full max-w-xs">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search requests by branch or admin..."
+                    value={requestSearch}
+                    onChange={(e) => setRequestSearch(e.target.value)}
+                    className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
+                  />
+                </div>
+
+                <Select
+                  value={requestStatusFilter}
+                  onChange={(e) => setRequestStatusFilter(e.target.value)}
+                  className="h-9 rounded-full border border-navy/45 text-xs bg-white text-navy font-bold focus:border-navy focus:ring-1"
+                >
+                  <option value="all">All Request Statuses</option>
+                  <option value="Pending">Pending Review</option>
+                  <option value="Approved">Approved Tiers</option>
+                  <option value="Rejected">Rejected Tiers</option>
+                </Select>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t pt-4 text-xs">
-                  <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                      disabled={page === 1}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-muted hover:bg-muted font-semibold"
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={page === totalPages}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-muted hover:bg-muted font-semibold"
-                    >
-                      Next
-                    </Button>
-                  </div>
+              {/* Requests Table */}
+              {filteredRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-xs font-medium">No subscription requests matched your criteria.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+                    <thead>
+                      <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-bold select-none">
+                        <th className="p-4">Property Branch</th>
+                        <th className="p-4">Requested Plan</th>
+                        <th className="p-4">Admin</th>
+                        <th className="p-4 text-right">Price</th>
+                        <th className="p-4 text-center">Status</th>
+                        <th className="p-4">Request Date</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y font-sans">
+                      {filteredRequests.map((req) => (
+                        <tr key={req._id || req.id} className="hover:bg-muted/15 transition-colors">
+                          <td className="p-4 font-bold text-navy">{req.propertyName}</td>
+                          <td className="p-4 font-semibold text-navy-deep">{req.planName}</td>
+                          <td className="p-4 text-muted-foreground font-medium">{req.adminName}</td>
+                          <td className="p-4 text-right font-bold text-navy">₹{req.price.toLocaleString("en-IN")}</td>
+                          <td className="p-4 text-center">
+                            <Tag tone={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'}>
+                              {req.status}
+                            </Tag>
+                          </td>
+                          <td className="p-4 text-muted-foreground font-semibold">
+                            {new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                            <Button
+                              onClick={() => setSelectedRequest(req)}
+                              variant="ghost"
+                              className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
+                              title="View Request Details"
+                            >
+                              <Eye className="size-4" />
+                            </Button>
+                            {req.status === 'Pending' && (
+                              <>
+                                <Button
+                                  disabled={decidingId !== null}
+                                  onClick={() => handleDecide(req._id || req.id, 'Approve')}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer inline-flex items-center justify-center gap-1"
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  disabled={decidingId !== null}
+                                  onClick={() => {
+                                    setRejectionModalId(req._id || req.id);
+                                    setRejectionReason("");
+                                  }}
+                                  className="bg-red-600 hover:bg-red-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer inline-flex items-center justify-center gap-1"
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
-          )}
+          </Panel>
         </div>
-      </Panel>
+      )}
 
       {/* Confirmation Dialog Modal */}
       {confirmModal.open && (
@@ -290,6 +457,133 @@ function SuperAdminSubscription() {
           </div>
         </div>
       )}
+
+      {/* Rejection Feedback Modal */}
+      {rejectionModalId && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
+          <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
+            <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
+              <h3 className="font-bold text-navy text-sm">Provide Rejection Reason</h3>
+              <button
+                className="text-muted-foreground hover:text-navy cursor-pointer"
+                onClick={() => setRejectionModalId(null)}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Feedback / Reason for rejection</label>
+                <textarea
+                  className="w-full border border-muted rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-navy resize-none min-h-[80px]"
+                  placeholder="E.g., Requested tier does not match target property rooms count limit."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-muted bg-[#fcfcfc] flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setRejectionModalId(null)}
+                className="h-8 px-4 text-xs rounded-full cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!rejectionReason.trim()}
+                onClick={() => handleDecide(rejectionModalId, 'Reject', rejectionReason)}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 px-4 text-xs rounded-full cursor-pointer"
+              >
+                Submit Rejection
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Request Details Modal */}
+      {selectedRequest && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
+          <div className="bg-white rounded-xl border border-muted max-w-md w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
+            <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
+              <h3 className="font-bold text-navy text-sm">Subscription Request Details</h3>
+              <button
+                className="text-muted-foreground hover:text-navy cursor-pointer"
+                onClick={() => setSelectedRequest(null)}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted/20 border border-muted rounded-lg">
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Property Branch</span>
+                  <span className="font-bold text-navy text-sm">{selectedRequest.propertyName}</span>
+                </div>
+                <div className="p-3 bg-muted/20 border border-muted rounded-lg">
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Requested Plan</span>
+                  <span className="font-bold text-navy text-sm">{selectedRequest.planName}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted/20 border border-muted rounded-lg">
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Administrator</span>
+                  <span className="font-bold text-navy text-sm">{selectedRequest.adminName}</span>
+                </div>
+                <div className="p-3 bg-muted/20 border border-muted rounded-lg">
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Rate / Month</span>
+                  <span className="font-bold text-navy text-sm">₹{selectedRequest.price.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-lg space-y-1.5">
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Status & Log Details</p>
+                <div className="flex justify-between items-center text-xs">
+                  <span>Current Status:</span>
+                  <Tag tone={selectedRequest.status === 'Approved' ? 'success' : selectedRequest.status === 'Rejected' ? 'error' : 'warning'}>
+                    {selectedRequest.status}
+                  </Tag>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span>Submitted On:</span>
+                  <span className="font-semibold">{new Date(selectedRequest.createdAt).toLocaleString("en-IN")}</span>
+                </div>
+                {selectedRequest.status !== 'Pending' && (
+                  <>
+                    <div className="flex justify-between items-center text-xs">
+                      <span>Decided By:</span>
+                      <span className="font-semibold">{selectedRequest.decidedBy}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span>Decided On:</span>
+                      <span className="font-semibold">{new Date(selectedRequest.decidedAt).toLocaleString("en-IN")}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {selectedRequest.status === 'Rejected' && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-lg space-y-1">
+                  <p className="text-[9px] font-bold text-red-700 uppercase tracking-wider">Rejection Reason</p>
+                  <p className="font-bold text-red-800 leading-relaxed">{selectedRequest.rejectionReason || "No details specified"}</p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-muted bg-[#fcfcfc] flex justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedRequest(null)}
+                className="h-8 px-4 text-xs rounded-full cursor-pointer"
+              >
+                Close details
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

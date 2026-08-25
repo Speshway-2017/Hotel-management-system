@@ -92,6 +92,7 @@ const managerNotificationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 export const ManagerNotification = mongoose.models.ManagerNotification || mongoose.model('ManagerNotification', managerNotificationSchema);
+export const ReceptionistNotification = mongoose.models.ReceptionistNotification || mongoose.model('ReceptionistNotification', managerNotificationSchema);
 
 // ==========================================
 // PAYMENTS MODEL

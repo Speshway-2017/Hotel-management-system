@@ -11,6 +11,8 @@ import Announcement from '../models/announcement.model.js';
 import { upload, uploadImageToCloudinary, deleteImageFromCloudinary } from '../utils/uploader.js';
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import PromoCoupon from '../models/promoCoupon.model.js';
+import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
+import { triggerNotification } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -268,6 +270,14 @@ router.post('/properties', authorize('super-admin'), async (req, res) => {
 
     console.log(`[API] POST /properties created. ID=${propertyId}, DB readyState=${mongoose.connection.readyState}`);
     await logAction(req.user, 'Created Property', `${name} (${city})`, req);
+    // Trigger notification
+    await triggerNotification({
+      role: 'super-admin',
+      title: 'New Property Onboarded',
+      message: `Onboarded '${name}' in ${city}. Default inventory mapping initialized.`,
+      category: 'Property Audit'
+    });
+
     return sendSuccess(res, 201, property, 'Property created successfully');
   } catch (error) {
     console.error('[API] POST /properties error:', error);
@@ -770,7 +780,7 @@ router.post('/notifications', authorize('super-admin'), async (req, res) => {
 // ==========================================
 // 8. SUBSCRIPTION PLANS
 // ==========================================
-router.get('/plans', authorize('super-admin'), async (req, res) => {
+router.get('/plans', authorize('super-admin', 'admin'), async (req, res) => {
   try {
     const list = await SubscriptionPlan.find({});
     // If empty, let's seed a few standard plans so the database is populated by default!
@@ -817,6 +827,75 @@ router.delete('/plans/:id', authorize('super-admin'), async (req, res) => {
     return sendSuccess(res, 200, deleted, 'Plan deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete plan');
+  }
+});
+
+// ==========================================
+// 8.5 SUBSCRIPTION REQUESTS & APPROVALS
+// ==========================================
+router.get('/subscription/requests', authorize('super-admin'), async (req, res) => {
+  try {
+    const list = await SubscriptionRequest.find({}).sort({ createdAt: -1 });
+    return sendSuccess(res, 200, list, 'Subscription requests list retrieved.');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.post('/subscription/requests/:id/decide', authorize('super-admin'), async (req, res) => {
+  try {
+    const { action, rejectionReason } = req.body;
+    if (!action || !['Approve', 'Reject'].includes(action)) {
+      return sendError(res, 400, 'Action must be either Approve or Reject.');
+    }
+
+    const requestObj = await SubscriptionRequest.findById(req.params.id);
+    if (!requestObj) {
+      return sendError(res, 404, 'Subscription request not found.');
+    }
+    if (requestObj.status !== 'Pending') {
+      return sendError(res, 400, 'This request has already been decided.');
+    }
+
+    if (action === 'Approve') {
+      requestObj.status = 'Approved';
+      requestObj.decidedBy = req.user.name;
+      requestObj.decidedAt = new Date();
+      await requestObj.save();
+
+      // Map planName to subscriptionTier
+      let tier = "None";
+      if (requestObj.planName === "Starter Tier") tier = "Basic";
+      else if (requestObj.planName === "Professional Suite") tier = "Premium";
+      else if (requestObj.planName === "Enterprise Pro") tier = "Enterprise";
+
+      await Property.findByIdAndUpdate(requestObj.propertyId, {
+        subscriptionTier: tier,
+        subscriptionStatus: 'Active',
+        subscriptionExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      });
+
+      await logAction(req.user, 'Approved Subscription Request', `${requestObj.planName} for ${requestObj.propertyName}`, req);
+      return sendSuccess(res, 200, requestObj, 'Subscription request approved successfully.');
+    } else {
+      if (!rejectionReason) {
+        return sendError(res, 400, 'Rejection reason is required for rejection.');
+      }
+      requestObj.status = 'Rejected';
+      requestObj.rejectionReason = rejectionReason;
+      requestObj.decidedBy = req.user.name;
+      requestObj.decidedAt = new Date();
+      await requestObj.save();
+
+      await Property.findByIdAndUpdate(requestObj.propertyId, {
+        subscriptionStatus: 'Rejected'
+      });
+
+      await logAction(req.user, 'Rejected Subscription Request', `${requestObj.planName} for ${requestObj.propertyName}`, req);
+      return sendSuccess(res, 200, requestObj, 'Subscription request rejected.');
+    }
+  } catch (error) {
+    return sendError(res, 500, error.message);
   }
 });
 

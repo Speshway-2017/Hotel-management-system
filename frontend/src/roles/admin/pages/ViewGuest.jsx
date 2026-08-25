@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { 
   User, Mail, Phone, MapPin, Sparkles, Heart, Lock, Eye, EyeOff, 
-  History, CreditCard, Award, FileText, ChevronRight, XCircle, Sliders
+  History, CreditCard, Award, FileText, ChevronRight, XCircle, Sliders, Calendar
 } from "lucide-react";
+import { managerService } from "@/services/manager";
 
 export const Route = createFileRoute("/admin/guests/view/$id")({
   head: () => ({
@@ -20,6 +21,33 @@ export const Route = createFileRoute("/admin/guests/view/$id")({
 
 import { superAdminService } from "@/services/superAdmin";
 
+// Utility helpers for date handling
+const formatDateToYYYYMMDD = (dateStr) => {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatDateToString = (date) => {
+  const day = date.getDate();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+};
+
+const getAdditionalNights = (currentOutStr, newOutStr) => {
+  const currentOut = new Date(currentOutStr);
+  const newOut = new Date(newOutStr);
+  if (isNaN(currentOut.getTime()) || isNaN(newOut.getTime())) return 0;
+  const diffTime = newOut - currentOut;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 0;
+};
+
 function ViewGuestPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -28,43 +56,113 @@ function ViewGuestPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Secure ID passcode check
-  const [isPasscodeOpen, setIsPasscodeOpen] = useState(false);
-  const [passcode, setPasscode] = useState("");
-  const [passcodeError, setPasscodeError] = useState(false);
-  const [isDocRevealed, setIsDocRevealed] = useState(false);
+  // Extend Stay modal state
+  const [extendingBooking, setExtendingBooking] = useState(null);
+  const [newCheckOutDate, setNewCheckOutDate] = useState("");
+  const [dailyRate, setDailyRate] = useState(0);
+  const [extendingSubmit, setExtendingSubmit] = useState(false);
+
+  const handleOpenExtendModal = (b) => {
+    setExtendingBooking(b);
+    const currentOut = new Date(b.checkOut);
+    const nextDay = new Date(currentOut.getTime() + 24 * 60 * 60 * 1000);
+    setNewCheckOutDate(formatDateToYYYYMMDD(nextDay));
+    const avgNightWithTax = b.amount / (b.nights || 1);
+    setDailyRate(Math.round(avgNightWithTax / 1.18));
+  };
+
+  const handleConfirmExtend = async () => {
+    if (!extendingBooking || !newCheckOutDate) return;
+    const additionalNights = getAdditionalNights(extendingBooking.checkOut, newCheckOutDate);
+    if (additionalNights <= 0) {
+      toast.error("New check-out date must be after current check-out date.");
+      return;
+    }
+    
+    setExtendingSubmit(true);
+    try {
+      const roomCharges = dailyRate * additionalNights;
+      const gst = Math.round(roomCharges * 0.18);
+      const totalAdditionalAmount = roomCharges + gst;
+      
+      const payload = {
+        newCheckOut: formatDateToString(new Date(newCheckOutDate)),
+        additionalNights,
+        additionalAmount: totalAdditionalAmount
+      };
+      
+      const res = await managerService.extendReservation(extendingBooking._id || extendingBooking.id, payload);
+      if (res.success) {
+        toast.success(`Stay extended successfully until ${payload.newCheckOut}!`);
+        setExtendingBooking(null);
+        loadGuestDetail();
+      } else {
+        toast.error(res.message || "Failed to extend stay.");
+      }
+    } catch (err) {
+      toast.error(err.message || "An error occurred while extending stay.");
+    } finally {
+      setExtendingSubmit(false);
+    }
+  };
+
+  const loadGuestDetail = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [usersRes, resRes] = await Promise.all([
+        superAdminService.getUsers(),
+        superAdminService.getReservations()
+      ]);
+      if (usersRes.success && usersRes.data) {
+        const matched = usersRes.data.find(g => g._id === id || g.id === id);
+        if (matched) {
+          const bookings = resRes.success && resRes.data ? resRes.data : [];
+          const guestBookings = bookings.filter(b => b.guest === matched.name || b.phone === matched.mobile || b.phone === matched.phone);
+          const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
+          const latest = sorted[0];
+          
+          setGuest({
+            ...matched,
+            id: matched.id || matched._id,
+            phone: matched.phone || matched.mobile || '—',
+            stays: guestBookings.length,
+            spend: guestBookings.reduce((sum, b) => sum + (b.amount || 0), 0),
+            balance: guestBookings.reduce((sum, b) => sum + (b.balance || 0), 0),
+            currentStay: latest ? `${latest.room ? latest.room : 'Not Assigned'} (${latest.checkIn} → ${latest.checkOut})` : '—',
+            room: latest && latest.room ? latest.room.split(" ")[0] : '—',
+            status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
+            history: guestBookings.map(b => ({
+              id: b._id || b.id,
+              checkIn: b.checkIn,
+              checkOut: b.checkOut,
+              room: b.room ? b.room.split(" ")[0] : '—',
+              amount: b.amount || 0,
+              status: b.status || 'Pending',
+              balance: b.balance || 0
+            })),
+            billing: guestBookings.map(b => ({
+              invoiceId: `INV-${b._id || b.id}`,
+              amount: b.amount || 0,
+              date: b.checkOut,
+              status: b.balance === 0 ? 'Paid' : 'Unpaid'
+            })),
+            latestStay: latest
+          });
+        } else {
+          setError("Guest record not found.");
+        }
+      } else {
+        setError("Failed to retrieve guests.");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to load guest data.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadGuestDetail = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await superAdminService.getUsers();
-        if (res.success && res.data) {
-          const matched = res.data.find(g => g._id === id || g.id === id);
-          if (matched) {
-            // Map MERN keys to component expectations
-            setGuest({
-              ...matched,
-              id: matched.id || matched._id,
-              phone: matched.phone || matched.mobile || '—',
-              stays: matched.stays || 0,
-              spend: matched.spend || 0,
-              currentStay: matched.currentStay || '—',
-              status: matched.status || 'Active'
-            });
-          } else {
-            setError("Guest record not found.");
-          }
-        } else {
-          setError("Failed to retrieve guests.");
-        }
-      } catch (err) {
-        setError(err.message || "Failed to load guest data.");
-      } finally {
-        setLoading(false);
-      }
-    };
     if (id) loadGuestDetail();
   }, [id]);
 
@@ -234,10 +332,18 @@ function ViewGuestPage() {
           
           {/* Current Stay & Outstanding Folio */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left space-y-2">
+            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left space-y-2 animate-fade-in">
               <span className="text-[10px] text-muted-foreground uppercase font-bold">Current Allocation</span>
               <p className="font-black text-navy text-base">{guest.room !== "—" ? `Room #${guest.room}` : "No Active Room"}</p>
               <p className="text-[10.5px] text-muted-foreground">{guest.currentStay || "No active check-in staying"}</p>
+              {guest.latestStay && guest.latestStay.status === "Checked-in" && (
+                <button
+                  onClick={() => handleOpenExtendModal(guest.latestStay)}
+                  className="text-[10px] text-brand hover:underline font-bold block mt-2 cursor-pointer"
+                >
+                  Extend Stay
+                </button>
+              )}
             </div>
             <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left space-y-2">
               <span className="text-[10px] text-muted-foreground uppercase font-bold">Lifetime Visits</span>
@@ -350,6 +456,107 @@ function ViewGuestPage() {
         </div>
 
       </div>
+
+      {/* Extend Stay Modal */}
+      {extendingBooking && (
+        <div className="fixed inset-0 bg-[#071420]/75 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-muted shadow-lift w-full max-w-md overflow-hidden animate-scale-up text-left font-sans">
+            
+            {/* Modal Header */}
+            <div className="bg-navy p-5 text-white flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-bold">Extend Stay Duration</h3>
+                <p className="text-[10px] text-[#A5F3FC] font-semibold mt-1">Guest: {extendingBooking.guest} · Room: {extendingBooking.room}</p>
+              </div>
+              <button
+                onClick={() => setExtendingBooking(null)}
+                className="text-white/60 hover:text-white cursor-pointer text-xs"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4 text-xs text-navy">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Current Checkout</label>
+                  <p className="font-semibold text-navy-deep bg-muted/20 border border-muted/50 p-2.5 rounded-lg text-[11px]">{extendingBooking.checkOut}</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">New Checkout Date</label>
+                  <input
+                    type="date"
+                    min={formatDateToYYYYMMDD(new Date(new Date(extendingBooking.checkOut).getTime() + 24 * 60 * 60 * 1000))}
+                    value={newCheckOutDate}
+                    onChange={(e) => setNewCheckOutDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy text-navy font-semibold h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Additional Nights</label>
+                  <p className="font-bold text-navy bg-muted/20 border border-muted/50 p-2.5 rounded-lg text-xs">
+                    {getAdditionalNights(extendingBooking.checkOut, newCheckOutDate)} Nights
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Daily Charge (Excl. GST)</label>
+                  <input
+                    type="number"
+                    value={dailyRate}
+                    onChange={(e) => setDailyRate(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy text-navy font-bold h-9"
+                  />
+                </div>
+              </div>
+
+              {/* Price Breakdown Ledger */}
+              <div className="border-t border-muted pt-4 space-y-2 select-none">
+                <div className="flex justify-between font-semibold text-muted-foreground">
+                  <span>Room Charges (Excl. GST):</span>
+                  <span>₹{(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate)).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-muted-foreground">
+                  <span>GST (18%):</span>
+                  <span>₹{Math.round(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) * 0.18).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-black text-navy text-sm pt-2 border-t border-muted/50">
+                  <span>Total Additional Amount:</span>
+                  <span className="text-brand">
+                    ₹{(
+                      dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) +
+                      Math.round(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) * 0.18)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 flex justify-end gap-2 border-t border-muted/30">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setExtendingBooking(null)}
+                  className="h-9 px-4 text-xs font-bold rounded-md"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmExtend}
+                  disabled={extendingSubmit || getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) <= 0}
+                  className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-5 rounded-md cursor-pointer"
+                >
+                  {extendingSubmit ? "Processing..." : "Confirm Extension"}
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Passcode Verification Security Modal */}
       {isPasscodeOpen && (

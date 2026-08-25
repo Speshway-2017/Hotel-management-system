@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Panel, Tag, Notice } from "@/components/hs/kit";
+import { Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -10,7 +10,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { authService } from "@/services/auth";
-import { managerService } from "@/services/manager";
+import { notificationsService } from "@/services/notifications";
 
 export const Route = createFileRoute("/manager/notifications/$id")({
   head: () => ({
@@ -51,12 +51,13 @@ function ManagerNotificationDetailsPage() {
 
     const loadNotificationDetail = async () => {
       try {
-        const res = await managerService.getNotifications();
+        const res = await notificationsService.getNotifications();
         if (res.success && res.data) {
           const matched = res.data.find(n => n._id === id || n.id === id);
           if (matched) {
             if (!matched.isRead) {
-              await managerService.markNotificationRead(matched._id || matched.id);
+              await notificationsService.markNotificationRead(matched._id || matched.id);
+              window.dispatchEvent(new Event('refresh-unread-notifications-count'));
             }
             setNtf({
               id: matched._id || matched.id,
@@ -101,6 +102,8 @@ function ManagerNotificationDetailsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
+      <Crumbs items={[{ label: "Alert Center", to: "/manager/notifications" }, { label: "Incident Diagnostic Details" }]} />
+
       <div className="max-w-3xl">
         <Panel title="Diagnostic Report Overview" description={`Incident ID: ${ntf.id}`}>
           <div className="p-6 space-y-6 text-xs text-navy leading-relaxed">

@@ -122,4 +122,83 @@ router.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
+import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
+
+router.get('/property', async (req, res) => {
+  try {
+    const propertyId = req.user.propertyId;
+    if (!propertyId) {
+      return sendError(res, 400, 'User has no assigned property');
+    }
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return sendError(res, 404, 'Property not found');
+    }
+    return sendSuccess(res, 200, property, 'Property details retrieved successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.post('/subscription/request', async (req, res) => {
+  try {
+    const propertyId = req.user.propertyId;
+    if (!propertyId) {
+      return sendError(res, 400, 'User has no assigned property');
+    }
+
+    const { planName, price } = req.body;
+    if (!planName || !price) {
+      return sendError(res, 400, 'Plan name and price are required');
+    }
+
+    // Check for existing pending request
+    const existingPending = await SubscriptionRequest.findOne({
+      propertyId,
+      status: 'Pending'
+    });
+    if (existingPending) {
+      return sendError(res, 400, 'A subscription request is already pending for this property.');
+    }
+
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return sendError(res, 404, 'Property not found');
+    }
+
+    // Create the request
+    const newRequest = await SubscriptionRequest.create({
+      propertyId,
+      propertyName: property.name,
+      adminId: req.user._id,
+      adminName: req.user.name,
+      planName,
+      price: Number(price),
+      status: 'Pending'
+    });
+
+    // Set property status to Pending
+    await Property.findByIdAndUpdate(propertyId, {
+      subscriptionStatus: 'Pending'
+    });
+
+    return sendSuccess(res, 201, newRequest, 'Subscription request submitted successfully.');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.get('/subscription/requests', async (req, res) => {
+  try {
+    const propertyId = req.user.propertyId;
+    if (!propertyId) {
+      return sendError(res, 400, 'User has no assigned property');
+    }
+    const list = await SubscriptionRequest.find({ propertyId }).sort({ createdAt: -1 });
+    return sendSuccess(res, 200, list, 'Subscription requests history retrieved.');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
 export default router;

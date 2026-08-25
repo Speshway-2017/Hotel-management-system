@@ -112,39 +112,23 @@ export const navByRole = {
         { label: "Dashboard", to: "/manager", icon: LayoutDashboard },
         { label: "Operations", to: "/manager/operations", icon: CalendarCheck },
         { label: "Management", to: "/manager/approvals", icon: UserCog },
-        { label: "Guest Experience", to: "/manager/feedback", icon: MessageSquareHeart },
+        { label: "Feedback", to: "/manager/feedback", icon: MessageSquareHeart },
         { label: "Finance", to: "/manager/billing", icon: Receipt }
       ]
     }
   ],
 
   reception: [
-  {
-    group: "Front Desk",
-    items: [
-    { label: "Room Status Grid", to: "/reception", icon: Grid3x3 },
-    { label: "Reservations", to: "/reception/reservations", icon: CalendarCheck },
-    { label: "New / Walk-in", to: "/reception/new-booking", icon: CalendarClock },
-    { label: "Guest Search", to: "/reception/guest-search", icon: Search }]
-
-  },
-  {
-    group: "Stay Flow",
-    items: [
-    { label: "Check-in", to: "/reception/check-in", icon: LogIn },
-    { label: "ID Capture", to: "/reception/id-capture", icon: IdCard },
-    { label: "Room Assignment", to: "/reception/room-assignment", icon: KeyRound },
-    { label: "Check-out", to: "/reception/check-out", icon: LogOut }]
-
-  },
-  {
-    group: "Money & Service",
-    items: [
-    { label: "Folio & Billing", to: "/reception/folio", icon: Receipt },
-    { label: "Payments", to: "/reception/payments", icon: CreditCard },
-    { label: "Maintenance", to: "/reception/maintenance", icon: Wrench }]
-
-  }],
+    {
+      group: "Front Desk Console",
+      items: [
+        { label: "Dashboard", to: "/reception", icon: LayoutDashboard },
+        { label: "Front Desk", to: "/reception/check-in", icon: ConciergeBell },
+        { label: "Reservations", to: "/reception/reservations", icon: CalendarCheck },
+        { label: "Billing", to: "/reception/folio", icon: Receipt }
+      ]
+    }
+  ],
 
   guest: [
   {

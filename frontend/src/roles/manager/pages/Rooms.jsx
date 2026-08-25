@@ -401,10 +401,11 @@ function ManagerRoomsPage() {
                           )}
                           {!active && (
                             <Button
+                              disabled={rm.status === "Occupied"}
                               onClick={() => navigate({ to: `/manager/reservations` })}
                               size="xs"
                               variant="outline"
-                              className="text-brand border-brand/40 hover:bg-brand/5 h-6 text-[10px] font-bold px-2 cursor-pointer"
+                              className="text-brand border-brand/40 hover:bg-brand/5 h-6 text-[10px] font-bold px-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Assign Guest
                             </Button>
@@ -412,12 +413,12 @@ function ManagerRoomsPage() {
                           
                           {/* Operational status override selector */}
                           <Select
-                            value={overrides[rm.room] || "normal"}
+                            value={rm.status}
                             onChange={(e) => handleOverrideStatus(rm.room, e.target.value)}
                             className="w-24 text-[9px] h-6 py-0 font-bold ml-1.5"
                           >
-                            <option value="normal">Normal</option>
                             <option value="Available">Available</option>
+                            <option value="Occupied">Occupied</option>
                             <option value="Dirty">Dirty</option>
                             <option value="Cleaning">Cleaning</option>
                             <option value="Out of Order">Out of Order</option>

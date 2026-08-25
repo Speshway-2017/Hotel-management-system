@@ -124,5 +124,13 @@ export const authService = {
   // Check if authenticated
   isAuthenticated: () => {
     return !!localStorage.getItem('hms_token');
+  },
+
+  // Change password
+  changePassword: async (currentPassword, newPassword) => {
+    return await request('/receptionist/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
   }
 };

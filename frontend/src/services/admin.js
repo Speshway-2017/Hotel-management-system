@@ -77,5 +77,17 @@ export const adminService = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+  getProperty: async () => {
+    return await request('/admin/property');
+  },
+  createSubscriptionRequest: async (planName, price) => {
+    return await request('/admin/subscription/request', {
+      method: 'POST',
+      body: JSON.stringify({ planName, price })
+    });
+  },
+  getSubscriptionRequests: async () => {
+    return await request('/admin/subscription/requests');
   }
 };

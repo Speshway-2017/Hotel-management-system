@@ -168,5 +168,14 @@ export const superAdminService = {
     return await request(`/super-admin/coupons/${id}`, {
       method: 'DELETE'
     });
+  },
+  getSubscriptionRequests: async () => {
+    return await request('/super-admin/subscription/requests');
+  },
+  decideSubscriptionRequest: async (id, action, rejectionReason = '') => {
+    return await request(`/super-admin/subscription/requests/${id}/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ action, rejectionReason })
+    });
   }
 };
