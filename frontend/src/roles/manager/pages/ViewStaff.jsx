@@ -108,10 +108,6 @@ function ManagerViewStaff() {
         { label: "Staff & Shifts", to: "/manager/shifts" },
         { label: "Personnel Profile" }
       ]} />
-      <PageHeader
-        title={staff ? `${staff.name}'s File` : "Staff Profile File"}
-        subtitle="Duty schedules roster metrics, department allocations, and compliance tracking."
-      />
 
       {error && <Notice tone="error" title="Personnel Sync Error">{error}</Notice>}
 

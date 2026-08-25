@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { HorizontalRouteTabs, Panel, Notice, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,41 +17,39 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
+  Eye,
+  EyeOff,
   Camera
 } from "lucide-react";
 import { authService } from "@/services/auth";
-import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
+import { receptionistService } from "@/services/receptionist";
 
-const settingsTabs = [
-  { label: "Settings", to: "/admin/settings", icon: User },
-  { label: "Profile", to: "/admin/profile", icon: User }
-];
-
-export const Route = createFileRoute("/admin/profile")({
+export const Route = createFileRoute("/reception/profile")({
   head: () => ({
     meta: [
-      { title: "Admin Profile — Speshway Luxury Hotel" },
+      { title: "Receptionist Profile — Hour Stay" },
       { name: "description", content: "Manage credentials, password configuration, and session status." }
     ]
   }),
-  component: AdminProfilePage
+  component: ReceptionProfilePage
 });
 
-function AdminProfilePage() {
+function ReceptionProfilePage() {
   const currentUser = authService.getCurrentUser() || {
-    name: "Madhu",
-    email: "madhu@speshway.com",
-    role: "admin"
+    name: "Imran Sheikh",
+    email: "imran@hourstay.com",
+    role: "receptionist"
   };
 
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   
   const [profileData, setProfileData] = useState({
-    name: currentUser.name || "Madhu",
-    email: currentUser.email || "madhu@speshway.com",
-    phone: currentUser.mobile || currentUser.phone || "+91 99112 23344",
-    role: currentUser.role === "admin" ? "Property Admin" : currentUser.role,
+    name: currentUser.name || "Imran Sheikh",
+    email: currentUser.email || "imran@hourstay.com",
+    phone: currentUser.mobile || currentUser.phone || "+91 98765 43210",
+    role: "Front Desk Receptionist",
     status: "Active",
     avatar: currentUser.avatar || null
   });
@@ -62,33 +60,39 @@ function AdminProfilePage() {
     confirmNewPassword: ""
   });
 
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [userProperty, setUserProperty] = useState({
     name: "Speshway Luxury Hotel",
-    city: "Madhapur,Hyderabad"
+    city: "Madhapur, Hyderabad"
   });
 
   const [notification, setNotification] = useState(null);
 
   useEffect(() => {
-    superAdminService.getProperties()
-      .then((res) => {
-        if (res.success && res.data && res.data.length > 0) {
-          setUserProperty(res.data[0]);
-        }
-      })
-      .catch(() => {});
-
+    // Sync fresh user profile
     authService.getProfile()
       .then((res) => {
         if (res.success && res.data) {
+          const fresh = res.data;
           setProfileData({
-            name: res.data.name || "",
-            email: res.data.email || "",
-            phone: res.data.mobile || res.data.phone || "",
-            role: res.data.role === "admin" ? "Property Admin" : res.data.role,
-            status: res.data.status || "Active",
-            avatar: res.data.avatar || null
+            name: fresh.name || "",
+            email: fresh.email || "",
+            phone: fresh.mobile || fresh.phone || "",
+            role: fresh.role === "receptionist" ? "Front Desk Receptionist" : fresh.role,
+            status: fresh.status || "Active",
+            avatar: fresh.avatar || null
           });
+          
+          managerService.getProperty()
+            .then((propRes) => {
+              if (propRes.success && propRes.data) {
+                setUserProperty(propRes.data);
+              }
+            })
+            .catch(() => {});
         }
       })
       .catch(() => {});
@@ -150,7 +154,7 @@ function AdminProfilePage() {
         setNotification({
           tone: "success",
           title: "Profile Saved",
-          body: "Administrator account details have been updated successfully."
+          body: "Receptionist account details have been updated successfully."
         });
       }
     } catch (err) {
@@ -163,7 +167,7 @@ function AdminProfilePage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handlePasswordSubmit = async (e) => {
+  const handlePasswordSubmit = (e) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmNewPassword) {
       setNotification({
@@ -174,9 +178,8 @@ function AdminProfilePage() {
       return;
     }
     
-    try {
-      const res = await authService.changePassword(passwordData.currentPassword, passwordData.newPassword);
-      if (res.success) {
+    receptionistService.changePassword(passwordData.currentPassword, passwordData.newPassword)
+      .then(res => {
         setIsChangingPassword(false);
         setPasswordData({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
         setNotification({
@@ -184,15 +187,17 @@ function AdminProfilePage() {
           title: "Credentials Saved",
           body: "Security password credentials updated successfully."
         });
-      }
-    } catch (err) {
-      setNotification({
-        tone: "error",
-        title: "Change Password Failed",
-        body: err.message || "Failed to update your credentials."
+      })
+      .catch(err => {
+        setNotification({
+          tone: "error",
+          title: "Password Update Failed",
+          body: err.message || "Failed to update password credentials."
+        });
+      })
+      .finally(() => {
+        setTimeout(() => setNotification(null), 4000);
       });
-    }
-    setTimeout(() => setNotification(null), 4000);
   };
 
   const handleLogout = () => {
@@ -208,8 +213,10 @@ function AdminProfilePage() {
     .substring(0, 2);
 
   return (
-    <div className="space-y-6 text-left animate-fade-in">
-      <HorizontalRouteTabs tabs={settingsTabs} />
+    <div className="space-y-6 text-left animate-fade-in font-sans text-navy">
+      
+      {/* Top Navbar Header */}
+      <PageHeader />
 
       {notification && (
         <Notice tone={notification.tone} title={notification.title}>
@@ -225,7 +232,7 @@ function AdminProfilePage() {
               <Avatar className="size-24 border-[3px] border-navy/10">
                 <AvatarImage src={profileData.avatar || ""} alt={profileData.name} className="object-cover" />
                 <AvatarFallback className="bg-navy text-2xl font-bold text-cream select-none">
-                  {initials || "AD"}
+                  {initials || "IS"}
                 </AvatarFallback>
               </Avatar>
               <label
@@ -266,7 +273,7 @@ function AdminProfilePage() {
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="size-4 text-navy/70" />
-                <span>Last login: Today, 11:32 AM</span>
+                <span>Last login: Today, 3:00 PM</span>
               </div>
             </div>
 
@@ -284,9 +291,9 @@ function AdminProfilePage() {
         {/* Right column details and update actions */}
         <div className="md:col-span-2 space-y-6">
           
-          {/* View Details details */}
+          {/* View Details */}
           {!isEditing && !isChangingPassword && (
-            <Panel title="Personal Administrator Details" description="Your core operational profile details.">
+            <Panel title="Personal Front Desk Details" description="Your core operational profile details.">
               <div className="p-6 bg-white rounded-b-xl space-y-5 text-xs">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -303,7 +310,7 @@ function AdminProfilePage() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-muted-foreground font-bold uppercase tracking-wider text-[9px]">Hotel Property</p>
-                    <p className="font-semibold text-navy text-sm">{userProperty.name} ({userProperty.city})</p>
+                    <p className="font-semibold text-navy text-sm">{userProperty.name} ({userProperty.city || "Jaipur"})</p>
                   </div>
                 </div>
 
@@ -326,7 +333,7 @@ function AdminProfilePage() {
             </Panel>
           )}
 
-          {/* Modify Profile Specifications */}
+          {/* Edit Profile */}
           {isEditing && (
             <Panel title="Modify Profile Specifications" description="Change your general personal identity attributes.">
               <form onSubmit={handleProfileSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
@@ -364,7 +371,7 @@ function AdminProfilePage() {
             </Panel>
           )}
 
-          {/* Change Password Form Panel */}
+          {/* Change Password */}
           {isChangingPassword && (
             <Panel title="Change Account Password" description="Update your security passcode.">
               <form onSubmit={handlePasswordSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
@@ -383,7 +390,7 @@ function AdminProfilePage() {
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center border-none bg-transparent"
                     >
                       {showCurrentPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
@@ -405,7 +412,7 @@ function AdminProfilePage() {
                       <button
                         type="button"
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center border-none bg-transparent"
                       >
                         {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
@@ -426,7 +433,7 @@ function AdminProfilePage() {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-navy cursor-pointer flex items-center justify-center border-none bg-transparent"
                       >
                         {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>

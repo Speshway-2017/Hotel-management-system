@@ -13,6 +13,7 @@ import {
   ManagerNotification,
   Payment
 } from '../models/managerData.model.js';
+import { triggerNotification } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -366,6 +367,61 @@ router.get('/staff', async (req, res) => {
   }
 });
 
+router.post('/staff', async (req, res) => {
+  try {
+    const { name, email, password, mobile, dept, shift } = req.body;
+    if (!name || !email || !password) {
+      return sendError(res, 400, 'Name, email, and password are required.');
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return sendError(res, 400, 'User with this email already exists.');
+    }
+
+    const newUser = await User.create({
+      name,
+      email,
+      password,
+      role: 'receptionist',
+      mobile: mobile || '',
+      propertyId: req.user.propertyId,
+      status: 'Active',
+      dept: dept || 'Front Office',
+      shift: shift || 'Morning Shift'
+    });
+
+    return sendSuccess(res, 201, newUser, 'Receptionist staff personnel created successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.put('/staff/:id', async (req, res) => {
+  try {
+    const { name, mobile, dept, shift } = req.body;
+    const staffMember = await User.findOne({ _id: req.params.id, propertyId: req.user.propertyId, role: 'receptionist' });
+    if (!staffMember) {
+      return sendError(res, 404, 'Staff member not found.');
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        name: name || staffMember.name,
+        mobile: mobile !== undefined ? mobile : staffMember.mobile,
+        dept: dept || staffMember.dept,
+        shift: shift || staffMember.shift
+      },
+      { new: true }
+    );
+
+    return sendSuccess(res, 200, updated, 'Staff profile updated successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 router.get('/shifts', async (req, res) => {
   try {
     const receptionistStaff = await User.find({
@@ -488,12 +544,28 @@ router.post('/billing/:id/payment', async (req, res) => {
     }
     
     await booking.save();
+
+    // Trigger notifications
+    await triggerNotification({
+      role: 'manager',
+      propertyId: req.user.propertyId,
+      title: 'Folio Balance Settled',
+      message: `Invoice folio balance of ₹${amountPaid} settled for guest ${booking.guest}. Remaining: ₹${newBalance}.`,
+      category: 'Payments'
+    });
+    await triggerNotification({
+      role: 'receptionist',
+      propertyId: req.user.propertyId,
+      title: 'Folio Balance Settled',
+      message: `Invoice folio balance of ₹${amountPaid} settled for guest ${booking.guest}. Remaining: ₹${newBalance}.`,
+      category: 'Payments'
+    });
+
     return sendSuccess(res, 200, booking, 'Invoice payment recorded successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
 });
-
 // ==========================================
 // 9.5. PAYMENTS LEDGER
 // ==========================================
@@ -550,6 +622,35 @@ router.post('/notifications/:id/read', async (req, res) => {
       return sendError(res, 404, 'Alert message not found.');
     }
     return sendSuccess(res, 200, updated, 'Notification marked as read.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.put('/reservations/:id/extend', async (req, res) => {
+  try {
+    const { newCheckOut, additionalNights, additionalAmount } = req.body;
+    if (!newCheckOut || additionalNights === undefined || additionalAmount === undefined) {
+      return sendError(res, 400, 'newCheckOut, additionalNights, and additionalAmount are required.');
+    }
+
+    const booking = await Booking.findOne({ _id: req.params.id, propertyId: req.user.propertyId });
+    if (!booking) {
+      return sendError(res, 404, 'Booking reservation record not found.');
+    }
+
+    const updated = await Booking.findByIdAndUpdate(
+      req.params.id,
+      {
+        checkOut: newCheckOut,
+        nights: Number(booking.nights) + Number(additionalNights),
+        amount: Number(booking.amount) + Number(additionalAmount),
+        balance: Number(booking.balance) + Number(additionalAmount)
+      },
+      { new: true }
+    );
+
+    return sendSuccess(res, 200, updated, 'Stay reservation extended successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }

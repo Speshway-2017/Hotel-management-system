@@ -50,6 +50,7 @@ import { Route as AdminEditStaff } from "./roles/admin/pages/EditStaff";
 import { Route as AdminViewStaff } from "./roles/admin/pages/ViewStaff";
 import { Route as AdminTaxes } from "./roles/admin/pages/Taxes";
 import { Route as AdminCrm } from "./roles/admin/pages/Crm";
+import { Route as AdminSubscription } from "./roles/admin/pages/Subscription";
 import { Route as AdminProfile } from "./roles/admin/pages/Profile";
 import { Route as AdminAddReservation } from "./roles/admin/pages/AddReservation";
 import { Route as AdminEditReservation } from "./roles/admin/pages/EditReservation";
@@ -81,6 +82,8 @@ import { Route as ManagerRooms } from "./roles/manager/pages/Rooms";
 import { Route as ManagerViewGuest } from "./roles/manager/pages/ViewGuest";
 import { Route as ManagerViewApproval } from "./roles/manager/pages/ViewApproval";
 import { Route as ManagerViewStaff } from "./roles/manager/pages/ViewStaff";
+import { Route as ManagerAddStaff } from "./roles/manager/pages/AddStaff";
+import { Route as ManagerEditStaff } from "./roles/manager/pages/EditStaff";
 import { Route as ManagerViewShift } from "./roles/manager/pages/ViewShift";
 import { Route as ManagerAttendance } from "./roles/manager/pages/Attendance";
 import { Route as ManagerViewAttendance } from "./roles/manager/pages/ViewAttendance";
@@ -99,6 +102,14 @@ import { Route as ReceptionNotifications } from "./roles/receptionist/pages/Noti
 import { Route as ReceptionPayments } from "./roles/receptionist/pages/Payments";
 import { Route as ReceptionReservations } from "./roles/receptionist/pages/Reservations";
 import { Route as ReceptionRoomAssignment } from "./roles/receptionist/pages/RoomAssignment";
+import { Route as ReceptionProfile } from "./roles/receptionist/pages/Profile";
+import { Route as ReceptionCheckInDetails } from "./roles/receptionist/pages/CheckInDetails";
+import { Route as ReceptionCheckOutDetails } from "./roles/receptionist/pages/CheckOutDetails";
+import { Route as ReceptionFolioDetails } from "./roles/receptionist/pages/FolioDetails";
+import { Route as ReceptionReservationDetails } from "./roles/receptionist/pages/ReservationDetails";
+import { Route as ReceptionRoomDetails } from "./roles/receptionist/pages/RoomDetails";
+import { Route as ReceptionGuestDetails } from "./roles/receptionist/pages/GuestDetails";
+import { Route as ReceptionNotificationDetails } from "./roles/receptionist/pages/NotificationDetails";
 
 // Import Guest Workspace Pages
 import { Route as GuestLayout } from "./roles/guest/pages/GuestLayout";
@@ -297,6 +308,7 @@ export default function App() {
             <Route path="/admin/staff/view/:id" element={<RouteWrapper routeObj={AdminViewStaff} />} />
             <Route path="/admin/taxes" element={<RouteWrapper routeObj={AdminTaxes} />} />
             <Route path="/admin/crm" element={<RouteWrapper routeObj={AdminCrm} />} />
+            <Route path="/admin/subscription" element={<RouteWrapper routeObj={AdminSubscription} />} />
             <Route path="/admin/profile" element={<RouteWrapper routeObj={AdminProfile} />} />
           </Route>
 
@@ -325,6 +337,8 @@ export default function App() {
             <Route path="/manager/attendance" element={<RouteWrapper routeObj={ManagerAttendance} />} />
             <Route path="/manager/attendance/view/:id" element={<RouteWrapper routeObj={ManagerViewAttendance} />} />
             <Route path="/manager/staff/view/:id" element={<RouteWrapper routeObj={ManagerViewStaff} />} />
+            <Route path="/manager/staff/add" element={<RouteWrapper routeObj={ManagerAddStaff} />} />
+            <Route path="/manager/staff/edit/:id" element={<RouteWrapper routeObj={ManagerEditStaff} />} />
             <Route path="/manager/shifts/view/:id" element={<RouteWrapper routeObj={ManagerViewShift} />} />
             <Route path="/manager/profile" element={<RouteWrapper routeObj={ManagerProfile} />} />
           </Route>
@@ -343,6 +357,14 @@ export default function App() {
             <Route path="/reception/payments" element={<RouteWrapper routeObj={ReceptionPayments} />} />
             <Route path="/reception/reservations" element={<RouteWrapper routeObj={ReceptionReservations} />} />
             <Route path="/reception/room-assignment" element={<RouteWrapper routeObj={ReceptionRoomAssignment} />} />
+            <Route path="/reception/profile" element={<RouteWrapper routeObj={ReceptionProfile} />} />
+            <Route path="/reception/check-in/:id" element={<RouteWrapper routeObj={ReceptionCheckInDetails} />} />
+            <Route path="/reception/check-out/:id" element={<RouteWrapper routeObj={ReceptionCheckOutDetails} />} />
+            <Route path="/reception/folio/:id" element={<RouteWrapper routeObj={ReceptionFolioDetails} />} />
+            <Route path="/reception/reservations/:id" element={<RouteWrapper routeObj={ReceptionReservationDetails} />} />
+            <Route path="/reception/room-assignment/:id" element={<RouteWrapper routeObj={ReceptionRoomDetails} />} />
+            <Route path="/reception/guest-search/:id" element={<RouteWrapper routeObj={ReceptionGuestDetails} />} />
+            <Route path="/reception/notifications/:id" element={<RouteWrapper routeObj={ReceptionNotificationDetails} />} />
           </Route>
 
           {/* Guest Workspace */}

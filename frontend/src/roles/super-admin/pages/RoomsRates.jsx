@@ -198,6 +198,18 @@ function SuperAdminRoomsRates() {
     loadProperties();
   }, []);
 
+  useEffect(() => {
+    if (properties.length > 0) {
+      setRoomsData(prev => prev.map(r => {
+        const prop = properties.find(p => p._id === r.propertyId || p.id === r.propertyId);
+        return {
+          ...r,
+          propertyName: prop ? prop.name : r.propertyName
+        };
+      }));
+    }
+  }, [properties]);
+
   const handleOpenModal = (type, room) => {
     setSelectedRoom(room);
     setModalType(type);

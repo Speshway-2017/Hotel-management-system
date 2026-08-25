@@ -7,6 +7,9 @@ import { cn } from "@/utils/utils";
 import { Button } from "@/components/ui/button";
 import { authService } from "../services/auth";
 import { superAdminService } from "@/services/superAdmin";
+import { adminService } from "@/services/admin";
+import { managerService } from "@/services/manager";
+import { receptionistService } from "@/services/receptionist";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -60,7 +63,8 @@ const subModules = {
     "Finance": [
       { label: "Billing", to: "/admin/billing" },
       { label: "Payments", to: "/admin/payments" },
-      { label: "Reports", to: "/admin/reports" }
+      { label: "Reports", to: "/admin/reports" },
+      { label: "Subscription", to: "/admin/subscription" }
     ],
     "Management": [
       { label: "Staff", to: "/admin/staff" },
@@ -86,12 +90,21 @@ const subModules = {
       { label: "Staff & Shifts", to: "/manager/shifts" },
       { label: "Attendance", to: "/manager/attendance" }
     ],
-    "Guest Experience": [
-      { label: "Feedback", to: "/manager/feedback" }
-    ],
     "Finance": [
       { label: "Billing Overview", to: "/manager/billing" },
       { label: "Reports", to: "/manager/reports" }
+    ]
+  },
+  "reception": {
+    "Front Desk": [
+      { label: "Arrivals", to: "/reception/check-in" },
+      { label: "Departures", to: "/reception/check-out" },
+      { label: "In-House Guests", to: "/reception/guest-search" },
+      { label: "Room Status", to: "/reception/room-assignment" }
+    ],
+    "Billing": [
+      { label: "Invoices & Folios", to: "/reception/folio" },
+      { label: "Payments", to: "/reception/payments" }
     ]
   }
 };
@@ -110,6 +123,39 @@ export function DashShell({ role, children }) {
     : meta.initials;
 
   const [userProperty, setUserProperty] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const token = localStorage.getItem('hms_token');
+        if (!token) return;
+        
+        const res = await fetch('http://localhost:5000/api/notifications/unread-count', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+        if (data.success) {
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch (err) {
+        console.error("Failed to load notifications unread count:", err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 15000); // 15 seconds poll
+    
+    const handleForceRefresh = () => fetchUnreadCount();
+    window.addEventListener('refresh-unread-notifications-count', handleForceRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('refresh-unread-notifications-count', handleForceRefresh);
+    };
+  }, []);
 
   useEffect(() => {
     const handleProfileUpdate = () => {
@@ -120,39 +166,28 @@ export function DashShell({ role, children }) {
   }, []);
 
   useEffect(() => {
-    if (role === "admin" || role === "manager") {
-      authService.getProfile()
-        .then(profileRes => {
-          const freshUser = profileRes.data;
-          return superAdminService.getProperties()
-            .then(res => {
-              if (res.success && res.data) {
-                if (role === "manager") {
-                  const found = res.data.find(p => p._id === freshUser.propertyId || p.id === freshUser.propertyId);
-                  setUserProperty(found || null);
-                } else if (res.data.length > 0) {
-                  setUserProperty(res.data[0]);
-                }
-              }
-            });
-        })
-        .catch(() => {
-          // Fallback if profile API fails
-          superAdminService.getProperties()
-            .then(res => {
-              if (res.success && res.data) {
-                if (role === "manager") {
-                  const found = res.data.find(p => p._id === user?.propertyId || p.id === user?.propertyId);
-                  setUserProperty(found || null);
-                } else if (res.data.length > 0) {
-                  setUserProperty(res.data[0]);
-                }
-              }
-            })
-            .catch(() => {});
-        });
+    const fetchPropertyDetails = async () => {
+      try {
+        let res;
+        if (role === "admin") {
+          res = await adminService.getProperty();
+        } else if (role === "manager") {
+          res = await managerService.getProperty();
+        } else if (role === "reception") {
+          res = await receptionistService.getProperty();
+        }
+        if (res && res.success && res.data) {
+          setUserProperty(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to load userProperty details:", err);
+      }
+    };
+    
+    if (role === "admin" || role === "manager" || role === "reception") {
+      fetchPropertyDetails();
     }
-  }, [role, user?.propertyId]);
+  }, [role, currentUser?.propertyId]);
 
   const [tooltip, setTooltip] = useState({
     show: false,
@@ -243,7 +278,7 @@ export function DashShell({ role, children }) {
               )}
               <ul className="space-y-1">
                 {g.items.map((item) => {
-                  const hasChildren = (role === "super-admin" || role === "admin" || role === "manager") && subModules[role]?.[item.label];
+                  const hasChildren = (role === "super-admin" || role === "admin" || role === "manager" || role === "reception") && subModules[role]?.[item.label];
                   const isExpanded = expandedGroups[item.label];
                   const childActive = hasChildren && subModules[role][item.label].some(sub => pathname === sub.to || pathname.startsWith(sub.to + "/"));
                   const active = isActive(item.to) || childActive;
@@ -381,7 +416,7 @@ export function DashShell({ role, children }) {
             <Menu className="size-5" />
           </button>
 
-          {(role === "super-admin" || role === "admin" || role === "manager") && (() => {
+          {(role === "super-admin" || role === "admin" || role === "manager" || role === "reception") && (() => {
             const getHeaderContent = (path) => {
               if (role === "super-admin") {
                 if (path === "/super-admin" || path === "/super-admin/") {
@@ -480,7 +515,8 @@ export function DashShell({ role, children }) {
                   path.startsWith("/admin/billing") ||
                   path.startsWith("/admin/payments") ||
                   path.startsWith("/admin/approvals") ||
-                  path.startsWith("/admin/taxes")
+                  path.startsWith("/admin/taxes") ||
+                  path.startsWith("/admin/subscription")
                 ) {
                   return {
                     title: "Finance Center",
@@ -538,7 +574,7 @@ export function DashShell({ role, children }) {
               } else if (role === "manager") {
                 if (path === "/manager" || path === "/manager/") {
                   return {
-                    title: `${userProperty?.name || "Rambagh Residency"} Operations`,
+                    title: `${userProperty?.name || "Assigned Hotel"} Operations`,
                     subtitle: `Live console for GM ${user?.name || "Rajesh Sharma"} · ${userProperty?.city || "Hyderabad"}`
                   };
                 }
@@ -615,6 +651,73 @@ export function DashShell({ role, children }) {
                   };
                 }
               }
+               if (role === "reception") {
+                if (path === "/reception" || path === "/reception/") {
+                  const displayName = user?.name || "Poojitha";
+                  let displayProperty = userProperty?.name || "Assigned Hotel";
+                  if (displayProperty.startsWith("Hour Stay ")) {
+                    displayProperty = displayProperty.replace("Hour Stay ", "");
+                  }
+                  return {
+                    title: `Good Morning, ${displayName}`,
+                    subtitle: `Here's your front-desk overview for today • ${displayProperty}`
+                  };
+                }
+                if (path.startsWith("/reception/check-in")) {
+                  return {
+                    title: "Check-in Desk",
+                    subtitle: "Process arriving guests check-ins, room mapping key assignments."
+                  };
+                }
+                if (path.startsWith("/reception/check-out")) {
+                  return {
+                    title: "Check-out Desk",
+                    subtitle: "Process check-outs, balance settlements, and folio check-offs."
+                  };
+                }
+                if (path.startsWith("/reception/new-booking")) {
+                  return {
+                    title: "Walk-in & Reservations Booking",
+                    subtitle: "Create new instant bookings, guest allocations, and billing forms."
+                  };
+                }
+                if (path.startsWith("/reception/reservations")) {
+                  return {
+                    title: "Reservations Ledger",
+                    subtitle: "Browse, filter, and audit scheduled booking details."
+                  };
+                }
+                if (path.startsWith("/reception/guest-search")) {
+                  return {
+                    title: "Guests Profiles Directory",
+                    subtitle: "Look up guest logs, contact info, previous visits, and flags."
+                  };
+                }
+                if (path.startsWith("/reception/folio")) {
+                  return {
+                    title: "Invoices & Folios Overview",
+                    subtitle: "Audit split bills, GST calculations, guest folios, and receipts."
+                  };
+                }
+                if (path.startsWith("/reception/payments")) {
+                  return {
+                    title: "Folio Payments Ledger",
+                    subtitle: "Capture, verify, and refund reservation deposits and incidentals."
+                  };
+                }
+                if (path.startsWith("/reception/notifications")) {
+                  return {
+                    title: "Desk Notifications",
+                    subtitle: "Track live property-level alarms, housekeeping alerts, and booking updates."
+                  };
+                }
+                if (path.startsWith("/reception/profile")) {
+                  return {
+                    title: "Desk Agent Profile",
+                    subtitle: "Manage your shift credentials, passcode configurations, and property info."
+                  };
+                }
+              }
               return {
                 title: "Hour Stay Console",
                 subtitle: "Hotel Property Management System."
@@ -635,7 +738,7 @@ export function DashShell({ role, children }) {
           })()}
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {role !== "super-admin" && role !== "admin" && role !== "manager" && (
+            {role !== "super-admin" && role !== "admin" && role !== "manager" && role !== "reception" && (
               <span className="mr-1 hidden rounded-full border border-accent/50 bg-accent/15 px-3 py-1 text-[11px] font-medium text-navy sm:inline dark:text-accent">
                 {meta.name}
               </span>
@@ -646,10 +749,14 @@ export function DashShell({ role, children }) {
               aria-label="Notifications"
             >
               <Bell className="size-5" />
-              <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-blush" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-blush px-0.5 text-[8px] font-black text-white leading-none">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
             <Link
-              to={role === "super-admin" ? "/super-admin/profile" : (role === "admin" ? "/admin/profile" : (role === "manager" ? "/manager/profile" : "/guest/profile"))}
+              to={role === "super-admin" ? "/super-admin/profile" : (role === "admin" ? "/admin/profile" : (role === "manager" ? "/manager/profile" : (role === "reception" ? "/reception/profile" : "/guest/profile")))}
               className="grid size-11 place-items-center rounded-md hover:bg-muted"
               aria-label="Account menu"
             >
@@ -811,15 +918,37 @@ export function DashShell({ role, children }) {
                 "/manager/attendance": [{ label: "Management" }, { label: "Attendance" }],
                 "/manager/feedback": [{ label: "Guest Experience" }, { label: "Feedback" }],
                 "/manager/billing": [{ label: "Finance" }, { label: "Billing Overview" }],
-                "/manager/reports": [{ label: "Reports" }]
+                "/manager/reports": [{ label: "Reports" }],
+                "/reception/check-in": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals" }],
+                "/reception/check-out": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures" }],
+                "/reception/guest-search": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests" }],
+                "/reception/room-assignment": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status" }],
+                "/reception/reservations": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger" }],
+                "/reception/new-booking": [{ label: "Reservations", to: "/reception/reservations" }, { label: "New Reservation" }],
+                "/reception/folio": [{ label: "Billing", to: "/reception/folio" }, { label: "Invoices & Folios" }],
+                "/reception/payments": [{ label: "Billing", to: "/reception/folio" }, { label: "Payments" }],
+                "/reception/notifications": [{ label: "Notifications" }],
+                "/reception/profile": [{ label: "Profile" }],
+                "/reception/check-in/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals", to: "/reception/check-in" }, { label: "Check-in Details" }],
+                "/reception/check-out/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures", to: "/reception/check-out" }, { label: "Checkout Details" }],
+                "/reception/folio/:id": [{ label: "Billing", to: "/reception/folio" }, { label: "Invoices & Folios", to: "/reception/folio" }, { label: "Folio Details" }],
+                "/reception/reservations/:id": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger", to: "/reception/reservations" }, { label: "Booking Details" }],
+                "/reception/room-assignment/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status", to: "/reception/room-assignment" }, { label: "Room Details" }],
+                "/reception/guest-search/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests", to: "/reception/guest-search" }, { label: "Guest Details" }]
               };
               const cleanPathname = pathname.replace(/\/view\/[^\/]+$/, "/view")
-                                            .replace(/\/edit\/[^\/]+$/, "/edit");
+                                            .replace(/\/edit\/[^\/]+$/, "/edit")
+                                            .replace(/\/reception\/check-in\/[^\/]+$/, "/reception/check-in/:id")
+                                            .replace(/\/reception\/check-out\/[^\/]+$/, "/reception/check-out/:id")
+                                            .replace(/\/reception\/folio\/[^\/]+$/, "/reception/folio/:id")
+                                            .replace(/\/reception\/reservations\/[^\/]+$/, "/reception/reservations/:id")
+                                            .replace(/\/reception\/room-assignment\/[^\/]+$/, "/reception/room-assignment/:id")
+                                            .replace(/\/reception\/guest-search\/[^\/]+$/, "/reception/guest-search/:id");
               const segments = mappings[cleanPathname];
               if (segments) {
                 return (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
-                    <Link to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : "/admin")} className="hover:text-navy transition-colors">
+                    <Link to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : (role === "reception" ? "/reception" : "/admin"))} className="hover:text-navy transition-colors">
                       Dashboard
                     </Link>
                     {segments.map((seg, idx) => {

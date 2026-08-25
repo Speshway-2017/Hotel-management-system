@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -26,6 +26,8 @@ function getToneForType(type) {
   }
 }
 
+import { notificationsService } from "@/services/notifications";
+
 function SuperAdminNotificationDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -33,27 +35,38 @@ function SuperAdminNotificationDetails() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("hms_super_admin_notifications");
-    if (saved) {
-      try {
-        const list = JSON.parse(saved);
-        const item = list.find((n) => n.id === id);
-        if (item) {
-          // Mark as read if not already read
-          if (!item.read) {
-            item.read = true;
-            localStorage.setItem("hms_super_admin_notifications", JSON.stringify(list));
+    notificationsService.getNotifications()
+      .then(res => {
+        if (res.success && res.data) {
+          const item = res.data.find(n => (n._id || n.id) === id);
+          if (item) {
+            const mapped = {
+              id: item._id || item.id,
+              title: item.title,
+              message: item.message,
+              type: item.category || 'General',
+              propertyName: item.propertyId === 'All' || !item.propertyId ? 'Global System' : 'Assigned Hotel',
+              timestamp: new Date(item.createdAt).toLocaleDateString(),
+              read: item.isRead,
+              body: item.message
+            };
+            setNtf(mapped);
+            if (!item.isRead) {
+              notificationsService.markNotificationRead(item._id || item.id)
+                .then(() => {
+                  window.dispatchEvent(new Event('refresh-unread-notifications-count'));
+                })
+                .catch(err => console.error(err));
+            }
+          } else {
+            setError(`Notification record not found.`);
           }
-          setNtf(item);
-        } else {
-          setError(`Notification with ID ${id} not found.`);
         }
-      } catch (e) {
-        setError("Failed to parse notifications database.");
-      }
-    } else {
-      setError("Notifications database is empty.");
-    }
+      })
+      .catch(err => {
+        console.error(err);
+        setError("Failed to fetch notification incident record details.");
+      });
   }, [id]);
 
   if (error) {
@@ -80,10 +93,7 @@ function SuperAdminNotificationDetails() {
 
   return (
     <div className="space-y-6 text-left">
-      <PageHeader
-        title="Alert Diagnostic Details"
-        subtitle={`System event logs and diagnostic details for incident ${ntf.id}`}
-      />
+      <Crumbs items={[{ label: "Alert Center", to: "/super-admin/notifications" }, { label: "Incident Diagnostic Details" }]} />
 
       <div className="max-w-3xl">
         <Panel title="Diagnostic Report Overview" description={`Incident ID: ${ntf.id}`}>

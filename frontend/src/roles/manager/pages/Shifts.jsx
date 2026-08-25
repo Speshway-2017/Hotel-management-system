@@ -16,7 +16,9 @@ import {
   Briefcase,
   ShieldAlert,
   CalendarDays,
-  UserCheck
+  UserCheck,
+  Plus,
+  Edit
 } from "lucide-react";
 
 // Premium stat card component
@@ -188,7 +190,16 @@ function ManagerShiftsPage() {
   }
 
   return (
-    <div className="space-y-6 text-left animate-fade-in">
+    <div className="space-y-6 text-left animate-fade-in font-sans">
+      <div className="flex justify-end">
+        <Button
+          onClick={() => navigate({ to: "/manager/staff/add" })}
+          className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-4 rounded-md cursor-pointer flex items-center gap-1.5"
+        >
+          <Plus className="size-4" /> Add Staff Member
+        </Button>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard label="Total Staff" value={totalCount.toString()} hint="Property headcount log" accentColor="#0d1b2a" />
@@ -310,6 +321,16 @@ function ManagerShiftsPage() {
                             title="View Staff Profile"
                           >
                             <Eye className="size-3.5" />
+                          </Button>
+
+                          <Button
+                            onClick={() => navigate({ to: `/manager/staff/edit/${btoa(targetId)}` })}
+                            size="icon"
+                            variant="ghost"
+                            className="size-7 hover:text-brand cursor-pointer"
+                            title="Edit Staff Profile"
+                          >
+                            <Edit className="size-3.5" />
                           </Button>
                           
                           {/* Reassign Shift dropdown */}

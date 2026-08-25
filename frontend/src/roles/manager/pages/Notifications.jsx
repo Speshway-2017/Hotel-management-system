@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/auth";
 import { managerService } from "@/services/manager";
+import { notificationsService } from "@/services/notifications";
 
 const managementTabs = [
   { label: "Approvals", to: "/manager/approvals", icon: UserCog },
@@ -66,10 +67,10 @@ function ManagerNotificationsPage() {
 
         const [propRes, notificationsRes] = await Promise.all([
           managerService.getProperty(),
-          managerService.getNotifications()
+          notificationsService.getNotifications()
         ]);
 
-        let propertyName = "Rambagh Residency";
+        let propertyName = "Assigned Hotel";
         if (propRes.success && propRes.data) {
           setUserProperty(propRes.data);
           propertyName = propRes.data.name;
@@ -102,10 +103,13 @@ function ManagerNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await Promise.all(notifications.filter(n => !n.read).map(n => managerService.markNotificationRead(n.id)));
+      await notificationsService.markAllNotificationsRead();
       
+      // Force refresh bell unread count immediately!
+      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
+
       // Reload alerts
-      const notificationsRes = await managerService.getNotifications();
+      const notificationsRes = await notificationsService.getNotifications();
       if (notificationsRes.success && notificationsRes.data) {
         const propertyName = userProperty?.name || "assigned hotel";
         const compiled = notificationsRes.data.map((n, idx) => ({

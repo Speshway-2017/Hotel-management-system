@@ -93,33 +93,75 @@ function getToneForType(type) {
   }
 }
 
-// Load notifications from localStorage or use defaults
-const getSavedNotifications = () => {
-  const saved = localStorage.getItem("hms_super_admin_notifications");
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return initialNotifications;
-    }
-  }
-  localStorage.setItem("hms_super_admin_notifications", JSON.stringify(initialNotifications));
-  return initialNotifications;
-};
+import { notificationsService } from "@/services/notifications";
+import { superAdminService } from "@/services/superAdmin";
 
 function SuperAdminNotifications() {
-  const [notifications, setNotifications] = useState(() => getSavedNotifications());
-  const [loading] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [filterType, setFilterType] = useState("All"); // 'All' | 'Unread' | 'System' | 'Property'
+  const fetchAlerts = () => {
+    setLoading(true);
+    superAdminService.getProperties()
+      .then(propRes => {
+        const propertiesList = propRes.success && propRes.data ? propRes.data : [];
+        notificationsService.getNotifications()
+          .then(res => {
+            if (res.success && res.data) {
+              const compiled = res.data.map(n => {
+                const matched = propertiesList.find(p => p._id === n.propertyId || p.id === n.propertyId);
+                return {
+                  id: n._id || n.id,
+                  title: n.title,
+                  message: n.message,
+                  type: n.category || 'General',
+                  propertyName: matched ? matched.name : (n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel'),
+                  timestamp: new Date(n.createdAt).toLocaleDateString(),
+                  read: n.isRead,
+                  body: n.message
+                };
+              });
+              setNotifications(compiled);
+            }
+          })
+          .catch(err => console.error("Failed to load super admin alerts:", err))
+          .finally(() => setLoading(false));
+      })
+      .catch(() => {
+        notificationsService.getNotifications()
+          .then(res => {
+            if (res.success && res.data) {
+              const compiled = res.data.map(n => ({
+                id: n._id || n.id,
+                title: n.title,
+                message: n.message,
+                type: n.category || 'General',
+                propertyName: n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel',
+                timestamp: new Date(n.createdAt).toLocaleDateString(),
+                read: n.isRead,
+                body: n.message
+              }));
+              setNotifications(compiled);
+            }
+          })
+          .catch(err => console.error(err))
+          .finally(() => setLoading(false));
+      });
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  const [filterType, setFilterType] = useState("All");
 
   const handleMarkAllAsRead = () => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true }));
-      localStorage.setItem("hms_super_admin_notifications", JSON.stringify(updated));
-      return updated;
-    });
+    notificationsService.markAllNotificationsRead()
+      .then(() => {
+        fetchAlerts();
+        window.dispatchEvent(new Event('refresh-unread-notifications-count'));
+      })
+      .catch(err => console.error(err));
   };
 
   // Filtered dataset

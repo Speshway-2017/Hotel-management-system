@@ -51,6 +51,18 @@ export const managerService = {
   getStaff: async () => {
     return await request(`/manager/staff?t=${Date.now()}`);
   },
+  addStaff: async (data) => {
+    return await request('/manager/staff', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updateStaff: async (id, data) => {
+    return await request(`/manager/staff/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
   getShifts: async () => {
     return await request(`/manager/shifts?t=${Date.now()}`);
   },
@@ -87,6 +99,12 @@ export const managerService = {
   markNotificationRead: async (id) => {
     return await request(`/manager/notifications/${id}/read`, {
       method: 'POST'
+    });
+  },
+  extendReservation: async (id, data) => {
+    return await request(`/manager/reservations/${id}/extend`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
     });
   }
 };

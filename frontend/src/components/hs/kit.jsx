@@ -20,10 +20,11 @@ export function PageHeader({
   actions
 }) {
   const isSuperAdmin = window.location.pathname.startsWith("/super-admin");
+  const isReception = window.location.pathname.startsWith("/reception");
 
   return (
     <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
-      {!isSuperAdmin && (
+      {!isSuperAdmin && !isReception && (
         <div className="min-w-0">
           <h1 className="truncate font-sans text-xl font-semibold tracking-tight sm:text-2xl">
             {title}
@@ -33,7 +34,7 @@ export function PageHeader({
           )}
         </div>
       )}
-      {isSuperAdmin && <div className="min-w-0 flex-1" />}
+      {(isSuperAdmin || isReception) && <div className="min-w-0 flex-1" />}
       {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
     </header>
   );

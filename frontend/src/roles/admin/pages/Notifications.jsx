@@ -91,7 +91,7 @@ function getToneForType(type) {
   }
 }
 
-import { managerService } from "@/services/manager";
+import { notificationsService } from "@/services/notifications";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
@@ -103,7 +103,7 @@ function AdminNotificationsPage() {
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      const res = await managerService.getNotifications();
+      const res = await notificationsService.getNotifications();
       if (res.success && res.data) {
         const mapped = res.data.map(n => ({
           id: n._id || n.id,
@@ -116,7 +116,7 @@ function AdminNotificationsPage() {
           read: n.isRead || false,
           propertyName: "Speshway Luxury Hotel"
         }));
-        setNotifications(mapped.length > 0 ? mapped : initialNotifications);
+        setNotifications(mapped);
       }
     } catch (err) {
       toast.error("Failed to load alerts feed.");
@@ -131,10 +131,10 @@ function AdminNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const unreads = notifications.filter(n => !n.read);
-      await Promise.all(unreads.map(n => managerService.markNotificationRead(n._id || n.id)));
+      await notificationsService.markAllNotificationsRead();
       toast.success("All announcements marked as read.");
       loadNotifications();
+      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
     } catch (err) {
       toast.error("Failed to mark all as read.");
     }

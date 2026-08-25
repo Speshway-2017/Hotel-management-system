@@ -383,7 +383,7 @@ function ManagerDashboard() {
         {/* Right Side: Operations stack */}
         <div className="lg:col-span-1">
           <Panel title="Today's Operations" description="Check-in flows and expected stays">
-            <div className="space-y-3.5 text-xs font-semibold text-navy">
+            <div className="p-5 bg-white rounded-b-xl space-y-3.5 text-xs font-semibold text-navy">
               <div className="flex items-center justify-between py-1.5 border-b border-muted">
                 <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-indigo shrink-0" /> Total Arrivals</span>
                 <span className="font-bold text-navy">{arrivalsToday.length} booking(s)</span>
@@ -450,8 +450,7 @@ function ManagerDashboard() {
               { id: "departures", label: "Departures" },
               { id: "stays", label: "Current Stays" },
               { id: "approvals", label: "Pending Approvals" },
-              { id: "feedback", label: "Recent Feedback" },
-              { id: "maintenance", label: "Maintenance Issues" }
+              { id: "feedback", label: "Recent Feedback" }
             ].map((tab) => (
               <Button
                 key={tab.id}
@@ -599,24 +598,6 @@ function ManagerDashboard() {
                     <span className="flex items-center gap-1 text-[11px] font-bold text-brand"><Star className="size-3.5 fill-brand text-brand" /> {item.score} / 5</span>
                   </div>
                   <p className="text-xs italic text-muted-foreground">"{item.comment}"</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {opTab === "maintenance" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeMaintenance.map((item) => (
-                <div key={item.id} className="p-4 rounded-xl border border-muted hover:bg-muted/15 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-navy text-xs">Room {item.room}</span>
-                      <span className="rounded bg-warning/15 px-2 py-0.5 text-[9px] font-bold text-warning">{item.priority} Priority</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{item.issue}</p>
-                    <p className="text-[9px] font-mono text-muted-foreground mt-1">ID: {item.id} · Status: {item.status}</p>
-                  </div>
-                  <Button size="xs" variant="outline" className="text-indigo border-indigo/40 hover:bg-indigo/5 text-[10px] h-7 px-2.5 font-semibold">Mark Resolved</Button>
                 </div>
               ))}
             </div>

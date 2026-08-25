@@ -4,10 +4,12 @@ import { Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 import { toast } from "sonner";
 import {
   Award, Search, Eye, Sparkles, DollarSign, TrendingUp, XCircle, Heart,
-  Users, CheckCircle2, MessageSquareText, ShieldAlert, Award as AwardIcon, Gift
+  Users, CheckCircle2, MessageSquareText, ShieldAlert, Award as AwardIcon, Gift,
+  Star
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/crm")({
@@ -51,14 +53,21 @@ const mockEngagementLogs = [
 ];
 
 function AdminCrmPage() {
+  const [activeTab, setActiveTab] = useState("directory"); // "directory" or "feedback"
   const [reservations, setReservations] = useState([]);
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filters
+  // Directory Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
   const [segmentFilter, setSegmentFilter] = useState("all");
+
+  // Feedback Filters
+  const [feedbackSearch, setFeedbackSearch] = useState("");
+  const [feedbackRatingFilter, setFeedbackRatingFilter] = useState("all");
 
   // Selected Guest detail modal
   const [selectedGuest, setSelectedGuest] = useState(null);
@@ -67,8 +76,18 @@ function AdminCrmPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await superAdminService.getReservations();
+      const [res, feedbackRes, propertiesRes] = await Promise.all([
+        superAdminService.getReservations(),
+        managerService.getFeedback(),
+        superAdminService.getProperties()
+      ]);
       setReservations(res.data || []);
+      if (feedbackRes.success) {
+        setFeedbackList(feedbackRes.data || []);
+      }
+      if (propertiesRes.success) {
+        setProperties(propertiesRes.data || []);
+      }
     } catch (err) {
       setError(err.message || "Failed to load CRM stay logs");
     } finally {
@@ -79,6 +98,11 @@ function AdminCrmPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const getPropertyName = (pId) => {
+    const found = properties.find(p => p._id === pId || p.id === pId);
+    return found ? found.name : pId;
+  };
 
   // Aggregation of guest loyalty stats from reservations
   const guestGroup = {};
@@ -152,7 +176,7 @@ function AdminCrmPage() {
     };
   });
 
-  // Filter application
+  // Filter application for loyalty
   const filteredProfiles = guestProfiles.filter(p => {
     const s = searchQuery.toLowerCase();
     const matchesSearch =
@@ -165,6 +189,23 @@ function AdminCrmPage() {
     return matchesSearch && matchesTier && matchesSegment;
   });
 
+  // Filter application for feedbacks
+  const filteredFeedbacks = feedbackList.filter(f => {
+    const s = feedbackSearch.toLowerCase();
+    const matchesSearch =
+      f.guestName.toLowerCase().includes(s) ||
+      (f.comment || "").toLowerCase().includes(s);
+
+    const overall = Math.round((f.ratings.cleanliness + f.ratings.service + f.ratings.room) / 3);
+    let matchesRating = true;
+    if (feedbackRatingFilter === "5") matchesRating = overall === 5;
+    else if (feedbackRatingFilter === "4") matchesRating = overall >= 4;
+    else if (feedbackRatingFilter === "3") matchesRating = overall >= 3;
+    else if (feedbackRatingFilter === "less3") matchesRating = overall < 3;
+
+    return matchesSearch && matchesRating;
+  });
+
   // KPIs
   const totalMembers = guestProfiles.length;
   const platinumCount = guestProfiles.filter(p => p.tier === "Platinum").length;
@@ -175,165 +216,287 @@ function AdminCrmPage() {
       
       {error && <Notice tone="error" title="CRM Sync Fail">{error}</Notice>}
 
-      {/* KPI Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <PremiumStatCard
-          label="Total Loyalty Members"
-          value={totalMembers.toString()}
-          hint="Registered loyalty database"
-          icon={Users}
-          accentColor="#6366f1"
-        />
-        <PremiumStatCard
-          label="Platinum Tier Members"
-          value={platinumCount.toString()}
-          hint="Top-tier VIP guest segment"
-          icon={Award}
-          accentColor="#10b981"
-        />
-        <PremiumStatCard
-          label="Total Reward Points Issued"
-          value={totalLoyaltyPoints.toLocaleString()}
-          hint="Total accrued member points"
-          icon={Sparkles}
-          accentColor="#a855f7"
-        />
-        <PremiumStatCard
-          label="Avg Rating Index"
-          value="4.8 / 5.0"
-          hint="Member guest feedback index"
-          icon={Heart}
-          accentColor="#ec4899"
-        />
+      {/* Tabs Switcher */}
+      <div className="flex gap-2 border-b border-muted pb-px select-none">
+        <button
+          onClick={() => setActiveTab("directory")}
+          className={`px-4 py-2 border-b-2 font-bold text-xs transition-all ${
+            activeTab === "directory"
+              ? "border-navy text-navy"
+              : "border-transparent text-muted-foreground hover:text-navy"
+          }`}
+        >
+          Loyalty Directory
+        </button>
+        <button
+          onClick={() => setActiveTab("feedback")}
+          className={`px-4 py-2 border-b-2 font-bold text-xs transition-all ${
+            activeTab === "feedback"
+              ? "border-navy text-navy"
+              : "border-transparent text-muted-foreground hover:text-navy"
+          }`}
+        >
+          Guest Feedback
+        </button>
       </div>
 
-      {/* Search & Filters */}
-      <Panel title="CRM Directory Search Filters">
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-          <FormField label="Search Guest Profile" id="search">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input
-                id="search"
-                type="text"
-                className="pl-9 h-10 text-xs font-bold"
-                placeholder="Name, email address..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+      {loading ? (
+        <LoadingRows rows={5} />
+      ) : activeTab === "directory" ? (
+        <>
+          {/* KPI Stats cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <PremiumStatCard
+              label="Total Loyalty Members"
+              value={totalMembers.toString()}
+              hint="Registered loyalty database"
+              icon={Users}
+              accentColor="#6366f1"
+            />
+            <PremiumStatCard
+              label="Platinum Tier Members"
+              value={platinumCount.toString()}
+              hint="Top-tier VIP guest segment"
+              icon={Award}
+              accentColor="#10b981"
+            />
+            <PremiumStatCard
+              label="Total Reward Points Issued"
+              value={totalLoyaltyPoints.toLocaleString()}
+              hint="Total accrued member points"
+              icon={Sparkles}
+              accentColor="#a855f7"
+            />
+            <PremiumStatCard
+              label="Avg Rating Index"
+              value="4.8 / 5.0"
+              hint="Member guest feedback index"
+              icon={Heart}
+              accentColor="#ec4899"
+            />
+          </div>
+
+          {/* Search & Filters */}
+          <Panel title="CRM Directory Search Filters">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+              <FormField label="Search Guest Profile" id="search">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    id="search"
+                    type="text"
+                    className="pl-9 h-10 text-xs font-bold"
+                    placeholder="Name, email address..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </FormField>
+
+              <FormField label="Loyalty Tier Status" id="tier">
+                <Select
+                  id="tier"
+                  value={tierFilter}
+                  onChange={(e) => setTierFilter(e.target.value)}
+                  className="h-10 text-xs font-bold"
+                >
+                  <option value="all">All Loyalty Tiers</option>
+                  <option value="Platinum">Platinum Elite</option>
+                  <option value="Gold">Gold Star</option>
+                  <option value="Silver">Silver Member</option>
+                  <option value="Bronze">Bronze Tier</option>
+                </Select>
+              </FormField>
+
+              <FormField label="Guest Segment Class" id="segment">
+                <Select
+                  id="segment"
+                  value={segmentFilter}
+                  onChange={(e) => setSegmentFilter(e.target.value)}
+                  className="h-10 text-xs font-bold"
+                >
+                  <option value="all">All Segments</option>
+                  <option value="VIP">VIP Elite</option>
+                  <option value="Corporate">Corporate Accounts</option>
+                  <option value="Leisure">Leisure / Retail</option>
+                </Select>
+              </FormField>
             </div>
-          </FormField>
+          </Panel>
 
-          <FormField label="Loyalty Tier Status" id="tier">
-            <Select
-              id="tier"
-              value={tierFilter}
-              onChange={(e) => setTierFilter(e.target.value)}
-              className="h-10 text-xs font-bold"
-            >
-              <option value="all">All Loyalty Tiers</option>
-              <option value="Platinum">Platinum Elite</option>
-              <option value="Gold">Gold Star</option>
-              <option value="Silver">Silver Member</option>
-              <option value="Bronze">Bronze Tier</option>
-            </Select>
-          </FormField>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Main loyalty table */}
+            <div className="lg:col-span-2 space-y-4">
+              <Panel title="Loyalty Members Registry">
+                {filteredProfiles.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-muted-foreground select-none">No loyalty profiles matched query filters.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs min-w-[750px]">
+                      <thead>
+                        <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+                          <th className="py-3 px-4 text-left">Loyalty Member</th>
+                          <th className="py-3 px-4 text-left">Tier Level</th>
+                          <th className="py-3 px-4 text-center font-bold">Stays Count</th>
+                          <th className="py-3 px-4 text-right">Points Accrued</th>
+                          <th className="py-3 px-4 text-left">Preferences / Custom Notes</th>
+                          <th className="py-3 px-4 text-left">Segment</th>
+                          <th className="py-3 px-4 text-center font-bold" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-muted/30 whitespace-nowrap">
+                        {filteredProfiles.map((p) => (
+                          <tr key={p.name} className="hover:bg-muted/5">
+                            <td className="py-3.5 px-4">
+                              <div>
+                                <p className="font-bold text-navy">{p.name}</p>
+                                <p className="text-[10px] text-muted-foreground font-semibold">{p.email}</p>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-black">
+                              <span className={`px-2 py-0.5 rounded text-[9.5px] font-black uppercase tracking-wider ${
+                                p.tier === "Platinum" ? "bg-purple-100 text-purple-800" : p.tier === "Gold" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-800"
+                              }`}>{p.tier}</span>
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-mono font-bold text-navy">{p.totalStays} stays</td>
+                            <td className="py-3.5 px-4 text-right font-black text-navy">{p.points.toLocaleString()} pts</td>
+                            <td className="py-3.5 px-4 text-muted-foreground font-medium truncate max-w-[150px]">{p.preferences}</td>
+                            <td className="py-3.5 px-4 font-semibold text-navy">{p.segment}</td>
+                            <td className="py-3 px-4 text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
+                              <Button
+                                onClick={() => setSelectedGuest(p)}
+                                variant="ghost"
+                                className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 mx-auto flex items-center justify-center rounded-full"
+                                title="View stays log"
+                              >
+                                <Eye className="size-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Panel>
+            </div>
 
-          <FormField label="Guest Segment Class" id="segment">
-            <Select
-              id="segment"
-              value={segmentFilter}
-              onChange={(e) => setSegmentFilter(e.target.value)}
-              className="h-10 text-xs font-bold"
-            >
-              <option value="all">All Segments</option>
-              <option value="VIP">VIP Elite</option>
-              <option value="Corporate">Corporate Accounts</option>
-              <option value="Leisure">Leisure / Retail</option>
-            </Select>
-          </FormField>
-        </div>
-      </Panel>
+            {/* Customer Engagement */}
+            <div className="lg:col-span-1">
+              <Panel title="Loyalty Engagement Dispatcher" description="Review recent guest campaigns.">
+                <div className="p-4 space-y-4">
+                  {mockEngagementLogs.map((log, idx) => (
+                    <div key={idx} className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-1.5 text-xs text-left">
+                      <div className="flex justify-between items-center text-[10px] text-muted-foreground font-semibold">
+                        <span>{log.date}</span>
+                        <span className="bg-muted px-1.5 py-0.5 rounded font-bold uppercase tracking-wider text-[8px]">{log.channel}</span>
+                      </div>
+                      <p className="font-bold text-navy mt-1">{log.guest}</p>
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">{log.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Main loyalty table */}
-        <div className="lg:col-span-2 space-y-4">
-          <Panel title="Loyalty Members Registry">
-            {loading ? (
-              <LoadingRows rows={5} />
-            ) : filteredProfiles.length === 0 ? (
-              <div className="p-8 text-center text-xs text-muted-foreground select-none">No loyalty profiles matched query filters.</div>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-6">
+          <Panel title="Guest Feedback Search Filters">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+              <FormField label="Search Guest or Review Comments" id="feedbackSearch">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    id="feedbackSearch"
+                    type="text"
+                    className="pl-9 h-10 text-xs font-bold"
+                    placeholder="Guest name, comment keywords..."
+                    value={feedbackSearch}
+                    onChange={(e) => setFeedbackSearch(e.target.value)}
+                  />
+                </div>
+              </FormField>
+
+              <FormField label="Filter by Rating" id="feedbackRating">
+                <Select
+                  id="feedbackRating"
+                  value={feedbackRatingFilter}
+                  onChange={(e) => setFeedbackRatingFilter(e.target.value)}
+                  className="h-10 text-xs font-bold"
+                >
+                  <option value="all">All Ratings</option>
+                  <option value="5">5 Stars only</option>
+                  <option value="4">4 Stars & above</option>
+                  <option value="3">3 Stars & above</option>
+                  <option value="less3">Under 3 Stars</option>
+                </Select>
+              </FormField>
+            </div>
+          </Panel>
+
+          <Panel title="Guest Reviews & Feedback Registry">
+            {filteredFeedbacks.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground select-none">No guest reviews matched your filters.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs min-w-[750px]">
+                <table className="w-full text-left text-xs min-w-[850px]">
                   <thead>
                     <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                      <th className="py-3 px-4 text-left">Loyalty Member</th>
-                      <th className="py-3 px-4 text-left">Tier Level</th>
-                      <th className="py-3 px-4 text-center font-bold">Stays Count</th>
-                      <th className="py-3 px-4 text-right">Points Accrued</th>
-                      <th className="py-3 px-4 text-left">Preferences / Custom Notes</th>
-                      <th className="py-3 px-4 text-left">Segment</th>
-                      <th className="py-3 px-4 text-center font-bold" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>Action</th>
+                      <th className="py-3 px-4 text-left">Guest Name</th>
+                      <th className="py-3 px-4 text-left">Property Branch</th>
+                      <th className="py-3 px-4 text-left">Cleanliness / Service / Room</th>
+                      <th className="py-3 px-4 text-left">Feedback & Comments</th>
+                      <th className="py-3 px-4 text-left">Submitted Date</th>
+                      <th className="py-3 px-4 text-left">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                    {filteredProfiles.map((p) => (
-                      <tr key={p.name} className="hover:bg-muted/5">
-                        <td className="py-3.5 px-4">
-                          <div>
-                            <p className="font-bold text-navy">{p.name}</p>
-                            <p className="text-[10px] text-muted-foreground font-semibold">{p.email}</p>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-black">
-                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-black uppercase tracking-wider ${
-                            p.tier === "Platinum" ? "bg-purple-100 text-purple-800" : p.tier === "Gold" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-800"
-                          }`}>{p.tier}</span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-mono font-bold text-navy">{p.totalStays} stays</td>
-                        <td className="py-3.5 px-4 text-right font-black text-navy">{p.points.toLocaleString()} pts</td>
-                        <td className="py-3.5 px-4 text-muted-foreground font-medium truncate max-w-[150px]">{p.preferences}</td>
-                        <td className="py-3.5 px-4 font-semibold text-navy">{p.segment}</td>
-                        <td className="py-3 px-4 text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
-                          <Button
-                            onClick={() => setSelectedGuest(p)}
-                            variant="ghost"
-                            className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 mx-auto flex items-center justify-center rounded-full"
-                            title="View stays log"
-                          >
-                            <Eye className="size-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredFeedbacks.map((f) => {
+                      const overall = Math.round((f.ratings.cleanliness + f.ratings.service + f.ratings.room) / 3);
+                      return (
+                        <tr key={f._id || f.id} className="hover:bg-muted/5">
+                          <td className="py-3.5 px-4 font-bold text-navy">{f.guestName}</td>
+                          <td className="py-3.5 px-4 font-semibold text-navy-deep">{getPropertyName(f.propertyId)}</td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1 font-semibold">
+                              <span className="font-bold text-navy flex items-center gap-0.5">
+                                {overall} <Star className="size-3 text-amber-500 fill-amber-500" />
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-semibold">
+                                ({f.ratings.cleanliness}/{f.ratings.service}/{f.ratings.room})
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-navy font-semibold whitespace-normal max-w-[300px]">
+                            <p>{f.comment}</p>
+                            {f.response && (
+                              <div className="mt-1.5 p-2 bg-[#f0f9ff] border border-blue-100 rounded text-[11px] text-blue-800">
+                                <span className="font-bold block">Response:</span>
+                                {f.response}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-muted-foreground font-semibold">
+                            {new Date(f.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <Tag tone={f.response ? "success" : "warning"}>
+                              {f.response ? "Responded" : "Pending Response"}
+                            </Tag>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </Panel>
         </div>
-
-        {/* Customer Engagement */}
-        <div className="lg:col-span-1">
-          <Panel title="Loyalty Engagement Dispatcher" description="Review recent guest campaigns.">
-            <div className="p-4 space-y-4">
-              {mockEngagementLogs.map((log, idx) => (
-                <div key={idx} className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-1.5 text-xs text-left">
-                  <div className="flex justify-between items-center text-[10px] text-muted-foreground font-semibold">
-                    <span>{log.date}</span>
-                    <span className="bg-muted px-1.5 py-0.5 rounded font-bold uppercase tracking-wider text-[8px]">{log.channel}</span>
-                  </div>
-                  <p className="font-bold text-navy mt-1">{log.guest}</p>
-                  <p className="text-muted-foreground text-[11px] leading-relaxed">{log.message}</p>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </div>
-
-      </div>
+      )}
 
       {/* Guest stay log modal */}
       {selectedGuest && (
@@ -374,7 +537,7 @@ function AdminCrmPage() {
               </div>
 
               <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-lg space-y-1">
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Active rewards tier privileges</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Active rewards privileges</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">{selectedGuest.reward}</p>
               </div>
 

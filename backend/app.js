@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import managerRoutes from './routes/manager.routes.js';
 import receptionistRoutes from './routes/receptionist.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 import guestRoutes from './routes/guest.routes.js';
 import superAdminRoutes from './routes/superAdmin.routes.js';
 import publicRoutes from './routes/public.routes.js';
@@ -54,6 +55,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/receptionist', receptionistRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/guest', guestRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 
@@ -62,6 +64,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/manager', managerRoutes);
 app.use('/api/v1/receptionist', receptionistRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/guest', guestRoutes);
 app.use('/api/v1/super-admin', superAdminRoutes);
 
