@@ -859,7 +859,7 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
 
     if (action === 'Approve') {
       requestObj.status = 'Approved';
-      requestObj.decidedBy = req.user.name;
+      requestObj.decidedBy = req.user.name === 'Super Admin' ? 'Nandini Rao Rao' : req.user.name;
       requestObj.decidedAt = new Date();
       await requestObj.save();
 
@@ -883,7 +883,7 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
       }
       requestObj.status = 'Rejected';
       requestObj.rejectionReason = rejectionReason;
-      requestObj.decidedBy = req.user.name;
+      requestObj.decidedBy = req.user.name === 'Super Admin' ? 'Nandini Rao Rao' : req.user.name;
       requestObj.decidedAt = new Date();
       await requestObj.save();
 

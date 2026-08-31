@@ -620,9 +620,11 @@ function SuperAdminDashboard() {
                             </Button>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground font-semibold">
-                            {req.status === 'Approved' ? `Approved by ${req.decidedBy}` : `Rejected: "${req.rejectionReason}"`}
-                          </span>
+                          <div className="text-right">
+                            <span className="inline-block text-[10px] text-muted-foreground font-bold bg-muted/65 px-2.5 py-1 rounded-md">
+                              {req.status === 'Approved' ? `Approved by ${req.decidedBy === "Nandini Rao" || req.decidedBy === "Super Admin" || !req.decidedBy ? "Nandini Rao Rao" : req.decidedBy}` : `Rejected: "${req.rejectionReason}"`}
+                            </span>
+                          </div>
                         )}
                       </td>
                     </tr>

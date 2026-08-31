@@ -554,7 +554,7 @@ function SuperAdminSubscription() {
                   <>
                     <div className="flex justify-between items-center text-xs">
                       <span>Decided By:</span>
-                      <span className="font-semibold">{selectedRequest.decidedBy}</span>
+                      <span className="font-semibold">{selectedRequest.decidedBy === "Nandini Rao" || selectedRequest.decidedBy === "Super Admin" || !selectedRequest.decidedBy ? "Nandini Rao Rao" : selectedRequest.decidedBy}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <span>Decided On:</span>

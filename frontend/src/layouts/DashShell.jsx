@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState, useNavigate, useLocation } from "@tanstack/react-router";
 import { Bell, Menu, Moon, Search, Sun, X, LogOut, ChevronLeft, ChevronRight, ChevronDown, User, ArrowLeft } from "lucide-react";
 import { Logo } from "./Logo";
 import { navByRole, roleMeta } from "./nav";
@@ -73,9 +73,9 @@ const subModules = {
       { label: "CRM & Loyalty", to: "/admin/crm" }
     ],
     "Settings": [
-      { label: "Hotel Profile", to: "/admin/profile" },
-      { label: "Policies & Timings", to: "/admin/settings" },
-      { label: "Payments & Bookings", to: "/admin/settings" }
+      { label: "Hotel Profile", to: "/admin/settings?tab=hotel-info" },
+      { label: "Policies & Timings", to: "/admin/settings?tab=policies" },
+      { label: "Payments & Bookings", to: "/admin/settings?tab=payments" }
     ]
   },
   "manager": {
@@ -217,9 +217,10 @@ export function DashShell({ role, children }) {
     setOpen(false);
     if (role && subModules[role]) {
       const activeGroup = Object.keys(subModules[role]).find(groupLabel => 
-        subModules[role][groupLabel].some(sub => 
-          sub.to === `/${role}` ? pathname === sub.to : pathname.startsWith(sub.to)
-        )
+        subModules[role][groupLabel].some(sub => {
+          const cleanTo = sub.to.split('?')[0];
+          return cleanTo === `/${role}` ? pathname === cleanTo : pathname.startsWith(cleanTo);
+        })
       );
       if (activeGroup) {
         setExpandedGroups(prev => ({ ...prev, [activeGroup]: true }));
@@ -227,8 +228,18 @@ export function DashShell({ role, children }) {
     }
   }, [pathname, role]);
 
-  const isActive = (to) =>
-    to === `/${role}` ? pathname === to : pathname.startsWith(to);
+  const location = useLocation();
+  const searchStr = location.search || "";
+  const isActive = (to) => {
+    const [cleanTo, queryString] = to.split('?');
+    if (queryString) {
+      if (pathname !== cleanTo) return false;
+      const targetTab = new URLSearchParams(queryString).get('tab');
+      const currentTab = new URLSearchParams(searchStr).get('tab') || 'hotel-info';
+      return targetTab === currentTab;
+    }
+    return cleanTo === `/${role}` ? pathname === cleanTo : pathname.startsWith(cleanTo);
+  };
 
   const toggleGroup = (itemLabel) => {
     setExpandedGroups(prev => ({
@@ -271,16 +282,19 @@ export function DashShell({ role, children }) {
         <nav className="flex-1 space-y-4 overflow-y-auto scrollbar-none px-3 py-4">
           {groups.map((g) => (
             <div key={g.group} className="space-y-1">
-              {!collapsed && (
+              {!collapsed && g.group && (
                 <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-sidebar-foreground/40">
                   {g.group}
                 </p>
               )}
               <ul className="space-y-1">
                 {g.items.map((item) => {
-                  const hasChildren = (role === "super-admin" || role === "admin" || role === "manager" || role === "reception") && subModules[role]?.[item.label];
+                  const hasChildren = Boolean(subModules[role]?.[item.label]);
                   const isExpanded = expandedGroups[item.label];
-                  const childActive = hasChildren && subModules[role][item.label].some(sub => pathname === sub.to || pathname.startsWith(sub.to + "/"));
+                  const childActive = hasChildren && subModules[role][item.label].some(sub => {
+                    const cleanTo = sub.to.split('?')[0];
+                    return pathname === cleanTo || pathname.startsWith(cleanTo + "/");
+                  });
                   const active = isActive(item.to) || childActive;
 
                   return (
@@ -416,7 +430,7 @@ export function DashShell({ role, children }) {
             <Menu className="size-5" />
           </button>
 
-          {(role === "super-admin" || role === "admin" || role === "manager" || role === "reception") && (() => {
+          {(role === "super-admin" || role === "admin" || role === "manager" || role === "reception" || role === "guest") && (() => {
             const getHeaderContent = (path) => {
               if (role === "super-admin") {
                 if (path === "/super-admin" || path === "/super-admin/") {
@@ -718,6 +732,51 @@ export function DashShell({ role, children }) {
                   };
                 }
               }
+              if (role === "guest") {
+                const displayName = currentUser?.name ? currentUser.name.split(' ')[0] : "Guest";
+                if (path === "/guest" || path === "/guest/") {
+                  return {
+                    title: `Hii, ${displayName}`,
+                    subtitle: "Your stays, requests and rewards with Hour Stay."
+                  };
+                }
+                if (path.startsWith("/guest/bookings")) {
+                  return {
+                    title: "My Bookings",
+                    subtitle: "Upcoming, completed and cancelled stays."
+                  };
+                }
+                if (path.startsWith("/guest/folio")) {
+                  return {
+                    title: "Digital Folio",
+                    subtitle: "View reservation invoices and receipt ledgers."
+                  };
+                }
+                if (path.startsWith("/guest/reviews")) {
+                  return {
+                    title: "Feedback",
+                    subtitle: "Rate your stay experience and share feedback."
+                  };
+                }
+                if (path.startsWith("/guest/settings")) {
+                  return {
+                    title: "Settings",
+                    subtitle: "Manage your guest account preferences, profile, notifications, and security."
+                  };
+                }
+                if (path.startsWith("/guest/notifications")) {
+                  return {
+                    title: "Notifications",
+                    subtitle: "View stay alerts, booking updates, and payment notifications."
+                  };
+                }
+                if (path.startsWith("/guest/profile")) {
+                  return {
+                    title: "Profile",
+                    subtitle: "Manage your personal details, contact info, and loyalty account."
+                  };
+                }
+              }
               return {
                 title: "Hour Stay Console",
                 subtitle: "Hotel Property Management System."
@@ -738,9 +797,9 @@ export function DashShell({ role, children }) {
           })()}
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {role !== "super-admin" && role !== "admin" && role !== "manager" && role !== "reception" && (
+            {role !== "super-admin" && role !== "admin" && role !== "manager" && role !== "reception" && role !== "guest" && (
               <span className="mr-1 hidden rounded-full border border-accent/50 bg-accent/15 px-3 py-1 text-[11px] font-medium text-navy sm:inline dark:text-accent">
-                {meta.name}
+                {currentUser?.name || meta.name}
               </span>
             )}
             <Link
@@ -773,7 +832,7 @@ export function DashShell({ role, children }) {
         <main className="min-w-0 flex-1 p-4 sm:p-6">
           <div className="mx-auto w-full max-w-[1400px] space-y-6 animate-fade-up">
             {(() => {
-              if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/manager" || pathname === "/admin/" || pathname === "/super-admin/" || pathname === "/manager/") {
+              if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/manager" || pathname === "/guest" || pathname === "/reception" || pathname === "/admin/" || pathname === "/super-admin/" || pathname === "/manager/" || pathname === "/guest/" || pathname === "/reception/") {
                 return (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
                     <span className="text-navy font-bold">Dashboard</span>
@@ -934,7 +993,18 @@ export function DashShell({ role, children }) {
                 "/reception/folio/:id": [{ label: "Billing", to: "/reception/folio" }, { label: "Invoices & Folios", to: "/reception/folio" }, { label: "Folio Details" }],
                 "/reception/reservations/:id": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger", to: "/reception/reservations" }, { label: "Booking Details" }],
                 "/reception/room-assignment/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status", to: "/reception/room-assignment" }, { label: "Room Details" }],
-                "/reception/guest-search/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests", to: "/reception/guest-search" }, { label: "Guest Details" }]
+                "/reception/guest-search/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests", to: "/reception/guest-search" }, { label: "Guest Details" }],
+                "/guest/bookings": [{ label: "My Bookings" }],
+                "/guest/current-stay": [{ label: "Current Stay" }],
+                "/guest/services": [{ label: "Service Requests" }],
+                "/guest/folio": [{ label: "Digital Folio" }],
+                "/guest/folio/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Folio Details" }],
+                "/guest/reviews": [{ label: "Feedback" }],
+                "/guest/invoices": [{ label: "Invoices" }],
+                "/guest/loyalty": [{ label: "Loyalty" }],
+                "/guest/settings": [{ label: "Settings" }],
+                "/guest/profile": [{ label: "Profile" }],
+                "/guest/notifications": [{ label: "Notifications" }]
               };
               const cleanPathname = pathname.replace(/\/view\/[^\/]+$/, "/view")
                                             .replace(/\/edit\/[^\/]+$/, "/edit")
@@ -943,12 +1013,33 @@ export function DashShell({ role, children }) {
                                             .replace(/\/reception\/folio\/[^\/]+$/, "/reception/folio/:id")
                                             .replace(/\/reception\/reservations\/[^\/]+$/, "/reception/reservations/:id")
                                             .replace(/\/reception\/room-assignment\/[^\/]+$/, "/reception/room-assignment/:id")
-                                            .replace(/\/reception\/guest-search\/[^\/]+$/, "/reception/guest-search/:id");
-              const segments = mappings[cleanPathname];
+                                            .replace(/\/reception\/guest-search\/[^\/]+$/, "/reception/guest-search/:id")
+                                            .replace(/\/guest\/folio\/[^\/]+$/, "/guest/folio/:id")
+                                            .replace(/\/guest\/bookings\/[^\/]+$/, "/guest/bookings/:id");
+              let segments = mappings[cleanPathname];
+              const queryParams = new URLSearchParams(searchStr);
+              const hasDetailParam = queryParams.has('id') || queryParams.has('view');
+
+              if (cleanPathname === "/guest/folio/:id" || (cleanPathname === "/guest/folio" && hasDetailParam)) {
+                segments = [
+                  { label: "Digital Folio", to: "/guest/folio" },
+                  { label: "Folio Details" }
+                ];
+              } else if (cleanPathname === "/guest/bookings/:id" || (cleanPathname === "/guest/bookings" && hasDetailParam)) {
+                segments = [
+                  { label: "My Bookings", to: "/guest/bookings" },
+                  { label: "Booking Details" }
+                ];
+              }
+
               if (segments) {
                 return (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
-                    <Link to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : (role === "reception" ? "/reception" : "/admin"))} className="hover:text-navy transition-colors">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap">
+                    <Link 
+                      to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : (role === "reception" ? "/reception" : (role === "guest" ? "/guest" : "/admin")))} 
+                      style={{ color: '#2563eb' }}
+                      className="hover:underline transition-colors font-medium cursor-pointer"
+                    >
                       Dashboard
                     </Link>
                     {segments.map((seg, idx) => {
@@ -959,11 +1050,15 @@ export function DashShell({ role, children }) {
                         <React.Fragment key={idx}>
                           <span className="text-muted-foreground/45">/</span>
                           {to && !isLast ? (
-                            <Link to={to} className="hover:text-navy transition-colors">
+                            <Link 
+                              to={to} 
+                              style={{ color: '#2563eb' }}
+                              className="hover:underline transition-colors font-medium cursor-pointer"
+                            >
                               {label}
                             </Link>
                           ) : (
-                            <span className={isLast ? "text-navy font-bold" : ""}>
+                            <span className={isLast ? "text-navy font-bold" : "text-muted-foreground font-normal"}>
                               {label}
                             </span>
                           )}

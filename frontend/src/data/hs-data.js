@@ -131,7 +131,7 @@ export const roomTypes = [
   occupancy: 2,
   inventory: 42,
   baseRate: 8900,
-  amenities: ["Courtyard view", "Rain shower", "Complimentary breakfast"]
+  amenities: ["Courtyard view", "Rain shower", "High-speed WiFi"]
 },
 {
   id: "RT-PRE",
@@ -475,7 +475,7 @@ export const blogPosts = [
 
 
 export const searchResults = [
-{ id: "HS-JAI", name: "Hour Stay Rambagh Residency", city: "Jaipur", rating: 4.8, reviews: 1284, price: 8900, tags: ["Heritage haveli", "Courtyard pool", "Free breakfast"] },
+{ id: "HS-JAI", name: "Hour Stay Rambagh Residency", city: "Jaipur", rating: 4.8, reviews: 1284, price: 8900, tags: ["Heritage haveli", "Courtyard pool", "High-speed WiFi"] },
 { id: "HS-UDA", name: "Hour Stay Lake Palace View", city: "Udaipur", rating: 4.9, reviews: 962, price: 14200, tags: ["Lake view", "Rooftop dining", "Spa"] },
 { id: "HS-GOA", name: "Hour Stay Candolim Beach Resort", city: "Goa", rating: 4.6, reviews: 2140, price: 11400, tags: ["Beachfront", "Kids club", "Sunset bar"] },
 { id: "HS-KER", name: "Hour Stay Backwater Retreat", city: "Alleppey", rating: 4.7, reviews: 738, price: 7600, tags: ["Backwaters", "Ayurveda", "Houseboat tour"] }];

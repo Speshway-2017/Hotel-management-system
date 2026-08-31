@@ -230,7 +230,9 @@ const noticeIcon = {
   success: CheckCircle2,
   warning: AlertTriangle,
   error: XCircle,
-  info: Info
+  info: Info,
+  neutral: Info,
+  brand: Info
 };
 
 export function Notice({
@@ -239,7 +241,7 @@ export function Notice({
   children,
   className
 }) {
-  const Icon = noticeIcon[tone];
+  const Icon = noticeIcon[tone] || Info;
   return (
     <div
       className={cn(
@@ -279,11 +281,15 @@ export function Crumbs({ items }) {
 
 export function HorizontalRouteTabs({ tabs }) {
   const location = useLocation();
+  const currentFullPath = location.pathname + (location.search || "");
   return (
     <div className="flex justify-start mb-6">
       <div className="bg-white p-1 rounded-full border border-muted shadow-soft inline-flex items-center gap-1 overflow-x-auto max-w-full scrollbar-none">
         {tabs.map((tab) => {
-          const active = location.pathname === tab.to;
+          const tabClean = tab.to.split('?')[0];
+          const active = tab.to.includes('?') 
+            ? currentFullPath === tab.to || (location.pathname === tabClean && !location.search && tab.to.includes('tab=hotel-info'))
+            : location.pathname === tabClean;
           return (
             <Link
               key={tab.to}

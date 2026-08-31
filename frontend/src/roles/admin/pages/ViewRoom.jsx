@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useParams } from "react-router-dom";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Panel, Crumbs, Tag } from "@/components/hs/kit";
+import { PageHeader, Crumbs, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import { Bed, ArrowLeft, Sliders, Edit2 } from "lucide-react";
+import { adminService } from "@/services/admin";
+import { superAdminService } from "@/services/superAdmin";
+import { Bed, ArrowLeft, Sliders, Edit2, CheckCircle, Clock, Image as ImageIcon } from "lucide-react";
 
 export const Route = createFileRoute("/admin/rooms/view/$id")({
   head: () => ({
@@ -15,49 +16,74 @@ export const Route = createFileRoute("/admin/rooms/view/$id")({
 });
 
 function ViewRoomPage() {
-  const { id } = useParams();
+  const params = Route.useParams();
+  const targetId = params?.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
+
   const navigate = useNavigate();
   const [room, setRoom] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    let saved = localStorage.getItem("hms_rooms_list");
-    if (!saved) {
-      const initial = [
-        { _id: "R-101", roomNumber: "101", category: "Villa Suite", floor: "Floor 1", status: "Available", ratePlan: "Standard BAR", currentRate: 38900, lastUpdated: "2 mins ago" },
-        { _id: "R-102", roomNumber: "102", category: "Villa Suite", floor: "Floor 1", status: "Occupied", ratePlan: "Standard BAR", currentRate: 38900, lastUpdated: "10 mins ago" },
-        { _id: "R-103", roomNumber: "103", category: "Heritage Luxury", floor: "Floor 1", status: "Available", ratePlan: "Standard BAR", currentRate: 11400, lastUpdated: "1 hr ago" },
-        { _id: "R-104", roomNumber: "104", category: "Heritage Luxury", floor: "Floor 1", status: "Dirty", ratePlan: "Standard BAR", currentRate: 11400, lastUpdated: "Just now" },
-        { _id: "R-105", roomNumber: "105", category: "Superior Deluxe", floor: "Floor 1", status: "Blocked", ratePlan: "Promo Non-Ref", currentRate: 8500, lastUpdated: "Yesterday" },
-        { _id: "R-106", roomNumber: "106", category: "Superior Deluxe", floor: "Floor 1", status: "Out of Order", ratePlan: "Standard BAR", currentRate: 8500, lastUpdated: "3 days ago" },
-        { _id: "R-201", roomNumber: "201", category: "Maharaja Suite", floor: "Floor 2", status: "Occupied", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "4 hrs ago" },
-        { _id: "R-202", roomNumber: "202", category: "Maharaja Suite", floor: "Floor 2", status: "Available", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "5 mins ago" },
-        { _id: "R-203", roomNumber: "203", category: "Villa Suite", floor: "Floor 2", status: "Available", ratePlan: "LOS Special Plan", currentRate: 38900, lastUpdated: "20 mins ago" },
-        { _id: "R-205", roomNumber: "205", category: "Heritage Luxury", floor: "Floor 2", status: "Available", ratePlan: "Standard BAR", currentRate: 11400, lastUpdated: "12 hrs ago" },
-        { _id: "R-301", roomNumber: "301", category: "Maharaja Suite", floor: "Floor 3", status: "Available", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "Just now" },
-        { _id: "R-302", roomNumber: "302", category: "Maharaja Suite", floor: "Floor 3", status: "Occupied", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "2 hrs ago" },
-        { _id: "R-303", roomNumber: "303", category: "Villa Suite", floor: "Floor 3", status: "Out of Order", ratePlan: "Standard BAR", currentRate: 38900, lastUpdated: "1 week ago" }
-      ];
-      localStorage.setItem("hms_rooms_list", JSON.stringify(initial));
-      saved = JSON.stringify(initial);
-    }
-    const list = JSON.parse(saved);
-    const matched = list.find(r => r._id === id || r.roomNumber === id);
-    if (matched) {
-      setRoom(matched);
-    }
-  }, [id]);
+    async function fetchRoom() {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await adminService.getRooms();
+        if (res.success && res.data && res.data.length > 0) {
+          const matched = res.data.find(r => 
+            (r._id && String(r._id) === String(targetId)) || 
+            (r.id && String(r.id) === String(targetId)) || 
+            (r.roomNumber && String(r.roomNumber) === String(targetId))
+          );
 
-  if (!room) {
+          if (matched) {
+            setRoom(matched);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        setError(err.message || "Failed to fetch room from backend.");
+      }
+
+      setLoading(false);
+    }
+
+    if (targetId) {
+      fetchRoom();
+    } else {
+      setLoading(false);
+    }
+  }, [targetId]);
+
+  if (loading) {
     return (
-      <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
+      <div className="space-y-6 text-left font-sans animate-fade-in font-ui p-6">
         <Crumbs items={[
           { label: "Workspace", to: "/admin" },
           { label: "Rooms & Rates", to: "/admin/rooms" },
           { label: "View Room" }
         ]} />
-        <PageHeader title="Room Not Found" subtitle="The requested room record does not exist or was removed." />
-        <Button onClick={() => navigate({ to: "/admin/rooms" })} className="bg-navy text-white rounded-full">
-          Back to Rooms
+        <div className="py-12 text-center">
+          <div className="mx-auto size-8 rounded-full border-4 border-navy border-t-transparent animate-spin mb-3" />
+          <p className="text-xs font-bold text-navy/60">Loading room specifications from MongoDB...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="space-y-6 text-left font-sans animate-fade-in font-ui p-6">
+        <Crumbs items={[
+          { label: "Workspace", to: "/admin" },
+          { label: "Rooms & Rates", to: "/admin/rooms" },
+          { label: "View Room" }
+        ]} />
+        <PageHeader title="Room Not Found" subtitle="The requested room record does not exist or was removed from MongoDB." />
+        <Button onClick={() => navigate({ to: "/admin/rooms" })} className="bg-navy text-white rounded-full text-xs font-bold cursor-pointer">
+          Back to Rooms List
         </Button>
       </div>
     );
@@ -66,12 +92,17 @@ function ViewRoomPage() {
   const statusMeta = {
     Available: { tone: "success", label: "Available" },
     Occupied: { tone: "brand", label: "Occupied" },
-    Dirty: { tone: "warning", label: "Dirty" },
-    Cleaning: { tone: "purple", label: "Cleaning" },
-    "Out of Order": { tone: "error", label: "Maintenance" },
     Blocked: { tone: "neutral", label: "Blocked" }
   };
   const meta = statusMeta[room.status] || statusMeta.Available;
+
+  const roomAmenitiesList = Array.isArray(room.amenities)
+    ? room.amenities
+    : (typeof room.amenities === 'string' && room.amenities.trim() !== ''
+        ? room.amenities.split(',').map(a => a.trim()).filter(Boolean)
+        : ["Free Wi-Fi", "Air Conditioning", "Ensuite Bathroom"]);
+
+  const roomImages = Array.isArray(room.images) ? room.images.filter(Boolean) : [];
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
@@ -79,17 +110,47 @@ function ViewRoomPage() {
         <Crumbs items={[
           { label: "Workspace", to: "/admin" },
           { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: "View Room" }
+          { label: `Room ${room.roomNumber}` }
         ]} />
         <PageHeader
           title={`Room ${room.roomNumber} Details`}
-          subtitle="Detailed record of the room category properties, pricing rules, and current stay assignments."
+          subtitle="Detailed specifications, photos, active rate plan, and live operational status from MongoDB."
         />
       </div>
 
-      <div className="max-w-xl space-y-6">
-        <Panel title="Room Specifications" description={`Asset Reference ID: ${room._id}`}>
-          <div className="p-6 space-y-4 bg-white rounded-b-xl text-xs text-navy leading-relaxed">
+      <div className="max-w-2xl space-y-6">
+
+        {/* Dynamic Room Images Gallery */}
+        <div className="bg-white rounded-2xl border border-navy/10 shadow-soft p-5 space-y-3">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-navy">Room Photos</h3>
+            {roomImages.length > 0 && (
+              <span className="text-[10px] font-bold text-purple bg-purple/10 px-2.5 py-0.5 rounded-full border border-purple/20">
+                {roomImages.length} Photo{roomImages.length > 1 ? 's' : ''} Stored in MongoDB
+              </span>
+            )}
+          </div>
+
+          {roomImages.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {roomImages.map((imgUrl, idx) => (
+                <div key={idx} className="relative group rounded-xl overflow-hidden border border-navy/10 h-36 bg-navy/5 shadow-soft">
+                  <img src={imgUrl} alt={`Room ${room.roomNumber} photo ${idx + 1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 border border-dashed border-navy/15 bg-navy/[0.02] rounded-xl text-center">
+              <Bed className="size-8 text-navy/30 mx-auto mb-2" />
+              <p className="text-xs font-bold text-navy/60">No photos uploaded for Room {room.roomNumber}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Click Modify Configuration below to upload photos.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Room Specifications Panel */}
+        <div className="bg-white rounded-2xl border border-navy/10 shadow-soft overflow-hidden">
+          <div className="p-6 space-y-4 text-xs text-navy leading-relaxed">
             
             <div className="grid grid-cols-2 gap-4 pb-4 border-b border-muted/40">
               <div>
@@ -104,19 +165,21 @@ function ViewRoomPage() {
 
             <div className="grid grid-cols-2 gap-4 pb-4 border-b border-muted/40">
               <div>
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Floor Map</span>
-                <strong className="block mt-1">{room.floor || "Floor 1"}</strong>
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Floor</span>
+                <strong className="block mt-1">{room.floor || 'Floor 1'}</strong>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Active Rate Plan</span>
-                <strong className="block mt-1 font-mono">{room.ratePlan || "Standard BAR"}</strong>
+                <strong className="block mt-1 font-mono">{room.ratePlan || "Standard Plan"}</strong>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 pb-4 border-b border-muted/40">
               <div>
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Daily Rate Tariff</span>
-                <strong className="block mt-1 text-navy font-bold text-sm">₹{room.currentRate?.toLocaleString()}</strong>
+                <strong className="block mt-1 text-navy font-bold text-sm">
+                  ₹{Number(room.currentRate || room.baseRate || room.dailyRate || 3500).toLocaleString('en-IN')}
+                </strong>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Standard Capacity</span>
@@ -137,11 +200,11 @@ function ViewRoomPage() {
               </div>
             </div>
 
-            {room.amenities && room.amenities.length > 0 && (
+            {roomAmenitiesList.length > 0 && (
               <div className="pb-4 border-b border-muted/40">
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-2 block">Room Amenities</span>
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {room.amenities.map((a, idx) => (
+                  {roomAmenitiesList.map((a, idx) => (
                     <span key={idx} className="inline-flex items-center rounded bg-muted/40 border border-muted px-2 py-0.5 text-[10px] font-semibold text-navy">
                       {a}
                     </span>
@@ -158,17 +221,26 @@ function ViewRoomPage() {
             )}
 
           </div>
-        </Panel>
+        </div>
 
         <div className="flex gap-2.5">
           <Button
-            onClick={() => navigate({ to: `/admin/rooms/edit/${room._id}` })}
-            className="bg-navy hover:bg-navy-deep text-white text-xs h-10 px-6 font-bold rounded-full flex items-center gap-1.5 shadow-soft"
+            onClick={() => navigate({ to: `/admin/rooms/edit/${room._id || room.id || targetId}` })}
+            className="bg-navy hover:bg-navy-deep text-white text-xs h-10 px-6 font-bold rounded-full flex items-center gap-1.5 shadow-soft cursor-pointer"
           >
             <Edit2 className="size-3.5" /> Modify Configuration
+          </Button>
+          <Button
+            onClick={() => navigate({ to: "/admin/rooms" })}
+            variant="ghost"
+            className="text-xs h-10 px-5 rounded-full cursor-pointer"
+          >
+            Back to Rooms List
           </Button>
         </div>
       </div>
     </div>
   );
 }
+
+export default ViewRoomPage;

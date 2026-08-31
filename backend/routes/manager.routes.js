@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { protect, authorize } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import User from '../models/user.model.js';
@@ -26,15 +27,26 @@ const seedDefaultRooms = async (propertyId) => {
   const count = await Room.countDocuments({ propertyId });
   if (count === 0) {
     const defaultRooms = [];
-    const categories = ["Standard Room", "Deluxe Room", "Executive Suite", "Presidential Suite"];
+    const roomTypeSpecs = [
+      { category: "Standard Room", rate: 3000, plan: "Standard Plan" },
+      { category: "Deluxe Room", rate: 4500, plan: "Deluxe Plan" },
+      { category: "Executive Suite", rate: 6500, plan: "Deluxe Plan" },
+      { category: "Villa Suite", rate: 12500, plan: "Weekend Plan" }
+    ];
     
-    // Seed 12 rooms (101-103 standard, 201-203 deluxe, 301-303 executive, 401-403 presidential)
+    // Seed 12 rooms with distinct per-category pricing and rate plans
     for (let floor = 1; floor <= 4; floor++) {
+      const spec = roomTypeSpecs[floor - 1];
       for (let r = 1; r <= 3; r++) {
         defaultRooms.push({
           roomNumber: `${floor}0${r}`,
-          category: categories[floor - 1],
-          status: r === 2 ? 'Occupied' : r === 3 ? 'Dirty' : 'Available',
+          category: spec.category,
+          status: r === 2 ? 'Occupied' : r === 3 ? 'Blocked' : 'Available',
+          ratePlan: spec.plan,
+          baseRate: spec.rate,
+          currentRate: spec.rate,
+          dailyRate: spec.rate,
+          floor: `Floor ${floor}`,
           propertyId
         });
       }
@@ -205,7 +217,40 @@ router.get('/reservations', async (req, res) => {
 router.get('/rooms', async (req, res) => {
   try {
     await seedDefaultRooms(req.user.propertyId);
-    const rooms = await Room.find({ propertyId: req.user.propertyId }).sort({ roomNumber: 1 });
+
+    // Convert any 4th floor or Villa Suite rooms to Standard Room in MongoDB
+    await Room.updateMany(
+      { propertyId: req.user.propertyId, category: "Villa Suite" },
+      { $set: { category: "Standard Room", baseRate: 3000, currentRate: 3000, dailyRate: 3000, ratePlan: "Standard Plan" } }
+    );
+
+    let rooms = await Room.find({ propertyId: req.user.propertyId }).sort({ roomNumber: 1 });
+
+    // Ensure status cleanup and floor setting if missing
+    for (let rm of rooms) {
+      let needsSave = false;
+
+      if (!rm.floor) {
+        const firstDigit = rm.roomNumber ? String(rm.roomNumber).charAt(0) : '';
+        if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
+          rm.floor = `Floor ${firstDigit}`;
+          needsSave = true;
+        } else {
+          rm.floor = 'Floor 1';
+          needsSave = true;
+        }
+      }
+
+      if (rm.status === 'Dirty' || rm.status === 'Cleaning' || rm.status === 'Out of Order' || rm.status === 'Maintenance') {
+        rm.status = 'Blocked';
+        needsSave = true;
+      }
+
+      if (needsSave) {
+        await rm.save();
+      }
+    }
+
     return sendSuccess(res, 200, rooms, 'Property rooms operational status list retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -234,14 +279,25 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
 
 router.post('/rooms', async (req, res) => {
   try {
-    const { roomNumber, category, status } = req.body;
+    const { roomNumber, category, status, ratePlan, baseRate, currentRate, dailyRate, floor, capacity, bedType, amenities, description, images } = req.body;
     if (!roomNumber || !category) {
       return sendError(res, 400, 'roomNumber and category are required.');
     }
+    const rate = Number(baseRate || currentRate || dailyRate || 3500);
     const newRoom = await Room.create({
       roomNumber,
       category,
       status: status || 'Available',
+      ratePlan: ratePlan || 'Standard Plan',
+      baseRate: rate,
+      currentRate: rate,
+      dailyRate: rate,
+      floor: floor || 'Floor 1',
+      capacity,
+      bedType,
+      amenities,
+      description,
+      images: Array.isArray(images) ? images : [],
       propertyId: req.user.propertyId
     });
     return sendSuccess(res, 201, newRoom, 'Room created successfully.');
@@ -252,12 +308,44 @@ router.post('/rooms', async (req, res) => {
 
 router.put('/rooms/:id', async (req, res) => {
   try {
-    const { roomNumber, category, status } = req.body;
-    const updated = await Room.findOneAndUpdate(
-      { _id: req.params.id, propertyId: req.user.propertyId },
-      { roomNumber, category, status },
+    const { roomNumber, category, status, ratePlan, baseRate, currentRate, dailyRate, floor, capacity, bedType, amenities, description, images } = req.body;
+    const rate = Number(baseRate || currentRate || dailyRate);
+    const updateData = { roomNumber, category, status };
+    if (ratePlan) updateData.ratePlan = ratePlan;
+    if (rate && !isNaN(rate) && rate > 0) {
+      updateData.baseRate = rate;
+      updateData.currentRate = rate;
+      updateData.dailyRate = rate;
+    }
+    if (floor) updateData.floor = floor;
+    if (capacity) updateData.capacity = capacity;
+    if (bedType) updateData.bedType = bedType;
+    if (amenities) updateData.amenities = amenities;
+    if (description !== undefined) updateData.description = description;
+    if (Array.isArray(images)) updateData.images = images;
+
+    const queryOr = [
+      { roomNumber: req.params.id },
+      { id: req.params.id }
+    ];
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      queryOr.push({ _id: req.params.id });
+    }
+
+    let updated = await Room.findOneAndUpdate(
+      { propertyId: req.user.propertyId, $or: queryOr },
+      updateData,
       { new: true }
     );
+
+    if (!updated) {
+      updated = await Room.findOneAndUpdate(
+        { $or: queryOr },
+        updateData,
+        { new: true }
+      );
+    }
+
     if (!updated) return sendError(res, 404, 'Room not found.');
     return sendSuccess(res, 200, updated, 'Room updated successfully.');
   } catch (err) {
@@ -267,7 +355,18 @@ router.put('/rooms/:id', async (req, res) => {
 
 router.delete('/rooms/:id', async (req, res) => {
   try {
-    const deleted = await Room.findOneAndDelete({ _id: req.params.id, propertyId: req.user.propertyId });
+    const queryOr = [
+      { roomNumber: req.params.id },
+      { id: req.params.id }
+    ];
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      queryOr.push({ _id: req.params.id });
+    }
+
+    let deleted = await Room.findOneAndDelete({ propertyId: req.user.propertyId, $or: queryOr });
+    if (!deleted) {
+      deleted = await Room.findOneAndDelete({ $or: queryOr });
+    }
     if (!deleted) return sendError(res, 404, 'Room not found.');
     return sendSuccess(res, 200, deleted, 'Room deleted successfully.');
   } catch (err) {

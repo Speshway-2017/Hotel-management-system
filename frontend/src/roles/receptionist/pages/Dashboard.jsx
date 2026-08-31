@@ -61,6 +61,21 @@ function FrontDeskDashboard() {
 
   const [propName, setPropName] = useState("Assigned Hotel");
 
+  const fetchDashboardData = () => {
+    receptionistService.getDashboard()
+      .then(res => {
+        if (res.success && res.data) {
+          setArrivals(res.data.arrivals || []);
+          setDepartures(res.data.departures || []);
+          if (res.data.stats) {
+            setStats(res.data.stats);
+          }
+        }
+      })
+      .catch(err => console.error("Failed to load dashboard data:", err))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     // Load dynamic user profile details
     let user = authService.getCurrentUser();
@@ -82,18 +97,9 @@ function FrontDeskDashboard() {
       })
       .catch(err => console.warn("Failed to load property details:", err));
 
-    receptionistService.getDashboard()
-      .then(res => {
-        if (res.success && res.data) {
-          setArrivals(res.data.arrivals || []);
-          setDepartures(res.data.departures || []);
-          if (res.data.stats) {
-            setStats(res.data.stats);
-          }
-        }
-      })
-      .catch(err => console.error("Failed to load dashboard data:", err))
-      .finally(() => setLoading(false));
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 20000); // 20 seconds poll
+    return () => clearInterval(interval);
   }, []);
 
   const receptionistName = currentUser?.name || "Imran Sheikh";

@@ -3,11 +3,14 @@ import { useState, useEffect } from "react";
 import { HorizontalRouteTabs, Panel, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea, Checkbox } from "@/components/hs/FormFields";
-import { Settings as SettingsIcon, User } from "lucide-react";
+import { Settings as SettingsIcon, User, Building2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+import { adminService } from "@/services/admin";
 
 const settingsTabs = [
-  { label: "Settings", to: "/admin/settings", icon: SettingsIcon },
-  { label: "Profile", to: "/admin/profile", icon: User }
+  { label: "Hotel Profile", to: "/admin/settings?tab=hotel-info", icon: Building2 },
+  { label: "Account Profile", to: "/admin/profile", icon: User }
 ];
 
 export const Route = createFileRoute("/admin/settings")({
@@ -20,15 +23,33 @@ export const Route = createFileRoute("/admin/settings")({
   component: AdminSettingsPage
 });
 
-import { superAdminService } from "@/services/superAdmin";
-
 function AdminSettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  
   const [activeSubTab, setActiveSubTab] = useState("hotel-info");
   
-  const [hotelName, setHotelName] = useState("Speshway Luxury Hotel");
-  const [hotelAddress, setHotelAddress] = useState("Speshway Heights, Hitech City Main Rd, Madhapur, Hyderabad, Telangana 500081");
-  const [hotelPhone, setHotelPhone] = useState("+91 40 4495 1022");
-  const [hotelEmail, setHotelEmail] = useState("reservations@speshway.com");
+  const [hotelName, setHotelName] = useState("");
+  const [hotelAddress, setHotelAddress] = useState("");
+  const [hotelPhone, setHotelPhone] = useState("");
+  const [hotelEmail, setHotelEmail] = useState("");
+  const [description, setDescription] = useState("");
+  const [logo, setLogo] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [country, setCountry] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [website, setWebsite] = useState("");
+  const [classification, setClassification] = useState("3-Star");
+  const [amenities, setAmenities] = useState("");
+  const [highlights, setHighlights] = useState("");
+  const [propertyPolicies, setPropertyPolicies] = useState("");
+  const [locationMap, setLocationMap] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [linkedin, setLinkedin] = useState("");
   
   const [gstin, setGstin] = useState("36AAAAA1111A1Z1");
   const [cgst, setCgst] = useState(9);
@@ -50,48 +71,144 @@ function AdminSettingsPage() {
   const [property, setProperty] = useState(null);
 
   useEffect(() => {
+    if (tabParam) {
+      setActiveSubTab(tabParam);
+    }
+  }, [tabParam]);
+
+  useEffect(() => {
     async function init() {
       try {
-        const res = await superAdminService.getProperties();
-        if (res.success && res.data && res.data.length > 0) {
-          const prop = res.data[0];
+        const res = await adminService.getProperty();
+        if (res.success && res.data) {
+          const prop = res.data;
           setProperty(prop);
-          setHotelName(prop.name || "Speshway Luxury Hotel");
-          setHotelAddress(prop.address || "");
-          setHotelEmail(prop.email || "");
-          setHotelPhone(prop.phone || "");
-
-          const settings = prop.settings || {};
-          if (settings.gstin) setGstin(settings.gstin);
-          if (settings.cgst) setCgst(settings.cgst);
-          if (settings.sgst) setSgst(settings.sgst);
-          if (settings.checkInTime) setCheckInTime(settings.checkInTime);
-          if (settings.checkOutTime) setCheckOutTime(settings.checkOutTime);
-          if (settings.cancelPolicy) setCancelPolicy(settings.cancelPolicy);
-          if (settings.autoAssign !== undefined) setAutoAssign(settings.autoAssign);
-          if (settings.waitlistLimit) setWaitlistLimit(settings.waitlistLimit);
-          if (settings.paymentProvider) setPaymentProvider(settings.paymentProvider);
-          if (settings.emailAlerts !== undefined) setEmailAlerts(settings.emailAlerts);
-          if (settings.smsAlerts !== undefined) setSmsAlerts(settings.smsAlerts);
-          if (settings.parityAlerts !== undefined) setParityAlerts(settings.parityAlerts);
+          
+          const s = prop.settings || {};
+          setHotelName(s.hotelName || s.name || prop.name || "");
+          setCity(s.city || prop.city || "");
+          setHotelAddress(s.address || "");
+          setHotelEmail(s.reservationEmail || s.email || "");
+          setHotelPhone(s.contactNumber || s.phone || "");
+          
+          setDescription(s.description || "");
+          setLogo(s.logo || "");
+          setPhotos(s.gallery || s.photos || []);
+          setState(s.state || "");
+          setCountry(s.country || "India");
+          setPincode(s.pincode || "");
+          setWebsite(s.website || "");
+          setClassification(s.classification || "3-Star");
+          
+          setAmenities(Array.isArray(s.amenities) ? s.amenities.join(", ") : s.amenities || "");
+          setHighlights(Array.isArray(s.highlights) ? s.highlights.join(", ") : s.highlights || "");
+          setPropertyPolicies(s.policies || s.propertyPolicies || s.bookingRules || "");
+          setLocationMap(s.locationMap || s.mapInfo || "");
+          setFacebook(s.facebook || "");
+          setInstagram(s.instagram || "");
+          setTwitter(s.twitter || "");
+          setLinkedin(s.linkedin || "");
+          
+          if (s.gstin) setGstin(s.gstin);
+          if (s.cgst) setCgst(s.cgst);
+          if (s.sgst) setSgst(s.sgst);
+          if (s.checkInTime) setCheckInTime(s.checkInTime);
+          if (s.checkOutTime) setCheckOutTime(s.checkOutTime);
+          if (s.cancellationPolicy || s.cancelPolicy) setCancelPolicy(s.cancellationPolicy || s.cancelPolicy);
+          if (s.autoAssign !== undefined) setAutoAssign(s.autoAssign);
+          if (s.waitlistLimit) setWaitlistLimit(s.waitlistLimit);
+          if (s.paymentProvider) setPaymentProvider(s.paymentProvider);
+          if (s.emailAlerts !== undefined) setEmailAlerts(s.emailAlerts);
+          if (s.smsAlerts !== undefined) setSmsAlerts(s.smsAlerts);
+          if (s.parityAlerts !== undefined) setParityAlerts(s.parityAlerts);
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("Failed to load property settings:", err);
+      }
     }
     init();
   }, []);
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const toastId = toast.loading("Uploading logo...");
+      const res = await adminService.uploadImage(file);
+      if (res.success && res.data?.url) {
+        setLogo(res.data.url);
+        toast.success("Logo uploaded successfully!", { id: toastId });
+      } else {
+        toast.error("Upload failed", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Logo upload failed: " + err.message);
+    }
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const toastId = toast.loading(`Uploading ${files.length} photo(s)...`);
+    try {
+      const urls = [];
+      for (let i = 0; i < files.length; i++) {
+        const res = await adminService.uploadImage(files[i]);
+        if (res.success && res.data?.url) {
+          urls.push(res.data.url);
+        }
+      }
+      setPhotos(prev => [...prev, ...urls]);
+      toast.success("Photos uploaded successfully!", { id: toastId });
+    } catch (err) {
+      toast.error("Photos upload failed: " + err.message, { id: toastId });
+    }
+  };
+
+  const handleRemovePhoto = (indexToRemove) => {
+    setPhotos(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   async function handleSave(e) {
     e.preventDefault();
-    if (!property) return;
+    const toastId = toast.loading("Saving property settings to MongoDB...");
     try {
       const nextSettings = {
-        ...(property.settings || {}),
+        ...(property?.settings || {}),
+        hotelName,
+        name: hotelName,
+        description,
+        logo,
+        gallery: photos,
+        photos: photos,
+        reservationEmail: hotelEmail,
+        email: hotelEmail,
+        contactNumber: hotelPhone,
+        phone: hotelPhone,
+        address: hotelAddress,
+        city,
+        state,
+        country,
+        pincode,
+        website,
+        gstin,
+        classification,
+        amenities: typeof amenities === 'string' ? amenities.split(",").map(a => a.trim()).filter(Boolean) : (amenities || []),
+        highlights: typeof highlights === 'string' ? highlights.split(",").map(h => h.trim()).filter(Boolean) : (highlights || []),
+        checkInTime,
+        checkOutTime,
+        cancellationPolicy: cancelPolicy,
+        cancelPolicy,
+        policies: propertyPolicies,
+        propertyPolicies,
+        locationMap,
+        facebook,
+        instagram,
+        twitter,
+        linkedin,
         gstin,
         cgst: Number(cgst),
         sgst: Number(sgst),
-        checkInTime,
-        checkOutTime,
-        cancelPolicy,
         autoAssign,
         waitlistLimit: Number(waitlistLimit),
         paymentProvider,
@@ -100,18 +217,35 @@ function AdminSettingsPage() {
         parityAlerts
       };
 
-      await superAdminService.updateProperty(property._id || property.id, {
-        name: hotelName,
-        address: hotelAddress,
-        email: hotelEmail,
-        phone: hotelPhone,
-        settings: nextSettings
-      });
+      const res = await adminService.updatePropertySettings(nextSettings);
+      if (res.success) {
+        // Re-fetch from backend MongoDB to verify persistence
+        const fetchRes = await adminService.getProperty();
+        if (fetchRes.success && fetchRes.data) {
+          const updatedProp = fetchRes.data;
+          setProperty(updatedProp);
+          setHotelName(updatedProp.name || "");
+          setCity(updatedProp.city || "");
+          const s = updatedProp.settings || {};
+          setLogo(s.logo || "");
+          setPhotos(s.photos || s.gallery || []);
+        }
 
-      setSuccessMsg("Property configuration saved successfully.");
-      setTimeout(() => setSuccessMsg(""), 3000);
+        const propId = property?._id || property?.id;
+        if (propId) {
+          localStorage.setItem('selected_property_id', propId);
+        }
+
+        window.dispatchEvent(new Event('selected-property-changed'));
+        toast.success("Hotel Profile updated and saved to MongoDB!", { id: toastId });
+        setSuccessMsg("Property configuration updated and verified in MongoDB.");
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        toast.error(res.message || "Failed to update property in MongoDB", { id: toastId });
+      }
     } catch (err) {
-      toast.error(err.message || "Failed to save property configuration.");
+      console.error("Save error:", err);
+      toast.error(err.message || "Failed to save property configuration.", { id: toastId });
     }
   }
 
@@ -139,7 +273,10 @@ function AdminSettingsPage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveSubTab(tab.id)}
+              onClick={() => {
+                setActiveSubTab(tab.id);
+                setSearchParams({ tab: tab.id });
+              }}
               className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
                 activeSubTab === tab.id
                   ? "bg-navy text-white shadow-sm"
@@ -154,8 +291,82 @@ function AdminSettingsPage() {
         {/* Right Form Content Column */}
         <form onSubmit={handleSave} className="lg:col-span-3">
           {activeSubTab === "hotel-info" && (
-            <Panel title="Hotel Profile Information" description="Update property address, support details, and descriptions.">
-              <div className="p-6 bg-white rounded-b-xl space-y-4">
+            <Panel title="Hotel Profile Information" description="Update property logo, photos, address, contact details, classification, and descriptions.">
+              <div className="p-6 bg-white rounded-b-xl space-y-6">
+                
+                {/* Logo & Photo Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 border-b border-muted">
+                  
+                  {/* Logo Upload */}
+                  <div className="space-y-2 text-left">
+                    <label className="text-xs font-semibold text-navy">Hotel Logo</label>
+                    <div className="flex items-center gap-4 mt-1">
+                      <div className="size-16 rounded-xl border border-muted bg-cream/45 overflow-hidden flex items-center justify-center relative">
+                        {logo ? (
+                          <img src={logo} alt="Hotel Logo" className="size-full object-contain" />
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground font-bold">No Logo</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <input 
+                          type="file" 
+                          id="logo-upload" 
+                          accept="image/*" 
+                          onChange={handleLogoUpload} 
+                          className="hidden" 
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => document.getElementById('logo-upload').click()}
+                          className="text-[11px] h-8 px-3 border-navy/20 hover:bg-navy/5 text-navy font-bold rounded-lg cursor-pointer"
+                        >
+                          Upload Logo
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Photo Gallery Upload */}
+                  <div className="md:col-span-2 space-y-2 text-left">
+                    <label className="text-xs font-semibold text-navy">Property Photos / Gallery</label>
+                    <div className="flex items-center gap-4 mt-1">
+                      <input 
+                        type="file" 
+                        id="photo-upload" 
+                        accept="image/*" 
+                        multiple 
+                        onChange={handlePhotoUpload} 
+                        className="hidden" 
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => document.getElementById('photo-upload').click()}
+                        className="text-[11px] h-8 px-3 border-navy/20 hover:bg-navy/5 text-navy font-bold rounded-lg cursor-pointer"
+                      >
+                        Upload Photos
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {photos.map((photo, idx) => (
+                        <div key={idx} className="size-14 rounded-lg border border-muted bg-cream overflow-hidden relative group">
+                          <img src={photo} alt={`Gallery ${idx}`} className="size-full object-cover" />
+                          <button 
+                            type="button" 
+                            onClick={() => handleRemovePhoto(idx)}
+                            className="absolute inset-0 bg-black/50 text-white font-bold text-[9px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer border-none"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Fields */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField label="Hotel Name" required className="col-span-2" id="hotelName">
                     <Input
@@ -164,6 +375,42 @@ function AdminSettingsPage() {
                       required
                       value={hotelName}
                       onChange={(e) => setHotelName(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="Hotel Description" className="col-span-2" id="description">
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Enter a compelling description for the guest booking website..."
+                      className="min-h-[100px]"
+                    />
+                  </FormField>
+
+                  <FormField label="Hotel Classification" id="classification">
+                    <Select
+                      id="classification"
+                      value={classification}
+                      onChange={(e) => setClassification(e.target.value)}
+                    >
+                      <option value="3-Star">3-Star Hotel</option>
+                      <option value="4-Star">4-Star Hotel</option>
+                      <option value="5-Star">5-Star Luxury Resort</option>
+                      <option value="Heritage Haveli">Heritage Haveli</option>
+                      <option value="Boutique Stay">Boutique Stay</option>
+                      <option value="Beach Resort">Beach Resort</option>
+                      <option value="Homestay">Boutique Homestay</option>
+                    </Select>
+                  </FormField>
+
+                  <FormField label="Website Link" id="website">
+                    <Input
+                      id="website"
+                      type="text"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      placeholder="e.g. https://www.hourstay.com"
                     />
                   </FormField>
 
@@ -196,9 +443,148 @@ function AdminSettingsPage() {
                       className="min-h-[80px]"
                     />
                   </FormField>
+
+                  <FormField label="City" required id="city">
+                    <Input
+                      id="city"
+                      type="text"
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="State" required id="state">
+                    <Input
+                      id="state"
+                      type="text"
+                      required
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      placeholder="e.g. Rajasthan"
+                    />
+                  </FormField>
+
+                  <FormField label="Country" required id="country">
+                    <Input
+                      id="country"
+                      type="text"
+                      required
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="e.g. India"
+                    />
+                  </FormField>
+
+                  <FormField label="Pincode" required id="pincode">
+                    <Input
+                      id="pincode"
+                      type="text"
+                      required
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                      placeholder="e.g. 302001"
+                    />
+                  </FormField>
+
+                  <FormField label="Standard Check-In Time" required id="checkInTimeInfo">
+                    <Input
+                      id="checkInTimeInfo"
+                      type="time"
+                      required
+                      value={checkInTime}
+                      onChange={(e) => setCheckInTime(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="Standard Check-Out Time" required id="checkOutTimeInfo">
+                    <Input
+                      id="checkOutTimeInfo"
+                      type="time"
+                      required
+                      value={checkOutTime}
+                      onChange={(e) => setCheckOutTime(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="Hotel Amenities (Comma-separated)" className="col-span-2" id="amenities">
+                    <Textarea
+                      id="amenities"
+                      value={amenities}
+                      onChange={(e) => setAmenities(e.target.value)}
+                      placeholder="WiFi, Swimming Pool, Complimentary Breakfast, Spa, Gym, Rooftop Restaurant"
+                      className="min-h-[60px]"
+                    />
+                  </FormField>
+
+                  <FormField label="Guest Highlights / Selling Points (Comma-separated)" className="col-span-2" id="highlights">
+                    <Textarea
+                      id="highlights"
+                      value={highlights}
+                      onChange={(e) => setHighlights(e.target.value)}
+                      placeholder="5 mins from Amber Fort, Infinity Pool, Heritage courtyard dining"
+                      className="min-h-[60px]"
+                    />
+                  </FormField>
+
+                  <FormField label="Property Policies & House Rules" className="col-span-2" id="propertyPolicies">
+                    <Textarea
+                      id="propertyPolicies"
+                      value={propertyPolicies}
+                      onChange={(e) => setPropertyPolicies(e.target.value)}
+                      placeholder="Valid ID required upon check-in. Pets not allowed. Unmarried couples permitted with valid ID."
+                      className="min-h-[70px]"
+                    />
+                  </FormField>
+
+                  <FormField label="Location/Map Embed URL" className="col-span-2" id="locationMap">
+                    <Input
+                      id="locationMap"
+                      type="text"
+                      value={locationMap}
+                      onChange={(e) => setLocationMap(e.target.value)}
+                      placeholder="Google Maps iframe src link"
+                    />
+                  </FormField>
+
+                  <FormField label="Facebook Page" id="facebook">
+                    <Input
+                      id="facebook"
+                      type="text"
+                      value={facebook}
+                      onChange={(e) => setFacebook(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="Instagram ID" id="instagram">
+                    <Input
+                      id="instagram"
+                      type="text"
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="Twitter ID" id="twitter">
+                    <Input
+                      id="twitter"
+                      type="text"
+                      value={twitter}
+                      onChange={(e) => setTwitter(e.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField label="LinkedIn Profile" id="linkedin">
+                    <Input
+                      id="linkedin"
+                      type="text"
+                      value={linkedin}
+                      onChange={(e) => setLinkedin(e.target.value)}
+                    />
+                  </FormField>
                 </div>
                 <div className="pt-4 border-t border-muted flex justify-end">
-                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer">
+                  <Button type="submit" className="bg-navy hover:bg-navy/90 text-white text-xs h-9 px-6 font-bold shadow-soft rounded-full cursor-pointer font-sans">
                     Save Changes
                   </Button>
                 </div>

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "cms_b1",
+    "_id": "cms_b1",
+    "type": "blog",
+    "slug": "pms-simplifies-operations",
+    "title": "How Hotel PMS Software Simplifies Daily Operations",
+    "excerpt": "Discover how a unified property management system connects your reservations, housekeeping logs, and front-desk check-ins in one calm workflow.",
+    "author": "Meera Nair",
+    "role": "General Manager, Udaipur",
+    "date": "02 Aug 2026",
+    "readTime": "5 min read",
+    "tag": "Hotel Management"
+  },
+  {
+    "id": "cms_f1",
+    "_id": "cms_f1",
+    "type": "faq",
+    "question": "How do I split a guest bill?",
+    "answer": "Navigate to the front-desk room layout grid, click on the active room folio, select 'Split Bill', choose the split method (e.g. personal vs. corporate), and generate the split invoices."
+  },
+  {
+    "id": "cms_f2",
+    "_id": "cms_f2",
+    "type": "faq",
+    "question": "Does the system support GST slab billing?",
+    "answer": "Yes, tariff under ₹7,500 attracts 12% GST and at or above ₹7,500 tariff attracts 18% GST dynamically."
+  }
+]

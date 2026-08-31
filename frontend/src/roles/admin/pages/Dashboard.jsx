@@ -518,14 +518,16 @@ function AdminDashboard() {
                     <tr><td colSpan="6" className="py-6 text-center text-muted-foreground">No reservations loaded.</td></tr>
                   ) : (
                     reservations.slice(0, 8).map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#fcfcfc] transition-colors">
-                        <td className="py-3 px-3 font-semibold text-navy">{item.guestName || "Walk-in Guest"}</td>
-                        <td className="py-3 px-3 font-mono">{item.roomNumber || "Unassigned"}</td>
-                        <td className="py-3 px-3">{item.checkIn} → {item.checkOut}</td>
-                        <td className="py-3 px-3"><Tag tone="brand">{item.source || "Direct"}</Tag></td>
-                        <td className="py-3 px-3 text-right font-bold">₹{(item.amount || 0).toLocaleString()}</td>
-                        <td className="py-3 px-3 text-center">
-                          <Tag tone={item.status === "Confirmed" || item.status === "Checked-in" ? "success" : "warning"}>{item.status}</Tag>
+                      <tr key={idx} className="hover:bg-[#fcfcfc] transition-colors align-middle">
+                        <td className="py-3 px-3 font-semibold text-navy align-middle">{item.guestName || "Walk-in Guest"}</td>
+                        <td className="py-3 px-3 font-mono align-middle">{item.roomNumber || "Unassigned"}</td>
+                        <td className="py-3 px-3 align-middle">{item.checkIn} → {item.checkOut}</td>
+                        <td className="py-3 px-3 align-middle"><Tag tone="brand">{item.source || "Direct"}</Tag></td>
+                        <td className="py-3 px-3 text-right font-bold align-middle">₹{(item.amount || 0).toLocaleString()}</td>
+                        <td className="py-3 px-3 text-center align-middle">
+                          <div className="flex items-center justify-center">
+                            <Tag tone={item.status === "Confirmed" || item.status === "Checked-in" ? "success" : "warning"}>{item.status}</Tag>
+                          </div>
                         </td>
                       </tr>
                     ))

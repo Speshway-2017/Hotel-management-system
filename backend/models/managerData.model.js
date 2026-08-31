@@ -6,7 +6,17 @@ import mongoose from 'mongoose';
 const roomSchema = new mongoose.Schema({
   roomNumber: { type: String, required: true },
   category: { type: String, required: true },
-  status: { type: String, enum: ['Available', 'Occupied', 'Dirty', 'Cleaning', 'Out of Order', 'Blocked'], default: 'Available' },
+  status: { type: String, enum: ['Available', 'Occupied', 'Blocked'], default: 'Available' },
+  ratePlan: { type: String, default: 'Standard Plan' },
+  baseRate: { type: Number, default: 3500 },
+  currentRate: { type: Number, default: 3500 },
+  dailyRate: { type: Number, default: 3500 },
+  floor: { type: String, default: 'Floor 1' },
+  capacity: { type: String, default: '2 Adults' },
+  bedType: { type: String, default: 'King Bed' },
+  amenities: { type: mongoose.Schema.Types.Mixed },
+  description: { type: String, default: '' },
+  images: [{ type: String }],
   propertyId: { type: String, required: true }
 }, { timestamps: true });
 
