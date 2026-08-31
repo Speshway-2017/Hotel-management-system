@@ -485,77 +485,96 @@ function ReservationsPage() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[1050px] table-fixed">
                   <thead>
                     <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                      <th className="py-4.5 px-6">Guest Info</th>
-                      <th className="py-4.5 px-4">Room No</th>
-                      <th className="py-4.5 px-4">Stay Dates</th>
-                      <th className="py-4.5 px-4">Channel / Type</th>
-                      <th className="py-4.5 px-4 text-right">Payment</th>
-                      <th className="py-4.5 px-4 text-center">Status</th>
-                      <th className="py-4.5 px-6 text-right">Actions</th>
+                      <th className="py-4 pl-4 pr-2 text-left w-[15%]">Guest Info</th>
+                      <th className="py-4 px-2 text-left w-[8%]">Room No</th>
+                      <th className="py-4 px-3 text-left w-[18%]">Stay Dates</th>
+                      <th className="py-4 px-3 text-left w-[13%]">Channel / Type</th>
+                      <th className="py-4 px-3 text-left w-[14%]">Payment</th>
+                      <th className="py-4 px-3 text-left w-[14%]">Status</th>
+                      <th className="py-4 pl-3 pr-4 text-left w-[18%]">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-muted text-sm text-[#2a2a2a]">
+                  <tbody className="divide-y divide-muted text-xs text-[#2a2a2a]">
                     {paginatedData.map((res) => {
                       const balanceVal = res.balance || 0;
                       const isPaid = balanceVal === 0;
 
                       return (
-                        <tr key={res._id} className="hover:bg-[#fcfcfc]/60 transition-colors group">
-                          <td className="py-4.5 px-6">
-                            <div className="font-medium text-navy group-hover:text-brand transition-colors flex items-center gap-1.5">
+                        <tr key={res._id} className="hover:bg-[#fcfcfc]/60 transition-colors group align-middle">
+                          <td className="py-3.5 pl-4 pr-2 align-middle">
+                            <div className="font-bold text-navy group-hover:text-purple transition-colors flex items-center gap-1.5 truncate">
                               {res.guest}
                               {res.groupBooking && (
                                 <span className="rounded bg-navy/15 border border-navy/35 text-[9px] font-bold px-1 text-navy-deep uppercase scale-90">Group</span>
                               )}
                             </div>
-                            <div className="text-[11px] text-muted-foreground">{res.phone}</div>
+                            <div className="text-[11px] text-muted-foreground font-medium truncate">{res.phone}</div>
                           </td>
-                          <td className="py-4.5 px-4 font-mono text-[13px]">{res.room || "—"}</td>
-                          <td className="py-4.5 px-4">
-                            <div className="font-medium">{res.checkIn} → {res.checkOut}</div>
-                            <div className="text-[11px] text-muted-foreground">{res.nights || 1} Night(s) / {res.pax || "2 Adults"}</div>
+                          <td className="py-3.5 px-2 font-mono text-xs font-bold text-navy align-middle">{res.room || "—"}</td>
+                          <td className="py-3.5 px-3 align-middle">
+                            <div className="font-bold text-navy whitespace-nowrap">{res.checkIn} → {res.checkOut}</div>
+                            <div className="text-[11px] text-muted-foreground font-medium">{res.nights || 1} Night(s) / {res.pax || "2 Adults"}</div>
                           </td>
-                          <td className="py-4.5 px-4">
-                            <span className="inline-flex items-center rounded-full bg-muted/60 border border-muted/80 px-2.5 py-0.5 text-xs font-semibold text-navy">
+                          <td className="py-3.5 px-3 align-middle">
+                            <span className="inline-flex items-center rounded-full bg-muted/60 border border-muted/80 px-2.5 py-0.5 text-[11px] font-semibold text-navy whitespace-nowrap">
                               {res.source || "Direct"}
                             </span>
                           </td>
-                          <td className="py-4.5 px-4 text-right">
-                            <div className="font-semibold text-navy">₹{res.amount?.toLocaleString()}</div>
-                            <div className={`text-[11px] font-bold ${isPaid ? "text-success" : "text-destructive"}`}>
-                              {isPaid ? "Fully Paid" : `Bal: ₹${balanceVal.toLocaleString()}`}
+                          <td className="py-3.5 px-3 text-left align-middle">
+                            <div className="font-bold text-navy text-xs">₹{(res.amount || 0).toLocaleString("en-IN")}</div>
+                            <div className="mt-1 flex justify-start">
+                              {isPaid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
+                                  <CheckCircle className="size-2.5 shrink-0" />
+                                  Fully Paid
+                                </span>
+                              ) : balanceVal < (res.amount || 0) ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs whitespace-nowrap">
+                                  <AlertTriangle className="size-2.5 shrink-0" />
+                                  Due: ₹{balanceVal.toLocaleString("en-IN")}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs whitespace-nowrap">
+                                  <XCircle className="size-2.5 shrink-0" />
+                                  Unpaid
+                                </span>
+                              )}
                             </div>
                           </td>
-                          <td className="py-4.5 px-4 text-center">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
-                                res.status === "Confirmed"
-                                  ? "bg-brand/10 text-brand border border-brand/20"
-                                  : res.status === "Checked-in"
-                                  ? "bg-success/10 text-success border border-success/20"
-                                  : res.status === "Checked-out"
-                                  ? "bg-muted text-muted-foreground border border-muted-foreground/15"
-                                  : res.status === "Cancelled"
-                                  ? "bg-destructive/10 text-destructive border border-destructive/20"
-                                  : "bg-warning/10 text-warning border border-warning/20"
-                              }`}
-                            >
-                              {res.status === "Checked-in" && <CheckCircle className="size-3 shrink-0" />}
-                              {res.status === "Pending" && <Clock className="size-3 shrink-0" />}
-                              {res.status}
-                            </span>
+                          <td className="py-3.5 px-3 text-left align-middle">
+                            <div className="flex items-center justify-start">
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap ${
+                                  res.status === "Confirmed"
+                                    ? "bg-purple/10 text-purple border border-purple/20"
+                                    : res.status === "Checked-in"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : res.status === "Checked-out"
+                                    ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                    : res.status === "Cancelled"
+                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
+                              >
+                                {res.status === "Checked-in" && <CheckCircle className="size-3 shrink-0 text-emerald-600" />}
+                                {res.status === "Pending" && <Clock className="size-3 shrink-0 text-amber-600" />}
+                                {res.status === "Confirmed" && <CalendarCheck className="size-3 shrink-0 text-purple" />}
+                                {res.status === "Cancelled" && <XCircle className="size-3 shrink-0 text-rose-600" />}
+                                {res.status}
+                              </span>
+                            </div>
                           </td>
-                          <td className="py-4.5 px-6 text-right">
-                            <div className="flex items-center justify-end gap-1.5 opacity-85 group-hover:opacity-100 transition-opacity">
+                          <td className="py-3.5 pl-3 pr-4 text-left align-middle">
+                            <div className="flex items-center justify-start gap-1 whitespace-nowrap">
                               {res.status === "Pending" && (
                                 <Button
                                   onClick={() => handleStatusChange(res._id, "Checked-in")}
                                   size="xs"
                                   variant="outline"
-                                  className="text-success border-success/40 hover:bg-success/5 h-7 px-2.5 text-xs font-semibold"
+                                  className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                                 >
                                   Check-In
                                 </Button>
@@ -565,20 +584,17 @@ function ReservationsPage() {
                                   onClick={() => handleStatusChange(res._id, "Checked-out")}
                                   size="xs"
                                   variant="outline"
-                                  className="text-navy border-navy/40 hover:bg-navy/5 h-7 px-2.5 text-xs font-semibold"
+                                  className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                                 >
                                   Check-Out
                                 </Button>
                               )}
                               <Button
-                                onClick={() => {
-                                  setSelectedRes(res);
-                                  setIsDrawerOpen(true);
-                                }}
+                                onClick={() => navigate({ to: `/admin/reservations/view/${res._id || res.id}` })}
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 hover:text-[#4f46e5] cursor-pointer"
-                                title="Open Stay Diagnostic Details"
+                                className="size-7 text-navy/70 hover:text-purple hover:bg-purple/10 rounded-lg cursor-pointer transition-colors"
+                                title="View Reservation"
                               >
                                 <Eye className="size-3.5" />
                               </Button>
@@ -586,7 +602,7 @@ function ReservationsPage() {
                                 onClick={() => navigate({ to: `/admin/reservations/edit/${res._id || res.id}` })}
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 hover:text-brand cursor-pointer"
+                                className="size-7 text-navy/70 hover:text-purple hover:bg-purple/10 rounded-lg cursor-pointer transition-colors"
                                 title="Modify Booking"
                               >
                                 <Edit2 className="size-3.5" />
@@ -595,7 +611,7 @@ function ReservationsPage() {
                                 onClick={() => handleDelete(res._id)}
                                 size="icon"
                                 variant="ghost"
-                                className="size-8 text-destructive hover:bg-destructive/5 cursor-pointer"
+                                className="size-7 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
                                 title="Cancel Booking"
                               >
                                 <XCircle className="size-3.5" />
@@ -696,8 +712,7 @@ function ReservationsPage() {
                         
                         return (
                           <td key={dIdx} className="py-4.5 px-2 text-center select-none cursor-pointer align-middle w-[96px] min-w-[96px]" onClick={() => {
-                            setSelectedRes(activeRes);
-                            setIsDrawerOpen(true);
+                            navigate({ to: `/admin/reservations/view/${activeRes._id || activeRes.id}` });
                           }}>
                             <div className="flex items-center justify-center">
                               <div className={`py-1.5 px-2 rounded-lg text-[10px] font-bold truncate text-center w-full max-w-[84px] cursor-pointer ${

@@ -128,6 +128,7 @@ function Home() {
   const [settings, setSettings] = useState({
     publicBookingsEnabled: true
   });
+  const [selectedProperty, setSelectedProperty] = useState(null);
 
   useEffect(() => {
     publicService.getHome()
@@ -153,31 +154,72 @@ function Home() {
       })
       .catch(err => {});
 
-    publicService.getMedia()
+    const fetchActiveProperty = () => {
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      publicService.getProperty(activeId)
+        .then(res => {
+          if (res.success && res.data) {
+            setSelectedProperty(res.data);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchActiveProperty();
+    window.addEventListener('selected-property-changed', fetchActiveProperty);
+
+    publicService.getProperties()
       .then(res => {
-        if (res.success && res.data) {
-          const mapping = res.data;
-          const mappedSlides = slides.map(slide => {
-            let key = '';
-            if (slide.image === jaipurImg) key = 'jaipur';
-            else if (slide.image === goaImg) key = 'goa';
-            else if (slide.image === palaceImg) key = 'palace';
-            else if (slide.image === keralaImg) key = 'kerala';
+        if (res.success && res.data && res.data.length > 0) {
+          const newSlides = res.data.map(p => {
+            let img = jaipurImg;
+            if (p._id === 'HS-UDA' || p.id === 'HS-UDA') img = palaceImg;
+            else if (p._id === 'HS-GOA' || p.id === 'HS-GOA') img = goaImg;
+            else if (p._id === 'HS-KER' || p.id === 'HS-KER') img = keralaImg;
+
+            if (p.settings?.logo) img = p.settings.logo;
+            else if (p.settings?.photos && p.settings.photos.length > 0) img = p.settings.photos[0];
 
             return {
-              ...slide,
-              image: mapping[key] || slide.image
+              image: img,
+              title: p.name,
+              location: p.city,
+              tagline: p.settings?.classification || "Boutique Luxury Hotel",
+              id: p._id || p.id
             };
           });
-          setDynamicSlides(mappedSlides);
+          setDynamicSlides(newSlides);
         }
       })
-      .catch(err => {});
+      .catch(() => {});
+
+    return () => {
+      window.removeEventListener('selected-property-changed', fetchActiveProperty);
+    };
   }, []);
 
   // States for OTA Sync Interaction
   const [otaState, setOtaState] = useState("idle"); // idle, booking_made, syncing_pms, syncing_all, synced
   const [activeOtaChannel, setActiveOtaChannel] = useState(null);
+
+  // States for Hero Room Search (unfilled by default)
+  const [heroLocation, setHeroLocation] = useState("");
+  const [heroCheckIn, setHeroCheckIn] = useState("");
+  const [heroCheckOut, setHeroCheckOut] = useState("");
+
+  const handleHeroSearchSubmit = (e) => {
+    e.preventDefault();
+    if (heroLocation) localStorage.setItem('search_location', heroLocation);
+    if (heroCheckIn) localStorage.setItem('booking_check_in', heroCheckIn);
+    if (heroCheckOut) localStorage.setItem('booking_check_out', heroCheckOut);
+
+    const query = new URLSearchParams();
+    if (heroLocation) query.set('location', heroLocation);
+    if (heroCheckIn) query.set('checkIn', heroCheckIn);
+    if (heroCheckOut) query.set('checkOut', heroCheckOut);
+
+    window.location.href = `/search?${query.toString()}`;
+  };
 
 
 
@@ -256,36 +298,52 @@ function Home() {
                   <p className="text-xs text-muted-foreground font-medium">Please contact our reservation desk or front office directly to book a room.</p>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-4">
+                <form onSubmit={handleHeroSearchSubmit} className="grid gap-4 sm:grid-cols-4">
                   <label className="block text-left">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Destination</span>
                     <span className="relative mt-1.5 block">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
-                      <Input className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-navy font-semibold" placeholder="Jaipur, Udaipur, Goa..." />
+                      <Input 
+                        value={heroLocation}
+                        onChange={e => setHeroLocation(e.target.value)}
+                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-navy font-semibold text-xs" 
+                        placeholder="Hyderabad, Jaipur, Goa..." 
+                      />
                     </span>
                   </label>
                   <label className="block text-left">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-in Date</span>
                     <span className="relative mt-1.5 block">
                       <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
-                      <Input type="date" className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-sm text-navy font-semibold" defaultValue="2026-08-12" />
+                      <Input 
+                        type="date" 
+                        value={heroCheckIn}
+                        onChange={e => setHeroCheckIn(e.target.value)}
+                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-xs text-navy font-semibold" 
+                      />
                     </span>
                   </label>
                   <label className="block text-left">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-out Date</span>
                     <span className="relative mt-1.5 block">
                       <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
-                      <Input type="date" className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-sm text-navy font-semibold" defaultValue="2026-08-15" />
+                      <Input 
+                        type="date" 
+                        value={heroCheckOut}
+                        onChange={e => setHeroCheckOut(e.target.value)}
+                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-xs text-navy font-semibold" 
+                      />
                     </span>
                   </label>
                   <div className="flex items-end">
-                    <Button asChild className="h-12 w-full rounded-md bg-navy text-cream hover:bg-navy/90 font-semibold gap-2 shadow-soft cursor-pointer">
-                      <Link to="/search">
-                        <SearchIcon className="size-4" /> Search Rooms
-                      </Link>
+                    <Button 
+                      type="submit"
+                      className="h-12 w-full rounded-md bg-navy text-cream hover:bg-navy/90 font-bold gap-2 shadow-soft cursor-pointer text-xs border-none"
+                    >
+                      <SearchIcon className="size-4" /> Search Rooms
                     </Button>
                   </div>
-                </div>
+                </form>
               )}
             </div>
           </div>
@@ -293,7 +351,7 @@ function Home() {
           {/* Slider Indicators and Caption */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-cream/15 pt-6">
             <div className="flex items-center gap-3">
-              {slides.map((_, idx) => (
+              {(dynamicSlides.length > 0 ? dynamicSlides : slides).map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentSlide(idx)}
@@ -304,11 +362,16 @@ function Home() {
                 />
               ))}
             </div>
-            <div className="text-right text-xs sm:text-sm">
-              <span className="text-gold font-semibold tracking-wider uppercase">{slides[currentSlide].tagline}</span>
-              <span className="mx-2 text-cream/35">|</span>
-              <span className="text-cream/70 font-ui">{slides[currentSlide].title}, {slides[currentSlide].location}</span>
-            </div>
+            {(() => {
+              const activeSlide = dynamicSlides[currentSlide] || dynamicSlides[0] || slides[0] || {};
+              return (
+                <div className="text-right text-xs sm:text-sm">
+                  <span className="text-gold font-semibold tracking-wider uppercase">{activeSlide.tagline || "Luxury Stays"}</span>
+                  <span className="mx-2 text-cream/35">|</span>
+                  <span className="text-cream/70 font-ui">{activeSlide.title || "Hour Stay"}, {activeSlide.location || "India"}</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </section>
@@ -823,10 +886,10 @@ function Home() {
           <div className="mt-16 grid gap-8 md:grid-cols-3">
             {[
               {
-                quote: "During peak wedding seasons in Jaipur, we handle dozens of guests at once. Hour Stay reduced our front-desk check-in turnaround to 90 seconds. The integrated GST invoicing alone saves our accounting team hours.",
-                name: "Vikram Rathore",
-                role: "General Manager, Rambagh Residency",
-                city: "Jaipur, Rajasthan",
+                quote: selectedProperty?.settings?.description || "During peak wedding seasons in Jaipur, we handle dozens of guests at once. Hour Stay reduced our front-desk check-in turnaround to 90 seconds. The integrated GST invoicing alone saves our accounting team hours.",
+                name: selectedProperty?.gm || "Vikram Rathore",
+                role: `General Manager, ${selectedProperty?.name || "Rambagh Residency"}`,
+                city: selectedProperty?.city || "Jaipur, Rajasthan",
                 stars: 5,
                 tone: "bg-navy text-cream"
               },

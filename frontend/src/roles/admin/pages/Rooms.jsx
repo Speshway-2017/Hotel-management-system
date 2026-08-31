@@ -83,53 +83,44 @@ function RoomsRatesPage() {
 
   // Tab navigation: 'rooms' | 'types' | 'plans' | 'availability' | 'restrictions'
   const [activeTab, setActiveTab] = useState("rooms");
-
-  // Core Data States (Initialized with local storage bindings or rich seeded data sets)
-  const [roomsList, setRoomsList] = useState(() => {
-    const saved = localStorage.getItem("hms_rooms_list");
-    if (saved) return JSON.parse(saved);
-    const initial = [
-      { _id: "R-101", roomNumber: "101", category: "Villa Suite", floor: "Floor 1", status: "Available", ratePlan: "Standard BAR", currentRate: 38900, lastUpdated: "2 mins ago" },
-      { _id: "R-102", roomNumber: "102", category: "Villa Suite", floor: "Floor 1", status: "Occupied", ratePlan: "Standard BAR", currentRate: 38900, lastUpdated: "10 mins ago" },
-      { _id: "R-103", roomNumber: "103", category: "Heritage Luxury", floor: "Floor 1", status: "Available", ratePlan: "Standard BAR", currentRate: 11400, lastUpdated: "1 hr ago" },
-      { _id: "R-104", roomNumber: "104", category: "Heritage Luxury", floor: "Floor 1", status: "Dirty", ratePlan: "Standard BAR", currentRate: 11400, lastUpdated: "Just now" },
-      { _id: "R-105", roomNumber: "105", category: "Superior Deluxe", floor: "Floor 1", status: "Blocked", ratePlan: "Promo Non-Ref", currentRate: 8500, lastUpdated: "Yesterday" },
-      { _id: "R-106", roomNumber: "106", category: "Superior Deluxe", floor: "Floor 1", status: "Out of Order", ratePlan: "Standard BAR", currentRate: 8500, lastUpdated: "3 days ago" },
-      { _id: "R-201", roomNumber: "201", category: "Maharaja Suite", floor: "Floor 2", status: "Occupied", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "4 hrs ago" },
-      { _id: "R-202", roomNumber: "202", category: "Maharaja Suite", floor: "Floor 2", status: "Available", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "5 mins ago" },
-      { _id: "R-203", roomNumber: "203", category: "Villa Suite", floor: "Floor 2", status: "Available", ratePlan: "LOS Special Plan", currentRate: 38900, lastUpdated: "20 mins ago" },
-      { _id: "R-205", roomNumber: "205", category: "Heritage Luxury", floor: "Floor 2", status: "Available", ratePlan: "Standard BAR", currentRate: 11400, lastUpdated: "12 hrs ago" },
-      { _id: "R-301", roomNumber: "301", category: "Maharaja Suite", floor: "Floor 3", status: "Available", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "Just now" },
-      { _id: "R-302", roomNumber: "302", category: "Maharaja Suite", floor: "Floor 3", status: "Occupied", ratePlan: "Standard BAR", currentRate: 24500, lastUpdated: "2 hrs ago" },
-      { _id: "R-303", roomNumber: "303", category: "Villa Suite", floor: "Floor 3", status: "Out of Order", ratePlan: "Standard BAR", currentRate: 38900, lastUpdated: "1 week ago" }
-    ];
-    localStorage.setItem("hms_rooms_list", JSON.stringify(initial));
-    return initial;
-  });
+  // Core Data States (Initialized with clean seeded room types)
+  const [roomsList, setRoomsList] = useState([
+    { _id: "R-101", roomNumber: "101", category: "Standard Room", floor: "Floor 1", status: "Available", ratePlan: "Standard Plan", currentRate: 3000, dailyRate: 3000 },
+    { _id: "R-102", roomNumber: "102", category: "Standard Room", floor: "Floor 1", status: "Occupied", ratePlan: "Standard Plan", currentRate: 3000, dailyRate: 3000 },
+    { _id: "R-103", roomNumber: "103", category: "Standard Room", floor: "Floor 1", status: "Available", ratePlan: "Standard Plan", currentRate: 3000, dailyRate: 3000 },
+    { _id: "R-201", roomNumber: "201", category: "Deluxe Room", floor: "Floor 2", status: "Available", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
+    { _id: "R-202", roomNumber: "202", category: "Deluxe Room", floor: "Floor 2", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
+    { _id: "R-203", roomNumber: "203", category: "Deluxe Room", floor: "Floor 2", status: "Blocked", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
+    { _id: "R-301", roomNumber: "301", category: "Executive Suite", floor: "Floor 3", status: "Available", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
+    { _id: "R-302", roomNumber: "302", category: "Executive Suite", floor: "Floor 3", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
+    { _id: "R-303", roomNumber: "303", category: "Executive Suite", floor: "Floor 3", status: "Available", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
+    { _id: "R-401", roomNumber: "401", category: "Villa Suite", floor: "Floor 4", status: "Available", ratePlan: "Weekend Plan", currentRate: 12500, dailyRate: 12500 },
+    { _id: "R-402", roomNumber: "402", category: "Villa Suite", floor: "Floor 4", status: "Occupied", ratePlan: "Weekend Plan", currentRate: 12500, dailyRate: 12500 },
+    { _id: "R-403", roomNumber: "403", category: "Villa Suite", floor: "Floor 4", status: "Blocked", ratePlan: "Weekend Plan", currentRate: 12500, dailyRate: 12500 }
+  ]);
 
   const [roomTypesList, setRoomTypesList] = useState(() => {
     const saved = localStorage.getItem("hms_room_types_list");
     if (saved) return JSON.parse(saved);
     const initial = [
-      { _id: "T-01", category: "Maharaja Suite", roomsCount: 4, occupancy: "2 Adults + 1 Child", baseRate: 24500, activePlans: 3, amenities: ["Private Jacuzzi", "Royal balcony view", "Butler service"], status: "Active" },
-      { _id: "T-02", category: "Villa Suite", roomsCount: 4, occupancy: "4 Adults", baseRate: 38900, activePlans: 3, amenities: ["Private infinity pool", "Plunge deck", "Open-air shower"], status: "Active" },
-      { _id: "T-03", category: "Heritage Luxury", roomsCount: 7, occupancy: "2 Adults", baseRate: 11400, activePlans: 2, amenities: ["Heritage furnishings", "Garden facing", "Coffee station"], status: "Active" },
-      { _id: "T-04", category: "Superior Deluxe", roomsCount: 9, occupancy: "2 Adults", baseRate: 8500, activePlans: 2, amenities: ["Courtyard facing", "Smart TV", "Mini espresso station"], status: "Active" }
+      { _id: "T-01", category: "Standard Room", roomsCount: 3, occupancy: "2 Adults", baseRate: 3000, activePlans: 1, amenities: ["Air Conditioning", "High-speed Wi-Fi", "Flat Screen TV"], status: "Active" },
+      { _id: "T-02", category: "Deluxe Room", roomsCount: 3, occupancy: "2 Adults + 1 Child", baseRate: 4500, activePlans: 2, amenities: ["Balcony View", "Smart TV", "Room Service"], status: "Active" },
+      { _id: "T-03", category: "Executive Suite", roomsCount: 3, occupancy: "4 Adults", baseRate: 6500, activePlans: 2, amenities: ["Jacuzzi Bath", "Living Room", "Espresso Machine", "Airport Transfer"], status: "Active" },
+      { _id: "T-04", category: "Villa Suite", roomsCount: 3, occupancy: "4 Adults", baseRate: 12500, activePlans: 3, amenities: ["Private Plunge Pool", "Garden Courtyard", "Personal Host"], status: "Active" }
     ];
     localStorage.setItem("hms_room_types_list", JSON.stringify(initial));
     return initial;
   });
 
   const [ratePlansList, setRatePlansList] = useState([
-    { _id: "P-01", name: "Standard Best Available Rate (BAR)", category: "All Categories", baseRate: "BAR 100%", pricingType: "Dynamic", mealPlan: "Continental Breakfast", policy: "Refundable up to 24h prior", minStay: "1 Night", status: "Active", lastUpdated: "1 hr ago" },
-    { _id: "P-02", name: "Non-Refundable Promo Plan", category: "All Categories", baseRate: "BAR - 12%", pricingType: "Discount Percentage", mealPlan: "Room Only", policy: "Non-cancellable, prepaid", minStay: "1 Night", status: "Active", lastUpdated: "4 hrs ago" },
-    { _id: "P-03", name: "Length of Stay Special (LOS)", category: "Villa Suite, Maharaja Suite", baseRate: "BAR - 15%", pricingType: "Length-based", mealPlan: "Half Board", policy: "Refundable up to 48h prior", minStay: "3 Nights", status: "Active", lastUpdated: "Yesterday" }
+    { _id: "P-01", name: "Standard Plan", category: "All Categories", baseRate: "BAR 100%", pricingType: "Standard", mealPlan: "Continental Breakfast", policy: "Refundable up to 24h prior", minStay: "1 Night", status: "Active", lastUpdated: "1 hr ago" },
+    { _id: "P-02", name: "Deluxe Plan", category: "Deluxe Room, Executive Suite", baseRate: "BAR - 10%", pricingType: "Package", mealPlan: "Half Board", policy: "Refundable up to 48h prior", minStay: "1 Night", status: "Active", lastUpdated: "4 hrs ago" },
+    { _id: "P-03", name: "Weekend Plan", category: "Villa Suite", baseRate: "BAR Special", pricingType: "Dynamic", mealPlan: "Full Board", policy: "Non-refundable", minStay: "2 Nights", status: "Active", lastUpdated: "Yesterday" }
   ]);
 
   const [restrictionsList, setRestrictionsList] = useState([
-    { _id: "RE-01", roomType: "Maharaja Suite", type: "Minimum Stay", value: "3 Nights", effectiveDates: "2026-08-20 to 2026-08-25", status: "Active" },
-    { _id: "RE-02", roomType: "Villa Suite", type: "Closed to Arrival (CTA)", value: "True", effectiveDates: "2026-08-18 to 2026-08-19", status: "Active" },
-    { _id: "RE-03", roomType: "Superior Deluxe", type: "Stop Sell", value: "True", effectiveDates: "2026-08-24 to 2026-08-26", status: "Active" }
+    { _id: "RE-01", roomType: "Executive Suite", type: "Minimum Stay", value: "2 Nights", effectiveDates: "2026-08-20 to 2026-08-25", status: "Active" },
+    { _id: "RE-02", roomType: "Villa Suite", type: "Closed to Arrival (CTA)", value: "True", effectiveDates: "2026-08-18 to 2026-08-19", status: "Active" }
   ]);
 
   // Calendar scheduler state
@@ -148,6 +139,68 @@ function RoomsRatesPage() {
   const [formPlanName, setFormPlanName] = useState("");
   const [formPlanCategory, setFormPlanCategory] = useState("All Categories");
   const [formPlanPricingType, setFormPlanPricingType] = useState("Dynamic");
+
+  // Load backend properties & dynamic room dataset
+  async function loadData() {
+    try {
+      setLoading(true);
+      const [propsRes, roomsRes] = await Promise.all([
+        superAdminService.getProperties(),
+        adminService.getRooms()
+      ]);
+
+      if (propsRes.success && propsRes.data && propsRes.data.length > 0) {
+        setProperties(propsRes.data);
+        const prop = propsRes.data[0];
+        setSelectedPropId(prop._id || prop.id);
+        
+        const settings = prop.settings || {};
+        if (settings.roomTypes) setRoomTypesList(settings.roomTypes);
+        if (settings.ratePlans) setRatePlansList(settings.ratePlans);
+        if (settings.restrictions) setRestrictionsList(settings.restrictions);
+      }
+
+      if (roomsRes.success && roomsRes.data && roomsRes.data.length > 0) {
+        const normalized = roomsRes.data.map(rm => {
+          let cleanStatus = rm.status;
+          if (cleanStatus === 'Dirty' || cleanStatus === 'Cleaning' || cleanStatus === 'Out of Order' || cleanStatus === 'Maintenance') {
+            cleanStatus = 'Blocked';
+          }
+          if (!['Available', 'Occupied', 'Blocked'].includes(cleanStatus)) {
+            cleanStatus = 'Available';
+          }
+          
+          let roomFloor = rm.floor;
+          if (!roomFloor) {
+            const firstDigit = rm.roomNumber ? String(rm.roomNumber).charAt(0) : '';
+            if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
+              roomFloor = `Floor ${firstDigit}`;
+            } else {
+              roomFloor = 'Floor 1';
+            }
+          }
+
+          const actualRate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500);
+
+          return {
+            ...rm,
+            status: cleanStatus,
+            floor: roomFloor,
+            category: rm.category || 'Standard Room',
+            ratePlan: rm.ratePlan || 'Standard Plan',
+            currentRate: actualRate,
+            dailyRate: actualRate,
+            baseRate: actualRate
+          };
+        });
+        setRoomsList(normalized);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to load properties and rooms dataset");
+    } finally {
+      setLoading(false);
+    }
+  }
   const [formPlanMealPlan, setFormPlanMealPlan] = useState("Continental Breakfast");
   const [formPlanPolicy, setFormPlanPolicy] = useState("Refundable");
   const [formPlanMinStay, setFormPlanMinStay] = useState("1 Night");
@@ -376,9 +429,6 @@ function RoomsRatesPage() {
   const statusMeta = {
     Available: { tone: "success", icon: CheckCircle, label: "Available", bgAccent: "border-l-success" },
     Occupied: { tone: "brand", icon: Bed, label: "Occupied", bgAccent: "border-l-indigo" },
-    Dirty: { tone: "warning", icon: AlertTriangle, label: "Dirty", bgAccent: "border-l-warning" },
-    Cleaning: { tone: "purple", icon: Sparkles, label: "Cleaning", bgAccent: "border-l-purple" },
-    "Out of Order": { tone: "error", icon: XCircle, label: "Maintenance", bgAccent: "border-l-destructive" },
     Blocked: { tone: "neutral", icon: Clock, label: "Blocked", bgAccent: "border-l-neutral" }
   };
 
@@ -395,13 +445,12 @@ function RoomsRatesPage() {
     <div className="space-y-6 text-left animate-fade-in font-ui">
       
 
-
       {/* 2. Standardized Metric KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard label="Total Rooms" value={kpiTotal.toString()} hint="Assigned property capacity" accentColor="#0d1b2a" />
-        <PremiumStatCard label="Available" value={kpiAvailable.toString()} hint="Vacant & clean rooms" accentColor="#10b981" />
+        <PremiumStatCard label="Available" value={kpiAvailable.toString()} hint="Vacant & ready rooms" accentColor="#10b981" />
         <PremiumStatCard label="Occupied" value={kpiOccupied.toString()} hint="Active guests stays" accentColor="#3b82f6" />
-        <PremiumStatCard label="Maintenance" value={kpiMaintenance.toString()} hint="Dirty/maintenance turnaround" accentColor="#ef4444" />
+        <PremiumStatCard label="Blocked" value={kpiBlocked.toString()} hint="Hold or restricted" accentColor="#6b7280" />
       </div>
 
       {/* 3. Main Navigation Sub-tabs */}
@@ -463,6 +512,7 @@ function RoomsRatesPage() {
                 <option value="Floor 1">Floor 1</option>
                 <option value="Floor 2">Floor 2</option>
                 <option value="Floor 3">Floor 3</option>
+                <option value="Floor 4">Floor 4</option>
               </Select>
             </div>
 
@@ -476,16 +526,14 @@ function RoomsRatesPage() {
                 <option value="all">All Statuses</option>
                 <option value="Available">Available</option>
                 <option value="Occupied">Occupied</option>
-                <option value="Dirty">Dirty</option>
                 <option value="Blocked">Blocked</option>
-                <option value="Out of Order">Out of Order</option>
               </Select>
             </div>
 
             <div className="flex justify-end select-none">
               <Button
                 onClick={() => navigate({ to: "/admin/rooms/add" })}
-                className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-9 px-4 font-bold rounded-full w-full justify-center flex items-center gap-1.5"
+                className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-9 px-4 font-bold rounded-full w-full justify-center flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="size-4" /> Add Room
               </Button>
@@ -505,23 +553,21 @@ function RoomsRatesPage() {
                 <table className="w-full text-left border-collapse text-xs table-fixed">
                   <colgroup>
                     <col className="w-[130px]" />
-                    <col className="w-[170px]" />
-                    <col className="w-[100px]" />
+                    <col className="w-[180px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[140px]" />
                     <col className="w-[130px]" />
                     <col className="w-[120px]" />
-                    <col className="w-[120px]" />
-                    <col className="w-[110px]" />
                     <col className="w-[110px]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
                       <th className="py-4.5 px-6 w-[130px] min-w-[130px]">Room Number</th>
-                      <th className="py-4.5 px-4 w-[170px] min-w-[170px]">Room Type</th>
-                      <th className="py-4.5 px-4 w-[100px] min-w-[100px]">Floor Map</th>
-                      <th className="py-4.5 px-4 w-[130px] min-w-[130px]">Active Plan</th>
-                      <th className="py-4.5 px-4 w-[120px] min-w-[120px]">Daily Rate</th>
+                      <th className="py-4.5 px-4 w-[180px] min-w-[180px]">Room Type</th>
+                      <th className="py-4.5 px-4 w-[110px] min-w-[110px]">Floor</th>
+                      <th className="py-4.5 px-4 w-[140px] min-w-[140px]">Active Rate Plan</th>
+                      <th className="py-4.5 px-4 w-[130px] min-w-[130px]">Daily Rate</th>
                       <th className="py-4.5 px-4 w-[120px] min-w-[120px]">Status</th>
-                      <th className="py-4.5 px-4 w-[110px] min-w-[110px]">Last Sync</th>
                       <th className="py-4.5 px-6 w-[110px] min-w-[110px] text-right">Actions</th>
                     </tr>
                   </thead>
@@ -532,21 +578,20 @@ function RoomsRatesPage() {
                       return (
                         <tr key={rm._id} className="hover:bg-[#fcfcfc]/60 transition-colors group">
                           <td className="py-4 px-6 font-bold text-navy-deep text-sm w-[130px] min-w-[130px] truncate">Room {rm.roomNumber}</td>
-                          <td className="py-4 px-4 font-bold text-brand w-[170px] min-w-[170px] truncate">{rm.category}</td>
-                          <td className="py-4 px-4 text-muted-foreground w-[100px] min-w-[100px] truncate">{rm.floor}</td>
-                          <td className="py-4 px-4 font-mono text-[11px] text-muted-foreground w-[130px] min-w-[130px] truncate">{rm.ratePlan}</td>
-                          <td className="py-4 px-4 font-bold text-navy w-[120px] min-w-[120px] truncate">₹{rm.currentRate?.toLocaleString()}</td>
+                          <td className="py-4 px-4 font-bold text-brand w-[180px] min-w-[180px] truncate">{rm.category}</td>
+                          <td className="py-4 px-4 text-muted-foreground w-[110px] min-w-[110px] truncate">{rm.floor || 'Floor 1'}</td>
+                          <td className="py-4 px-4 font-mono text-[11px] text-muted-foreground w-[140px] min-w-[140px] truncate">{rm.ratePlan || 'Standard Plan'}</td>
+                          <td className="py-4 px-4 font-bold text-navy w-[130px] min-w-[130px] truncate">₹{Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500).toLocaleString('en-IN')}</td>
                           <td className="py-4 px-4 w-[120px] min-w-[120px]">
                             <Tag tone={meta.tone} className="flex items-center gap-1 w-fit select-none py-0.5">
                               <StatusIcon className="size-3" />
                               <span>{meta.label}</span>
                             </Tag>
                           </td>
-                          <td className="py-4 px-4 text-muted-foreground text-[11px] w-[110px] min-w-[110px] truncate">{rm.lastUpdated}</td>
                           <td className="py-4 px-6 text-right w-[110px] min-w-[110px]">
                             <div className="flex items-center justify-end gap-1.5 select-none opacity-85 group-hover:opacity-100 transition-opacity">
                               <Button
-                                onClick={() => navigate({ to: `/admin/rooms/view/${rm._id}` })}
+                                onClick={() => navigate({ to: `/admin/rooms/view/${rm._id || rm.id || rm.roomNumber}` })}
                                 size="icon"
                                 variant="ghost"
                                 className="size-7 hover:text-[#4f46e5] cursor-pointer"
@@ -568,7 +613,7 @@ function RoomsRatesPage() {
                                 <Sliders className="size-3.5" />
                               </Button>
                               <Button
-                                onClick={() => navigate({ to: `/admin/rooms/edit/${rm._id}` })}
+                                onClick={() => navigate({ to: `/admin/rooms/edit/${rm._id || rm.id || rm.roomNumber}` })}
                                 size="icon"
                                 variant="ghost"
                                 className="size-7 hover:text-brand cursor-pointer"
@@ -1111,7 +1156,7 @@ function RoomsRatesPage() {
               <p className="text-xs text-muted-foreground">Force status overrides to trigger cleanups or lock room inventory.</p>
               
               <div className="space-y-2">
-                {["Available", "Dirty", "Blocked", "Out of Order"].map((status) => {
+                {["Available", "Occupied", "Blocked"].map((status) => {
                   const meta = statusMeta[status] || statusMeta.Available;
                   const Icon = meta.icon;
                   return (

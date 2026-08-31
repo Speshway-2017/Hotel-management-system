@@ -47,5 +47,20 @@ export const publicService = {
   },
   getMedia: async () => {
     return await request('/media');
+  },
+  getProperties: async () => {
+    return await request('/properties');
+  },
+  getProperty: async (id) => {
+    return await request(`/properties/${id}`);
+  },
+  getPropertyRooms: async (id) => {
+    return await request(`/properties/${id}/rooms`);
+  },
+  createBooking: async (bookingData) => {
+    return await request('/bookings', {
+      method: 'POST',
+      body: JSON.stringify(bookingData)
+    });
   }
 };

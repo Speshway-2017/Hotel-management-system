@@ -109,6 +109,29 @@ function Contact() {
         }
       })
       .catch(err => {});
+
+    const fetchActiveProperty = () => {
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      publicService.getProperty(activeId)
+        .then(res => {
+          if (res.success && res.data) {
+            const p = res.data;
+            setContactData(prev => ({
+              ...prev,
+              name: p.name,
+              email: p.settings?.email || prev.email,
+              phone: p.settings?.phone || prev.phone,
+              address: `${p.settings?.address || ''}, ${p.city}, ${p.settings?.state || ''} ${p.settings?.pincode || ''}, ${p.settings?.country || ''}`,
+              hours: `Check-in: ${p.settings?.checkInTime || '12:00'} · Check-out: ${p.settings?.checkOutTime || '11:00'} (Support 24/7)`
+            }));
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchActiveProperty();
+    window.addEventListener('selected-property-changed', fetchActiveProperty);
+    return () => window.removeEventListener('selected-property-changed', fetchActiveProperty);
   }, []);
 
   const allFaqs = dbFaqs.length > 0 ? dbFaqs : faqs;

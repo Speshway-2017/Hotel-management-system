@@ -10,7 +10,7 @@ import { authService } from "@/services/auth";
 
 function SuperAdminProfile() {
   const currentUser = authService.getCurrentUser() || {
-    name: "Nandini Rao",
+    name: "Nandini Rao Rao",
     email: "superadmin@hourstay.com",
     phone: "9999999999",
     role: "Super Admin",
@@ -20,7 +20,7 @@ function SuperAdminProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [profileData, setProfileData] = useState({
-    name: currentUser.name || "Nandini Rao",
+    name: currentUser.name || "Nandini Rao Rao",
     email: currentUser.email || "superadmin@hourstay.com",
     phone: currentUser.mobile || currentUser.phone || "9999999999",
     role: currentUser.role === "super-admin" ? "Super Admin" : (currentUser.role || "Super Admin"),

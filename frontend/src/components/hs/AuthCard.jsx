@@ -59,6 +59,12 @@ export function AuthCard({
       if (mode === "login") {
         const res = await authService.login(email, password);
         if (res.success) {
+          const redirectTarget = localStorage.getItem('redirect_after_login') || searchParams.get("redirect");
+          if (redirectTarget) {
+            localStorage.removeItem('redirect_after_login');
+            window.location.href = redirectTarget;
+            return;
+          }
           const redirectMap = {
             "super-admin": "/super-admin",
             "admin": "/admin",
@@ -72,6 +78,12 @@ export function AuthCard({
       } else if (mode === "register") {
         const res = await authService.register(name, email, password, mobile, "guest");
         if (res.success) {
+          const redirectTarget = localStorage.getItem('redirect_after_login') || searchParams.get("redirect");
+          if (redirectTarget) {
+            localStorage.removeItem('redirect_after_login');
+            window.location.href = redirectTarget;
+            return;
+          }
           navigate({ to: "/guest" });
         }
       } else if (mode === "forgot") {

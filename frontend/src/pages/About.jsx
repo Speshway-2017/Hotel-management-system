@@ -65,6 +65,29 @@ function About() {
         }
       })
       .catch(err => {});
+
+    const fetchActiveProperty = () => {
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      publicService.getProperty(activeId)
+        .then(res => {
+          if (res.success && res.data) {
+            const p = res.data;
+            setAboutData(prev => ({
+              ...prev,
+              title: `About ${p.name}`,
+              description: p.settings?.description || prev.description,
+              mission: `Classification: ${p.settings?.classification || 'Standard Boutique'} · Located in ${p.city}, ${p.settings?.state || ''}`,
+              vision: `Cancellation Policy: ${p.settings?.cancellationPolicy || prev.vision}`,
+              imageUrl: p.settings?.photos?.[0] || p.settings?.logo || prev.imageUrl
+            }));
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchActiveProperty();
+    window.addEventListener('selected-property-changed', fetchActiveProperty);
+    return () => window.removeEventListener('selected-property-changed', fetchActiveProperty);
   }, []);
 
   return (

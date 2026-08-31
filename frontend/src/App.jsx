@@ -13,6 +13,7 @@ import { Route as Features } from "./pages/Features";
 import { Route as Contact } from "./pages/Contact";
 import { Route as Search } from "./pages/Search";
 import { Route as RoomDetails } from "./pages/RoomDetails";
+import { Route as HotelDetails } from "./pages/HotelDetails";
 import { Route as BlogIndex } from "./pages/BlogIndex";
 import { Route as BlogPost } from "./pages/BlogPost";
 import { Route as Login } from "./pages/Login";
@@ -125,6 +126,9 @@ import { Route as GuestProfile } from "./roles/guest/pages/Profile";
 import { Route as GuestReviews } from "./roles/guest/pages/Reviews";
 import { Route as GuestSearch } from "./roles/guest/pages/Search";
 import { Route as GuestServices } from "./roles/guest/pages/Services";
+import { Route as GuestCurrentStay } from "./roles/guest/pages/CurrentStay";
+import { Route as GuestInvoices } from "./roles/guest/pages/Invoices";
+import { Route as GuestSettings } from "./roles/guest/pages/Settings";
 
 // Import Super Admin Workspace Pages
 import { Route as SuperAdminLayout } from "./roles/super-admin/pages/SuperAdminLayout";
@@ -257,6 +261,8 @@ export default function App() {
           <Route path="/features" element={<RouteWrapper routeObj={Features} />} />
           <Route path="/contact" element={<RouteWrapper routeObj={Contact} />} />
           <Route path="/search" element={<RouteWrapper routeObj={Search} />} />
+          <Route path="/hotels" element={<RouteWrapper routeObj={Search} />} />
+          <Route path="/hotels/:propertyId" element={<RouteWrapper routeObj={HotelDetails} />} />
           <Route path="/rooms/:roomId" element={<RouteWrapper routeObj={RoomDetails} />} />
           <Route path="/blog" element={<RouteWrapper routeObj={BlogIndex} />} />
           <Route path="/blog/:slug" element={<RouteWrapper routeObj={BlogPost} />} />
@@ -372,7 +378,9 @@ export default function App() {
             <Route path="/guest" element={<RouteWrapper routeObj={GuestDashboard} />} />
             <Route path="/guest/booking" element={<RouteWrapper routeObj={GuestBooking} />} />
             <Route path="/guest/bookings" element={<RouteWrapper routeObj={GuestBookings} />} />
+            <Route path="/guest/bookings/:id" element={<RouteWrapper routeObj={GuestBookings} />} />
             <Route path="/guest/folio" element={<RouteWrapper routeObj={GuestFolio} />} />
+            <Route path="/guest/folio/:id" element={<RouteWrapper routeObj={GuestFolio} />} />
             <Route path="/guest/loyalty" element={<RouteWrapper routeObj={GuestLoyalty} />} />
             <Route path="/guest/notifications" element={<RouteWrapper routeObj={GuestNotifications} />} />
             <Route path="/guest/payment" element={<RouteWrapper routeObj={GuestPayment} />} />
@@ -381,6 +389,9 @@ export default function App() {
             <Route path="/guest/reviews" element={<RouteWrapper routeObj={GuestReviews} />} />
             <Route path="/guest/search" element={<RouteWrapper routeObj={GuestSearch} />} />
             <Route path="/guest/services" element={<RouteWrapper routeObj={GuestServices} />} />
+            <Route path="/guest/current-stay" element={<RouteWrapper routeObj={GuestCurrentStay} />} />
+            <Route path="/guest/invoices" element={<RouteWrapper routeObj={GuestInvoices} />} />
+            <Route path="/guest/settings" element={<RouteWrapper routeObj={GuestSettings} />} />
           </Route>
 
           {/* Super Admin Workspace */}

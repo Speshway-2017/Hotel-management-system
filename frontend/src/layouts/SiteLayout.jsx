@@ -19,6 +19,9 @@ export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  const [properties, setProperties] = useState([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState(localStorage.getItem('selected_property_id') || 'HS-JAI');
+
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 15);
@@ -28,12 +31,38 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    publicService.getProperties()
+      .then(res => {
+        if (res.success && res.data) {
+          setProperties(res.data);
+          if (res.data.length > 0) {
+            const hasSelected = res.data.some(p => p._id === selectedPropertyId || p.id === selectedPropertyId);
+            if (!hasSelected) {
+              const firstId = res.data[0]._id || res.data[0].id;
+              setSelectedPropertyId(firstId);
+              localStorage.setItem('selected_property_id', firstId);
+              window.dispatchEvent(new Event('selected-property-changed'));
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [selectedPropertyId]);
+
+  const handlePropertyChange = (e) => {
+    const id = e.target.value;
+    setSelectedPropertyId(id);
+    localStorage.setItem('selected_property_id', id);
+    window.dispatchEvent(new Event('selected-property-changed'));
+  };
+
   return (
     <header className={cn(
-      "sticky top-0 z-40 transition-all duration-300 w-full border-b",
+      "sticky top-0 z-40 transition-all duration-300 w-full border-b bg-white",
       scrolled 
-        ? "bg-cream shadow-[0_10px_30px_-10px_rgba(13,27,42,0.08)] border-navy/5 py-2" 
-        : "bg-cream border-transparent py-4"
+        ? "bg-white/95 backdrop-blur-md shadow-[0_4px_20px_rgba(13,27,42,0.08)] border-navy/10 py-2.5" 
+        : "bg-white border-navy/5 py-4"
     )}>
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 sm:px-6 transition-all duration-300">
         <Logo removeBg={true} />
@@ -78,7 +107,7 @@ export function SiteHeader() {
         </div>
       </div>
       {open &&
-      <div className="border-t border-navy/5 bg-cream px-6 py-4 lg:hidden animate-fade-in shadow-inner">
+      <div className="border-t border-navy/5 bg-white px-6 py-4 lg:hidden animate-fade-in shadow-inner">
           <nav className="flex flex-col gap-2">
             {links.map((l) =>
           <Link
@@ -121,6 +150,7 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const [brandName, setBrandName] = useState("Hour Stay");
+  const [property, setProperty] = useState(null);
 
   useEffect(() => {
     publicService.getBranding()
@@ -130,6 +160,21 @@ export function SiteFooter() {
         }
       })
       .catch(err => {});
+
+    const fetchActiveProperty = () => {
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      publicService.getProperty(activeId)
+        .then(res => {
+          if (res.success && res.data) {
+            setProperty(res.data);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchActiveProperty();
+    window.addEventListener('selected-property-changed', fetchActiveProperty);
+    return () => window.removeEventListener('selected-property-changed', fetchActiveProperty);
   }, []);
 
   return (
@@ -147,20 +192,22 @@ export function SiteFooter() {
         <div className="space-y-6">
           <Logo tone="light" />
           <p className="text-xs sm:text-sm leading-relaxed text-[#FFF7E6]/70">
-            A calm, premium property management suite built for Indian hospitality.
+            {property?.settings?.description || "A calm, premium property management suite built for Indian hospitality."}
           </p>
           <div className="flex gap-4 pt-2">
             {[
-              { icon: Facebook, label: "Facebook" },
-              { icon: Twitter, label: "Twitter" },
-              { icon: Instagram, label: "Instagram" },
-              { icon: Linkedin, label: "Linkedin" }
+              { icon: Facebook, label: "Facebook", href: property?.settings?.facebook || "#" },
+              { icon: Twitter, label: "Twitter", href: property?.settings?.twitter || "#" },
+              { icon: Instagram, label: "Instagram", href: property?.settings?.instagram || "#" },
+              { icon: Linkedin, label: "Linkedin", href: property?.settings?.linkedin || "#" }
             ].map((soc, i) => {
               const Icon = soc.icon;
               return (
                 <a 
                   key={i} 
-                  href="#" 
+                  href={soc.href}
+                  target="_blank"
+                  rel="noreferrer"
                   className="text-[#FFF7E6]/50 hover:text-gold hover:scale-110 transition-all duration-200"
                   aria-label={soc.label}
                 >
@@ -219,15 +266,15 @@ export function SiteFooter() {
           <ul className="space-y-3 text-xs sm:text-sm text-[#FFF7E6]/70">
             <li className="flex items-center gap-2.5">
               <Phone className="size-4 text-gold shrink-0" />
-              <span>+91 141 4055 900</span>
+              <span>{property?.settings?.phone || "+91 141 4055 900"}</span>
             </li>
             <li className="flex items-center gap-2.5">
               <Mail className="size-4 text-gold shrink-0" />
-              <span>stay@hourstay.in</span>
+              <span>{property?.settings?.email || "stay@hourstay.in"}</span>
             </li>
             <li className="flex items-start gap-2.5">
               <MapPin className="size-4 text-gold shrink-0 mt-0.5" />
-              <span>Amber Fort Road, Jaipur, Rajasthan 302002</span>
+              <span>{property ? `${property.settings?.address || ''}${property.settings?.address ? ', ' : ''}${property.city}` : "Amber Fort Road, Jaipur, Rajasthan 302002"}</span>
             </li>
           </ul>
 

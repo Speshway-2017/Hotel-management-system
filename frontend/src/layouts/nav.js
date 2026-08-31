@@ -33,23 +33,15 @@ import {
   UserCog,
   Users,
   User,
-  Wrench } from
-"lucide-react";
+  Wrench
+} from "lucide-react";
 
-
-
-
-
-
-export const roleMeta =
-
-
-{
+export const roleMeta = {
   "super-admin": {
     name: "Super Admin",
-    person: "Nandini Rao",
+    person: "Nandini Rao Rao",
     caption: "Hour Stay Group · 6 properties",
-    initials: "NR"
+    initials: "NRR"
   },
   admin: {
     name: "Admin / Owner",
@@ -131,33 +123,17 @@ export const navByRole = {
   ],
 
   guest: [
-  {
-    group: "Your Stay",
-    items: [
-    { label: "Home", to: "/guest", icon: LayoutDashboard },
-    { label: "My Bookings", to: "/guest/bookings", icon: CalendarCheck },
-    { label: "Pre Check-in", to: "/guest/pre-check-in", icon: ClipboardCheck },
-    { label: "Service Requests", to: "/guest/services", icon: ConciergeBell }]
-
-  },
-  {
-    group: "Book",
-    items: [
-    { label: "Search Availability", to: "/guest/search", icon: Search },
-    { label: "Booking", to: "/guest/booking", icon: Bed },
-    { label: "Payment", to: "/guest/payment", icon: CreditCard }]
-
-  },
-  {
-    group: "Account",
-    items: [
-    { label: "Digital Folio", to: "/guest/folio", icon: Receipt },
-    { label: "Loyalty", to: "/guest/loyalty", icon: Gift },
-    { label: "Reviews", to: "/guest/reviews", icon: Star },
-    { label: "Profile", to: "/guest/profile", icon: Heart }]
-
-  }]
-
+    {
+      group: "Guest Portal",
+      items: [
+        { label: "Dashboard", to: "/guest", icon: LayoutDashboard },
+        { label: "My Bookings", to: "/guest/bookings", icon: CalendarCheck },
+        { label: "Digital Folio", to: "/guest/folio", icon: FileText },
+        { label: "Feedback", to: "/guest/reviews", icon: MessageSquareHeart },
+        { label: "Settings", to: "/guest/settings", icon: Settings }
+      ]
+    }
+  ]
 };
 
 export const gaugeIcon = Gauge;
