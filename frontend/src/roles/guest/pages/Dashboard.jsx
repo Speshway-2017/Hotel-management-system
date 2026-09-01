@@ -58,11 +58,43 @@ function GuestDashboardPage() {
 
       const res = await fetch('http://localhost:5000/api/v1/guest/dashboard', { headers });
       const result = await res.json();
+      
+      const stored = localStorage.getItem('latest_booking');
+      let localBooking = null;
+      if (stored) {
+        try { localBooking = JSON.parse(stored); } catch(e) {}
+      }
+
       if (result && result.success && result.data) {
-        setData(result.data);
+        let serverData = result.data;
+        let recent = serverData.recentBookings || [];
+
+        // If local latest booking exists, prepend if not already in list
+        if (localBooking) {
+          const exists = recent.some(b => b.id === localBooking.id || b.bookingId === localBooking.id || b.bookingId === localBooking.bookingId);
+          if (!exists) {
+            recent = [localBooking, ...recent];
+          }
+        }
+
+        const upcomingBooking = recent.find(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending') || recent[0] || null;
+        const currentStay = recent.find(b => b.status === 'Checked-in') || null;
+        const totalStays = recent.length;
+        const totalSpent = recent.reduce((acc, b) => acc + Number(b.amount || 0), 0);
+
+        setData({
+          stats: {
+            upcomingBooking,
+            currentStay,
+            totalStays,
+            loyaltyPoints: totalStays > 0 ? (totalStays * 2000 + Math.round(totalSpent * 0.1)) : 0,
+            loyaltyTier: totalStays >= 10 ? 'Platinum' : (totalStays >= 5 ? 'Gold' : 'Silver'),
+            totalSpent
+          },
+          recentBookings: recent
+        });
       } else {
-        const stored = localStorage.getItem('latest_booking');
-        const parsed = stored ? [JSON.parse(stored)] : [];
+        const parsed = localBooking ? [localBooking] : [];
         setData({
           stats: {
             upcomingBooking: parsed[0] || null,
@@ -97,6 +129,24 @@ function GuestDashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Realtime Socket.io updates for Guest Dashboard
+    import('@/services/socket').then(({ socket }) => {
+      const handleRealtimeUpdate = () => {
+        console.log('⚡ Realtime Socket event received on Guest Dashboard. Updating metrics...');
+        fetchDashboardData();
+      };
+
+      socket.on('booking_updated', handleRealtimeUpdate);
+      socket.on('room_status_changed', handleRealtimeUpdate);
+      socket.on('availability_changed', handleRealtimeUpdate);
+
+      return () => {
+        socket.off('booking_updated', handleRealtimeUpdate);
+        socket.off('room_status_changed', handleRealtimeUpdate);
+        socket.off('availability_changed', handleRealtimeUpdate);
+      };
+    });
   }, []);
 
   if (loading) {

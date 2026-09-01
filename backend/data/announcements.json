@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ann_1",
+    "_id": "ann_1",
+    "title": "Rate parity alert — Goibibo",
+    "body": "Deluxe Courtyard is ₹450 below direct rate in Jaipur.",
+    "tone": "warning",
+    "time": "10 min ago"
+  },
+  {
+    "id": "ann_2",
+    "_id": "ann_2",
+    "title": "Database backup completed",
+    "body": "Daily automated backup for all 6 properties completed successfully.",
+    "tone": "success",
+    "time": "1 hr ago"
+  }
+]

@@ -74,12 +74,7 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
 }
 
 // Initial Mock Datasets
-const defaultBookingsData = [
-  { id: "BKG-9081", guest: "Karan Malhotra", room: "101", category: "Maharaja Suite", source: "Direct", amount: 15400, gst: 3080, status: "Checked-out", checkIn: "2026-08-13", payment: "Paid" },
-  { id: "BKG-9082", guest: "Aisha Sharma", room: "104", category: "Superior Deluxe", source: "Booking.com", amount: 8900, gst: 1780, status: "Checked-out", checkIn: "2026-08-10", payment: "Partial" },
-  { id: "BKG-9083", guest: "Rohan Varma", room: "205", category: "Garden Pool Villa", source: "MakeMyTrip", amount: 12500, gst: 2500, status: "Checked-in", checkIn: "2026-08-12", payment: "Paid" },
-  { id: "BKG-9084", guest: "Meera Nair", room: "101", category: "Maharaja Suite", source: "Direct", amount: 4500, gst: 900, status: "Checked-in", checkIn: "2026-08-14", payment: "Unpaid" }
-];
+const defaultBookingsData = [];
 
 function AdminReportsDashboard() {
   const [activeReportTab, setActiveReportTab] = useState("revenue"); // "revenue" | "occupancy" | "reservations" | "payments" | "gst" | "performance"
@@ -97,26 +92,43 @@ function AdminReportsDashboard() {
   const [paymentFilter, setPaymentFilter] = useState("all");
 
   useEffect(() => {
-    const saved = localStorage.getItem("hms_billing_invoices");
-    if (saved) {
-      const list = JSON.parse(saved);
-      const mapped = list.map((inv, idx) => ({
-        id: inv.bookingId || `BKG-10${idx}`,
-        guest: inv.guest,
-        room: inv.room,
-        category: inv.roomCharges >= 10000 ? "Maharaja Suite" : "Superior Deluxe",
-        source: idx % 2 === 0 ? "Direct" : "MakeMyTrip",
-        amount: inv.totalAmount,
-        gst: inv.taxes,
-        status: inv.invoiceStatus === "Issued" ? "Checked-out" : "Checked-in",
-        checkIn: inv.checkIn,
-        payment: inv.paymentStatus
-      }));
-      setBookings(mapped);
-    } else {
-      setBookings(defaultBookingsData);
+    async function loadReportsData() {
+      setLoading(true);
+      try {
+        const res = await superAdminService.getReservations();
+        if (res.success && res.data && res.data.length > 0) {
+          const mapped = res.data.map((b, idx) => ({
+            id: b._id || b.id || `BKG-10${idx}`,
+            guest: b.guest || "Guest",
+            room: b.room || "101",
+            category: b.roomType || b.category || "Standard Room",
+            source: b.source || "Direct",
+            amount: b.amount || b.totalAmount || 3500,
+            gst: Math.round((b.amount || 3500) * 0.18),
+            status: b.status || "Confirmed",
+            checkIn: b.checkIn || new Date().toISOString().split("T")[0],
+            payment: b.paymentStatus || (b.balance === 0 ? "Paid" : "Pending")
+          }));
+          setBookings(mapped);
+        } else {
+          setBookings([]);
+        }
+      } catch (err) {
+        setBookings([]);
+      } finally {
+        setLoading(false);
+      }
     }
-    setLoading(false);
+    loadReportsData();
+
+    const handleFocus = () => {
+      loadReportsData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Filter application logic

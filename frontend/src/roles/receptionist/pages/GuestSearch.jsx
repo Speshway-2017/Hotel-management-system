@@ -53,7 +53,8 @@ function InHouseGuestsPage() {
   const [loading, setLoading] = useState(true);
   const [guests, setGuests] = useState([]);
 
-  useEffect(() => {
+  const loadGuests = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getGuests()
       .then(res => {
         if (res.success && res.data) {
@@ -61,7 +62,27 @@ function InHouseGuestsPage() {
         }
       })
       .catch(err => console.error("Failed to load in-house guests:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadGuests(false);
+
+    const interval = setInterval(() => {
+      loadGuests(true);
+    }, 5000);
+
+    const handleFocus = () => {
+      loadGuests(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Selected Guest Drawer State
@@ -313,7 +334,7 @@ function InHouseGuestsPage() {
                           asChild
                           className="bg-navy/5 hover:bg-navy/10 border border-navy/15 text-navy-deep h-7 px-2.5 text-[10px] rounded-lg font-bold cursor-pointer transition-all"
                         >
-                          <Link to={`/reception/folio/FOL-2026-093`}>View Folio</Link>
+                          <Link to={`/reception/folio/FOL-${g.id}`}>View Folio</Link>
                         </Button>
                       </div>
                     </td>

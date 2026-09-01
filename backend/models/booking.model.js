@@ -53,84 +53,109 @@ const ensureDataFile = () => {
   if (!fs.existsSync(DATA_FILE)) {
     const defaultBookings = [
       {
+        id: "BK-10301",
+        _id: "BK-10301",
+        bookingId: "BK-10301",
+        guest: "Surya",
+        phone: "+91 98765 10301",
+        email: "surya@gmail.com",
+        room: "103 · Deluxe Room",
+        roomNumber: "103",
+        checkIn: "2026-09-01",
+        checkOut: "2026-09-02",
+        nights: 1,
+        pax: "2 Adults",
+        source: "Direct Web",
+        status: "Checked-in",
+        amount: 8500,
+        totalAmount: 8500,
+        balance: 0,
+        paymentStatus: "Paid",
+        propertyId: "HS-JAI"
+      },
+      {
+        id: "BK-20402",
+        _id: "BK-20402",
+        bookingId: "BK-20402",
+        guest: "Mounika",
+        phone: "+91 99443 88120",
+        email: "mounika@gmail.com",
+        room: "204 · Executive Suite",
+        roomNumber: "204",
+        checkIn: "2026-09-02",
+        checkOut: "2026-09-03",
+        nights: 1,
+        pax: "2 Adults",
+        source: "MakeMyTrip",
+        status: "Confirmed",
+        amount: 11400,
+        totalAmount: 11400,
+        balance: 0,
+        paymentStatus: "Paid",
+        propertyId: "HS-JAI"
+      },
+      {
         id: "HS24-10241",
         _id: "HS24-10241",
+        bookingId: "HS24-10241",
         guest: "Aarav Mehta",
         phone: "+91 98204 33121",
+        email: "aarav.mehta@gmail.com",
         room: "312 · Premier Haveli",
-        checkIn: "12 Aug 2026",
-        checkOut: "15 Aug 2026",
+        roomNumber: "312",
+        checkIn: "2026-09-01",
+        checkOut: "2026-09-04",
         nights: 3,
         pax: "2 Adults",
         source: "Direct",
         status: "Confirmed",
         amount: 37200,
+        totalAmount: 37200,
         balance: 0,
-        propertyId: "HS-JAI"
-      },
-      {
-        id: "HS24-10242",
-        _id: "HS24-10242",
-        guest: "Priya Iyer",
-        phone: "+91 90031 87740",
-        room: "204 · Deluxe Courtyard",
-        checkIn: "12 Aug 2026",
-        checkOut: "13 Aug 2026",
-        nights: 1,
-        pax: "1 Adult",
-        source: "MakeMyTrip",
-        status: "Checked-in",
-        amount: 8900,
-        balance: 2100,
+        paymentStatus: "Paid",
         propertyId: "HS-JAI"
       },
       {
         id: "HS24-10243",
         _id: "HS24-10243",
+        bookingId: "HS24-10243",
         guest: "Rohan & Sneha Kulkarni",
         phone: "+91 99870 21145",
+        email: "rohan.k@gmail.com",
         room: "501 · Maharaja Suite",
-        checkIn: "13 Aug 2026",
-        checkOut: "17 Aug 2026",
+        roomNumber: "501",
+        checkIn: "2026-09-03",
+        checkOut: "2026-09-07",
         nights: 4,
         pax: "2 Adults, 1 Child",
         source: "Booking.com",
         status: "Confirmed",
         amount: 98000,
+        totalAmount: 98000,
         balance: 49000,
-        propertyId: "HS-UDA"
+        paymentStatus: "Partial",
+        propertyId: "HS-JAI"
       },
       {
         id: "HS24-10244",
         _id: "HS24-10244",
+        bookingId: "HS24-10244",
         guest: "Devendra Shastri",
         phone: "+91 93450 09912",
+        email: "devendra@shastri.com",
         room: "108 · Deluxe Courtyard",
-        checkIn: "11 Aug 2026",
-        checkOut: "12 Aug 2026",
+        roomNumber: "108",
+        checkIn: "2026-08-31",
+        checkOut: "2026-09-01",
         nights: 1,
         pax: "1 Adult",
         source: "Walk-in",
         status: "Checked-out",
         amount: 9400,
+        totalAmount: 9400,
         balance: 0,
+        paymentStatus: "Paid",
         propertyId: "HS-JAI"
-      },
-      {
-        id: "HS24-10245",
-        _id: "HS24-10245",
-        guest: "Ananya Bose",
-        phone: "+91 98311 55420",
-        room: "410 · Premier Haveli",
-        checkIn: "14 Aug 2026",
-        checkOut: "16 Aug 2026",
-        nights: 2,
-        pax: "2 Adults",
-        source: "Goibibo",
-        status: "Pending",
-        amount: 24800,
-        balance: 24800,
-        propertyId: "HS-GOA"
       }
     ];
     fs.writeFileSync(DATA_FILE, JSON.stringify(defaultBookings, null, 2));
@@ -265,8 +290,14 @@ class QueryWrapper {
   constructor(executor) {
     this.executor = executor;
     this.selectFields = [];
+    this.sortFields = [];
+    this.limitVal = null;
+    this.skipVal = null;
   }
   select(fields) { this.selectFields.push(fields); return this; }
+  sort(fields) { this.sortFields.push(fields); return this; }
+  limit(n) { this.limitVal = n; return this; }
+  skip(n) { this.skipVal = n; return this; }
   lean() { return this; }
   populate() { return this; }
   async then(onFulfilled, onRejected) {
@@ -277,9 +308,39 @@ class QueryWrapper {
         for (const fields of this.selectFields) {
           query = query.select(fields);
         }
+        for (const sFields of this.sortFields) {
+          query = query.sort(sFields);
+        }
+        if (this.limitVal !== null) {
+          query = query.limit(this.limitVal);
+        }
+        if (this.skipVal !== null) {
+          query = query.skip(this.skipVal);
+        }
         result = await query;
       } else {
         result = await this.executor(false);
+        if (Array.isArray(result)) {
+          for (const sFields of this.sortFields) {
+            if (typeof sFields === 'object') {
+              const keys = Object.keys(sFields);
+              result.sort((a, b) => {
+                for (const key of keys) {
+                  const dir = sFields[key];
+                  if (a[key] < b[key]) return dir === -1 ? 1 : -1;
+                  if (a[key] > b[key]) return dir === -1 ? -1 : 1;
+                }
+                return 0;
+              });
+            }
+          }
+          if (this.skipVal) {
+            result = result.slice(this.skipVal);
+          }
+          if (this.limitVal) {
+            result = result.slice(0, this.limitVal);
+          }
+        }
       }
       return onFulfilled ? onFulfilled(result) : result;
     } catch (err) {
@@ -306,6 +367,18 @@ const Booking = {
     return new QueryWrapper((isMongoose) => {
       if (isMongoose) return MongooseBooking.findById(id);
       return MockBooking.findById(id);
+    });
+  },
+  findOneAndUpdate: (query, update, options) => {
+    return new QueryWrapper((isMongoose) => {
+      if (isMongoose) return MongooseBooking.findOneAndUpdate(query, update, { new: true, ...options });
+      return MockBooking.findOneAndUpdate(query, update, options);
+    });
+  },
+  findOneAndDelete: (query) => {
+    return new QueryWrapper((isMongoose) => {
+      if (isMongoose) return MongooseBooking.findOneAndDelete(query);
+      return MockBooking.findOneAndDelete(query);
     });
   },
   create: async (data) => {

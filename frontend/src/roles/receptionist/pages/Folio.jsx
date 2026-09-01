@@ -35,10 +35,12 @@ function InvoicesAndFolioPage() {
         if (res.success && res.data) {
           const list = res.data.map(f => ({
             ...f,
-            guest: f.guestName,
-            room: f.roomNo,
-            dates: f.stayDates,
-            balance: f.balanceDue,
+            guest: f.guestName || f.guest || 'Guest',
+            room: f.roomNo || f.room || '101',
+            dates: f.stayDates || f.dates || '2026-09-01',
+            balance: f.balanceDue !== undefined ? f.balanceDue : (f.balance || 0),
+            amountPaid: f.amountPaid !== undefined ? f.amountPaid : (f.paidAmount || 0),
+            items: Array.isArray(f.items) ? f.items : [],
             type: 'Guest Room Billing'
           }));
           setFolios(list);
@@ -91,9 +93,12 @@ function InvoicesAndFolioPage() {
     return matchesSearch && matchesBillingStatus && matchesPaymentStatus && matchesType;
   });
 
-  // Action methods
   const calculateTotalCharges = (folio) => {
-    return folio.items.reduce((sum, item) => sum + item.total, 0);
+    if (!folio) return 0;
+    if (Array.isArray(folio.items) && folio.items.length > 0) {
+      return folio.items.reduce((sum, item) => sum + (Number(item?.total) || Number(item?.amount) || 0), 0);
+    }
+    return Number(folio.totalCharges) || Number(folio.totalAmount) || Number(folio.amount) || Number(folio.total) || 0;
   };
 
   if (loading) {

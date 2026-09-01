@@ -141,9 +141,9 @@ function RoomsRatesPage() {
   const [formPlanPricingType, setFormPlanPricingType] = useState("Dynamic");
 
   // Load backend properties & dynamic room dataset
-  async function loadData() {
+  async function loadData(isSilent = false) {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const [propsRes, roomsRes] = await Promise.all([
         superAdminService.getProperties(),
         adminService.getRooms()
@@ -162,13 +162,7 @@ function RoomsRatesPage() {
 
       if (roomsRes.success && roomsRes.data && roomsRes.data.length > 0) {
         const normalized = roomsRes.data.map(rm => {
-          let cleanStatus = rm.status;
-          if (cleanStatus === 'Dirty' || cleanStatus === 'Cleaning' || cleanStatus === 'Out of Order' || cleanStatus === 'Maintenance') {
-            cleanStatus = 'Blocked';
-          }
-          if (!['Available', 'Occupied', 'Blocked'].includes(cleanStatus)) {
-            cleanStatus = 'Available';
-          }
+          let cleanStatus = rm.status || 'Available';
           
           let roomFloor = rm.floor;
           if (!roomFloor) {
@@ -196,11 +190,12 @@ function RoomsRatesPage() {
         setRoomsList(normalized);
       }
     } catch (err) {
-      setError(err.message || "Failed to load properties and rooms dataset");
+      if (!isSilent) setError(err.message || "Failed to load properties and rooms dataset");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }
+
   const [formPlanMealPlan, setFormPlanMealPlan] = useState("Continental Breakfast");
   const [formPlanPolicy, setFormPlanPolicy] = useState("Refundable");
   const [formPlanMinStay, setFormPlanMinStay] = useState("1 Night");
@@ -218,40 +213,34 @@ function RoomsRatesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  async function loadData() {
-    try {
-      setLoading(true);
-      setError(null);
-      const [propsRes, roomsRes] = await Promise.all([
-        superAdminService.getProperties(),
-        adminService.getRooms().catch(() => ({ success: true, data: [] }))
-      ]);
-
-      if (propsRes.success && propsRes.data) {
-        setProperties(propsRes.data);
-        if (propsRes.data.length > 0) {
-          const prop = propsRes.data[0];
-          setSelectedPropId(prop._id || prop.id);
-          
-          const settings = prop.settings || {};
-          if (settings.roomTypes) setRoomTypesList(settings.roomTypes);
-          if (settings.ratePlans) setRatePlansList(settings.ratePlans);
-          if (settings.restrictions) setRestrictionsList(settings.restrictions);
-        }
-      }
-
-      if (roomsRes.success && roomsRes.data) {
-        setRoomsList(roomsRes.data);
-      }
-    } catch (err) {
-      setError(err.message || "Failed to load properties and rooms dataset");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => {
+      loadData(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    import('@/services/socket').then(({ socket }) => {
+      const handleRealtime = () => {
+        console.log('⚡ Realtime Socket event received on Admin Rooms page. Refreshing...');
+        loadData(true);
+      };
+
+      socket.on('booking_updated', handleRealtime);
+      socket.on('room_status_changed', handleRealtime);
+      socket.on('availability_changed', handleRealtime);
+
+      return () => {
+        socket.off('booking_updated', handleRealtime);
+        socket.off('room_status_changed', handleRealtime);
+        socket.off('availability_changed', handleRealtime);
+      };
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Handlers for dynamic creations
@@ -429,10 +418,11 @@ function RoomsRatesPage() {
   const statusMeta = {
     Available: { tone: "success", icon: CheckCircle, label: "Available", bgAccent: "border-l-success" },
     Occupied: { tone: "brand", icon: Bed, label: "Occupied", bgAccent: "border-l-indigo" },
+    Reserved: { tone: "warning", icon: Bed, label: "Reserved", bgAccent: "border-l-amber" },
     Blocked: { tone: "neutral", icon: Clock, label: "Blocked", bgAccent: "border-l-neutral" }
   };
 
-  if (loading) {
+  if (loading && roomsList.length === 0) {
     return (
       <div className="p-6 space-y-6">
         <PageHeader title="Rooms & Rates" subtitle="Synchronizing room configurations..." />
@@ -526,6 +516,7 @@ function RoomsRatesPage() {
                 <option value="all">All Statuses</option>
                 <option value="Available">Available</option>
                 <option value="Occupied">Occupied</option>
+                <option value="Reserved">Reserved</option>
                 <option value="Blocked">Blocked</option>
               </Select>
             </div>
@@ -568,7 +559,7 @@ function RoomsRatesPage() {
                       <th className="py-4.5 px-4 w-[140px] min-w-[140px]">Active Rate Plan</th>
                       <th className="py-4.5 px-4 w-[130px] min-w-[130px]">Daily Rate</th>
                       <th className="py-4.5 px-4 w-[120px] min-w-[120px]">Status</th>
-                      <th className="py-4.5 px-6 w-[110px] min-w-[110px] text-right">Actions</th>
+                      <th className="py-4.5 px-2 w-[110px] min-w-[110px] text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -588,8 +579,8 @@ function RoomsRatesPage() {
                               <span>{meta.label}</span>
                             </Tag>
                           </td>
-                          <td className="py-4 px-6 text-right w-[110px] min-w-[110px]">
-                            <div className="flex items-center justify-end gap-1.5 select-none opacity-85 group-hover:opacity-100 transition-opacity">
+                          <td className="py-4 px-2 text-left w-[110px] min-w-[110px]">
+                            <div className="flex items-center justify-start gap-1 select-none opacity-85 group-hover:opacity-100 transition-opacity">
                               <Button
                                 onClick={() => navigate({ to: `/admin/rooms/view/${rm._id || rm.id || rm.roomNumber}` })}
                                 size="icon"

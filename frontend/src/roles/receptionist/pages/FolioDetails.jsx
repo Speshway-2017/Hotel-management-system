@@ -65,7 +65,11 @@ function ReceptionFolioDetailsPage() {
   const [refundAmount, setRefundAmount] = useState("");
 
   const calculateTotalCharges = (fol) => {
-    return fol.items.reduce((sum, item) => sum + item.total, 0);
+    if (!fol) return 0;
+    if (Array.isArray(fol.items) && fol.items.length > 0) {
+      return fol.items.reduce((sum, item) => sum + (Number(item?.total) || Number(item?.amount) || 0), 0);
+    }
+    return Number(fol.totalCharges) || Number(fol.totalAmount) || Number(fol.amount) || Number(fol.total) || 0;
   };
 
   const handlePostCharge = () => {

@@ -204,7 +204,12 @@ router.get('/property', async (req, res) => {
 // ==========================================
 router.get('/reservations', async (req, res) => {
   try {
-    const bookings = await Booking.find({ propertyId: req.user.propertyId });
+    const propId = req.user?.propertyId;
+    let query = {};
+    if (req.user?.role !== 'super-admin' && propId) {
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] };
+    }
+    const bookings = await Booking.find(query).sort({ createdAt: -1 });
     return sendSuccess(res, 200, bookings, 'Property reservations retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -225,33 +230,98 @@ router.get('/rooms', async (req, res) => {
     );
 
     let rooms = await Room.find({ propertyId: req.user.propertyId }).sort({ roomNumber: 1 });
+    const { checkIn, checkOut } = req.query;
 
-    // Ensure status cleanup and floor setting if missing
-    for (let rm of rooms) {
-      let needsSave = false;
+    // Fetch active bookings across property and global collections
+    const activeBookings = await Booking.find({
+      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
+    });
 
-      if (!rm.floor) {
-        const firstDigit = rm.roomNumber ? String(rm.roomNumber).charAt(0) : '';
-        if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
-          rm.floor = `Floor ${firstDigit}`;
-          needsSave = true;
-        } else {
-          rm.floor = 'Floor 1';
-          needsSave = true;
-        }
+    const parseTime = (dateStr) => {
+      if (!dateStr) return null;
+      const t = new Date(dateStr).getTime();
+      return isNaN(t) ? null : t;
+    };
+
+    const reqIn = parseTime(checkIn);
+    const reqOut = parseTime(checkOut);
+
+    // Pass 1: Explicit room number / roomId matching
+    const roomBookingMap = new Map();
+    const unassignedCategoryBookings = [];
+
+    for (const b of activeBookings) {
+      if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') continue;
+
+      const bIn = parseTime(b.checkIn);
+      const bOut = parseTime(b.checkOut);
+      if (reqIn && reqOut && bIn && bOut && !(reqIn < bOut && reqOut > bIn)) {
+        continue;
       }
 
-      if (rm.status === 'Dirty' || rm.status === 'Cleaning' || rm.status === 'Out of Order' || rm.status === 'Maintenance') {
-        rm.status = 'Blocked';
-        needsSave = true;
+      const bRoomNum = b.roomId || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
+      let matchedRm = null;
+
+      if (b.roomId) {
+        matchedRm = rooms.find(r => String(r._id) === String(b.roomId) || String(r.id) === String(b.roomId));
+      }
+      if (!matchedRm && bRoomNum) {
+        matchedRm = rooms.find(r => String(r.roomNumber).trim() === String(bRoomNum).trim());
+      }
+      if (!matchedRm && b.room && !b.room.includes("Standard Room") && !b.room.includes("Deluxe Room") && !b.room.includes("Executive Suite") && !b.room.includes("Villa Suite")) {
+        matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber)));
       }
 
-      if (needsSave) {
-        await rm.save();
+      if (matchedRm) {
+        roomBookingMap.set(String(matchedRm._id), b);
+      } else {
+        unassignedCategoryBookings.push(b);
       }
     }
 
-    return sendSuccess(res, 200, rooms, 'Property rooms operational status list retrieved.');
+    // Pass 2: Category-level matching for bookings without an explicit room number
+    for (const b of unassignedCategoryBookings) {
+      const targetCategory = b.roomType || b.category || b.room;
+      if (!targetCategory) continue;
+
+      const candidate = rooms.find(r => {
+        if (roomBookingMap.has(String(r._id))) return false;
+        if (r.status === 'Blocked') return false;
+
+        const rCat = String(r.category || '').toLowerCase();
+        const bCat = String(targetCategory).toLowerCase();
+        return rCat === bCat || bCat.includes(rCat) || rCat.includes(bCat);
+      });
+
+      if (candidate) {
+        roomBookingMap.set(String(candidate._id), b);
+      }
+    }
+
+    const mappedRooms = rooms.map(rm => {
+      const matchedBooking = roomBookingMap.get(String(rm._id));
+      const isReserved = !!matchedBooking;
+
+      let displayStatus = rm.status;
+      if (rm.status !== 'Blocked' && matchedBooking) {
+        if (matchedBooking.status === 'Checked-in') {
+          displayStatus = 'Occupied';
+        } else if (['Confirmed', 'Paid', 'Pending'].includes(matchedBooking.status)) {
+          displayStatus = 'Reserved';
+        }
+      }
+
+      return {
+        ...rm.toObject(),
+        status: displayStatus,
+        operationalStatus: rm.status,
+        isReserved,
+        isAvailable: displayStatus === 'Available',
+        guest: matchedBooking ? matchedBooking.guest : ''
+      };
+    });
+
+    return sendSuccess(res, 200, mappedRooms, 'Property rooms retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -726,25 +796,31 @@ router.post('/notifications/:id/read', async (req, res) => {
   }
 });
 
-router.put('/reservations/:id/extend', async (req, res) => {
+const handleExtendReservation = async (req, res) => {
   try {
     const { newCheckOut, additionalNights, additionalAmount } = req.body;
     if (!newCheckOut || additionalNights === undefined || additionalAmount === undefined) {
       return sendError(res, 400, 'newCheckOut, additionalNights, and additionalAmount are required.');
     }
 
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId: req.user.propertyId });
+    const { id } = req.params;
+    const bookingQuery = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      bookingQuery.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: bookingQuery });
     if (!booking) {
       return sendError(res, 404, 'Booking reservation record not found.');
     }
 
-    const updated = await Booking.findByIdAndUpdate(
-      req.params.id,
+    const updated = await Booking.findOneAndUpdate(
+      { $or: bookingQuery },
       {
         checkOut: newCheckOut,
-        nights: Number(booking.nights) + Number(additionalNights),
-        amount: Number(booking.amount) + Number(additionalAmount),
-        balance: Number(booking.balance) + Number(additionalAmount)
+        nights: Number(booking.nights || 1) + Number(additionalNights),
+        amount: Number(booking.amount || 0) + Number(additionalAmount),
+        balance: Number(booking.balance || 0) + Number(additionalAmount)
       },
       { new: true }
     );
@@ -753,6 +829,9 @@ router.put('/reservations/:id/extend', async (req, res) => {
   } catch (err) {
     return sendError(res, 500, err.message);
   }
-});
+};
+
+router.put('/reservations/:id/extend', handleExtendReservation);
+router.post('/reservations/:id/extend', handleExtendReservation);
 
 export default router;

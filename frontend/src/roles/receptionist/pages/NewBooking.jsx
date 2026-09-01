@@ -38,9 +38,10 @@ function NewReservationPage() {
   const [childrenCount, setChildrenCount] = useState("0");
   const [guestTier, setGuestTier] = useState("Classic Guest");
 
-  // Step 2: Stay Details State
-  const [checkIn, setCheckIn] = useState("2026-08-25");
-  const [checkOut, setCheckOut] = useState("2026-08-27");
+  const todayDate = new Date().toISOString().split('T')[0];
+  const tomorrowDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const [checkIn, setCheckIn] = useState(todayDate);
+  const [checkOut, setCheckOut] = useState(tomorrowDate);
   const [nights, setNights] = useState(2);
   const [roomType, setRoomType] = useState("Deluxe King");
   const [roomsCount, setRoomsCount] = useState("1");

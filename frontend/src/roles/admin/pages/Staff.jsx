@@ -92,6 +92,15 @@ function AdminStaffPage() {
 
   useEffect(() => {
     loadStaff();
+
+    const handleFocus = () => {
+      loadStaff();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleStatusToggle = async (member) => {

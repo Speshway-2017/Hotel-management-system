@@ -12,7 +12,31 @@ import {
 } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
 
+import mongoose from 'mongoose';
+
 const router = express.Router();
+
+// Helper to query booking by ObjectId, bookingId string, or id string safely
+const findBookingById = async (id, propertyId) => {
+  if (!id) return null;
+  const queries = [
+    { bookingId: id },
+    { id: id }
+  ];
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    queries.unshift({ _id: id });
+  }
+
+  const filter = { $or: queries };
+  if (propertyId) {
+    const propBooking = await Booking.findOne({
+      ...filter,
+      $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }]
+    });
+    if (propBooking) return propBooking;
+  }
+  return await Booking.findOne(filter);
+};
 
 // Protect all routes and allow receptionists, managers, admins, super-admins
 router.use(protect);
@@ -125,29 +149,43 @@ router.get('/dashboard', async (req, res) => {
 // ==========================================
 router.get('/guests', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
-    const bookings = await Booking.find({ propertyId, status: 'Checked-in' });
+    const propId = req.user?.propertyId;
+    let query = { status: { $in: ['Checked-in', 'Confirmed', 'Paid'] } };
+    if (req.user?.role !== 'super-admin' && propId) {
+      query = {
+        $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }],
+        status: { $in: ['Checked-in', 'Confirmed', 'Paid'] }
+      };
+    }
+    const bookings = await Booking.find(query).sort({ createdAt: -1 });
     
-    const guestList = bookings.map(b => ({
-      id: b.id || b._id,
-      name: b.guest,
-      phone: b.phone || '--',
-      email: b.email || `${b.guest.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-      room: b.room ? b.room.split(' ')[0] : '--',
-      roomType: b.room ? b.room.split('·')[1]?.trim() || 'Deluxe King' : 'Deluxe King',
-      checkIn: b.checkIn,
-      checkOut: b.checkOut,
-      duration: `${b.nights} Nights`,
-      pax: b.pax || '2 Adults',
-      balance: b.balance,
-      paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
-      status: 'Staying',
-      vipTier: 'Gold Elite',
-      specialRequests: 'None',
-      timeline: [
-        { time: b.checkIn, action: "Guest checked in successfully." }
-      ]
-    }));
+    const guestList = bookings.map(b => {
+      const rmNum = b.roomId || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
+      const rmCategory = b.roomType || b.category || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room');
+      const guestName = b.guest || b.guestName || 'Guest';
+
+      return {
+        id: b.id || b.bookingId || b._id,
+        _id: b._id || b.id || b.bookingId,
+        name: guestName,
+        phone: b.phone || '--',
+        email: b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        room: rmNum || '103',
+        roomType: rmCategory,
+        checkIn: b.checkIn || '2026-09-01',
+        checkOut: b.checkOut || '2026-09-02',
+        duration: `${b.nights || 1} Nights`,
+        pax: b.pax || `${b.adults || 2} Adults`,
+        balance: b.balance !== undefined ? b.balance : 0,
+        paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
+        status: 'Staying',
+        vipTier: 'Gold Elite',
+        specialRequests: b.specialRequests || 'None',
+        timeline: [
+          { time: b.checkIn || '2026-09-01', action: `Guest status: ${b.status}` }
+        ]
+      };
+    });
 
     return sendSuccess(res, 200, guestList, 'In-house guests list compiled.');
   } catch (err) {
@@ -163,7 +201,7 @@ router.post('/guests/:id/charge', async (req, res) => {
       return sendError(res, 400, 'Valid numeric charge amount required.');
     }
     
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId: req.user.propertyId || 'HS-JAI' });
+    const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-JAI');
     if (!booking) {
       return sendError(res, 404, 'Guest stay record not found.');
     }
@@ -196,7 +234,7 @@ router.post('/guests/:id/extend', async (req, res) => {
       return sendError(res, 400, 'Valid stay extension days required.');
     }
 
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId: req.user.propertyId || 'HS-JAI' });
+    const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-JAI');
     if (!booking) {
       return sendError(res, 404, 'Guest stay record not found.');
     }
@@ -227,25 +265,80 @@ router.post('/guests/:id/extend', async (req, res) => {
 router.get('/rooms', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
+    const { checkIn, checkOut } = req.query;
     const rooms = await Room.find({ propertyId }).sort({ roomNumber: 1 });
     
-    // Auto map guest details from active bookings
-    const bookings = await Booking.find({ propertyId, status: 'Checked-in' });
+    // Fetch all active bookings across propertyId or global
+    const bookings = await Booking.find({
+      $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }],
+      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
+    });
     
+    const parseTime = (dateStr) => {
+      if (!dateStr) return null;
+      const t = new Date(dateStr).getTime();
+      return isNaN(t) ? null : t;
+    };
+
+    const reqIn = parseTime(checkIn);
+    const reqOut = parseTime(checkOut);
+
     const roomsList = rooms.map(r => {
-      const activeBooking = bookings.find(b => b.room && b.room.split(' ')[0] === r.roomNumber);
+      const activeCheckIn = bookings.find(b => b.status === 'Checked-in' && b.room && (b.room.includes(r.roomNumber) || String(b.roomId) === String(r._id)));
+      
+      let isReservedForDates = false;
+      let reservedBooking = null;
+
+      // Find any confirmed reservation linked to this room
+      reservedBooking = bookings.find(b => {
+        if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') return false;
+        
+        const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
+        const matchesRoom = (b.roomId && String(b.roomId) === String(r._id)) || 
+                            (bRoomNum && bRoomNum === r.roomNumber) ||
+                            (b.room && b.room.includes(r.roomNumber));
+        if (!matchesRoom) return false;
+
+        const bIn = parseTime(b.checkIn);
+        const bOut = parseTime(b.checkOut);
+
+        if (reqIn && reqOut && bIn && bOut) {
+          return (reqIn < bOut && reqOut > bIn);
+        }
+
+        // If no query date, check if active reservation exists for current timeframe
+        return true;
+      });
+
+      if (reservedBooking) {
+        isReservedForDates = true;
+        console.log(`🔍 [Room Availability Audit] Room ${r.roomNumber} -> RESERVED for Booking ${reservedBooking.bookingId || reservedBooking._id} (${reservedBooking.guest})`);
+      }
+
+      // Compute display status
+      let displayStatus = r.status;
+      if ((r.status === 'Available' || !r.status) && isReservedForDates) {
+        displayStatus = 'Reserved';
+      }
+
       return {
+        id: r._id ? String(r._id) : r.id,
+        _id: r._id ? String(r._id) : r.id,
         room: r.roomNumber,
-        floor: `Floor ${r.roomNumber[0]}`,
+        roomNumber: r.roomNumber,
+        floor: `Floor ${r.roomNumber ? String(r.roomNumber)[0] : '1'}`,
         roomType: r.category,
-        status: r.status,
-        housekeeping: r.status === 'Dirty' ? 'Dirty' : r.status === 'Available' ? 'Inspected' : 'Clean',
-        guest: activeBooking ? activeBooking.guest : '',
-        checkOut: activeBooking ? activeBooking.checkOut : '',
-        notes: r.status === 'Out of Order' ? 'Room maintenance requested.' : 'No special alerts.',
-        history: [
-          { time: "Today, 10:00 AM", action: `Room operational status: ${r.status}` }
-        ]
+        category: r.category,
+        status: displayStatus,
+        operationalStatus: r.status || 'Available',
+        isReserved: isReservedForDates,
+        isAvailable: (r.status === 'Available' || !r.status) && !isReservedForDates,
+        housekeeping: r.status === 'Dirty' ? 'Dirty' : 'Inspected',
+        guest: activeCheckIn ? activeCheckIn.guest : (reservedBooking ? reservedBooking.guest : ''),
+        checkIn: activeCheckIn ? activeCheckIn.checkIn : (reservedBooking ? reservedBooking.checkIn : ''),
+        checkOut: activeCheckIn ? activeCheckIn.checkOut : (reservedBooking ? reservedBooking.checkOut : ''),
+        bookingRef: activeCheckIn ? (activeCheckIn.bookingId || activeCheckIn._id) : (reservedBooking ? (reservedBooking.bookingId || reservedBooking._id) : null),
+        notes: isReservedForDates ? `Reserved for guest ${reservedBooking?.guest} (${reservedBooking?.checkIn} → ${reservedBooking?.checkOut}).` : 'No special alerts.'
       };
     });
 
@@ -306,15 +399,20 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
 router.get('/reservations', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
-    const bookings = await Booking.find({ propertyId }).sort({ createdAt: -1 });
+    const bookings = await Booking.find({
+      $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }]
+    }).sort({ createdAt: -1 });
 
     const list = bookings.map(b => ({
-      id: b.id || b._id,
+      id: b.bookingId || b.id || b._id,
+      _id: b._id || b.id || b.bookingId,
+      bookingId: b.bookingId || b.id || b._id,
       name: b.guest,
+      guest: b.guest,
       phone: b.phone || '--',
       email: b.email || `${b.guest.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
       room: b.room ? b.room.split(' ')[0] : 'TBD',
-      roomType: b.room ? b.room.split('·')[1]?.trim() || 'Deluxe Room' : 'Deluxe Room',
+      roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Deluxe Room' : 'Deluxe Room'),
       checkIn: b.checkIn,
       checkOut: b.checkOut,
       nights: b.nights || 1,
@@ -324,7 +422,7 @@ router.get('/reservations', async (req, res) => {
       amount: b.amount,
       balance: b.balance,
       paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
-      specialRequests: 'High floor preference.',
+      specialRequests: b.specialRequests || 'High floor preference.',
       timeline: [
         { time: b.createdAt, action: 'Reservation created successfully.' }
       ]
@@ -339,11 +437,40 @@ router.get('/reservations', async (req, res) => {
 // Create new reservation
 router.post('/reservations', async (req, res) => {
   try {
-    const { guest, phone, email, room, checkIn, checkOut, nights, pax, source, amount, balance } = req.body;
+    const { guest, phone, email, room, roomId, checkIn, checkOut, nights, pax, source, amount, balance } = req.body;
     const propertyId = req.user.propertyId || 'HS-JAI';
 
     if (!guest || !checkIn || !checkOut || !amount) {
       return sendError(res, 400, 'Guest, checkIn, checkOut, and amount are required.');
+    }
+
+    // Overlapping Date Availability Check
+    const newCheckIn = new Date(checkIn).getTime();
+    const newCheckOut = new Date(checkOut).getTime();
+
+    let assignedRoomId = roomId || null;
+    let roomNum = room ? room.split(' ')[0] : null;
+
+    if (roomNum || assignedRoomId) {
+      const existingBookings = await Booking.find({
+        propertyId,
+        status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
+      });
+
+      const isOverlapping = existingBookings.some(b => {
+        if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') return false;
+        const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
+        const sameRoom = (roomNum && bRoomNum === roomNum) || (assignedRoomId && b.roomId === assignedRoomId);
+        if (!sameRoom) return false;
+
+        const bIn = new Date(b.checkIn).getTime();
+        const bOut = new Date(b.checkOut).getTime();
+        return (newCheckIn < bOut && newCheckOut > bIn);
+      });
+
+      if (isOverlapping) {
+        return sendError(res, 400, `Room ${roomNum || ''} is already reserved for the selected dates.`);
+      }
     }
 
     const newBooking = await Booking.create({
@@ -351,40 +478,42 @@ router.post('/reservations', async (req, res) => {
       phone: phone || '',
       email: email || '',
       room: room || '',
+      roomId: assignedRoomId,
       checkIn,
       checkOut,
       nights: Number(nights) || 1,
       pax: pax || '2 Adults',
       source: source || 'Direct',
+      status: 'Confirmed',
       amount: Number(amount),
       balance: Number(balance !== undefined ? balance : amount),
       propertyId
     });
 
-    // If a room is assigned, change its status to Occupied/Reserved
-    if (room) {
-      const roomNum = room.split(' ')[0];
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNum, propertyId },
-        { status: 'Occupied' }
-      );
-    }
+    // NOTE: Per Phase 1 spec, room operational status stays unchanged at booking time.
 
     // Trigger notifications
     await triggerNotification({
       role: 'manager',
       propertyId,
       title: 'New Reservation Booking',
-      message: `Walk-in booking created for ${guest} in Room ${room || 'unassigned'} (Amount: ₹${amount}).`,
+      message: `Reservation created for ${guest} in Room ${room || 'unassigned'} (Amount: ₹${amount}).`,
       category: 'Operations'
     });
     await triggerNotification({
       role: 'receptionist',
       propertyId,
       title: 'New Reservation Booking',
-      message: `Walk-in booking created for ${guest} in Room ${room || 'unassigned'} (Amount: ₹${amount}).`,
+      message: `Reservation created for ${guest} in Room ${room || 'unassigned'} (Amount: ₹${amount}).`,
       category: 'Operations'
     });
+
+    // Notify Realtime (Socket.io)
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('booking_updated', { type: 'CREATED', booking: newBooking });
+      io.emit('availability_changed', { propertyId, roomId: assignedRoomId });
+    }
 
     return sendSuccess(res, 201, newBooking, 'Reservation created successfully.');
   } catch (err) {
@@ -392,13 +521,13 @@ router.post('/reservations', async (req, res) => {
   }
 });
 
-// Update status (e.g. check-in, check-out, cancel)
+// Update status (e.g. check-in, check-out, cancel, no-show)
 router.put('/reservations/:id/status', async (req, res) => {
   try {
     const { status, room } = req.body;
     const propertyId = req.user.propertyId || 'HS-JAI';
 
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId });
+    const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) {
       return sendError(res, 404, 'Booking not found.');
     }
@@ -408,15 +537,18 @@ router.put('/reservations/:id/status', async (req, res) => {
 
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, updateData, { new: true });
 
-    // Sync room status based on checkin/checkout/cancel
-    const roomNum = (room || booking.room)?.split(' ')[0];
+    // Sync operational room status on check-in, check-out, cancel, or no-show
+    const roomNum = (room || booking.room)?.match(/\b\d{3,4}\b/)?.[0];
     if (roomNum) {
       if (status === 'Checked-in') {
+        // Operational status -> Occupied on Check-in
         await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId }, { status: 'Occupied' });
       } else if (status === 'Checked-out') {
+        // Operational status -> Dirty on Check-out
         await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId }, { status: 'Dirty' });
-      } else if (status === 'Cancelled') {
-        await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId }, { status: 'Available' });
+      } else if (status === 'Cancelled' || status === 'No-show') {
+        // Release inventory reservation
+        await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId, status: 'Occupied' }, { status: 'Available' });
       }
     }
 
@@ -426,15 +558,22 @@ router.put('/reservations/:id/status', async (req, res) => {
       propertyId,
       title: `Reservation ${status}`,
       message: `Reservation for guest ${booking.guest} has been updated to: ${status} in Room ${roomNum || 'TBD'}.`,
-      category: status === 'Cancelled' ? 'Alerts' : 'Operations'
+      category: status === 'Cancelled' || status === 'No-show' ? 'Alerts' : 'Operations'
     });
     await triggerNotification({
       role: 'receptionist',
       propertyId,
       title: `Reservation ${status}`,
       message: `Reservation for guest ${booking.guest} has been updated to: ${status} in Room ${roomNum || 'TBD'}.`,
-      category: status === 'Cancelled' ? 'Alerts' : 'Operations'
+      category: status === 'Cancelled' || status === 'No-show' ? 'Alerts' : 'Operations'
     });
+
+    // Notify Realtime (Socket.io)
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('booking_updated', { type: 'STATUS_CHANGE', booking: updated });
+      io.emit('room_status_changed', { propertyId, roomNumber: roomNum, status });
+    }
 
     return sendSuccess(res, 200, updated, `Reservation status marked as ${status}.`);
   } catch (err) {
@@ -472,7 +611,7 @@ router.get('/folios', async (req, res) => {
 router.get('/folios/:id', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId });
+    const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) {
       return sendError(res, 404, 'Folio record not found.');
     }
@@ -510,7 +649,7 @@ router.post('/folios/:id/charges', async (req, res) => {
     const { amount, description, category } = req.body;
     const propertyId = req.user.propertyId || 'HS-JAI';
 
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId });
+    const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) return sendError(res, 404, 'Folio not found.');
 
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, {
@@ -530,7 +669,7 @@ router.post('/folios/:id/payments', async (req, res) => {
     const { amount, method } = req.body;
     const propertyId = req.user.propertyId || 'HS-JAI';
 
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId });
+    const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) return sendError(res, 404, 'Folio not found.');
 
     const newBalance = Math.max(0, booking.balance - amount);

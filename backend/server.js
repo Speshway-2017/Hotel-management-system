@@ -20,6 +20,8 @@ const PORT = process.env.PORT || 5000;
 
 import { seedUsers } from './scripts/seed.js';
 
+import { Server } from 'socket.io';
+
 const startServer = async () => {
   // Connect to Database
   await connectDB();
@@ -27,8 +29,23 @@ const startServer = async () => {
   // Seed demo workspace accounts
   await seedUsers();
 
-  // Create HTTP Server
+  // Create HTTP Server & Socket.io instance
   const server = http.createServer(app);
+  const io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+    }
+  });
+
+  app.set('socketio', io);
+
+  io.on('connection', (socket) => {
+    console.log('⚡ Socket.io client connected:', socket.id);
+    socket.on('disconnect', () => {
+      console.log('🔌 Socket.io client disconnected:', socket.id);
+    });
+  });
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -42,7 +59,7 @@ const startServer = async () => {
   });
 
   server.listen(PORT, () => {
-    console.log(`🏨 Hour Stay HMS Backend Server running on port ${PORT}`);
+    console.log(`🏨 Hour Stay HMS Backend Server running on port ${PORT} with Socket.io real-time updates enabled`);
   });
 
   const gracefulShutdown = (signal) => {

@@ -39,136 +39,8 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
     </div>
   );
 }
-
-const defaultInvoices = [
-  {
-    id: "INV-BKG9-1001",
-    bookingId: "BKG-9081",
-    guest: "Karan Malhotra",
-    room: "101",
-    checkIn: "2026-08-13",
-    checkOut: "2026-08-15",
-    roomCharges: 11550,
-    serviceCharges: 1540,
-    discounts: 770,
-    taxes: 3080,
-    totalAmount: 15400,
-    paidAmount: 15400,
-    balance: 0,
-    paymentStatus: "Paid",
-    invoiceStatus: "Issued",
-    issuedDate: "2026-08-15"
-  },
-  {
-    id: "INV-BKG9-1002",
-    bookingId: "BKG-9082",
-    guest: "Aisha Sharma",
-    room: "104",
-    checkIn: "2026-08-10",
-    checkOut: "2026-08-12",
-    roomCharges: 6675,
-    serviceCharges: 890,
-    discounts: 445,
-    taxes: 1780,
-    totalAmount: 8900,
-    paidAmount: 4400,
-    balance: 4500,
-    paymentStatus: "Partial",
-    invoiceStatus: "Issued",
-    issuedDate: "2026-08-12"
-  },
-  {
-    id: "INV-BKG9-1003",
-    bookingId: "BKG-9083",
-    guest: "Rohan Varma",
-    room: "205",
-    checkIn: "2026-08-12",
-    checkOut: "2026-08-14",
-    roomCharges: 9375,
-    serviceCharges: 1250,
-    discounts: 625,
-    taxes: 2500,
-    totalAmount: 12500,
-    paidAmount: 12500,
-    balance: 0,
-    paymentStatus: "Paid",
-    invoiceStatus: "Issued",
-    issuedDate: "2026-08-14"
-  },
-  {
-    id: "INV-BKG9-1004",
-    bookingId: "BKG-9084",
-    guest: "Meera Nair",
-    room: "101",
-    checkIn: "2026-08-14",
-    checkOut: "2026-08-17",
-    roomCharges: 3375,
-    serviceCharges: 450,
-    discounts: 225,
-    taxes: 900,
-    totalAmount: 4500,
-    paidAmount: 0,
-    balance: 4500,
-    paymentStatus: "Unpaid",
-    invoiceStatus: "Issued",
-    issuedDate: "2026-08-17"
-  }
-];
-
-const initialDiscountsLedger = [
-  {
-    id: "REQ-3021",
-    bookingId: "BKG-9081",
-    guest: "Karan Malhotra",
-    room: "101",
-    type: "Refund",
-    reason: "AC malfunctioning override",
-    amount: 3500,
-    requestedBy: "Receptionist Shrey",
-    approvedBy: "Admin Madhu",
-    date: "2026-08-16",
-    status: "Approved"
-  },
-  {
-    id: "REQ-1042",
-    bookingId: "BKG-9082",
-    guest: "Aisha Sharma",
-    room: "104",
-    type: "Discount",
-    reason: "Corporate GDS Contract slab",
-    amount: 1200,
-    requestedBy: "Agent Riya",
-    approvedBy: "Admin Madhu",
-    date: "2026-08-15",
-    status: "Approved"
-  },
-  {
-    id: "REQ-2051",
-    bookingId: "BKG-9083",
-    guest: "Rohan Varma",
-    room: "205",
-    type: "Refund",
-    reason: "Double billing error",
-    amount: 4500,
-    requestedBy: "Receptionist Shrey",
-    approvedBy: "—",
-    date: "2026-08-17",
-    status: "Pending"
-  },
-  {
-    id: "REQ-1011",
-    bookingId: "BKG-9084",
-    guest: "Meera Nair",
-    room: "101",
-    type: "Discount",
-    reason: "Loyalty Tier Waiver",
-    amount: 2000,
-    requestedBy: "Agent Riya",
-    approvedBy: "—",
-    date: "2026-08-17",
-    status: "Pending"
-  }
-];
+const defaultInvoices = [];
+const initialDiscountsLedger = [];
 
 function AdminBillingPage() {
   const navigate = useNavigate();
@@ -239,20 +111,8 @@ function AdminBillingPage() {
             issuedDate: b.checkOut
           };
         });
-        setInvoices(mappedInvoices.length > 0 ? mappedInvoices : defaultInvoices);
-
-        const mappedDiscounts = (approvalsRes.data || []).map(a => ({
-          id: a._id || a.id,
-          bookingId: a.bookingId || "BKG-9081",
-          guest: a.guest || "Guest",
-          type: a.type || "Discount",
-          amount: a.amount || 1500,
-          status: a.status || "Pending",
-          requestedBy: a.requestedBy || "Receptionist",
-          requestedDate: a.date || a.createdAt?.split("T")[0] || "2026-08-24",
-          reason: a.reason || "Client request"
-        }));
-        setDiscounts(mappedDiscounts.length > 0 ? mappedDiscounts : initialDiscountsLedger);
+        setInvoices(mappedInvoices);
+        setDiscounts(mappedDiscounts);
       } catch (err) {
         toast.error("Failed to sync billing data with MERN backend.");
       } finally {

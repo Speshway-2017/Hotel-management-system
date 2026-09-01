@@ -83,16 +83,16 @@ function ManagerRoomsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  async function loadData() {
+  async function loadData(isSilent = false) {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const user = authService.getCurrentUser();
       setCurrentUser(user);
 
       if (!user || user.role !== "manager") {
         setIsAuthorized(false);
-        setLoading(false);
+        if (!isSilent) setLoading(false);
         return;
       }
 
@@ -115,14 +115,45 @@ function ManagerRoomsPage() {
       }
 
     } catch (err) {
-      setError(err.message || "Failed to load rooms dataset");
+      if (!isSilent) setError(err.message || "Failed to load rooms dataset");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 10000);
+
+    const handleFocus = () => {
+      loadData(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    import('@/services/socket').then(({ socket }) => {
+      const handleRealtimeUpdate = () => {
+        console.log('⚡ Socket update received in Manager Rooms table. Refreshing...');
+        loadData(true);
+      };
+
+      socket.on('booking_updated', handleRealtimeUpdate);
+      socket.on('room_status_changed', handleRealtimeUpdate);
+      socket.on('availability_changed', handleRealtimeUpdate);
+
+      return () => {
+        socket.off('booking_updated', handleRealtimeUpdate);
+        socket.off('room_status_changed', handleRealtimeUpdate);
+        socket.off('availability_changed', handleRealtimeUpdate);
+      };
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Set manual operational status override via backend API
@@ -131,39 +162,93 @@ function ManagerRoomsPage() {
       const res = await managerService.updateRoomStatus(roomNumber, newStatus);
       if (res.success) {
         toast.success(`Room ${roomNumber} operational status changed to ${newStatus}`);
-        // Reload rooms database records
-        const roomsRes = await managerService.getRooms();
-        if (roomsRes.success && roomsRes.data) {
-          setRooms(roomsRes.data);
-        }
+        loadData();
       }
     } catch (err) {
       toast.error(err.message || "Failed to update room status");
     }
   };
 
-  const getActiveBooking = (roomNumber) => {
-    return bookings.find(b => {
-      if (b.status === "Cancelled" || b.status === "Checked-out") return false;
-      const bRoom = (b.room || "").toLowerCase();
-      const rNum = roomNumber.toLowerCase();
-      return bRoom.includes(rNum) || rNum.includes(bRoom);
-    });
-  };
+  // Compile full Rooms array with dynamic MongoDB status and booking data (Pass 1: explicit room IDs/numbers, Pass 2: category-level bookings)
+  const roomBookingMap = new Map();
+  const unassignedBookings = [];
 
-  // Compile full Rooms array with status
-  const compiledRooms = rooms.map(r => {
-    const activeBooking = getActiveBooking(r.roomNumber);
-    let status = r.status;
-    if (activeBooking && activeBooking.status === "Checked-in") {
-      status = "Occupied";
+  for (const b of bookings) {
+    if (b.status === "Cancelled" || b.status === "Checked-out" || b.status === "No-show") continue;
+    const bRoomNum = b.roomId || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
+    let matchedRm = null;
+
+    if (b.roomId) {
+      matchedRm = rooms.find(r => String(r._id || r.id) === String(b.roomId));
     }
+    if (!matchedRm && bRoomNum) {
+      matchedRm = rooms.find(r => String(r.roomNumber || r.room).trim() === String(bRoomNum).trim());
+    }
+    if (!matchedRm && b.room && !b.room.includes("Standard Room") && !b.room.includes("Deluxe Room") && !b.room.includes("Executive Suite") && !b.room.includes("Villa Suite")) {
+      matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber || r.room)));
+    }
+
+    if (matchedRm) {
+      const k1 = String(matchedRm._id || matchedRm.id || '');
+      const k2 = String(matchedRm.roomNumber || matchedRm.room || '');
+      if (k1) roomBookingMap.set(k1, b);
+      if (k2) roomBookingMap.set(k2, b);
+    } else {
+      unassignedBookings.push(b);
+    }
+  }
+
+  for (const b of unassignedBookings) {
+    const targetCategory = b.roomType || b.category || b.room;
+    if (!targetCategory) continue;
+
+    const candidate = rooms.find(r => {
+      const k1 = String(r._id || r.id || '');
+      const k2 = String(r.roomNumber || r.room || '');
+      if (roomBookingMap.has(k1) || roomBookingMap.has(k2)) return false;
+      if (r.status === 'Blocked') return false;
+
+      const rCat = String(r.category || r.roomType || '').toLowerCase();
+      const bCat = String(targetCategory).toLowerCase();
+      return rCat === bCat || bCat.includes(rCat) || rCat.includes(bCat);
+    });
+
+    if (candidate) {
+      const k1 = String(candidate._id || candidate.id || '');
+      const k2 = String(candidate.roomNumber || candidate.room || '');
+      if (k1) roomBookingMap.set(k1, b);
+      if (k2) roomBookingMap.set(k2, b);
+    }
+  }
+
+  const compiledRooms = rooms.map(r => {
+    const k1 = String(r._id || r.id || '');
+    const k2 = String(r.roomNumber || r.room || '');
+    const activeBooking = roomBookingMap.get(k1) || roomBookingMap.get(k2);
+
+    let currentStatus = r.status || "Available";
+    if (activeBooking) {
+      if (activeBooking.status === "Checked-in") {
+        currentStatus = "Occupied";
+      } else {
+        currentStatus = "Reserved";
+      }
+    }
+
     return {
-      room: r.roomNumber,
-      roomType: r.category,
-      floor: `Floor ${r.roomNumber[0] || '1'}`,
-      activeBooking,
-      status
+      _id: r._id || r.id,
+      room: r.roomNumber || r.room,
+      roomType: r.category || r.roomType || "Standard Room",
+      floor: r.floor || `Floor ${String(r.roomNumber || r.room || '1')[0]}`,
+      activeBooking: activeBooking ? {
+        id: activeBooking.bookingId || activeBooking._id || activeBooking.id,
+        _id: activeBooking._id || activeBooking.id || activeBooking.bookingId,
+        guest: activeBooking.guest || activeBooking.guestName || "Guest",
+        checkIn: activeBooking.checkIn || activeBooking.checkInDate || "—",
+        checkOut: activeBooking.checkOut || activeBooking.checkOutDate || "—",
+        status: activeBooking.status || "Confirmed"
+      } : null,
+      status: currentStatus
     };
   });
 
@@ -200,6 +285,7 @@ function ManagerRoomsPage() {
   // Status mapping constants
   const statusMeta = {
     Available: { tone: "success", icon: CheckCircle, label: "Available", color: "#10b981" },
+    Reserved: { tone: "info", icon: Sparkles, label: "Reserved", color: "#0284c7" },
     Occupied: { tone: "brand", icon: Bed, label: "Occupied", color: "#0d1b2a" },
     Dirty: { tone: "warning", icon: AlertTriangle, label: "Dirty", color: "#f59e0b" },
     Cleaning: { tone: "purple", icon: Sparkles, label: "Cleaning", color: "#8b5cf6" },
@@ -328,7 +414,7 @@ function ManagerRoomsPage() {
                   <th className="py-4.5 px-4">Check-In</th>
                   <th className="py-4.5 px-4">Check-Out</th>
                   <th className="py-4.5 px-4">Current Booking</th>
-                  <th className="py-4.5 px-6 text-right">Actions</th>
+                  <th className="py-4.5 px-2 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -375,8 +461,8 @@ function ManagerRoomsPage() {
                           <span className="text-muted-foreground/45">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5 select-none">
+                      <td className="py-4 px-2 text-left">
+                        <div className="flex items-center justify-start gap-1 select-none">
                           {active && (
                             <>
                               <Button
@@ -411,19 +497,6 @@ function ManagerRoomsPage() {
                             </Button>
                           )}
                           
-                          {/* Operational status override selector */}
-                          <Select
-                            value={rm.status}
-                            onChange={(e) => handleOverrideStatus(rm.room, e.target.value)}
-                            className="w-24 text-[9px] h-6 py-0 font-bold ml-1.5"
-                          >
-                            <option value="Available">Available</option>
-                            <option value="Occupied">Occupied</option>
-                            <option value="Dirty">Dirty</option>
-                            <option value="Cleaning">Cleaning</option>
-                            <option value="Out of Order">Out of Order</option>
-                            <option value="Blocked">Blocked</option>
-                          </Select>
                         </div>
                       </td>
                     </tr>

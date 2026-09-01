@@ -17,32 +17,7 @@ export const Route = createFileRoute("/admin/front-desk/assign/$id")({
 });
 
 // Default hotel rooms metadata fallback
-const defaultRooms = [
-  { num: "101", type: "Villa Suite", floor: "Floor 1" },
-  { num: "102", type: "Villa Suite", floor: "Floor 1" },
-  { num: "103", type: "Heritage Luxury", floor: "Floor 1" },
-  { num: "104", type: "Heritage Luxury", floor: "Floor 1" },
-  { num: "105", type: "Heritage Luxury", floor: "Floor 1" },
-  { num: "106", type: "Superior Deluxe", floor: "Floor 1" },
-  { num: "107", type: "Superior Deluxe", floor: "Floor 1" },
-  { num: "108", type: "Superior Deluxe", floor: "Floor 1" },
-  { num: "201", type: "Maharaja Suite", floor: "Floor 2" },
-  { num: "202", type: "Maharaja Suite", floor: "Floor 2" },
-  { num: "203", type: "Villa Suite", floor: "Floor 2" },
-  { num: "204", type: "Heritage Luxury", floor: "Floor 2" },
-  { num: "205", type: "Heritage Luxury", floor: "Floor 2" },
-  { num: "206", type: "Superior Deluxe", floor: "Floor 2" },
-  { num: "207", type: "Superior Deluxe", floor: "Floor 2" },
-  { num: "208", type: "Superior Deluxe", floor: "Floor 2" },
-  { num: "301", type: "Maharaja Suite", floor: "Floor 3" },
-  { num: "302", type: "Maharaja Suite", floor: "Floor 3" },
-  { num: "303", type: "Villa Suite", floor: "Floor 3" },
-  { num: "304", type: "Heritage Luxury", floor: "Floor 3" },
-  { num: "305", type: "Heritage Luxury", floor: "Floor 3" },
-  { num: "306", type: "Superior Deluxe", floor: "Floor 3" },
-  { num: "307", type: "Superior Deluxe", floor: "Floor 3" },
-  { num: "308", type: "Superior Deluxe", floor: "Floor 3" }
-];
+const defaultRooms = [];
 
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
@@ -72,7 +47,7 @@ function AssignRoomDeskPage() {
           type: r.category,
           floor: `Floor ${r.roomNumber.charAt(0)}`
         }));
-        setRooms(mappedRooms.length > 0 ? mappedRooms : defaultRooms);
+        setRooms(mappedRooms);
       } catch (err) {
         toast.error("Failed to load reservations and rooms.");
       }

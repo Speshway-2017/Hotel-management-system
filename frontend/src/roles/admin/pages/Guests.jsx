@@ -68,128 +68,7 @@ const getAdditionalNights = (currentOutStr, newOutStr) => {
   return diffDays > 0 ? diffDays : 0;
 };
 
-const defaultGuests = [
-  {
-    id: "GST-1001",
-    _id: "GST-1001",
-    name: "Karan Malhotra",
-    email: "karan.m@gmail.com",
-    phone: "+91 98765 43210",
-    city: "Mumbai",
-    state: "Maharashtra",
-    country: "India",
-    address: "Flat 402, Sea Breeze Apts, Bandra West",
-    tier: "VIP",
-    type: "VIP",
-    stays: 12,
-    spend: 184500,
-    preferences: ["High floor", "King size bed", "Extra feather pillows"],
-    idDocType: "Passport",
-    idDocNumber: "Z-8849502",
-    status: "Staying-In",
-    currentStay: "Palace Udaipur - Villa Suite 101",
-    room: "101",
-    balance: 0,
-    loyaltyPoints: 1200,
-    notes: "Regular high-end profile guest. Enjoys silent rooms.",
-    history: [
-      { id: "BKG-9081", checkIn: "2026-08-13", checkOut: "2026-08-15", room: "101", amount: 15400, status: "Completed" }
-    ],
-    billing: [
-      { invoiceId: "INV-4829", amount: 15400, date: "2026-08-15", status: "Paid" }
-    ]
-  },
-  {
-    id: "GST-1002",
-    _id: "GST-1002",
-    name: "Aisha Sharma",
-    email: "aisha.sharma@yahoo.com",
-    phone: "+91 99112 23344",
-    city: "Delhi",
-    state: "NCR",
-    country: "India",
-    address: "C-12, Green Park Extension",
-    tier: "Regular",
-    type: "Regular",
-    stays: 8,
-    spend: 92400,
-    preferences: ["Soft beverages only", "Late check-out"],
-    idDocType: "Aadhaar Card",
-    idDocNumber: "9820-1122-3344",
-    status: "Checked-out",
-    currentStay: "Jaipur Resort - Deluxe Room 104",
-    room: "104",
-    balance: 4500,
-    loyaltyPoints: 800,
-    notes: "Requires late checkout preferences whenever available.",
-    history: [
-      { id: "BKG-9082", checkIn: "2026-08-10", checkOut: "2026-08-12", room: "104", amount: 8900, status: "Completed" }
-    ],
-    billing: [
-      { invoiceId: "INV-4830", amount: 8900, date: "2026-08-12", status: "Partial" }
-    ]
-  },
-  {
-    id: "GST-1003",
-    _id: "GST-1003",
-    name: "Rohan Varma",
-    email: "rohan.varma@outlook.com",
-    phone: "+91 98300 12345",
-    city: "Kolkata",
-    state: "West Bengal",
-    country: "India",
-    address: "24B, Ballygunge Circular Road",
-    tier: "Regular",
-    type: "Regular",
-    stays: 4,
-    spend: 44200,
-    preferences: ["Newspaper in morning", "Near elevator"],
-    idDocType: "PAN Card",
-    idDocNumber: "ABCDE1234F",
-    status: "Expected",
-    currentStay: "Goa Beach - Executive Room 205",
-    room: "205",
-    balance: 0,
-    loyaltyPoints: 400,
-    notes: "Prefers morning newspaper selection and room placement close to the lobby elevator.",
-    history: [
-      { id: "BKG-9083", checkIn: "2026-08-12", checkOut: "2026-08-14", room: "205", amount: 12500, status: "Completed" }
-    ],
-    billing: [
-      { invoiceId: "INV-4831", amount: 12500, date: "2026-08-14", status: "Paid" }
-    ]
-  },
-  {
-    id: "GST-1004",
-    _id: "GST-1004",
-    name: "Meera Nair",
-    email: "meera.nair@gmail.com",
-    phone: "+91 97777 88888",
-    city: "Bangalore",
-    state: "Karnataka",
-    country: "India",
-    address: "12, Outer Ring Road, HSR Layout",
-    tier: "Corporate",
-    type: "Corporate",
-    stays: 16,
-    spend: 215000,
-    preferences: ["Airport pickup", "Silent room"],
-    idDocType: "Passport",
-    idDocNumber: "X-2244950",
-    status: "Staying-In",
-    currentStay: "Kerala Retreat - Villa Suite 101",
-    room: "101",
-    balance: 12000,
-    loyaltyPoints: 1600,
-    notes: "Requires silent rooms and corporate travel vouchers.",
-    history: [
-      { id: "BKG-9084", checkIn: "2026-08-14", checkOut: "2026-08-17", room: "101", amount: 4500, status: "Completed" }
-    ],
-    billing: [
-      { invoiceId: "INV-4832", amount: 4500, date: "2026-08-17", status: "Unpaid" }
-    ]
-  }
-];
+const defaultGuests = [];
 
 function GuestsCrmPage() {
   const navigate = useNavigate();
@@ -270,27 +149,67 @@ function GuestsCrmPage() {
         superAdminService.getUsers(),
         superAdminService.getReservations()
       ]);
-      if (usersRes.success && usersRes.data) {
-        const guestUsers = usersRes.data.filter(u => u.role === "guest");
-        const bookings = resRes.success && resRes.data ? resRes.data : [];
+      const guestUsers = usersRes.success && usersRes.data ? usersRes.data.filter(u => u.role === "guest") : [];
+      const bookings = resRes.success && resRes.data ? resRes.data : [];
+
+      const guestUserNames = new Set(guestUsers.map(u => u.name?.toLowerCase()));
+      const compiled = guestUsers.map(u => {
+        const guestBookings = bookings.filter(b => b.guest?.toLowerCase() === u.name?.toLowerCase() || (b.phone && (b.phone === u.mobile || b.phone === u.phone)));
+        const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
+        const latest = sorted[0];
         
-        const compiled = guestUsers.map(u => {
-          const guestBookings = bookings.filter(b => b.guest === u.name || b.phone === u.mobile || b.phone === u.phone);
+        return {
+          ...u,
+          id: u._id || u.id,
+          _id: u._id || u.id,
+          name: u.name,
+          email: u.email || "—",
+          phone: u.mobile || u.phone || "—",
+          stays: guestBookings.length,
+          balance: guestBookings.reduce((sum, b) => sum + (b.balance || 0), 0),
+          room: latest && latest.room ? latest.room.split(" ")[0] : '—',
+          currentStay: latest ? `${latest.room ? latest.room : 'Not Assigned'}` : '—',
+          status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
+          latestStay: latest
+        };
+      });
+
+      // Extract unique guests from bookings that are not registered users
+      const extraGuestsMap = {};
+      bookings.forEach(b => {
+        if (!b.guest) return;
+        const gNameLower = b.guest.toLowerCase();
+        if (!guestUserNames.has(gNameLower) && !extraGuestsMap[gNameLower]) {
+          const guestBookings = bookings.filter(bk => bk.guest?.toLowerCase() === gNameLower);
           const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
           const latest = sorted[0];
-          
-          return {
-            ...u,
+          extraGuestsMap[gNameLower] = {
+            id: b._id || b.id || `GST-${Date.now()}`,
+            _id: b._id || b.id,
+            name: b.guest,
+            email: b.email || `${b.guest.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+            phone: b.phone || "+91 98765 43210",
+            city: b.city || "Hyderabad",
+            state: "Telangana",
+            country: "India",
+            address: "Guest Address",
+            tier: "Regular",
+            type: "Regular",
             stays: guestBookings.length,
-            balance: guestBookings.reduce((sum, b) => sum + (b.balance || 0), 0),
+            spend: guestBookings.reduce((sum, bk) => sum + (bk.amount || 0), 0),
+            balance: guestBookings.reduce((sum, bk) => sum + (bk.balance || 0), 0),
             room: latest && latest.room ? latest.room.split(" ")[0] : '—',
             currentStay: latest ? `${latest.room ? latest.room : 'Not Assigned'}` : '—',
             status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
-            latestStay: latest
+            latestStay: latest,
+            history: guestBookings,
+            billing: []
           };
-        });
-        setGuests(compiled);
-      }
+        }
+      });
+
+      const fullList = [...compiled, ...Object.values(extraGuestsMap)];
+      setGuests(fullList);
     } catch (err) {
       toast.error("Failed to load guests from database.");
     } finally {
@@ -300,6 +219,15 @@ function GuestsCrmPage() {
 
   useEffect(() => {
     loadGuests();
+
+    const handleFocus = () => {
+      loadGuests();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const syncGuests = (updatedList) => {
