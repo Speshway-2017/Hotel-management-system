@@ -44,6 +44,22 @@ function RoomStatusPage() {
 
   useEffect(() => {
     loadRooms();
+
+    import('@/services/socket').then(({ socket }) => {
+      const handleRealtime = () => {
+        console.log('⚡ Socket event received on Room Status grid. Refreshing rooms...');
+        loadRooms();
+      };
+      socket.on('room_status_changed', handleRealtime);
+      socket.on('booking_updated', handleRealtime);
+      socket.on('availability_changed', handleRealtime);
+
+      return () => {
+        socket.off('room_status_changed', handleRealtime);
+        socket.off('booking_updated', handleRealtime);
+        socket.off('availability_changed', handleRealtime);
+      };
+    });
   }, []);
 
   // Selected Room Details Modal

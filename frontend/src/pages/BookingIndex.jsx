@@ -142,8 +142,8 @@ function Booking() {
         localStorage.removeItem('booking_check_in');
         localStorage.removeItem('booking_check_out');
 
-        // Redirect to Guest Dashboard
-        window.location.href = '/guest';
+        // Redirect to Guest Dashboard -> My Bookings
+        window.location.href = `/guest/bookings?id=${bId}`;
         return;
       } else {
         setBookingError(res?.message || 'Booking payment could not be processed. Please verify your details and try again.');

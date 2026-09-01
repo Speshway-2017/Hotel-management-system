@@ -120,6 +120,15 @@ function AdminDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+
+    const handleFocus = () => {
+      loadDashboardData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleRefresh = () => {
@@ -230,12 +239,12 @@ function AdminDashboard() {
       
       {/* Consolidated Critical KPIs Grid */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 font-ui">
+        <PremiumStatCard label="Occupied Rooms" value={`${occupiedRooms} Rooms`} hint="In-stay guests" icon={Users} accentColor="#5B21B6" />
+        <PremiumStatCard label="Available Rooms" value={`${availableRooms} Rooms`} hint="Ready to sell" icon={CheckCircle2} accentColor="#2E7D32" />
         <PremiumStatCard label="Occupancy Rate" value={`${occupancyRate}%`} hint="Property capacity" icon={Percent} accentColor="#FF6B8B" />
         <PremiumStatCard label="Today's Revenue" value={`₹${revenueToday.toLocaleString("en-IN")}`} hint="Room billing logs" icon={DollarSign} accentColor="#F5C06A" />
         <PremiumStatCard label="Average ADR" value={`₹${adr.toLocaleString("en-IN")}`} hint="Daily room rate" icon={TrendingUp} accentColor="#FF7A59" />
         <PremiumStatCard label="Yield RevPAR" value={`₹${revpar.toLocaleString("en-IN")}`} hint="Rev per available key" icon={Activity} accentColor="#071420" />
-        <PremiumStatCard label="Occupied Rooms" value={`${occupiedRooms} Rooms`} hint="In-stay guests" icon={Users} accentColor="#5B21B6" />
-        <PremiumStatCard label="Available Rooms" value={`${availableRooms} Rooms`} hint="Ready to sell" icon={CheckCircle2} accentColor="#2E7D32" />
       </div>
 
       {/* Main Row: Operational Performance Trends & Right Operations Column */}
@@ -366,46 +375,47 @@ function AdminDashboard() {
 
         {/* Right Side: Operations stack */}
         <div className="lg:col-span-1 space-y-6">
-          <Panel title="Today's Front Desk" description="Check-in flows and expected stays">
-            <div className="space-y-3.5 text-xs font-semibold text-navy">
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-indigo shrink-0" /> Expected Arrivals</span>
-                <span className="font-bold text-navy">{arrivalsCount} booking(s)</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-purple shrink-0" /> Expected Departures</span>
-                <span className="font-bold text-navy">{departuresCount} booking(s)</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Users className="size-4 text-success shrink-0" /> Occupied Rooms</span>
-                <span className="font-bold text-navy">{occupiedRooms} Rooms</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-warning shrink-0" /> Available Rooms</span>
-                <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-success font-bold text-[10px]">{availableRooms} remaining</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5">
-                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-pink shrink-0" /> Out of Order</span>
-                <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-destructive font-bold text-[10px]">{outOfOrderRooms} Rooms</span>
-              </div>
-            </div>
-          </Panel>
-
-          {/* Quick Console Actions moved here inside right column */}
+          {/* Quick Console Actions */}
           <Panel title="Console Quick Actions" description="Fast operational shortcuts.">
-            <div className="grid grid-cols-3 gap-2 p-3 bg-white rounded-b-xl font-ui">
-              <Link to="/admin/staff/add" className="flex flex-col items-center justify-center p-2 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[72px]">
+            <div className="grid grid-cols-3 gap-2.5 p-4 bg-white rounded-b-xl font-ui">
+              <Link to="/admin/staff/add" className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[76px]">
                 <UserPlus className="size-5 text-indigo group-hover:scale-115 transition-transform" />
                 <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Staff</span>
               </Link>
-              <Link to="/admin/reservations/add" className="flex flex-col items-center justify-center p-2 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[72px]">
+              <Link to="/admin/reservations/add" className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[76px]">
                 <CalendarCheck className="size-5 text-warning group-hover:scale-115 transition-transform" />
                 <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Booking</span>
               </Link>
-              <Link to="/admin/approvals" className="flex flex-col items-center justify-center p-2 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[72px]">
+              <Link to="/admin/approvals" className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[76px]">
                 <Percent className="size-5 text-success group-hover:scale-115 transition-transform" />
                 <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Coupons</span>
               </Link>
+            </div>
+          </Panel>
+
+          {/* Today's Front Desk Card */}
+          <Panel title="Today's Front Desk" description="Check-in flows and expected stays">
+            <div className="p-4 sm:p-5 space-y-3.5 text-xs font-semibold text-navy bg-white rounded-b-xl">
+              <div className="flex items-center justify-between py-2 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-indigo shrink-0" /> Expected Arrivals</span>
+                <span className="font-bold text-navy">{arrivalsCount} booking(s)</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-purple shrink-0" /> Expected Departures</span>
+                <span className="font-bold text-navy">{departuresCount} booking(s)</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Users className="size-4 text-success shrink-0" /> Occupied Rooms</span>
+                <span className="font-bold text-navy">{occupiedRooms} Rooms</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-muted">
+                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-warning shrink-0" /> Available Rooms</span>
+                <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-success font-bold text-[10px]">{availableRooms} remaining</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-pink shrink-0" /> Out of Order</span>
+                <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-destructive font-bold text-[10px]">{outOfOrderRooms} Rooms</span>
+              </div>
             </div>
           </Panel>
         </div>
@@ -473,67 +483,57 @@ function AdminDashboard() {
 
           {/* 2. Occupancy Grid Tab */}
           {opTab === "occupancy" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    <th className="pb-3 px-3">Room Category</th>
-                    <th className="pb-3 px-3">Total Keys</th>
-                    <th className="pb-3 px-3">Occupied Rooms</th>
-                    <th className="pb-3 px-3 text-right">Daily Tariff</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted font-sans">
-                  {roomTypeStats.map((item) => (
-                    <tr key={item.type} className="hover:bg-muted/5 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-navy text-sm">{item.type}</td>
-                      <td className="py-3 px-3 text-muted-foreground">{item.count} Keys</td>
-                      <td className="py-3 px-3 text-muted-foreground">
-                        <Tag tone={item.occupied > 5 ? "success" : "info"}>{item.occupied} Occupied</Tag>
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-navy">₹{item.rate.toLocaleString("en-IN")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="overflow-x-auto min-w-[600px] border border-muted rounded-xl bg-white shadow-soft">
+              <div className="grid grid-cols-4 gap-4 px-4 py-3 border-b border-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/10 rounded-t-xl">
+                <div className="text-left">Room Category</div>
+                <div className="text-center">Total Keys</div>
+                <div className="text-center">Occupied Rooms</div>
+                <div className="text-right">Daily Tariff</div>
+              </div>
+              <div className="divide-y divide-muted/60 font-sans">
+                {roomTypeStats.map((item) => (
+                  <div key={item.type} className="grid grid-cols-4 gap-4 px-4 py-3.5 items-center hover:bg-muted/5 transition-colors">
+                    <div className="text-left font-semibold text-navy text-xs">{item.type}</div>
+                    <div className="text-center text-muted-foreground font-semibold">{item.count} Keys</div>
+                    <div className="flex items-center justify-center">
+                      <Tag tone={item.occupied > 5 ? "success" : "info"}>{item.occupied} Occupied</Tag>
+                    </div>
+                    <div className="text-right font-bold text-navy">₹{item.rate.toLocaleString("en-IN")}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* 3. Reservations Tab */}
           {opTab === "reservations" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
-                    <th className="pb-3 px-3">Guest Name</th>
-                    <th className="pb-3 px-3">Room Number</th>
-                    <th className="pb-3 px-3">Stay Dates</th>
-                    <th className="pb-3 px-3">Source Channel</th>
-                    <th className="pb-3 px-3 text-right">Invoice Amount</th>
-                    <th className="pb-3 px-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted">
-                  {reservations.length === 0 ? (
-                    <tr><td colSpan="6" className="py-6 text-center text-muted-foreground">No reservations loaded.</td></tr>
-                  ) : (
-                    reservations.slice(0, 8).map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#fcfcfc] transition-colors align-middle">
-                        <td className="py-3 px-3 font-semibold text-navy align-middle">{item.guestName || "Walk-in Guest"}</td>
-                        <td className="py-3 px-3 font-mono align-middle">{item.roomNumber || "Unassigned"}</td>
-                        <td className="py-3 px-3 align-middle">{item.checkIn} → {item.checkOut}</td>
-                        <td className="py-3 px-3 align-middle"><Tag tone="brand">{item.source || "Direct"}</Tag></td>
-                        <td className="py-3 px-3 text-right font-bold align-middle">₹{(item.amount || 0).toLocaleString()}</td>
-                        <td className="py-3 px-3 text-center align-middle">
-                          <div className="flex items-center justify-center">
-                            <Tag tone={item.status === "Confirmed" || item.status === "Checked-in" ? "success" : "warning"}>{item.status}</Tag>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="overflow-x-auto min-w-[700px] border border-muted rounded-xl bg-white shadow-soft">
+              <div className="grid grid-cols-6 gap-4 px-4 py-3 border-b border-muted text-[10px] uppercase font-bold text-muted-foreground bg-muted/10 rounded-t-xl">
+                <div className="text-left">Guest Name</div>
+                <div className="text-left">Room Number</div>
+                <div className="text-left">Stay Dates</div>
+                <div className="text-left">Source Channel</div>
+                <div className="text-right">Invoice Amount</div>
+                <div className="text-center">Status</div>
+              </div>
+              <div className="divide-y divide-muted/60">
+                {reservations.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground font-semibold">No reservations loaded.</div>
+                ) : (
+                  reservations.slice(0, 8).map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-6 gap-4 px-4 py-3.5 items-center hover:bg-[#fcfcfc] transition-colors text-xs">
+                      <div className="text-left font-semibold text-navy truncate">{item.guestName || "Walk-in Guest"}</div>
+                      <div className="text-left font-mono">{item.roomNumber || "Unassigned"}</div>
+                      <div className="text-left text-muted-foreground truncate">{item.checkIn} → {item.checkOut}</div>
+                      <div className="text-left"><Tag tone="brand">{item.source || "Direct"}</Tag></div>
+                      <div className="text-right font-bold text-navy">₹{(item.amount || 0).toLocaleString()}</div>
+                      <div className="flex items-center justify-center">
+                        <Tag tone={item.status === "Confirmed" || item.status === "Checked-in" ? "success" : "warning"}>{item.status}</Tag>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -555,24 +555,20 @@ function AdminDashboard() {
                 </div>
               </div>
               <h5 className="font-bold text-navy pt-2">Recent Invoiced Folios</h5>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
-                      <th className="pb-2">Folio ID</th>
-                      <th className="pb-2">Guest</th>
-                      <th className="pb-2">Method</th>
-                      <th className="pb-2 text-right">Invoiced</th>
-                      <th className="pb-2 text-center">Payment Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-muted/40">
-                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-8839</td><td>Karan Malhotra</td><td>Razorpay GDS</td><td className="text-right font-bold">₹24,500</td><td className="text-center"><Tag tone="success">Paid</Tag></td></tr>
-                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-4739</td><td>Aisha Sharma</td><td>UPI QR Code</td><td className="text-right font-bold">₹11,400</td><td className="text-center"><Tag tone="success">Paid</Tag></td></tr>
-                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-1029</td><td>Rohan Varma</td><td>Paytm Wallet</td><td className="text-right font-bold">₹4,500</td><td className="text-center"><Tag tone="warning">Pending</Tag></td></tr>
-                    <tr className="hover:bg-[#fcfcfc]"><td className="py-2.5">FOL-9988</td><td>Meera Nair</td><td>Card Swipe</td><td className="text-right font-bold">₹11,400</td><td className="text-center"><Tag tone="success">Paid</Tag></td></tr>
-                  </tbody>
-                </table>
+              <div className="overflow-x-auto border border-muted rounded-xl bg-white shadow-soft">
+                <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-muted text-[10px] uppercase font-bold text-muted-foreground bg-muted/10 rounded-t-xl">
+                  <div className="text-left">Folio ID</div>
+                  <div className="text-left">Guest</div>
+                  <div className="text-left">Method</div>
+                  <div className="text-right">Invoiced Amount</div>
+                  <div className="text-center">Payment Status</div>
+                </div>
+                <div className="divide-y divide-muted/40">
+                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-8839</div><div className="text-left">Karan Malhotra</div><div className="text-left text-muted-foreground">Razorpay GDS</div><div className="text-right font-bold text-navy">₹24,500</div><div className="flex items-center justify-center"><Tag tone="success">Paid</Tag></div></div>
+                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-4739</div><div className="text-left">Aisha Sharma</div><div className="text-left text-muted-foreground">UPI QR Code</div><div className="text-right font-bold text-navy">₹11,400</div><div className="flex items-center justify-center"><Tag tone="success">Paid</Tag></div></div>
+                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-1029</div><div className="text-left">Rohan Varma</div><div className="text-left text-muted-foreground">Paytm Wallet</div><div className="text-right font-bold text-navy">₹4,500</div><div className="flex items-center justify-center"><Tag tone="warning">Pending</Tag></div></div>
+                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-9988</div><div className="text-left">Meera Nair</div><div className="text-left text-muted-foreground">Card Swipe</div><div className="text-right font-bold text-navy">₹11,400</div><div className="flex items-center justify-center"><Tag tone="success">Paid</Tag></div></div>
+                </div>
               </div>
             </div>
           )}
@@ -604,33 +600,29 @@ function AdminDashboard() {
 
           {/* 6. Staff List Tab */}
           {opTab === "staff" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
-                    <th className="pb-3 px-3">Name</th>
-                    <th className="pb-3 px-3">Email Address</th>
-                    <th className="pb-3 px-3">Assigned Role</th>
-                    <th className="pb-3 px-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted">
-                  {staffList.length === 0 ? (
-                    <tr><td colSpan="4" className="py-6 text-center text-muted-foreground">No active operators found.</td></tr>
-                  ) : (
-                    staffList.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#fcfcfc] transition-colors">
-                        <td className="py-3 px-3 font-semibold text-navy">{item.name}</td>
-                        <td className="py-3 px-3 font-mono">{item.email}</td>
-                        <td className="py-3 px-3"><Tag tone="brand">{item.role === "receptionist" ? "Front Desk Operator" : item.role}</Tag></td>
-                        <td className="py-3 px-3 text-center">
-                          <Tag tone={item.status === "Active" ? "success" : "error"}>{item.status || "Active"}</Tag>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="overflow-x-auto border border-muted rounded-xl bg-white shadow-soft">
+              <div className="grid grid-cols-4 gap-4 px-4 py-3 border-b border-muted text-[10px] uppercase font-bold text-muted-foreground bg-muted/10 rounded-t-xl">
+                <div className="text-left">Name</div>
+                <div className="text-left">Email Address</div>
+                <div className="text-left">Assigned Role</div>
+                <div className="text-center">Status</div>
+              </div>
+              <div className="divide-y divide-muted/60">
+                {staffList.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground font-semibold">No active operators found.</div>
+                ) : (
+                  staffList.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-4 gap-4 px-4 py-3.5 items-center hover:bg-[#fcfcfc] transition-colors text-xs">
+                      <div className="text-left font-semibold text-navy">{item.name}</div>
+                      <div className="text-left font-mono text-muted-foreground truncate">{item.email}</div>
+                      <div className="text-left"><Tag tone="brand">{item.role === "receptionist" ? "Front Desk Operator" : item.role}</Tag></div>
+                      <div className="flex items-center justify-center">
+                        <Tag tone={item.status === "Active" ? "success" : "error"}>{item.status || "Active"}</Tag>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 

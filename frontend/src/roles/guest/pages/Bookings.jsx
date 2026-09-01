@@ -43,16 +43,22 @@ function GuestBookingsPage() {
       const result = await res.json();
       
       let list = [];
+      const stored = localStorage.getItem('latest_booking');
+      let localBooking = null;
+      if (stored) {
+        try { localBooking = JSON.parse(stored); } catch (e) {}
+      }
+
       if (result && result.success && Array.isArray(result.data) && result.data.length > 0) {
         list = result.data;
-      } else {
-        const stored = localStorage.getItem('latest_booking');
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            list = [parsed];
-          } catch (e) {}
+        if (localBooking) {
+          const exists = list.some(b => b.id === localBooking.id || b.bookingId === localBooking.id || b.bookingId === localBooking.bookingId);
+          if (!exists) {
+            list = [localBooking, ...list];
+          }
         }
+      } else if (localBooking) {
+        list = [localBooking];
       }
       setBookings(list);
 
@@ -89,6 +95,24 @@ function GuestBookingsPage() {
 
   useEffect(() => {
     fetchBookings();
+
+    // Listen for realtime Socket.io updates
+    import('@/services/socket').then(({ socket }) => {
+      const handleRealtimeUpdate = () => {
+        console.log('⚡ Socket event received. Refreshing bookings ledger...');
+        fetchBookings();
+      };
+
+      socket.on('booking_updated', handleRealtimeUpdate);
+      socket.on('room_status_changed', handleRealtimeUpdate);
+      socket.on('availability_changed', handleRealtimeUpdate);
+
+      return () => {
+        socket.off('booking_updated', handleRealtimeUpdate);
+        socket.off('room_status_changed', handleRealtimeUpdate);
+        socket.off('availability_changed', handleRealtimeUpdate);
+      };
+    });
 
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);

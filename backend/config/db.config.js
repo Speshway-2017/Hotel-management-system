@@ -53,6 +53,18 @@ export const connectDB = async () => {
       process.exit(1);
     }
 
+    console.log('💾 Attempting MongoMemoryServer in-memory fallback...');
+    try {
+      const { MongoMemoryServer } = await import('mongodb-memory-server');
+      const mongoServer = await MongoMemoryServer.create();
+      const mongoUri = mongoServer.getUri();
+      await mongoose.connect(mongoUri, { dbName: 'hourstay_hms' });
+      console.log('🍃 Connected to MongoMemoryServer in-memory database successfully!');
+      return;
+    } catch (memErr) {
+      console.warn('⚠️ MongoMemoryServer fallback failed:', memErr.message);
+    }
+
     console.log('💾 Using local offline File-based JSON Database fallback');
   }
 };

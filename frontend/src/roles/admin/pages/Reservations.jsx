@@ -152,12 +152,47 @@ function ReservationsPage() {
     { id: "WTL-02", guest: "Siddharth Sen", phone: "+91 98450 11223", roomType: "Villa Suite", dates: "20 Aug - 22 Aug" }
   ]);
 
-  async function loadReservations() {
+  async function loadReservations(showSpinner = true) {
     try {
-      setLoading(true);
+      if (showSpinner && reservations.length === 0) setLoading(true);
       setError(null);
       const res = await superAdminService.getReservations();
-      setReservations(res.data || []);
+      if (res.success && Array.isArray(res.data)) {
+        const mapped = res.data.map(b => {
+          let roomNum = b.room || b.roomNumber || "103";
+          if (typeof roomNum === 'string' && roomNum.includes('·')) {
+            roomNum = roomNum.split('·')[0].trim();
+          }
+          if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) {
+            roomNum = roomNum.replace(/room/i, '').trim();
+          }
+
+          let checkInDate = b.checkIn || b.checkInDate || "";
+          if (checkInDate.includes('T')) checkInDate = checkInDate.split('T')[0];
+
+          let checkOutDate = b.checkOut || b.checkOutDate || "";
+          if (checkOutDate.includes('T')) checkOutDate = checkOutDate.split('T')[0];
+
+          return {
+            _id: b._id || b.id || b.bookingId,
+            id: b.bookingId || b.id || b._id,
+            bookingId: b.bookingId || b.id || b._id,
+            guest: b.guest || b.guestName || b.name || "Surya",
+            phone: b.phone || b.guestPhone || b.mobile || "+91 98765 43210",
+            room: roomNum,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
+            nights: b.nights || 1,
+            pax: b.pax || "2 Adults",
+            source: b.source || "Direct Web",
+            amount: b.amount || b.totalAmount || 0,
+            balance: b.balance !== undefined ? b.balance : (b.paymentStatus === "Paid" || b.status === "Paid" || b.status === "Checked-in" ? 0 : (b.amount || b.totalAmount || 0)),
+            status: b.status || "Confirmed",
+            notes: b.notes || ""
+          };
+        });
+        setReservations(mapped);
+      }
     } catch (err) {
       setError(err.message || "Failed to load reservations");
     } finally {
@@ -166,7 +201,16 @@ function ReservationsPage() {
   }
 
   useEffect(() => {
-    loadReservations();
+    loadReservations(true);
+
+    const handleFocus = () => {
+      loadReservations(false);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   async function handleStatusChange(bookingId, newStatus, notes = "") {
@@ -472,7 +516,7 @@ function ReservationsPage() {
       {viewMode === "list" ? (
         /* List View Component */
         <div className="bg-white border border-muted rounded-xl shadow-soft overflow-hidden">
-          {loading ? (
+          {loading && reservations.length === 0 ? (
             <div className="p-8">
               <LoadingRows rows={5} />
             </div>

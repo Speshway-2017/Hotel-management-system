@@ -43,60 +43,9 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
   );
 }
 
-const initialRequests = [
-  {
-    id: "APR-8401",
-    bookingId: "BKG-9081",
-    guest: "Karan Malhotra",
-    room: "101",
-    type: "Refund Request",
-    description: "AC malfunction waiver override credit",
-    value: "₹3,500 Refund",
-    requestedBy: "Receptionist Shrey",
-    approvedBy: "Admin Madhu",
-    date: "2026-08-16",
-    status: "Approved"
-  },
-  {
-    id: "APR-8402",
-    bookingId: "BKG-9082",
-    guest: "Aisha Sharma",
-    room: "104",
-    type: "Discounts Waiver",
-    description: "Corporate rate waiver contract adjustment",
-    value: "₹1,200 discount",
-    requestedBy: "Agent Riya",
-    approvedBy: "Admin Madhu",
-    date: "2026-08-15",
-    status: "Approved"
-  },
-  {
-    id: "APR-8403",
-    bookingId: "BKG-9083",
-    guest: "Rohan Varma",
-    room: "205",
-    type: "Room Change",
-    description: "Upgrade from Deluxe to Premium Suite",
-    value: "Suite Upgrade (Room 302)",
-    requestedBy: "Receptionist Shrey",
-    approvedBy: "—",
-    date: "2026-08-17",
-    status: "Pending"
-  },
-  {
-    id: "APR-8404",
-    bookingId: "BKG-9084",
-    guest: "Meera Nair",
-    room: "101",
-    type: "Booking Cancellation",
-    description: "Waiver of 1-night cancellation penalty",
-    value: "Penalty Waiver (₹4,500)",
-    requestedBy: "Agent Riya",
-    approvedBy: "—",
-    date: "2026-08-17",
-    status: "Pending"
-  }
-];
+const initialRequests = [];
+
+import { managerService } from "@/services/manager";
 
 function AdminApprovalsPage() {
   const [requests, setRequests] = useState([]);
@@ -110,47 +59,76 @@ function AdminApprovalsPage() {
   // Selected details modal
   const [selectedReq, setSelectedReq] = useState(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_admin_approvals");
-    if (saved) {
-      setRequests(JSON.parse(saved));
-    } else {
-      localStorage.setItem("hms_admin_approvals", JSON.stringify(initialRequests));
-      setRequests(initialRequests);
+  const loadApprovals = async () => {
+    setLoading(true);
+    try {
+      const res = await managerService.getApprovals();
+      if (res.success && res.data) {
+        const mapped = res.data.map(a => ({
+          id: a._id || a.id,
+          _id: a._id || a.id,
+          guest: a.requestedBy || a.guest || "Staff Request",
+          room: a.category || "General",
+          type: a.category || "Override Request",
+          reason: a.reason || "Override request logged",
+          amount: a.amount || 0,
+          requestedBy: a.requestedBy || "Staff",
+          requestedDate: a.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+          status: a.status || "Pending",
+          approvedBy: a.decidedBy || "—",
+          bookingId: a.bookingId || "BKG-GENERAL"
+        }));
+        setRequests(mapped);
+      } else {
+        setRequests([]);
+      }
+    } catch (err) {
+      setRequests([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadApprovals();
+
+    const handleFocus = () => {
+      loadApprovals();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
-  const syncRequests = (list) => {
-    localStorage.setItem("hms_admin_approvals", JSON.stringify(list));
-    setRequests(list);
-  };
-
-  const handleApprove = (id) => {
-    const updated = requests.map(r => {
-      if (r.id === id) {
-        toast.success(`Request ${id} approved successfully!`);
-        return { ...r, status: "Approved", approvedBy: "Admin Madhu" };
+  const handleApprove = async (id) => {
+    try {
+      const target = requests.find(r => r.id === id || r._id === id);
+      const targetId = target?._id || target?.id || id;
+      await managerService.updateApproval(targetId, 'Approve', 'Approved via Admin Approvals Console');
+      toast.success(`Request ${id} approved successfully!`);
+      loadApprovals();
+      if (selectedReq && (selectedReq.id === id || selectedReq._id === id)) {
+        setSelectedReq({ ...selectedReq, status: "Approved", approvedBy: "Admin" });
       }
-      return r;
-    });
-    syncRequests(updated);
-    if (selectedReq && selectedReq.id === id) {
-      setSelectedReq({ ...selectedReq, status: "Approved", approvedBy: "Admin Madhu" });
+    } catch (err) {
+      toast.error(err.message || "Approval decision failed.");
     }
   };
 
-  const handleReject = (id) => {
-    const updated = requests.map(r => {
-      if (r.id === id) {
-        toast.error(`Request ${id} has been rejected.`);
-        return { ...r, status: "Rejected", approvedBy: "Admin Madhu" };
+  const handleReject = async (id) => {
+    try {
+      const target = requests.find(r => r.id === id || r._id === id);
+      const targetId = target?._id || target?.id || id;
+      await managerService.updateApproval(targetId, 'Reject', 'Rejected via Admin Approvals Console');
+      toast.error(`Request ${id} has been rejected.`);
+      loadApprovals();
+      if (selectedReq && (selectedReq.id === id || selectedReq._id === id)) {
+        setSelectedReq({ ...selectedReq, status: "Rejected", approvedBy: "Admin" });
       }
-      return r;
-    });
-    syncRequests(updated);
-    if (selectedReq && selectedReq.id === id) {
-      setSelectedReq({ ...selectedReq, status: "Rejected", approvedBy: "Admin Madhu" });
+    } catch (err) {
+      toast.error(err.message || "Rejection decision failed.");
     }
   };
 

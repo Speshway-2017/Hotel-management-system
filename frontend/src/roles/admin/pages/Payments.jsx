@@ -39,73 +39,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
   );
 }
 
-const initialTransactions = [
-  {
-    txnId: "TXN-84950291",
-    bookingId: "BKG-9081",
-    guest: "Karan Malhotra",
-    room: "101",
-    amount: 15400,
-    method: "Credit Card (Visa)",
-    date: "2026-08-15 11:24 AM",
-    status: "Success",
-    settlementStatus: "Settled",
-    settlementDate: "2026-08-16 02:00 AM",
-    gateway: "Razorpay"
-  },
-  {
-    txnId: "TXN-84950292",
-    bookingId: "BKG-9082",
-    guest: "Aisha Sharma",
-    room: "104",
-    amount: 4400,
-    method: "UPI (Google Pay)",
-    date: "2026-08-12 04:12 PM",
-    status: "Success",
-    settlementStatus: "Settled",
-    settlementDate: "2026-08-13 02:00 AM",
-    gateway: "Razorpay"
-  },
-  {
-    txnId: "TXN-84950293",
-    bookingId: "BKG-9083",
-    guest: "Rohan Varma",
-    room: "205",
-    amount: 12500,
-    method: "OTA Virtual Card",
-    date: "2026-08-14 09:30 AM",
-    status: "Success",
-    settlementStatus: "Pending Settlement",
-    settlementDate: "—",
-    gateway: "Stripe Connect"
-  },
-  {
-    txnId: "TXN-84950294",
-    bookingId: "BKG-9084",
-    guest: "Meera Nair",
-    room: "101",
-    amount: 4500,
-    method: "Debit Card (Mastercard)",
-    date: "2026-08-17 10:15 AM",
-    status: "Failed",
-    settlementStatus: "—",
-    settlementDate: "—",
-    gateway: "Razorpay"
-  },
-  {
-    txnId: "TXN-84950295",
-    bookingId: "BKG-9081",
-    guest: "Karan Malhotra",
-    room: "101",
-    amount: 3500,
-    method: "UPI (PhonePe)",
-    date: "2026-08-16 03:40 PM",
-    status: "Refunded",
-    settlementStatus: "Settled",
-    settlementDate: "2026-08-17 02:00 AM",
-    gateway: "Razorpay"
-  }
-];
+const initialTransactions = [];
 
 function AdminPaymentsPage() {
   const navigate = useNavigate();
@@ -133,18 +67,20 @@ function AdminPaymentsPage() {
         if (res.success && res.data) {
           const mapped = res.data.map(p => ({
             _id: p._id || p.id,
-            txnId: `TXN-${(p._id || p.id).substring(0, 8).toUpperCase()}`,
-            bookingId: p.bookingId,
-            guest: p.guestName,
-            room: "302",
-            amount: p.amount,
+            txnId: `TXN-${(p._id || p.id || "").substring(0, 8).toUpperCase()}`,
+            bookingId: p.bookingId || "BK-0000",
+            guest: p.guestName || "Guest",
+            room: p.roomNumber || "101",
+            amount: p.amount || 0,
             date: p.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
             method: p.paymentMethod || "UPI",
-            status: p.status === 'Settled' ? 'Success' : p.status,
+            status: p.status === 'Settled' ? 'Success' : (p.status || 'Success'),
             settlementStatus: "Settled",
+            settlementDate: p.settledAt || "Today, 02:00 AM",
+            gateway: p.gateway || "Razorpay GDS",
             reference: "UPI ID Mapped"
           }));
-          setTransactions(mapped.length > 0 ? mapped : initialTransactions);
+          setTransactions(mapped);
         }
       } catch (err) {
         toast.error("Failed to load transaction history.");
@@ -152,7 +88,17 @@ function AdminPaymentsPage() {
         setLoading(false);
       }
     };
+
     loadTransactions();
+
+    const handleFocus = () => {
+      loadTransactions();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const syncTransactions = (list) => {
@@ -161,21 +107,21 @@ function AdminPaymentsPage() {
 
   // KPIs
   const successList = transactions.filter(t => t.status === "Success");
-  const totalCollected = successList.reduce((acc, curr) => acc + curr.amount, 0);
-  const pendingSettlementVal = transactions.filter(t => t.settlementStatus === "Pending Settlement").reduce((acc, curr) => acc + curr.amount, 0);
+  const totalCollected = successList.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const pendingSettlementVal = transactions.filter(t => t.settlementStatus === "Pending Settlement").reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const failedCount = transactions.filter(t => t.status === "Failed").length;
-  const refundedVal = transactions.filter(t => t.status === "Refunded").reduce((acc, curr) => acc + curr.amount, 0);
+  const refundedVal = transactions.filter(t => t.status === "Refunded").reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
   // Filtered list
   const filteredTxns = transactions.filter(t => {
     const s = searchQuery.toLowerCase();
     const matchesSearch =
-      t.guest.toLowerCase().includes(s) ||
-      t.txnId.toLowerCase().includes(s) ||
-      t.bookingId.toLowerCase().includes(s) ||
-      t.room.toLowerCase().includes(s);
+      (t.guest || "").toLowerCase().includes(s) ||
+      (t.txnId || "").toLowerCase().includes(s) ||
+      (t.bookingId || "").toLowerCase().includes(s) ||
+      (t.room || "").toLowerCase().includes(s);
 
-    const matchesMethod = methodFilter === "all" || t.method.toLowerCase().includes(methodFilter.toLowerCase());
+    const matchesMethod = methodFilter === "all" || (t.method || "").toLowerCase().includes(methodFilter.toLowerCase());
     const matchesStatus = statusFilter === "all" || t.status === statusFilter;
 
     return matchesSearch && matchesMethod && matchesStatus;
