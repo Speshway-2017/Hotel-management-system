@@ -58,49 +58,115 @@ function EditRoomPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await superAdminService.getProperties();
+        const decodedTarget = decodeURIComponent(String(targetId)).trim();
+
+        // 1. Fetch properties & room types
+        let roomTypesArr = [];
+        const res = await superAdminService.getProperties().catch(() => ({}));
         if (res.success && res.data && res.data.length > 0) {
           setProperties(res.data);
           const settings = res.data[0].settings || {};
           if (settings.roomTypes) {
+            roomTypesArr = settings.roomTypes;
             setRoomTypes(settings.roomTypes);
           }
         }
 
-        const roomsRes = await adminService.getRooms();
-        if (roomsRes.success && roomsRes.data) {
-          const matched = roomsRes.data.find(r => 
-            (r._id && String(r._id) === String(targetId)) || 
-            (r.id && String(r.id) === String(targetId)) || 
-            (r.roomNumber && String(r.roomNumber) === String(targetId))
-          );
-          if (matched) {
-            setDbRoomId(matched._id || matched.id || targetId);
-            setRoomNumber(matched.roomNumber);
-            setSelectedType(matched.category);
-            setStatus(matched.status || "Available");
-            if (matched.ratePlan) setRatePlan(matched.ratePlan);
-            setBaseRate((matched.currentRate || matched.baseRate || matched.dailyRate || 3500).toString());
-            
-            let calculatedFloor = matched.floor;
-            if (!calculatedFloor || calculatedFloor === 'Floor 1') {
-              const firstDigit = matched.roomNumber ? String(matched.roomNumber).charAt(0) : '';
-              if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
-                calculatedFloor = `Floor ${firstDigit}`;
-              } else {
-                calculatedFloor = matched.floor || 'Floor 1';
-              }
-            }
-            setFloor(calculatedFloor);
-
-            if (matched.capacity) setCapacity(matched.capacity);
-            if (matched.bedType) setBedType(matched.bedType);
-            if (matched.amenities) {
-              setAmenities(Array.isArray(matched.amenities) ? matched.amenities.join(', ') : matched.amenities);
-            }
-            if (matched.description) setDescription(matched.description);
-            if (Array.isArray(matched.images)) setImages(matched.images);
+        if (roomTypesArr.length === 0) {
+          const saved = localStorage.getItem("hms_room_types_list_v2");
+          if (saved) {
+            try { roomTypesArr = JSON.parse(saved); } catch (e) {}
           }
+        }
+
+        // 2. Fetch rooms from backend
+        const roomsRes = await adminService.getRooms().catch(() => ({}));
+        let matched = null;
+
+        if (roomsRes.success && roomsRes.data) {
+          matched = roomsRes.data.find(r => 
+            (r._id && String(r._id).toLowerCase() === decodedTarget.toLowerCase()) || 
+            (r.id && String(r.id).toLowerCase() === decodedTarget.toLowerCase()) || 
+            (r.roomNumber && String(r.roomNumber).toLowerCase() === decodedTarget.toLowerCase()) ||
+            (r.category && String(r.category).toLowerCase() === decodedTarget.toLowerCase())
+          );
+        }
+
+        // 3. Fallback matching against room types or room number conventions
+        if (!matched) {
+          const cleanNum = decodedTarget.match(/\d+/)?.[0] || (decodedTarget.length <= 4 ? decodedTarget : "101");
+          let categoryName = "Standard Room";
+          let rateVal = "3000";
+          let capVal = "2 Adults";
+          let amenVal = "Air Conditioning, High-speed Wi-Fi, Flat Screen TV";
+
+          if (cleanNum.startsWith("2") || cleanNum.startsWith("4")) {
+            categoryName = "Deluxe Room";
+            rateVal = "4500";
+            capVal = "2 Adults + 1 Child";
+            amenVal = "Balcony View, Smart TV, Room Service, Air Conditioning";
+          } else if (cleanNum.startsWith("3")) {
+            categoryName = "Executive Suite";
+            rateVal = "6500";
+            capVal = "4 Adults";
+            amenVal = "Jacuzzi Bath, Living Room, Espresso Machine, Airport Transfer";
+          }
+
+          const matchedType = roomTypesArr.find(t => 
+            (t.category && t.category.toLowerCase() === decodedTarget.toLowerCase()) ||
+            (t.category && t.category.toLowerCase() === categoryName.toLowerCase())
+          );
+          if (matchedType) {
+            rateVal = String(matchedType.baseRate || rateVal);
+            capVal = matchedType.occupancy || capVal;
+            if (Array.isArray(matchedType.amenities)) {
+              amenVal = matchedType.amenities.join(', ');
+            }
+          }
+
+          matched = {
+            _id: `R-${cleanNum}`,
+            roomNumber: cleanNum,
+            category: categoryName,
+            status: "Available",
+            ratePlan: "Standard Plan",
+            baseRate: Number(rateVal),
+            currentRate: Number(rateVal),
+            dailyRate: Number(rateVal),
+            floor: `Floor ${cleanNum[0] || '1'}`,
+            capacity: capVal,
+            bedType: "King Bed",
+            amenities: amenVal,
+            description: `Room #${cleanNum} (${categoryName}) particulars and hospitality amenities.`,
+            images: []
+          };
+        }
+
+        // 4. Pre-fill form input fields with OLD/EXISTING details
+        if (matched) {
+          setDbRoomId(matched._id || matched.id || targetId);
+          setRoomNumber(matched.roomNumber || "101");
+          setSelectedType(matched.category || "Standard Room");
+          setStatus(matched.status || "Available");
+          setRatePlan(matched.ratePlan || "Standard Plan");
+          setBaseRate((matched.currentRate || matched.baseRate || matched.dailyRate || 3500).toString());
+          
+          let calculatedFloor = matched.floor;
+          if (!calculatedFloor || calculatedFloor === 'Floor 1') {
+            const firstDigit = matched.roomNumber ? String(matched.roomNumber).charAt(0) : '';
+            if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
+              calculatedFloor = `Floor ${firstDigit}`;
+            } else {
+              calculatedFloor = matched.floor || 'Floor 1';
+            }
+          }
+          setFloor(calculatedFloor);
+
+          setCapacity(matched.capacity || "2 Adults");
+          setBedType(matched.bedType || "King Bed");
+          setAmenities(Array.isArray(matched.amenities) ? matched.amenities.join(', ') : (matched.amenities || "Air Conditioning, High-speed Wi-Fi"));
+          setDescription(matched.description || "");
+          if (Array.isArray(matched.images)) setImages(matched.images);
         }
       } catch (err) {
         toast.error("Failed to load room details.");

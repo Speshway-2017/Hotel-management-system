@@ -104,37 +104,68 @@ function FrontDeskPage() {
   const [extendNightsCount, setExtendNightsCount] = useState("2");
   const [collectAmount, setCollectAmount] = useState("");
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const roomsRes = await adminService.getRooms().catch(() => ({ success: true, data: [] }));
-      let mappedRooms = (roomsRes.data || []).map(r => ({
-        num: r.roomNumber || String(r.num || ''),
-        type: r.category || r.roomType || 'Deluxe Room',
-        status: r.status || 'Available'
-      }));
+  const notifySocketEvents = (action = 'update', roomNum = null) => {
+    import('@/services/socket').then(({ socket }) => {
+      if (socket) {
+        socket.emit('booking_updated', { action, roomNum });
+        socket.emit('room_status_changed', { action, roomNum });
+        socket.emit('availability_changed', { action, roomNum });
+      }
+    }).catch(() => {});
+  };
 
-      if (mappedRooms.length === 0) {
-        mappedRooms = [
-          { num: "101", type: "Villa Suite", status: "Available" },
-          { num: "102", type: "Executive Suite", status: "Available" },
-          { num: "103", type: "Deluxe Room", status: "Occupied" },
-          { num: "104", type: "Heritage Luxury", status: "Available" },
-          { num: "105", type: "Deluxe Room", status: "Available" },
-          { num: "108", type: "Deluxe Courtyard", status: "Available" },
-          { num: "204", type: "Executive Suite", status: "Reserved" },
-          { num: "205", type: "Heritage Luxury", status: "Available" },
-          { num: "302", type: "Maharaja Suite", status: "Available" },
-          { num: "312", type: "Premier Haveli", status: "Reserved" },
-          { num: "501", type: "Maharaja Suite", status: "Available" }
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    try {
+      const [roomsRes, propsRes, res] = await Promise.all([
+        adminService.getRooms().catch(() => ({ success: true, data: [] })),
+        superAdminService.getProperties().catch(() => ({ success: true, data: [] })),
+        superAdminService.getReservations().catch(() => ({ success: true, data: [] }))
+      ]);
+
+      let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
+
+      let settingsTypes = [];
+      if (propsRes && propsRes.success && Array.isArray(propsRes.data) && propsRes.data.length > 0) {
+        settingsTypes = propsRes.data[0]?.settings?.roomTypes || [];
+      }
+
+      let savedTypes = [];
+      try {
+        const saved = localStorage.getItem("hms_room_types_list_v2");
+        if (saved) savedTypes = JSON.parse(saved);
+      } catch (e) {}
+
+      if (settingsTypes.length === 0 && savedTypes.length === 0) {
+        savedTypes = [
+          { category: "Standard Room", rooms: ["101", "102", "103"] },
+          { category: "Deluxe Room", rooms: ["201", "202", "203", "401", "402", "403"] },
+          { category: "Executive Suite", rooms: ["301", "302", "303"] }
         ];
       }
-      setRooms(mappedRooms);
 
-      const res = await superAdminService.getReservations();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mappedRes = res.data.map(b => {
-          let roomNum = b.room || b.roomNumber || "103";
+      const allTypes = [...settingsTypes, ...savedTypes];
+      const existingNums = new Set(dbRooms.map(r => String(r.roomNumber || r.num)));
+
+      allTypes.forEach(t => {
+        const assigned = Array.isArray(t.rooms) ? t.rooms : [];
+        assigned.forEach(num => {
+          if (num && !existingNums.has(String(num))) {
+            existingNums.add(String(num));
+            dbRooms.push({
+              _id: `R-${num}`,
+              roomNumber: String(num),
+              category: t.category,
+              status: "Available"
+            });
+          }
+        });
+      });
+
+      let mappedRes = [];
+      if (res.success && Array.isArray(res.data)) {
+        mappedRes = res.data.map(b => {
+          let roomNum = b.room || b.roomNumber || "";
           if (typeof roomNum === 'string' && roomNum.includes('·')) {
             roomNum = roomNum.split('·')[0].trim();
           }
@@ -152,8 +183,8 @@ function FrontDeskPage() {
             _id: b._id || b.id || b.bookingId,
             id: b.bookingId || b.id || b._id,
             bookingId: b.bookingId || b.id || b._id,
-            guest: b.guest || b.guestName || b.name || "Surya",
-            phone: b.phone || b.guestPhone || b.mobile || "+91 98765 10301",
+            guest: b.guest || b.guestName || b.name || "Guest",
+            phone: b.phone || b.guestPhone || b.mobile || "+91 98765 43210",
             room: roomNum,
             category: b.roomType || b.category || "Deluxe Room",
             roomType: b.roomType || b.category || "Deluxe Room",
@@ -169,13 +200,44 @@ function FrontDeskPage() {
             notes: b.notes || ""
           };
         });
-        setReservations(mappedRes);
       }
+
+      // Map dynamic room list & compute current status
+      const mappedRooms = dbRooms
+        .map(r => {
+          const num = String(r.roomNumber || r.num || '');
+          const activeStay = mappedRes.find(b => String(b.room) === num && (b.status === 'Checked-in' || b.status === 'Confirmed' || b.status === 'Pending'));
+          let computedStatus = r.status || 'Available';
+          if (activeStay) {
+            if (activeStay.status === 'Checked-in') computedStatus = 'Occupied';
+            else if (activeStay.status === 'Confirmed' || activeStay.status === 'Pending') computedStatus = 'Reserved';
+          }
+          return {
+            num,
+            type: r.category || r.roomType || 'Standard Room',
+            status: computedStatus
+          };
+        })
+        .filter(r => r.num);
+
+      // Deduplicate by room number & sort
+      const uniqueRooms = [];
+      const seenNums = new Set();
+      mappedRooms.forEach(rm => {
+        if (!seenNums.has(rm.num)) {
+          seenNums.add(rm.num);
+          uniqueRooms.push(rm);
+        }
+      });
+      uniqueRooms.sort((a, b) => Number(a.num) - Number(b.num));
+
+      setRooms(uniqueRooms);
+      setReservations(mappedRes);
       setError(null);
     } catch (err) {
       setError(err.message || "Failed to initialize frontdesk datasets.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -183,19 +245,37 @@ function FrontDeskPage() {
     loadData();
 
     const handleFocus = () => {
-      loadData();
+      loadData(true);
     };
     window.addEventListener('focus', handleFocus);
 
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadData(true);
+      socket.on('booking_updated', handleRealtime);
+      socket.on('booking_created', handleRealtime);
+      socket.on('booking_deleted', handleRealtime);
+      socket.on('room_status_changed', handleRealtime);
+      socket.on('availability_changed', handleRealtime);
+    });
+
     return () => {
       window.removeEventListener('focus', handleFocus);
+      if (socketInst) {
+        socketInst.off('booking_updated');
+        socketInst.off('booking_created');
+        socketInst.off('booking_deleted');
+        socketInst.off('room_status_changed');
+        socketInst.off('availability_changed');
+      }
     };
   }, []);
 
   // Helper selectors
   const activeCheckInsToday = reservations.filter(r => r.status === "Confirmed" || r.status === "Pending" || r.checkIn === targetDate);
   const activeCheckOutsToday = reservations.filter(r => r.status === "Checked-out" || r.checkOut === targetDate);
-  const inHouseGuests = reservations.filter(r => r.status === "Checked-in" || (r.room === "103" && r.guest === "Surya"));
+  const inHouseGuests = reservations.filter(r => r.status === "Checked-in");
 
   // State modification logic
   const handleWalkinSubmit = async (e) => {
@@ -227,8 +307,10 @@ function FrontDeskPage() {
 
     try {
       await superAdminService.createReservation(newBooking);
+      await adminService.updateRoomStatus(formRoomNum, "Occupied").catch(() => ({}));
       toast.success(`Walk-in guest ${formGuest} checked-in to room #${formRoomNum}!`);
-      loadData();
+      notifySocketEvents('walkin', formRoomNum);
+      loadData(true);
       setActiveModal(null);
       clearFormFields();
     } catch (err) {
@@ -248,8 +330,10 @@ function FrontDeskPage() {
     try {
       const targetId = booking._id || booking.id;
       await superAdminService.updateReservation(targetId, { status: "Checked-in" });
+      await adminService.updateRoomStatus(booking.room, "Occupied").catch(() => ({}));
       toast.success(`Guest ${booking.guest} successfully checked-in.`);
-      loadData();
+      notifySocketEvents('checkin', booking.room);
+      loadData(true);
       setActiveModal(null);
     } catch (err) {
       toast.error(err.message || "Failed to complete check-in.");
@@ -268,8 +352,10 @@ function FrontDeskPage() {
     try {
       const targetId = booking._id || booking.id;
       await superAdminService.updateReservation(targetId, { status: "Checked-out" });
+      await adminService.updateRoomStatus(booking.room, "Available").catch(() => ({}));
       toast.success(`Guest ${booking.guest} successfully checked-out.`);
-      loadData();
+      notifySocketEvents('checkout', booking.room);
+      loadData(true);
       setActiveModal(null);
     } catch (err) {
       toast.error(err.message || "Failed to complete check-out.");
@@ -284,8 +370,12 @@ function FrontDeskPage() {
       const booking = reservations.find(r => (r._id || r.id) === targetBookingId);
       const targetId = booking?._id || booking?.id || targetBookingId;
       await superAdminService.updateReservation(targetId, { room: targetRoomNum });
+      if (booking?.status === 'Checked-in') {
+        await adminService.updateRoomStatus(targetRoomNum, "Occupied").catch(() => ({}));
+      }
       toast.success("Room mapping assigned successfully.");
-      loadData();
+      notifySocketEvents('assign', targetRoomNum);
+      loadData(true);
       setActiveModal(null);
     } catch (err) {
       toast.error(err.message || "Failed to map room assignment.");
@@ -304,8 +394,13 @@ function FrontDeskPage() {
     try {
       const targetId = booking._id || booking.id;
       await superAdminService.updateReservation(targetId, { room: targetRoomNum });
+      if (booking.status === 'Checked-in') {
+        if (oldRoom) await adminService.updateRoomStatus(oldRoom, "Available").catch(() => ({}));
+        await adminService.updateRoomStatus(targetRoomNum, "Occupied").catch(() => ({}));
+      }
       toast.success(`Room changed from #${oldRoom} to #${targetRoomNum}.`);
-      loadData();
+      notifySocketEvents('change_room', targetRoomNum);
+      loadData(true);
       setActiveModal(null);
     } catch (err) {
       toast.error(err.message || "Failed to update room change.");
@@ -331,7 +426,8 @@ function FrontDeskPage() {
       const targetId = booking._id || booking.id;
       await superAdminService.updateReservation(targetId, payload);
       toast.success("Stay extension registered successfully.");
-      loadData();
+      notifySocketEvents('extend_stay', booking.room);
+      loadData(true);
       setActiveModal(null);
     } catch (err) {
       toast.error(err.message || "Failed to extend stay.");
@@ -355,17 +451,17 @@ function FrontDeskPage() {
       const targetId = booking._id || booking.id;
       await superAdminService.updateReservation(targetId, payload);
       
-      // Log payment record in payments database collection
       await adminService.createPayment({
         bookingId: targetId,
         guestName: booking.guest,
         amount: Number(collectAmount),
         paymentMethod: 'Card',
         status: 'Settled'
-      });
+      }).catch(() => ({}));
 
       toast.success(`Collected payment of ₹${Number(collectAmount).toLocaleString()}. Folio updated.`);
-      loadData();
+      notifySocketEvents('payment', booking.room);
+      loadData(true);
       setActiveModal(null);
     } catch (err) {
       toast.error(err.message || "Failed to record payment.");

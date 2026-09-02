@@ -91,10 +91,15 @@ function AdminPaymentsPage() {
 
     loadTransactions();
 
-    const handleFocus = () => {
-      loadTransactions();
-    };
+    const handleFocus = () => loadTransactions();
     window.addEventListener('focus', handleFocus);
+
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      socket.on('payment_added', loadTransactions);
+      socket.on('booking_updated', loadTransactions);
+    });
 
     return () => {
       window.removeEventListener('focus', handleFocus);

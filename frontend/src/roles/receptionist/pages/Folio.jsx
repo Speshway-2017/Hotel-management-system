@@ -230,7 +230,9 @@ function InvoicesAndFolioPage() {
                       <td className="py-3.5 px-4">
                         <Button
                           asChild
-                          className="bg-emerald-600 hover:bg-emerald-700 !text-white h-7 px-3.5 text-[10px] rounded-lg font-bold cursor-pointer transition-all shadow-sm"
+                          size="xs"
+                          variant="outline"
+                          className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                         >
                           <Link to={`/reception/folio/${f.id}`}>View Folio</Link>
                         </Button>

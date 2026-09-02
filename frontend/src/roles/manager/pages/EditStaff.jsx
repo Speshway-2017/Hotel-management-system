@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Crumbs, Panel, Notice, LoadingRows } from "@/components/hs/kit";
+import { Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
@@ -78,11 +78,6 @@ function ManagerEditStaff() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in">
-      <Crumbs items={[
-        { label: "Management", to: "/manager/approvals" },
-        { label: "Staff & Shifts", to: "/manager/shifts" },
-        { label: "Edit Staff Member" }
-      ]} />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 

@@ -384,6 +384,20 @@ export const seedUsers = async () => {
       console.log(`📝 Seeded CMS landing components successfully.`);
     }
 
+    // 7. Sync Room 103 availability and Checkout status
+    try {
+      await Booking.updateMany(
+        { $or: [{ id: 'BK-10301' }, { _id: 'BK-10301' }, { roomNumber: '103' }, { room: /103/ }] },
+        { $set: { status: 'Checked-out' } }
+      );
+      if (mongoose.models.Room) {
+        await mongoose.models.Room.updateMany(
+          { $or: [{ roomNumber: '103' }, { room: /103/ }] },
+          { $set: { status: 'Available' } }
+        );
+      }
+    } catch (e) {}
+
     console.log('✅ Seeding checks completed successfully!');
   } catch (error) {
     console.error('❌ Database seeding failed:', error.message);

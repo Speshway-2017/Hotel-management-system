@@ -405,10 +405,92 @@
       ],
       "reservationEmail": "reservations@speshwayluxuryhotel.com",
       "contactNumber": "9876543210",
-      "policies": "Free cancellation up to 24 hours before check-in. Cancellations within 24 hours may be subject to a cancellation charge."
+      "policies": "Free cancellation up to 24 hours before check-in. Cancellations within 24 hours may be subject to a cancellation charge.",
+      "roomTypes": [
+        {
+          "_id": "RT-01",
+          "category": "Standard Room",
+          "rooms": [
+            "101",
+            "102",
+            "103"
+          ],
+          "roomsCount": 3,
+          "occupancy": "2 Adults",
+          "baseRate": 3000,
+          "activePlans": 1,
+          "amenities": [
+            "Air Conditioning",
+            "High-speed Wi-Fi",
+            "Flat Screen TV"
+          ],
+          "status": "Active"
+        },
+        {
+          "_id": "RT-02",
+          "category": "Deluxe Room",
+          "rooms": [
+            "201",
+            "202",
+            "203",
+            "401",
+            "402",
+            "403"
+          ],
+          "roomsCount": 6,
+          "occupancy": "2 Adults + 1 Child",
+          "baseRate": 4500,
+          "activePlans": 2,
+          "amenities": [
+            "Balcony View",
+            "Smart TV",
+            "Room Service",
+            "Mini Bar"
+          ],
+          "status": "Active"
+        },
+        {
+          "_id": "RT-03",
+          "category": "Executive Suite",
+          "rooms": [
+            "301",
+            "302",
+            "303"
+          ],
+          "roomsCount": 3,
+          "occupancy": "4 Adults",
+          "baseRate": 6500,
+          "activePlans": 2,
+          "amenities": [
+            "Jacuzzi Bath",
+            "Living Room",
+            "Espresso Machine",
+            "Airport Transfer"
+          ],
+          "status": "Active"
+        },
+        {
+          "_id": "RT-1788329427394",
+          "category": "Penthouse Suite",
+          "baseRate": 5500,
+          "occupancy": "2 Adults",
+          "rooms": [
+            "501",
+            "502"
+          ],
+          "roomsCount": 2,
+          "activePlans": 1,
+          "amenities": [
+            "Air Conditioning",
+            "High-speed Wi-Fi",
+            "Flat Screen TV"
+          ],
+          "status": "Active"
+        }
+      ]
     },
     "createdAt": "2026-08-18T06:50:34.910Z",
-    "updatedAt": "2026-08-31T05:59:31.249Z"
+    "updatedAt": "2026-09-02T06:10:27.622Z"
   },
   {
     "_id": "HS-0L43K",

@@ -51,42 +51,11 @@ const calculateDynamicMetrics = async (property) => {
   let totalNights = validBookings.reduce((sum, b) => sum + (b.nights || 1), 0);
   let totalRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
 
-  // Baseline seed parameters to match target seed properties metrics
-  let seedOccupancy = 0;
-  let seedAdr = 0;
-
-  if (propIdStr === "HS-JAI") {
-    seedOccupancy = 84;
-    seedAdr = 11400;
-  } else if (propIdStr === "HS-UDA") {
-    seedOccupancy = 91;
-    seedAdr = 16800;
-  } else if (propIdStr === "HS-GOA") {
-    seedOccupancy = 76;
-    seedAdr = 13250;
-  } else if (propIdStr === "HS-KER") {
-    seedOccupancy = 68;
-    seedAdr = 9800;
-  } else if (propIdStr === "HS-DEL") {
-    seedOccupancy = 88;
-    seedAdr = 10250;
-  } else if (propIdStr === "HS-MUM") {
-    seedOccupancy = 82;
-    seedAdr = 14600;
-  }
-
-  const roomsCount = property.rooms || 1;
-  const capacity30Days = roomsCount * 30;
-
-  const baselineNights = Math.round(capacity30Days * (seedOccupancy / 100));
-  const baselineRevenue = baselineNights * seedAdr;
-
-  const finalNights = totalNights + baselineNights;
-  const finalRevenue = totalRevenue + baselineRevenue;
-
-  const occupancy = Math.min(100, Math.round((finalNights / capacity30Days) * 100)) || 0;
-  const adr = finalNights > 0 ? Math.round(finalRevenue / finalNights) : 0;
-  const revpar = Math.round((occupancy * adr) / 100) || 0;
+  const roomsCount = property.rooms || 12;
+  const occupiedCount = bookings.filter(b => b.status === 'Checked-in').length;
+  const occupancy = roomsCount > 0 ? Math.round((occupiedCount / roomsCount) * 100) : 0;
+  const adr = occupiedCount > 0 ? Math.round(totalRevenue / occupiedCount) : (totalNights > 0 ? Math.round(totalRevenue / totalNights) : 0);
+  const revpar = roomsCount > 0 ? Math.round(totalRevenue / roomsCount) : 0;
 
   return { occupancy, adr, revpar };
 };

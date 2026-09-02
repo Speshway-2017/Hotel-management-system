@@ -94,21 +94,20 @@ function RoomsRatesPage() {
     { _id: "R-301", roomNumber: "301", category: "Executive Suite", floor: "Floor 3", status: "Available", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
     { _id: "R-302", roomNumber: "302", category: "Executive Suite", floor: "Floor 3", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
     { _id: "R-303", roomNumber: "303", category: "Executive Suite", floor: "Floor 3", status: "Available", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
-    { _id: "R-401", roomNumber: "401", category: "Villa Suite", floor: "Floor 4", status: "Available", ratePlan: "Weekend Plan", currentRate: 12500, dailyRate: 12500 },
-    { _id: "R-402", roomNumber: "402", category: "Villa Suite", floor: "Floor 4", status: "Occupied", ratePlan: "Weekend Plan", currentRate: 12500, dailyRate: 12500 },
-    { _id: "R-403", roomNumber: "403", category: "Villa Suite", floor: "Floor 4", status: "Blocked", ratePlan: "Weekend Plan", currentRate: 12500, dailyRate: 12500 }
+    { _id: "R-401", roomNumber: "401", category: "Deluxe Room", floor: "Floor 4", status: "Available", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
+    { _id: "R-402", roomNumber: "402", category: "Deluxe Room", floor: "Floor 4", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
+    { _id: "R-403", roomNumber: "403", category: "Deluxe Room", floor: "Floor 4", status: "Blocked", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 }
   ]);
 
   const [roomTypesList, setRoomTypesList] = useState(() => {
-    const saved = localStorage.getItem("hms_room_types_list");
+    const saved = localStorage.getItem("hms_room_types_list_v2");
     if (saved) return JSON.parse(saved);
     const initial = [
-      { _id: "T-01", category: "Standard Room", roomsCount: 3, occupancy: "2 Adults", baseRate: 3000, activePlans: 1, amenities: ["Air Conditioning", "High-speed Wi-Fi", "Flat Screen TV"], status: "Active" },
-      { _id: "T-02", category: "Deluxe Room", roomsCount: 3, occupancy: "2 Adults + 1 Child", baseRate: 4500, activePlans: 2, amenities: ["Balcony View", "Smart TV", "Room Service"], status: "Active" },
-      { _id: "T-03", category: "Executive Suite", roomsCount: 3, occupancy: "4 Adults", baseRate: 6500, activePlans: 2, amenities: ["Jacuzzi Bath", "Living Room", "Espresso Machine", "Airport Transfer"], status: "Active" },
-      { _id: "T-04", category: "Villa Suite", roomsCount: 3, occupancy: "4 Adults", baseRate: 12500, activePlans: 3, amenities: ["Private Plunge Pool", "Garden Courtyard", "Personal Host"], status: "Active" }
+      { _id: "RT-01", category: "Standard Room", rooms: ["101", "102", "103"], roomsCount: 3, occupancy: "2 Adults", baseRate: 3000, activePlans: 1, amenities: ["Air Conditioning", "High-speed Wi-Fi", "Flat Screen TV"], status: "Active" },
+      { _id: "RT-02", category: "Deluxe Room", rooms: ["201", "202", "203", "401", "402", "403"], roomsCount: 6, occupancy: "2 Adults + 1 Child", baseRate: 4500, activePlans: 2, amenities: ["Balcony View", "Smart TV", "Room Service", "Mini Bar"], status: "Active" },
+      { _id: "RT-03", category: "Executive Suite", rooms: ["301", "302", "303"], roomsCount: 3, occupancy: "4 Adults", baseRate: 6500, activePlans: 2, amenities: ["Jacuzzi Bath", "Living Room", "Espresso Machine", "Airport Transfer"], status: "Active" }
     ];
-    localStorage.setItem("hms_room_types_list", JSON.stringify(initial));
+    localStorage.setItem("hms_room_types_list_v2", JSON.stringify(initial));
     return initial;
   });
 
@@ -123,18 +122,37 @@ function RoomsRatesPage() {
     { _id: "RE-02", roomType: "Villa Suite", type: "Closed to Arrival (CTA)", value: "True", effectiveDates: "2026-08-18 to 2026-08-19", status: "Active" }
   ]);
 
-  // Calendar scheduler state
-  const [calendarStart, setCalendarStart] = useState(new Date("2026-08-17"));
+  // Calendar scheduler state (Starts from TODAY)
+  const [calendarStart, setCalendarStart] = useState(() => new Date());
 
   // Form / Drawer Modals states
   const [isAddPlanOpen, setIsAddPlanOpen] = useState(false);
   const [isChangeStatusOpen, setIsChangeStatusOpen] = useState(false);
   const [isAddRestrictionOpen, setIsAddRestrictionOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Room Types Action Modals
+  const [isAddTypeOpen, setIsAddTypeOpen] = useState(false);
+  const [isViewTypeOpen, setIsViewTypeOpen] = useState(false);
+  const [isAddRoomToCategoryOpen, setIsAddRoomToCategoryOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
   // Form Fields States
   const [formRoomStatus, setFormRoomStatus] = useState("Available");
+
+  // Room Type Form States
+  const [formTypeCategory, setFormTypeCategory] = useState("");
+  const [formTypeBaseRate, setFormTypeBaseRate] = useState("3000");
+  const [formTypeOccupancy, setFormTypeOccupancy] = useState("2 Adults");
+  const [formTypeAmenities, setFormTypeAmenities] = useState("");
+  const [formTypeRooms, setFormTypeRooms] = useState("");
+  const [formTypeStatus, setFormTypeStatus] = useState("Active");
+
+  // Add Room to Category Form States
+  const [formAddRoomCategory, setFormAddRoomCategory] = useState("Standard Room");
+  const [formAddRoomNumber, setFormAddRoomNumber] = useState("");
+  const [formAddRoomFloor, setFormAddRoomFloor] = useState("Floor 1");
+  const [formAddRoomRate, setFormAddRoomRate] = useState("3000");
 
   const [formPlanName, setFormPlanName] = useState("");
   const [formPlanCategory, setFormPlanCategory] = useState("All Categories");
@@ -144,9 +162,10 @@ function RoomsRatesPage() {
   async function loadData(isSilent = false) {
     try {
       if (!isSilent) setLoading(true);
-      const [propsRes, roomsRes] = await Promise.all([
+      const [propsRes, roomsRes, resRes] = await Promise.all([
         superAdminService.getProperties(),
-        adminService.getRooms()
+        adminService.getRooms(),
+        superAdminService.getReservations()
       ]);
 
       if (propsRes.success && propsRes.data && propsRes.data.length > 0) {
@@ -160,35 +179,86 @@ function RoomsRatesPage() {
         if (settings.restrictions) setRestrictionsList(settings.restrictions);
       }
 
-      if (roomsRes.success && roomsRes.data && roomsRes.data.length > 0) {
-        const normalized = roomsRes.data.map(rm => {
-          let cleanStatus = rm.status || 'Available';
-          
-          let roomFloor = rm.floor;
-          if (!roomFloor) {
-            const firstDigit = rm.roomNumber ? String(rm.roomNumber).charAt(0) : '';
-            if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
-              roomFloor = `Floor ${firstDigit}`;
-            } else {
-              roomFloor = 'Floor 1';
-            }
-          }
-
-          const actualRate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500);
-
-          return {
-            ...rm,
-            status: cleanStatus,
-            floor: roomFloor,
-            category: rm.category || 'Standard Room',
-            ratePlan: rm.ratePlan || 'Standard Plan',
-            currentRate: actualRate,
-            dailyRate: actualRate,
-            baseRate: actualRate
-          };
-        });
-        setRoomsList(normalized);
+      const checkedInRoomNums = new Set();
+      if (resRes && resRes.success && Array.isArray(resRes.data)) {
+        resRes.data
+          .filter(r => r.status === "Checked-in" || r.status === "Checked In")
+          .forEach(r => {
+            const roomVal = String(r.room || r.roomNumber || "");
+            const match = roomVal.match(/\b\d{3,4}\b/);
+            const num = match ? match[0] : roomVal.split("·")[0].split(" ")[0].trim();
+            if (num) checkedInRoomNums.add(num);
+          });
       }
+
+      let initialRooms = (roomsRes.success && roomsRes.data && roomsRes.data.length > 0)
+        ? roomsRes.data
+        : roomsList;
+
+      // Extract assigned rooms from room types in MongoDB settings & localStorage
+      let cachedTypes = [];
+      try {
+        const saved = localStorage.getItem("hms_room_types_list_v2");
+        if (saved) cachedTypes = JSON.parse(saved);
+      } catch (e) {}
+
+      const combinedTypes = [...(roomTypesList || []), ...cachedTypes];
+      const existingNums = new Set(initialRooms.map(r => String(r.roomNumber || r.num)));
+
+      combinedTypes.forEach(t => {
+        const assigned = Array.isArray(t.rooms) ? t.rooms : [];
+        assigned.forEach(num => {
+          if (num && !existingNums.has(String(num))) {
+            existingNums.add(String(num));
+            initialRooms.push({
+              _id: `R-${num}`,
+              roomNumber: String(num),
+              category: t.category,
+              floor: `Floor ${String(num)[0] || '1'}`,
+              status: "Available",
+              baseRate: t.baseRate || 3500,
+              currentRate: t.baseRate || 3500,
+              dailyRate: t.baseRate || 3500,
+              ratePlan: "Standard Plan"
+            });
+          }
+        });
+      });
+
+      const normalized = initialRooms.map(rm => {
+        const numStr = String(rm.roomNumber || rm.num || '');
+        let cleanStatus = rm.status || 'Available';
+
+        if (checkedInRoomNums.has(numStr)) {
+          cleanStatus = 'Occupied';
+        } else if (cleanStatus === 'Occupied') {
+          cleanStatus = 'Available';
+        }
+        
+        let roomFloor = rm.floor;
+        if (!roomFloor) {
+          const firstDigit = rm.roomNumber ? String(rm.roomNumber).charAt(0) : '';
+          if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
+            roomFloor = `Floor ${firstDigit}`;
+          } else {
+            roomFloor = 'Floor 1';
+          }
+        }
+
+        const actualRate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500);
+
+        return {
+          ...rm,
+          status: cleanStatus,
+          floor: roomFloor,
+          category: rm.category || 'Standard Room',
+          ratePlan: rm.ratePlan || 'Standard Plan',
+          currentRate: actualRate,
+          dailyRate: actualRate,
+          baseRate: actualRate
+        };
+      });
+      setRoomsList(normalized);
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to load properties and rooms dataset");
     } finally {
@@ -243,7 +313,160 @@ function RoomsRatesPage() {
     };
   }, []);
 
-  // Handlers for dynamic creations
+  // Handlers for dynamic creations & MongoDB Persistence
+
+  const persistRoomTypesToMongoDB = async (updatedTypes) => {
+    try {
+      setRoomTypesList(updatedTypes);
+      localStorage.setItem("hms_room_types_list_v2", JSON.stringify(updatedTypes));
+      
+      const settingsRes = await adminService.getPropertySettings().catch(() => ({}));
+      const currentSettings = settingsRes.data || settingsRes || {};
+      await adminService.updatePropertySettings({
+        ...currentSettings,
+        roomTypes: updatedTypes
+      }).catch(() => {});
+
+      if (properties.length > 0) {
+        const prop = properties[0];
+        await superAdminService.updateProperty(prop._id || prop.id, {
+          settings: {
+            ...(prop.settings || {}),
+            roomTypes: updatedTypes
+          }
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("Failed to persist room types to MongoDB:", err);
+    }
+  };
+
+  const handleSaveRoomType = async (e) => {
+    e.preventDefault();
+    if (!formTypeCategory) {
+      toast.error("Room Type / Category name is required");
+      return;
+    }
+
+    const roomsArr = formTypeRooms
+      ? formTypeRooms.split(",").map(s => s.trim()).filter(Boolean)
+      : [];
+
+    const isEditing = selectedItem && selectedItem._id;
+    let nextList = [];
+
+    if (isEditing) {
+      nextList = roomTypesList.map(t => {
+        if (t._id === selectedItem._id || t.category === selectedItem.category) {
+          return {
+            ...t,
+            category: formTypeCategory,
+            baseRate: Number(formTypeBaseRate) || 3000,
+            occupancy: formTypeOccupancy || "2 Adults",
+            amenities: typeof formTypeAmenities === "string"
+              ? formTypeAmenities.split(",").map(a => a.trim()).filter(Boolean)
+              : formTypeAmenities,
+            rooms: roomsArr.length > 0 ? roomsArr : (t.rooms || []),
+            roomsCount: roomsArr.length > 0 ? roomsArr.length : (t.roomsCount || 1),
+            status: formTypeStatus || "Active"
+          };
+        }
+        return t;
+      });
+      toast.success(`Room Type "${formTypeCategory}" updated and saved to MongoDB!`);
+    } else {
+      const newType = {
+        _id: `RT-${Date.now()}`,
+        category: formTypeCategory,
+        baseRate: Number(formTypeBaseRate) || 3000,
+        occupancy: formTypeOccupancy || "2 Adults",
+        activePlans: 1,
+        amenities: typeof formTypeAmenities === "string"
+          ? formTypeAmenities.split(",").map(a => a.trim()).filter(Boolean)
+          : ["Air Conditioning", "Wi-Fi"],
+        rooms: roomsArr,
+        roomsCount: roomsArr.length,
+        status: formTypeStatus || "Active"
+      };
+      nextList = [...roomTypesList, newType];
+      toast.success(`Room Type "${formTypeCategory}" created and saved to MongoDB!`);
+    }
+
+    await persistRoomTypesToMongoDB(nextList);
+    setIsAddTypeOpen(false);
+    setSelectedItem(null);
+  };
+
+  const handleAddRoomToCategory = async (e) => {
+    e.preventDefault();
+    if (!formAddRoomNumber) {
+      toast.error("Room number is required");
+      return;
+    }
+
+    const targetType = roomTypesList.find(t => t.category === formAddRoomCategory) || roomTypesList[0];
+    if (!targetType) return;
+
+    const currentRooms = Array.isArray(targetType.rooms) ? targetType.rooms : [];
+    if (currentRooms.includes(formAddRoomNumber)) {
+      toast.error(`Room #${formAddRoomNumber} already exists in ${targetType.category}`);
+      return;
+    }
+
+    const updatedRooms = [...currentRooms, formAddRoomNumber];
+    const nextList = roomTypesList.map(t => {
+      if (t._id === targetType._id || t.category === targetType.category) {
+        return {
+          ...t,
+          rooms: updatedRooms,
+          roomsCount: updatedRooms.length
+        };
+      }
+      return t;
+    });
+
+    await persistRoomTypesToMongoDB(nextList);
+
+    // Also sync room into roomsList
+    const newRoomObj = {
+      _id: `R-${formAddRoomNumber}`,
+      roomNumber: formAddRoomNumber,
+      category: targetType.category,
+      floor: formAddRoomFloor || "Floor 1",
+      status: "Available",
+      ratePlan: "Standard Plan",
+      currentRate: Number(formAddRoomRate) || targetType.baseRate,
+      dailyRate: Number(formAddRoomRate) || targetType.baseRate
+    };
+    setRoomsList(prev => [...prev.filter(r => r.roomNumber !== formAddRoomNumber), newRoomObj]);
+
+    // Create room via backend API
+    try {
+      await adminService.createRoom({
+        roomNumber: formAddRoomNumber,
+        category: targetType.category,
+        floor: formAddRoomFloor || "Floor 1",
+        status: "Available",
+        baseRate: Number(formAddRoomRate) || targetType.baseRate
+      }).catch(() => {});
+    } catch (err) {
+      console.error("Room API create fallback:", err);
+    }
+
+    setIsAddRoomToCategoryOpen(false);
+    setFormAddRoomNumber("");
+    toast.success(`Room #${formAddRoomNumber} added to ${targetType.category}!`);
+  };
+
+  const handleToggleRoomTypeStatus = async (typeId) => {
+    const next = roomTypesList.map(t =>
+      (t._id === typeId || t.category === typeId)
+        ? { ...t, status: t.status === "Active" ? "Inactive" : "Active" }
+        : t
+    );
+    await persistRoomTypesToMongoDB(next);
+    toast.success("Room Type status updated in MongoDB!");
+  };
 
   const handleCreateRatePlan = async (e) => {
     e.preventDefault();
@@ -448,9 +671,7 @@ function RoomsRatesPage() {
         {[
           { id: "rooms", label: "Rooms List", icon: Bed },
           { id: "types", label: "Room Types", icon: Layers },
-          { id: "plans", label: "Rate Plans", icon: TrendingUp },
-          { id: "availability", label: "Availability Calendar", icon: Calendar },
-          { id: "restrictions", label: "Stay Restrictions", icon: Sliders }
+          { id: "availability", label: "Availability Calendar", icon: Calendar }
         ].map((tab) => {
           const TabIcon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -655,158 +876,145 @@ function RoomsRatesPage() {
       {/* Tab B: Room Types Specifications */}
       {activeTab === "types" && (
         <div className="space-y-4 font-ui">
-          <div className="flex justify-between items-center bg-white border border-muted p-4 rounded-xl shadow-soft">
-            <span className="text-xs text-muted-foreground font-semibold">Registered Categories: **{roomTypesList.length} Types**</span>
-          </div>
+          {/* Header Action Bar */}
+          <div className="flex flex-wrap justify-between items-center bg-white border border-muted p-4 rounded-xl shadow-soft gap-3 text-left">
+            <div>
+              <span className="text-xs text-navy font-bold">Registered Categories: </span>
+              <span className="text-xs font-black text-brand">{roomTypesList.length} Room Types</span>
+            </div>
+            <div className="flex items-center gap-2 select-none">
+              <Button
+                onClick={() => navigate({ to: "/admin/rooms/add-type" })}
+                className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-8 px-3.5 font-bold rounded-full cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="size-3.5" /> Add Room Type
+              </Button>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {roomTypesList.map((type) => (
-              <div key={type._id} className="bg-white border border-muted rounded-xl p-5 shadow-soft flex flex-col justify-between space-y-4">
-                <div className="space-y-2 text-left">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-display font-black text-navy text-md">{type.category}</h4>
-                    <Tag tone={type.status === "Active" ? "success" : "neutral"} className="py-0.5">
-                      {type.status}
-                    </Tag>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-muted/30 text-xs">
-                    <div>
-                      <span className="text-[9px] text-muted-foreground block font-bold uppercase">Base Rate</span>
-                      <strong className="text-navy mt-0.5 block">₹{type.baseRate?.toLocaleString()}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-muted-foreground block font-bold uppercase">Occupancy</span>
-                      <strong className="text-navy mt-0.5 block">{type.occupancy}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-muted-foreground block font-bold uppercase">Active Plans</span>
-                      <strong className="text-navy mt-0.5 block">{type.activePlans} Plans</strong>
-                    </div>
-                  </div>
-                  <div className="pt-2">
-                    <span className="text-[9px] text-muted-foreground block font-bold uppercase mb-1">Amenities</span>
-                    <div className="flex flex-wrap gap-1.5 select-none">
-                      {type.amenities.map((a, idx) => (
-                        <span key={idx} className="inline-flex items-center gap-0.5 rounded bg-[#fcfcfc] border border-muted px-1.5 py-0.5 text-[8.5px] font-semibold text-navy">
-                          <Sparkles className="size-2 text-gold mr-0.5" /> {a}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-3 border-t border-muted/30">
-                  <Button
-                    onClick={() => toggleItemStatus(type._id, "type")}
-                    size="xs"
-                    variant="outline"
-                    className={`h-7 px-3.5 font-bold ${type.status === "Active" ? "text-destructive border-destructive/30 hover:bg-destructive/5" : "text-success border-success/30 hover:bg-success/5"}`}
-                  >
-                    {type.status === "Active" ? "Deactivate" : "Activate"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSelectedItem(type);
-                      setFormTypeCategory(type.category);
-                      setFormTypeOccupancy(type.occupancy);
-                      setFormTypeBaseRate(type.baseRate.toString());
-                      setFormTypeAmenities(type.amenities.join(", "));
-                      setIsAddTypeOpen(true);
-                    }}
-                    size="xs"
-                    className="bg-navy hover:bg-navy-deep text-white h-7 px-3.5 font-bold"
-                  >
-                    Edit Details
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab C: Rate Configuration Plans */}
-      {activeTab === "plans" && (
-        <div className="space-y-4 font-ui">
-          <div className="flex justify-between items-center bg-white border border-muted p-4 rounded-xl shadow-soft">
-            <span className="text-xs text-muted-foreground font-semibold">Active pricing schemes</span>
-            <Button
-              onClick={() => setIsAddPlanOpen(true)}
-              className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-8 px-3 font-bold rounded-full"
-            >
-              <Plus className="size-3.5 mr-1" /> Create Rate Plan
-            </Button>
-          </div>
-
-          <div className="bg-white border border-muted rounded-xl shadow-soft overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                    <th className="py-4.5 px-6">Plan Details</th>
-                    <th className="py-4.5 px-4">Room Category</th>
-                    <th className="py-4.5 px-4">Meal Plan</th>
-                    <th className="py-4.5 px-4 text-center">Cancellation Rule</th>
-                    <th className="py-4.5 px-4 text-center">Min Stay</th>
-                    <th className="py-4.5 px-4 text-center">Status</th>
-                    <th className="py-4.5 px-6 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
-                  {ratePlansList.map((plan) => (
-                    <tr key={plan._id} className="hover:bg-[#fcfcfc]/60 transition-colors group">
-                      <td className="py-4 px-6">
-                        <div className="font-bold text-navy-deep text-sm">{plan.name}</div>
-                        <div className="text-[10px] text-muted-foreground font-semibold mt-0.5">Pricing Type: **{plan.pricingType}** · Base: **{plan.baseRate}**</div>
-                      </td>
-                      <td className="py-4 px-4 font-bold text-brand">{plan.category}</td>
-                      <td className="py-4 px-4 text-muted-foreground">{plan.mealPlan}</td>
-                      <td className="py-4 px-4 text-center text-muted-foreground">{plan.policy}</td>
-                      <td className="py-4 px-4 text-center font-mono font-bold text-navy">{plan.minStay}</td>
-                      <td className="py-4 px-4 text-center">
-                        <span className="flex justify-center">
-                          <Tag tone={plan.status === "Active" ? "success" : "neutral"} className="py-0.5">
-                            {plan.status}
-                          </Tag>
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5 select-none">
-                          <Button
-                            onClick={() => toggleItemStatus(plan._id, "plan")}
-                            size="xs"
-                            variant="outline"
-                            className={`h-7 text-[10px] font-bold ${plan.status === "Active" ? "text-destructive border-destructive/20 hover:bg-destructive/5" : "text-success border-success/20 hover:bg-success/5"}`}
-                          >
-                            {plan.status === "Active" ? "Disable" : "Enable"}
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setSelectedItem(plan);
-                              setFormPlanName(plan.name);
-                              setFormPlanCategory(plan.category);
-                              setFormPlanPricingType(plan.pricingType);
-                              setFormPlanMealPlan(plan.mealPlan);
-                              setFormPlanPolicy(plan.policy);
-                              setFormPlanMinStay(plan.minStay);
-                              setIsAddPlanOpen(true);
-                            }}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 hover:text-brand cursor-pointer text-muted-foreground"
-                            title="Edit plan configuration"
-                          >
-                            <Edit2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <Button
+                onClick={() => navigate({ to: "/admin/rooms/add" })}
+                variant="outline"
+                className="border-navy text-navy hover:bg-navy/5 shadow-soft text-xs h-8 px-3.5 font-bold rounded-full cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="size-3.5 text-navy" /> Add Room
+              </Button>
             </div>
           </div>
+
+          {/* Cards Grid for Room Types */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {roomTypesList.map((type) => {
+              const assignedRoomsList = Array.isArray(type.rooms) && type.rooms.length > 0
+                ? type.rooms
+                : (type.category === "Standard Room" ? ["101", "102", "103"]
+                  : type.category === "Deluxe Room" ? ["201", "202", "203", "401", "402", "403"]
+                  : type.category === "Executive Suite" ? ["301", "302", "303"]
+                  : ["101"]);
+
+              return (
+                <div key={type._id || type.category} className="bg-white border border-muted rounded-xl p-5 shadow-soft flex flex-col justify-between space-y-4 text-left">
+                  <div className="space-y-3 text-left">
+                    <div className="flex justify-between items-center border-b border-muted/50 pb-2.5">
+                      <h4 className="font-display font-black text-navy text-md">{type.category}</h4>
+                      <Tag tone={type.status === "Active" ? "success" : "neutral"} className="py-0.5 select-none">
+                        {type.status || "Active"}
+                      </Tag>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <span className="text-[9px] text-muted-foreground block font-bold uppercase">Base Tariff</span>
+                        <strong className="text-navy mt-0.5 block font-black">₹{Number(type.baseRate).toLocaleString('en-IN')}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground block font-bold uppercase">Occupancy</span>
+                        <strong className="text-navy mt-0.5 block font-bold">{type.occupancy}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground block font-bold uppercase">Total Rooms</span>
+                        <strong className="text-brand mt-0.5 block font-extrabold">{assignedRoomsList.length} Rooms</strong>
+                      </div>
+                    </div>
+
+                    {/* Assigned Room Numbers */}
+                    <div className="pt-2 border-t border-muted/30">
+                      <span className="text-[9px] text-muted-foreground block font-bold uppercase mb-1">Assigned Rooms</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {assignedRoomsList.map((num) => (
+                          <span key={num} className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/5 border border-navy/15 text-[10px] font-black text-navy">
+                            Room #{num}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Amenities list */}
+                    <div className="pt-1">
+                      <span className="text-[9px] text-muted-foreground block font-bold uppercase mb-1">Amenities</span>
+                      <div className="flex flex-wrap gap-1 select-none">
+                        {(Array.isArray(type.amenities) ? type.amenities : String(type.amenities).split(",")).map((a, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-0.5 rounded bg-[#fcfcfc] border border-muted px-1.5 py-0.5 text-[8.5px] font-semibold text-navy">
+                            <Sparkles className="size-2 text-amber-500 mr-0.5" /> {typeof a === "string" ? a.trim() : a}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="flex items-center justify-between gap-1.5 pt-3 border-t border-muted/40">
+                    <div className="flex items-center gap-1 select-none">
+                      <Button
+                        onClick={() => navigate({ to: `/admin/rooms/view/${encodeURIComponent(type.category)}` })}
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 hover:text-[#4f46e5] cursor-pointer"
+                        title="View Category Specifications"
+                      >
+                        <Eye className="size-3.5" />
+                      </Button>
+
+                      <Button
+                        onClick={() => navigate({ to: `/admin/rooms/edit-type/${encodeURIComponent(type.category)}` })}
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 hover:text-brand cursor-pointer"
+                        title="Edit Category Details"
+                      >
+                        <Edit2 className="size-3.5" />
+                      </Button>
+
+                      <Button
+                        onClick={() => navigate({ to: "/admin/rooms/add" })}
+                        size="icon"
+                        variant="ghost"
+                        className="size-7 hover:text-emerald-600 cursor-pointer"
+                        title="Add Room to Category"
+                      >
+                        <Plus className="size-3.5" />
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={() => handleToggleRoomTypeStatus(type._id || type.category)}
+                      size="xs"
+                      variant="outline"
+                      className={`h-7 px-3 text-[10px] font-bold rounded-lg ${
+                        type.status === "Active"
+                          ? "text-rose-600 border-rose-200 hover:bg-rose-50"
+                          : "text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      }`}
+                    >
+                      {type.status === "Active" ? "Deactivate" : "Activate"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+
+
 
       {/* Tab D: Live Availability Timeline Calendar Grid */}
       {activeTab === "availability" && (
@@ -817,11 +1025,19 @@ function RoomsRatesPage() {
               <p className="text-[9px] text-muted-foreground mt-0.5">Active daily status logs of scoped rooms and categories.</p>
             </div>
             <div className="flex items-center gap-2 select-none">
-              <Button size="icon" variant="ghost" className="size-8 cursor-pointer" onClick={handlePrevWeek} title="Previous Week">
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setCalendarStart(new Date())}
+                className="h-8 px-3 text-[10px] font-bold rounded-full border-navy text-navy hover:bg-navy/5 cursor-pointer"
+              >
+                Today
+              </Button>
+              <Button size="icon" variant="ghost" className="size-8 cursor-pointer border border-muted/80 rounded-lg hover:bg-muted/20" onClick={handlePrevWeek} title="Previous 7 Days">
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="text-xs font-bold text-navy">{getWeekRangeLabel()}</span>
-              <Button size="icon" variant="ghost" className="size-8 cursor-pointer" onClick={handleNextWeek} title="Next Week">
+              <span className="text-xs font-black text-navy px-1">{getWeekRangeLabel()}</span>
+              <Button size="icon" variant="ghost" className="size-8 cursor-pointer border border-muted/80 rounded-lg hover:bg-muted/20" onClick={handleNextWeek} title="Next 7 Days">
                 <ChevronRight className="size-4" />
               </Button>
             </div>
@@ -899,238 +1115,7 @@ function RoomsRatesPage() {
         </div>
       )}
 
-      {/* Tab E: Restrictions Management Panel */}
-      {activeTab === "restrictions" && (
-        <div className="space-y-4 font-ui">
-          <div className="flex justify-between items-center bg-white border border-muted p-4 rounded-xl shadow-soft">
-            <div>
-              <h3 className="font-display font-black text-navy text-sm">GDS Parity Stay Restrictions</h3>
-              <p className="text-[9px] text-muted-foreground mt-0.5">Enforce Length-of-Stay rules, stop-sells, or closed check-ins.</p>
-            </div>
-            <Button
-              onClick={() => setIsAddRestrictionOpen(true)}
-              className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-8 px-3.5 font-bold rounded-full"
-            >
-              <Plus className="size-3.5 mr-1" /> Add Restriction
-            </Button>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {restrictionsList.map((rest) => (
-              <div key={rest._id} className="bg-white border border-muted rounded-xl p-4.5 shadow-soft flex flex-col justify-between space-y-3.5 text-xs text-left">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wide">{rest.type}</span>
-                    <Tag tone={rest.status === "Active" ? "error" : "neutral"} className="py-0.5 select-none scale-90">
-                      {rest.status === "Active" ? "Enforced" : "Disabled"}
-                    </Tag>
-                  </div>
-                  <h4 className="font-bold text-navy-deep text-sm">{rest.roomType}</h4>
-                  <div className="pt-2 border-t border-muted/30 space-y-1">
-                    <div className="flex justify-between"><span>Restriction Limit:</span> <strong className="text-navy">{rest.value}</strong></div>
-                    <div className="flex justify-between"><span>Effective Dates:</span> <strong className="text-navy">{rest.effectiveDates}</strong></div>
-                  </div>
-                </div>
-                <div className="pt-3 border-t border-muted/30 flex justify-end gap-2">
-                  <Button
-                    onClick={() => toggleItemStatus(rest._id, "restriction")}
-                    size="xs"
-                    variant="outline"
-                    className={`h-7 px-3.5 font-bold ${rest.status === "Active" ? "text-destructive border-destructive/20 hover:bg-destructive/5" : "text-success border-success/20 hover:bg-success/5"}`}
-                  >
-                    {rest.status === "Active" ? "Disable" : "Re-enable"}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-
-
-      {/* 6. Form Modals / Drawers */}
-
-
-
-      {/* Drawer C: Add/Edit Rate Plan */}
-      {isAddPlanOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end font-sans">
-          <div className="absolute inset-0 bg-navy-deep/40 backdrop-blur-sm transition-opacity" onClick={() => setIsAddPlanOpen(false)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between text-left animate-slide-in">
-            <div className="p-5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-navy-deep">Create Rate Configuration Plan</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Publish pricing rules, meal plans and cancellation policies.</p>
-              </div>
-              <Button size="icon" variant="ghost" className="size-8 rounded-full" onClick={() => setIsAddPlanOpen(false)}>
-                <X className="size-4.5" />
-              </Button>
-            </div>
-            
-            <form onSubmit={handleCreateRatePlan} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Rate Plan Name</label>
-                <Input
-                  required
-                  placeholder="e.g. Monsoon Promo Plan"
-                  value={formPlanName}
-                  onChange={(e) => setFormPlanName(e.target.value)}
-                  className="h-9.5 text-xs font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Target Room Category</label>
-                <Select
-                  value={formPlanCategory}
-                  onChange={(e) => setFormPlanCategory(e.target.value)}
-                  className="text-xs h-9.5 font-bold"
-                >
-                  <option value="All Categories">All Categories</option>
-                  <option value="Villa Suite">Villa Suite</option>
-                  <option value="Maharaja Suite">Maharaja Suite</option>
-                  <option value="Heritage Luxury">Heritage Luxury</option>
-                  <option value="Superior Deluxe">Superior Deluxe</option>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Pricing Type</label>
-                  <Select
-                    value={formPlanPricingType}
-                    onChange={(e) => setFormPlanPricingType(e.target.value)}
-                    className="text-xs h-9.5 font-bold"
-                  >
-                    <option value="Dynamic">Dynamic Pricing</option>
-                    <option value="Flat">Flat Price</option>
-                    <option value="Length-based">Length-of-Stay</option>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Meal Plan</label>
-                  <Select
-                    value={formPlanMealPlan}
-                    onChange={(e) => setFormPlanMealPlan(e.target.value)}
-                    className="text-xs h-9.5 font-bold"
-                  >
-                    <option value="Continental Breakfast">Continental Breakfast</option>
-                    <option value="Room Only">Room Only</option>
-                    <option value="Half Board (MAP)">Half Board (MAP)</option>
-                    <option value="All Inclusive">All Inclusive</option>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Cancellation Policy</label>
-                <Input
-                  placeholder="e.g. Refundable up to 24h prior"
-                  value={formPlanPolicy}
-                  onChange={(e) => setFormPlanPolicy(e.target.value)}
-                  className="h-9.5 text-xs font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Minimum Stay Limit</label>
-                <Select
-                  value={formPlanMinStay}
-                  onChange={(e) => setFormPlanMinStay(e.target.value)}
-                  className="text-xs h-9.5 font-bold"
-                >
-                  <option value="1 Night">1 Night</option>
-                  <option value="2 Nights">2 Nights</option>
-                  <option value="3 Nights">3 Nights</option>
-                  <option value="5 Nights">5 Nights</option>
-                </Select>
-              </div>
-
-              <div className="pt-4 border-t border-muted/30 flex justify-end gap-2">
-                <Button type="button" variant="ghost" className="h-9 text-xs" onClick={() => setIsAddPlanOpen(false)}>Cancel</Button>
-                <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-5 font-bold rounded-full">Publish Rate Plan</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Drawer D: Configure Restrictions */}
-      {isAddRestrictionOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end font-sans">
-          <div className="absolute inset-0 bg-navy-deep/40 backdrop-blur-sm transition-opacity" onClick={() => setIsAddRestrictionOpen(false)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between text-left animate-slide-in">
-            <div className="p-5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-navy-deep">Add Stay Restriction</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Enforce checks on arrivals, departures, checkouts, or stop-sells.</p>
-              </div>
-              <Button size="icon" variant="ghost" className="size-8 rounded-full" onClick={() => setIsAddRestrictionOpen(false)}>
-                <X className="size-4.5" />
-              </Button>
-            </div>
-            
-            <form onSubmit={handleCreateRestriction} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Restriction Policy Type</label>
-                <Select
-                  value={formRestType}
-                  onChange={(e) => setFormRestType(e.target.value)}
-                  className="text-xs h-9.5 font-bold"
-                >
-                  <option value="Minimum Stay">Minimum Stay Nights</option>
-                  <option value="Maximum Stay">Maximum Stay Nights</option>
-                  <option value="Closed to Arrival (CTA)">Closed to Arrival (CTA)</option>
-                  <option value="Closed to Departure (CTD)">Closed to Departure (CTD)</option>
-                  <option value="Stop Sell">Stop Sell (Global Sync Lock)</option>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Target Room Category</label>
-                <Select
-                  value={formRestRoomType}
-                  onChange={(e) => setFormRestRoomType(e.target.value)}
-                  className="text-xs h-9.5 font-bold"
-                >
-                  <option value="Maharaja Suite">Maharaja Suite</option>
-                  <option value="Villa Suite">Villa Suite</option>
-                  <option value="Heritage Luxury">Heritage Luxury</option>
-                  <option value="Superior Deluxe">Superior Deluxe</option>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Limit Value / Flag</label>
-                <Input
-                  required
-                  placeholder="e.g. 3 Nights or True"
-                  value={formRestValue}
-                  onChange={(e) => setFormRestValue(e.target.value)}
-                  className="h-9.5 text-xs font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Effective Dates Span</label>
-                <Input
-                  required
-                  placeholder="e.g. 2026-08-20 to 2026-08-25"
-                  value={formRestDates}
-                  onChange={(e) => setFormRestDates(e.target.value)}
-                  className="h-9.5 text-xs font-semibold"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-muted/30 flex justify-end gap-2">
-                <Button type="button" variant="ghost" className="h-9 text-xs" onClick={() => setIsAddRestrictionOpen(false)}>Cancel</Button>
-                <Button type="submit" className="bg-navy hover:bg-navy-deep text-white text-xs h-9 px-5 font-bold rounded-full">Apply Restriction</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal E: Change Room Status Override */}
       {isChangeStatusOpen && selectedItem && (
@@ -1165,9 +1150,6 @@ function RoomsRatesPage() {
             </div>
           </div>
         </div>
-      )}
-
-
-    </div>
+      )}    </div>
   );
 }

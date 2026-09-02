@@ -436,7 +436,7 @@ function GuestsCrmPage() {
               <tbody className="divide-y divide-muted/30">
                 {paginatedList.map((g) => (
                   <tr key={g._id} className="hover:bg-muted/5">
-                    <td className="py-3.5 px-4 font-bold text-navy">
+                    <td className="py-3.5 px-4 font-bold text-navy text-left align-middle">
                       <div className="flex items-center gap-2.5">
                         <div className="size-8 rounded-full bg-navy/5 text-navy font-bold text-xs grid place-items-center shrink-0 select-none">
                           {g.name.split(" ").map(n => n[0]).join("")}
@@ -447,12 +447,12 @@ function GuestsCrmPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-muted-foreground space-y-0.5">
+                    <td className="py-3.5 px-4 text-left align-middle text-muted-foreground space-y-0.5">
                       <p className="font-semibold text-navy select-all">{g.phone}</p>
                       <p className="text-[10px] select-all">{g.email}</p>
                     </td>
-                    <td className="py-3.5 px-4 font-semibold text-navy">{g.type}</td>
-                    <td className="py-3.5 px-4 font-medium text-navy max-w-[180px]">
+                    <td className="py-3.5 px-4 text-left align-middle font-semibold text-navy">{g.type || "Regular"}</td>
+                    <td className="py-3.5 px-4 text-left align-middle font-medium text-navy max-w-[180px]">
                       <div>{g.currentStay}</div>
                       {g.latestStay && (
                         <div className="text-[10px] text-muted-foreground mt-0.5 select-none font-semibold">
@@ -468,42 +468,46 @@ function GuestsCrmPage() {
                         </div>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 font-mono font-bold">#{g.room}</td>
-                    <td className="py-3.5 px-4 font-bold text-center">{g.stays} Stays</td>
-                    <td className={`py-3.5 px-4 font-black ${g.balance > 0 ? "text-destructive" : "text-success"}`}>
+                    <td className="py-3.5 px-4 text-left align-middle font-mono font-bold">#{g.room}</td>
+                    <td className="py-3.5 px-4 text-center align-middle font-bold">{g.stays} {g.stays === 1 ? 'Stay' : 'Stays'}</td>
+                    <td className={`py-3.5 px-4 text-left align-middle font-black ${g.balance > 0 ? "text-destructive" : "text-success"}`}>
                       ₹{(g.balance || 0).toLocaleString()}
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 text-center align-middle">
                       <Tag tone={g.status === "Staying-In" ? "success" : g.status === "Expected" ? "warning" : "neutral"}>
                         {g.status}
                       </Tag>
                     </td>
-                    <td className="py-3 px-4 text-left" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
+                    <td className="py-3 px-4 text-left align-middle" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
                       <div className="flex items-center justify-start gap-1 select-none">
                         <Button
                           onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
                           variant="ghost"
-                          className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full"
+                          className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full cursor-pointer"
                           title="View Profile"
                         >
                           <Eye className="size-4" />
                         </Button>
-                        <Button
-                          onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
-                          variant="ghost"
-                          className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full"
-                          title="Edit Profile"
-                        >
-                          <Edit2 className="size-4" />
-                        </Button>
-                        <Button
-                          onClick={() => { setNoteTargetGuest(g); setNewNoteText(g.notes || ""); }}
-                          variant="ghost"
-                          className="h-7 w-7 p-0 hover:text-navy hover:bg-muted/15 flex items-center justify-center rounded-full"
-                          title="Add Note"
-                        >
-                          <FileText className="size-4" />
-                        </Button>
+                        {(g.status !== "Checked-out" && g.status !== "Checked Out") && (
+                          <>
+                            <Button
+                              onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full cursor-pointer"
+                              title="Edit Profile"
+                            >
+                              <Edit2 className="size-4" />
+                            </Button>
+                            <Button
+                              onClick={() => { setNoteTargetGuest(g); setNewNoteText(g.notes || ""); }}
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:text-navy hover:bg-muted/15 flex items-center justify-center rounded-full cursor-pointer"
+                              title="Add Note"
+                            >
+                              <FileText className="size-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

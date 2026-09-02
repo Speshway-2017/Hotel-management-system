@@ -216,6 +216,176 @@ router.get('/reservations', async (req, res) => {
   }
 });
 
+router.get('/reservations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+    const booking = await Booking.findOne({ $or: query });
+    if (!booking) return sendError(res, 404, 'Reservation not found');
+    return sendSuccess(res, 200, booking, 'Reservation retrieved successfully');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/reservations', async (req, res) => {
+  try {
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const bookingId = req.body.bookingId || req.body.id || `BK-${Date.now().toString().slice(-5)}`;
+    
+    let roomNum = req.body.roomNumber || req.body.room || '';
+    if (typeof roomNum === 'string' && roomNum.includes('·')) {
+      roomNum = roomNum.split('·')[0].trim();
+    }
+    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) {
+      roomNum = roomNum.replace(/room/i, '').trim();
+    }
+
+    const payload = {
+      ...req.body,
+      bookingId,
+      id: bookingId,
+      propertyId: propId,
+      room: req.body.room || (roomNum ? `${roomNum} · ${req.body.roomType || 'Standard Room'}` : ''),
+      roomNumber: roomNum,
+      roomType: req.body.roomType || 'Standard Room',
+      status: req.body.status || (req.body.source === 'Walk-in' ? 'Checked-in' : 'Confirmed'),
+      paymentStatus: req.body.paymentStatus || (req.body.balance === 0 ? 'Paid' : 'Pending')
+    };
+
+    const newBooking = await Booking.create(payload);
+
+    // If room is assigned and checked-in, update room status
+    if (roomNum) {
+      const rmStatus = payload.status === 'Checked-in' ? 'Occupied' : 'Reserved';
+      await Room.findOneAndUpdate(
+        { roomNumber: roomNum, propertyId: propId },
+        { status: rmStatus }
+      );
+    }
+
+    return sendSuccess(res, 201, newBooking, 'Reservation created successfully');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to create reservation');
+  }
+});
+
+router.put('/reservations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const query = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+
+    let roomNum = req.body.roomNumber || req.body.room;
+    if (typeof roomNum === 'string' && roomNum.includes('·')) {
+      roomNum = roomNum.split('·')[0].trim();
+    }
+    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) {
+      roomNum = roomNum.replace(/room/i, '').trim();
+    }
+
+    const updatePayload = { ...req.body };
+    if (roomNum) {
+      updatePayload.roomNumber = roomNum;
+      updatePayload.room = req.body.room || `${roomNum} · ${req.body.roomType || 'Standard Room'}`;
+    }
+
+    const updated = await Booking.findOneAndUpdate(
+      { $or: query },
+      updatePayload,
+      { new: true }
+    );
+
+    if (!updated) return sendError(res, 404, 'Reservation not found');
+
+    // Update Room table accordingly
+    if (roomNum) {
+      let rmStatus = 'Available';
+      if (updated.status === 'Checked-in') rmStatus = 'Occupied';
+      else if (updated.status === 'Confirmed' || updated.status === 'Pending') rmStatus = 'Reserved';
+      else if (updated.status === 'Checked-out') rmStatus = 'Available';
+      else if (updated.status === 'Cancelled' || updated.status === 'No-show') rmStatus = 'Available';
+
+      await Room.findOneAndUpdate(
+        { roomNumber: roomNum, propertyId: propId },
+        { status: rmStatus }
+      );
+    }
+
+    return sendSuccess(res, 200, updated, 'Reservation updated successfully');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to update reservation');
+  }
+});
+
+router.post('/reservations/:id/assign-room', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { roomNumber, roomType } = req.body;
+    const propId = req.user?.propertyId || 'HS-JAI';
+
+    const query = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+
+    const updated = await Booking.findOneAndUpdate(
+      { $or: query },
+      {
+        roomNumber: String(roomNumber),
+        room: `${roomNumber} · ${roomType || 'Standard Room'}`,
+        roomType: roomType || 'Standard Room'
+      },
+      { new: true }
+    );
+
+    if (!updated) return sendError(res, 404, 'Reservation not found');
+
+    await Room.findOneAndUpdate(
+      { roomNumber: String(roomNumber), propertyId: propId },
+      { status: updated.status === 'Checked-in' ? 'Occupied' : 'Reserved' }
+    );
+
+    return sendSuccess(res, 200, updated, `Room ${roomNumber} assigned successfully`);
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to assign room');
+  }
+});
+
+router.delete('/reservations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const query = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: query });
+    if (!booking) return sendError(res, 404, 'Reservation not found');
+
+    booking.status = 'Cancelled';
+    await booking.save();
+
+    if (booking.roomNumber) {
+      await Room.findOneAndUpdate(
+        { roomNumber: booking.roomNumber, propertyId: propId },
+        { status: 'Available' }
+      );
+    }
+
+    return sendSuccess(res, 200, booking, 'Reservation cancelled and inventory released');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to cancel reservation');
+  }
+});
+
 // ==========================================
 // 3. ROOMS
 // ==========================================

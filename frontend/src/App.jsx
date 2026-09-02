@@ -42,8 +42,10 @@ import { Route as AdminReports } from "./roles/admin/pages/Reports";
 import { Route as AdminReservations } from "./roles/admin/pages/Reservations";
 import { Route as AdminRooms } from "./roles/admin/pages/Rooms";
 import { Route as AdminAddRoom } from "./roles/admin/pages/AddRoom";
+import { Route as AdminAddRoomType } from "./roles/admin/pages/AddRoomType";
 import { Route as AdminViewRoom } from "./roles/admin/pages/ViewRoom";
 import { Route as AdminEditRoom } from "./roles/admin/pages/EditRoom";
+import { Route as AdminEditRoomType } from "./roles/admin/pages/EditRoomType";
 import { Route as AdminSettings } from "./roles/admin/pages/Settings";
 import { Route as AdminStaff } from "./roles/admin/pages/Staff";
 import { Route as AdminAddStaff } from "./roles/admin/pages/AddStaff";
@@ -75,6 +77,7 @@ import { Route as ManagerOccupancy } from "./roles/manager/pages/Occupancy";
 import { Route as ManagerReports } from "./roles/manager/pages/Reports";
 import { Route as ManagerViewReport } from "./roles/manager/pages/ViewReport";
 import { Route as ManagerReservations } from "./roles/manager/pages/Reservations";
+import { Route as ManagerAddReservation } from "./roles/manager/pages/AddReservation";
 import { Route as ManagerViewReservation } from "./roles/manager/pages/ViewReservation";
 import { Route as ManagerEditReservation } from "./roles/manager/pages/EditReservation";
 import { Route as ManagerShifts } from "./roles/manager/pages/Shifts";
@@ -305,8 +308,10 @@ export default function App() {
             <Route path="/admin/reservations/view/:id" element={<RouteWrapper routeObj={AdminViewReservation} />} />
             <Route path="/admin/rooms" element={<RouteWrapper routeObj={AdminRooms} />} />
             <Route path="/admin/rooms/add" element={<RouteWrapper routeObj={AdminAddRoom} />} />
+            <Route path="/admin/rooms/add-type" element={<RouteWrapper routeObj={AdminAddRoomType} />} />
             <Route path="/admin/rooms/view/:id" element={<RouteWrapper routeObj={AdminViewRoom} />} />
             <Route path="/admin/rooms/edit/:id" element={<RouteWrapper routeObj={AdminEditRoom} />} />
+            <Route path="/admin/rooms/edit-type/:id" element={<RouteWrapper routeObj={AdminEditRoomType} />} />
             <Route path="/admin/settings" element={<RouteWrapper routeObj={AdminSettings} />} />
             <Route path="/admin/staff" element={<RouteWrapper routeObj={AdminStaff} />} />
             <Route path="/admin/staff/add" element={<RouteWrapper routeObj={AdminAddStaff} />} />
@@ -336,6 +341,8 @@ export default function App() {
             <Route path="/manager/reports" element={<RouteWrapper routeObj={ManagerReports} />} />
             <Route path="/manager/reports/view/:id" element={<RouteWrapper routeObj={ManagerViewReport} />} />
             <Route path="/manager/reservations" element={<RouteWrapper routeObj={ManagerReservations} />} />
+            <Route path="/manager/reservations/add" element={<RouteWrapper routeObj={ManagerAddReservation} />} />
+            <Route path="/manager/reservations/new" element={<RouteWrapper routeObj={ManagerAddReservation} />} />
             <Route path="/manager/reservations/view/:id" element={<RouteWrapper routeObj={ManagerViewReservation} />} />
             <Route path="/manager/reservations/edit/:id" element={<RouteWrapper routeObj={ManagerEditReservation} />} />
             <Route path="/manager/rooms" element={<RouteWrapper routeObj={ManagerRooms} />} />

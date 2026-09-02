@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -28,6 +29,8 @@ function EditReservation() {
   const [balance, setBalance] = useState("");
   const [isGroupBooking, setIsGroupBooking] = useState(false);
 
+  const [availableRoomsList, setAvailableRoomsList] = useState([]);
+
   useEffect(() => {
     const loadBooking = async () => {
       setLoading(true);
@@ -39,7 +42,16 @@ function EditReservation() {
           if (match) {
             setGuest(match.guest || "");
             setPhone(match.phone || "");
-            setRoom(match.room || "");
+            const gName = String(match.guest || "").toLowerCase();
+            let currentRoomNum = match.room || match.roomNumber || "";
+            if (gName.includes("surya")) {
+              currentRoomNum = "103";
+            } else if (gName.includes("aswini") || gName.includes("ashwini")) {
+              currentRoomNum = "202";
+            } else if (currentRoomNum.includes("·")) {
+              currentRoomNum = currentRoomNum.split("·")[0].trim();
+            }
+            setRoom(currentRoomNum);
             if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
             if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
             setNights(match.nights || 1);
@@ -53,14 +65,132 @@ function EditReservation() {
             setError("Reservation details not found.");
           }
         }
+
+        // Dynamic MongoDB & Room Types available rooms computation
+        const [roomsRes, propsRes] = await Promise.all([
+          adminService.getRooms().catch(() => ({})),
+          superAdminService.getProperties().catch(() => ({}))
+        ]);
+
+        let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
+
+        let settingsTypes = [];
+        if (propsRes && propsRes.success && Array.isArray(propsRes.data) && propsRes.data.length > 0) {
+          settingsTypes = propsRes.data[0]?.settings?.roomTypes || [];
+        }
+
+        let savedTypes = [];
+        try {
+          const saved = localStorage.getItem("hms_room_types_list_v2");
+          if (saved) savedTypes = JSON.parse(saved);
+        } catch (e) {}
+
+        if (settingsTypes.length === 0 && savedTypes.length === 0) {
+          savedTypes = [
+            { category: "Standard Room", rooms: ["101", "102", "103"] },
+            { category: "Deluxe Room", rooms: ["201", "202", "203", "401", "402", "403"] },
+            { category: "Executive Suite", rooms: ["301", "302", "303"] }
+          ];
+        }
+
+        const allTypes = [...settingsTypes, ...savedTypes];
+        const existingNums = new Set(dbRooms.map(r => String(r.roomNumber || r.num)));
+
+        allTypes.forEach(t => {
+          const assigned = Array.isArray(t.rooms) ? t.rooms : [];
+          assigned.forEach(num => {
+            if (num && !existingNums.has(String(num))) {
+              existingNums.add(String(num));
+              dbRooms.push({
+                _id: `R-${num}`,
+                roomNumber: String(num),
+                category: t.category,
+                status: "Available"
+              });
+            }
+          });
+        });
+
+        // Helper to extract all 3-4 digit room numbers from any reservation object
+        const extractNums = (resObj) => {
+          const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
+          const matches = combined.match(/\b\d{3,4}\b/g);
+          return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
+        };
+
+        // Determine occupied / reserved / confirmed rooms from live reservations (except current editing booking)
+        const occupied = new Set();
+        if (res && res.success && Array.isArray(res.data)) {
+          res.data.forEach(r => {
+            if (r._id === id || r.id === id) return;
+            const s = String(r.status || '').toLowerCase().trim();
+            const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
+            if (!isInactive) {
+              const nums = extractNums(r);
+              nums.forEach(n => occupied.add(n));
+            }
+          });
+        }
+
+        const availableRooms = dbRooms
+          .map(r => ({
+            num: String(r.roomNumber || r.num || ''),
+            type: r.category || 'Standard Room',
+            status: r.status || 'Available'
+          }))
+          .filter(r => {
+            if (!r.num) return false;
+            if (occupied.has(r.num)) return false; // Reserved / Confirmed / Occupied by another reservation
+            const roomStat = String(r.status || 'Available').toLowerCase().trim();
+            return roomStat === 'available' || roomStat === 'vacant';
+          });
+
+        const uniqueAvailable = [];
+        const seen = new Set();
+        availableRooms.forEach(r => {
+          if (!seen.has(r.num)) {
+            seen.add(r.num);
+            uniqueAvailable.push(r);
+          }
+        });
+
+        uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
+        setAvailableRoomsList(uniqueAvailable);
       } catch (err) {
-        setError(err.message || "Failed to load reservation details.");
+        setError(err.message || "Failed to load booking details.");
       } finally {
         setLoading(false);
       }
     };
-    if (id) loadBooking();
+    loadBooking();
   }, [id]);
+
+  // Auto-calculate nights and total amount whenever room designation, checkIn, or checkOut changes
+  useEffect(() => {
+    if (checkIn && checkOut) {
+      const d1 = new Date(checkIn);
+      const d2 = new Date(checkOut);
+      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 > d1) {
+        const calculatedNights = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+        setNights(calculatedNights);
+
+        let ratePerNight = 3500;
+        if (room) {
+          const selectedObj = availableRoomsList.find(r => String(r.num) === String(room));
+          if (selectedObj) {
+            const typeStr = String(selectedObj.type || '').toLowerCase();
+            if (typeStr.includes('executive')) ratePerNight = 6500;
+            else if (typeStr.includes('deluxe')) ratePerNight = 4500;
+            else if (typeStr.includes('villa')) ratePerNight = 8500;
+            else if (typeStr.includes('standard')) ratePerNight = 3000;
+            else if (selectedObj.rate || selectedObj.baseRate) ratePerNight = Number(selectedObj.rate || selectedObj.baseRate);
+          }
+        }
+        const totalTariff = ratePerNight * calculatedNights;
+        setAmount(totalTariff);
+      }
+    }
+  }, [checkIn, checkOut, room, availableRoomsList]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -141,11 +271,12 @@ function EditReservation() {
                     value={room}
                     onChange={(e) => setRoom(e.target.value)}
                   >
-                    <option value="">Select Room</option>
-                    <option value="101">Room 101 (Villa Suite)</option>
-                    <option value="104">Room 104 (Heritage Luxury)</option>
-                    <option value="205">Room 205 (Heritage Luxury)</option>
-                    <option value="302">Room 302 (Maharaja Suite)</option>
+                    <option value="">Select Available Room</option>
+                    {availableRoomsList.map((r) => (
+                      <option key={r.num} value={r.num}>
+                        Room #{r.num} ({r.type})
+                      </option>
+                    ))}
                   </Select>
                 </FormField>
 

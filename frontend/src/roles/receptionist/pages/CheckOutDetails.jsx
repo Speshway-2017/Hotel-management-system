@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception/check-out/$id")({
   component: ReceptionCheckOutDetailsPage
 });
 
+import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 
 function ReceptionCheckOutDetailsPage() {
@@ -42,15 +43,19 @@ function ReceptionCheckOutDetailsPage() {
     receptionistService.getReservations()
       .then(res => {
         if (res.success && res.data) {
-          const found = res.data.find(b => b.id === id);
+          const found = res.data.find(b => 
+            String(b._id) === String(id) || 
+            String(b.id) === String(id) || 
+            String(b.bookingId) === String(id)
+          );
           if (found) {
-            found.name = found.guest;
+            found.name = found.guest || found.name;
             found.type = found.roomType || 'Deluxe Room';
-            found.amountPaid = found.amount - found.balance;
+            found.amountPaid = Number(found.amount || 0) - Number(found.balance || 0);
             setGuest(found);
-            setCollectedPayment(found.balance);
+            setCollectedPayment(found.balance || 0);
           } else {
-            console.warn("Departure reservation not found.");
+            toast.error("Departure reservation record not found.");
           }
         }
       })
@@ -61,29 +66,33 @@ function ReceptionCheckOutDetailsPage() {
   const handleFinishCheckout = () => {
     // If balance remains, process payment first
     const processCheckoutStatus = () => {
-      receptionistService.updateReservationStatus(guest.id || guest._id, 'Checked-out')
+      receptionistService.updateReservationStatus(guest._id || guest.id, 'Checked-out')
         .then(res => {
           if (res.success) {
-            alert(`Guest ${guest.name} has been Checked Out successfully. Room #${guest.room} is now dirty housekeeping rack status!`);
+            toast.success(`Guest ${guest.name} has been Checked Out successfully. Room #${guest.room} is now dirty housekeeping status.`);
             navigate("/reception/check-out");
+          } else {
+            toast.error(res.message || "Failed to complete checkout.");
           }
         })
         .catch(err => {
           console.error("Failed to check-out guest:", err);
-          alert(err.message || "Failed to update guest check-out status.");
+          toast.error(err.message || "Failed to update guest check-out status.");
         });
     };
 
     if (guest.balance > 0) {
-      receptionistService.postFolioPayment(guest.id || guest._id, guest.balance, paymentMethod)
+      receptionistService.postFolioPayment(guest._id || guest.id, guest.balance, paymentMethod)
         .then(res => {
           if (res.success) {
             processCheckoutStatus();
+          } else {
+            toast.error(res.message || "Payment recording failed.");
           }
         })
         .catch(err => {
           console.error("Failed to settle checkout balance:", err);
-          alert(err.message || "Failed to settle folio balance during checkout.");
+          toast.error(err.message || "Failed to settle folio balance during checkout.");
         });
     } else {
       processCheckoutStatus();

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
-import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { Calendar, User, Home, CreditCard, ChevronLeft, ShieldAlert } from "lucide-react";
@@ -30,16 +30,11 @@ function ManagerViewReservation() {
       setLoading(true);
       setError(null);
       try {
-        const res = await superAdminService.getReservations();
-        if (res.success) {
-          const matched = res.data.find(b => b._id === id || b.id === id);
+        const res = await managerService.getReservations();
+        if (res.success && Array.isArray(res.data)) {
+          const matched = res.data.find(b => String(b._id) === String(id) || String(b.id) === String(id));
           if (matched) {
-            // Verify property scoping
-            if (matched.propertyId !== user.propertyId && matched.property !== user.propertyId) {
-              setIsAuthorized(false);
-            } else {
-              setBooking(matched);
-            }
+            setBooking(matched);
           } else {
             setError("Reservation record not found.");
           }
@@ -60,24 +55,16 @@ function ManagerViewReservation() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view reservations for this property. Access is strictly scoped to your assigned hotel branch.
         </Notice>
-        <Link to="/manager/reservations" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Reservations
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <div className="flex items-center gap-3">
-        <Link to="/manager/reservations" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
-          <ChevronLeft className="size-4" />
-        </Link>
-        <PageHeader
-          title={booking ? `Reservation: ${booking.id || booking._id}` : "Reservation Details"}
-          subtitle="Guest stay overview, room parameters, and tariff details."
-        />
-      </div>
+      <PageHeader
+        title={booking ? `Reservation Details: ${booking._id || booking.id}` : "Reservation Details"}
+        subtitle="Guest stay overview, room parameters, and tariff details."
+      />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 

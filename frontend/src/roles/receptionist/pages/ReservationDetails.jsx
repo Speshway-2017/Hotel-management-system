@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception/reservations/$id")({
   component: ReceptionReservationDetailsPage
 });
 
+import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 
 function ReceptionReservationDetailsPage() {
@@ -33,14 +34,18 @@ function ReceptionReservationDetailsPage() {
     receptionistService.getReservations()
       .then(res => {
         if (res.success && res.data) {
-          const found = res.data.find(b => b.id === id);
+          const found = res.data.find(b => 
+            String(b._id) === String(id) || 
+            String(b.id) === String(id) || 
+            String(b.bookingId) === String(id)
+          );
           if (found) {
             found.guests = found.pax || '2 Adults';
-            found.amountPaid = found.amount - found.balance;
+            found.amountPaid = Number(found.amount || 0) - Number(found.balance || 0);
             found.notes = found.specialRequests || 'No special requests listed.';
             setBooking(found);
           } else {
-            console.warn("Reservation not found in ledger search.");
+            toast.error("Reservation record not found.");
           }
         }
       })
@@ -65,16 +70,18 @@ function ReceptionReservationDetailsPage() {
     const confirmCancel = window.confirm("Are you sure you want to cancel this reservation? This cannot be undone.");
     if (!confirmCancel) return;
     
-    receptionistService.updateReservationStatus(booking.id || booking._id, 'Cancelled')
+    receptionistService.updateReservationStatus(booking._id || booking.id, 'Cancelled')
       .then(res => {
         if (res.success) {
-          alert("Reservation cancelled successfully!");
+          toast.success("Reservation cancelled successfully!");
           loadReservationDetails();
+        } else {
+          toast.error(res.message || "Failed to cancel reservation.");
         }
       })
       .catch(err => {
         console.error("Failed to cancel reservation:", err);
-        alert(err.message || "Failed to cancel reservation.");
+        toast.error(err.message || "Failed to cancel reservation.");
       });
   };
 

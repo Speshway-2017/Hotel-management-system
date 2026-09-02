@@ -47,7 +47,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
 const ROOM_DEFINITIONS = [
   { room: "101", roomType: "Villa Suite", floor: "Floor 1" },
   { room: "102", roomType: "Villa Suite", floor: "Floor 1" },
-  { room: "103", roomType: "Deluxe Room", floor: "Floor 1" },
+  { room: "103", roomType: "Standard Room", floor: "Floor 1" },
   { room: "104", roomType: "Deluxe Room", floor: "Floor 1" },
   { room: "105", roomType: "Standard Room", floor: "Floor 1" },
   { room: "106", roomType: "Standard Room", floor: "Floor 1" },
@@ -110,10 +110,39 @@ function ManagerRoomsPage() {
         setBookings(resRes.data);
       }
 
-      if (roomsRes.success && roomsRes.data) {
-        setRooms(roomsRes.data);
-      }
+      let dbRooms = (roomsRes.success && roomsRes.data) ? roomsRes.data : [];
 
+      // Merge room types assigned room numbers from MongoDB property settings & localStorage
+      const settingsTypes = propRes?.data?.settings?.roomTypes || [];
+      let savedTypes = [];
+      try {
+        const saved = localStorage.getItem("hms_room_types_list_v2");
+        if (saved) savedTypes = JSON.parse(saved);
+      } catch (e) {}
+
+      const allTypes = [...settingsTypes, ...savedTypes];
+      const existingRoomNums = new Set(dbRooms.map(r => String(r.roomNumber || r.room)));
+
+      allTypes.forEach(t => {
+        const assigned = Array.isArray(t.rooms) ? t.rooms : [];
+        assigned.forEach(num => {
+          if (num && !existingRoomNums.has(String(num))) {
+            existingRoomNums.add(String(num));
+            dbRooms.push({
+              _id: `R-${num}`,
+              roomNumber: String(num),
+              room: String(num),
+              category: t.category,
+              roomType: t.category,
+              floor: `Floor ${String(num)[0] || '1'}`,
+              status: "Available",
+              baseRate: t.baseRate || 3500
+            });
+          }
+        });
+      });
+
+      setRooms(dbRooms);
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to load rooms dataset");
     } finally {
@@ -124,35 +153,31 @@ function ManagerRoomsPage() {
   useEffect(() => {
     loadData(false);
 
-    const interval = setInterval(() => {
-      loadData(true);
-    }, 10000);
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadData(true);
+      socket.on('booking_updated', handleRealtime);
+      socket.on('booking_created', handleRealtime);
+      socket.on('booking_deleted', handleRealtime);
+      socket.on('room_status_changed', handleRealtime);
+      socket.on('availability_changed', handleRealtime);
+    });
 
     const handleFocus = () => {
       loadData(true);
     };
     window.addEventListener('focus', handleFocus);
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtimeUpdate = () => {
-        console.log('⚡ Socket update received in Manager Rooms table. Refreshing...');
-        loadData(true);
-      };
-
-      socket.on('booking_updated', handleRealtimeUpdate);
-      socket.on('room_status_changed', handleRealtimeUpdate);
-      socket.on('availability_changed', handleRealtimeUpdate);
-
-      return () => {
-        socket.off('booking_updated', handleRealtimeUpdate);
-        socket.off('room_status_changed', handleRealtimeUpdate);
-        socket.off('availability_changed', handleRealtimeUpdate);
-      };
-    });
-
     return () => {
-      clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      if (socketInst) {
+        socketInst.off('booking_updated');
+        socketInst.off('booking_created');
+        socketInst.off('booking_deleted');
+        socketInst.off('room_status_changed');
+        socketInst.off('availability_changed');
+      }
     };
   }, []);
 
@@ -228,11 +253,13 @@ function ManagerRoomsPage() {
 
     let currentStatus = r.status || "Available";
     if (activeBooking) {
-      if (activeBooking.status === "Checked-in") {
+      if (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In") {
         currentStatus = "Occupied";
       } else {
         currentStatus = "Reserved";
       }
+    } else if (currentStatus === "Occupied") {
+      currentStatus = "Available";
     }
 
     return {
@@ -316,14 +343,11 @@ function ManagerRoomsPage() {
   return (
     <div className="space-y-6 text-left animate-fade-in">
       {/* Summary Stat Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard label="Total Rooms" value={totalCount.toString()} hint="Assigned property capacity" accentColor="#0d1b2a" />
         <PremiumStatCard label="Available" value={availableCount.toString()} hint="Clean & vacant" accentColor="#10b981" />
         <PremiumStatCard label="Occupied" value={occupiedCount.toString()} hint="In-house guests stays" accentColor="#0d1b2a" />
-        <PremiumStatCard label="Dirty" value={dirtyCount.toString()} hint="Awaiting housekeeping turnaround" accentColor="#f59e0b" />
-        <PremiumStatCard label="Cleaning" value={cleaningCount.toString()} hint="Active cleaning sessions" accentColor="#8b5cf6" />
-        <PremiumStatCard label="Out of Order" value={oooCount.toString()} hint="Maintenance downtime" accentColor="#ef4444" />
-        <PremiumStatCard label="Blocked" value={blockedCount.toString()} hint="Precheck allocations" accentColor="#6b7280" />
+        <PremiumStatCard label="Reserved" value={compiledRooms.filter(r => r.status === "Reserved" || r.status === "Blocked").length.toString()} hint="Upcoming & blocked allocations" accentColor="#3b82f6" />
       </div>
 
       {/* Search & Filters */}
@@ -405,19 +429,19 @@ function ManagerRoomsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                  <th className="py-4.5 px-6">Room Number</th>
-                  <th className="py-4.5 px-4">Room Type</th>
-                  <th className="py-4.5 px-4">Floor</th>
-                  <th className="py-4.5 px-4">Current Status</th>
-                  <th className="py-4.5 px-4">Guest Name</th>
-                  <th className="py-4.5 px-4">Check-In</th>
-                  <th className="py-4.5 px-4">Check-Out</th>
-                  <th className="py-4.5 px-4">Current Booking</th>
-                  <th className="py-4.5 px-2 text-left">Actions</th>
+                <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
+                  <th className="py-4.5 px-6 text-left">Room Number</th>
+                  <th className="py-4.5 px-4 text-left">Room Type</th>
+                  <th className="py-4.5 px-4 text-left">Floor</th>
+                  <th className="py-4.5 px-4 text-left">Current Status</th>
+                  <th className="py-4.5 px-4 text-left">Guest Name</th>
+                  <th className="py-4.5 px-4 text-left">Check-In</th>
+                  <th className="py-4.5 px-4 text-left">Check-Out</th>
+                  <th className="py-4.5 px-4 text-left">Current Booking</th>
+                  <th className="py-4.5 px-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
+              <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
                 {paginatedRooms.map((rm) => {
                   const meta = statusMeta[rm.status] || statusMeta.Available;
                   const StatusIcon = meta.icon;
@@ -425,31 +449,31 @@ function ManagerRoomsPage() {
 
                   return (
                     <tr key={rm.room} className="hover:bg-[#fcfcfc]/60 transition-colors group">
-                      <td className="py-4 px-6 font-bold text-navy-deep text-sm">
+                      <td className="py-4 px-6 text-left font-bold text-navy-deep text-sm">
                         Room {rm.room}
                       </td>
-                      <td className="py-4 px-4 font-bold text-brand">
+                      <td className="py-4 px-4 text-left font-bold text-brand">
                         {rm.roomType}
                       </td>
-                      <td className="py-4 px-4 text-muted-foreground">
+                      <td className="py-4 px-4 text-left text-muted-foreground">
                         {rm.floor}
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-left">
                         <Tag tone={meta.tone} className="flex items-center gap-1 w-fit select-none">
                           <StatusIcon className="size-3" />
                           <span>{meta.label}</span>
                         </Tag>
                       </td>
-                      <td className="py-4 px-4 font-semibold text-navy">
+                      <td className="py-4 px-4 text-left font-semibold text-navy">
                         {active ? active.guest : <span className="text-muted-foreground/45">—</span>}
                       </td>
-                      <td className="py-4 px-4 text-muted-foreground">
+                      <td className="py-4 px-4 text-left text-muted-foreground">
                         {active ? active.checkIn : <span className="text-muted-foreground/45">—</span>}
                       </td>
-                      <td className="py-4 px-4 text-muted-foreground">
+                      <td className="py-4 px-4 text-left text-muted-foreground">
                         {active ? active.checkOut : <span className="text-muted-foreground/45">—</span>}
                       </td>
-                      <td className="py-4 px-4 font-mono text-[11px] text-muted-foreground">
+                      <td className="py-4 px-4 text-left font-mono text-[11px] text-muted-foreground">
                         {active ? (
                           <Link
                             to={`/manager/reservations/view/${active._id || active.id}`}
@@ -461,8 +485,8 @@ function ManagerRoomsPage() {
                           <span className="text-muted-foreground/45">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-2 text-left">
-                        <div className="flex items-center justify-start gap-1 select-none">
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-1 select-none">
                           {active && (
                             <>
                               <Button

@@ -3,20 +3,17 @@ import { useEffect, useState } from "react";
 import { Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
-import { receptionistService } from "@/services/receptionist";
+import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 
-function ReceptionistNewBooking() {
+function ManagerAddReservation() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [rooms, setRooms] = useState([]);
-  const [availableRoomsList, setAvailableRoomsList] = useState([]);
-
-  const todayDate = new Date().toISOString().split("T")[0];
-  const tomorrowDate = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const [property, setProperty] = useState(null);
 
   const [form, setForm] = useState({
     guest: "",
@@ -26,19 +23,49 @@ function ReceptionistNewBooking() {
     idProofNumber: "",
     roomNumber: "",
     roomType: "",
-    checkIn: todayDate,
-    checkOut: tomorrowDate,
-    nights: 1,
-    pax: "2 Adults",
-    source: "Walk-in",
+    checkIn: "",
+    checkOut: "",
+    nights: "",
+    pax: "",
+    source: "",
     amount: "",
-    balance: 0,
-    status: "Checked-in",
+    balance: "",
+    status: "Confirmed",
     notes: "",
     isCorporate: false,
     corporateName: "",
     isGroupBooking: false
   });
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (!user || user.role !== "manager") {
+      navigate({ to: "/manager" });
+      return;
+    }
+
+    const loadInitial = async () => {
+      try {
+        setLoading(true);
+        const [roomsRes, propRes] = await Promise.all([
+          managerService.getRooms().catch(() => ({})),
+          managerService.getProperty().catch(() => ({}))
+        ]);
+
+        if (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) {
+          setRooms(roomsRes.data);
+        }
+        if (propRes && propRes.success && propRes.data) {
+          setProperty(propRes.data);
+        }
+      } catch (e) {
+        // Fallback
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadInitial();
+  }, []);
 
   // Check if date is today
   const isDateToday = (dateStr) => {
@@ -49,110 +76,25 @@ function ReceptionistNewBooking() {
     return now.getFullYear() === y && (now.getMonth() + 1) === m && now.getDate() === d;
   };
 
-  // 1. Fetch rooms and live reservations to accurately filter available rooms
-  useEffect(() => {
-    const fetchRoomsAndAvailability = async () => {
-      try {
-        setLoading(true);
-        const [roomsRes, resRes] = await Promise.all([
-          receptionistService.getRooms().catch(() => ({})),
-          receptionistService.getReservations().catch(() => ({}))
-        ]);
-
-        let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
-        if (dbRooms.length === 0) {
-          dbRooms = [
-            { roomNumber: "101", category: "Standard Room", status: "Available", rate: 3000 },
-            { roomNumber: "102", category: "Standard Room", status: "Available", rate: 3000 },
-            { roomNumber: "103", category: "Standard Room", status: "Occupied", rate: 3000 },
-            { roomNumber: "201", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "202", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "203", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "204", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "301", category: "Executive Suite", status: "Available", rate: 6500 },
-            { roomNumber: "302", category: "Executive Suite", status: "Available", rate: 6500 },
-            { roomNumber: "303", category: "Executive Suite", status: "Available", rate: 6500 },
-            { roomNumber: "401", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "402", category: "Deluxe Room", status: "Available", rate: 4500 }
-          ];
-        }
-        setRooms(dbRooms);
-
-        // Helper to extract all 3-4 digit room numbers from any reservation object
-        const extractNums = (resObj) => {
-          const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
-          const matches = combined.match(/\b\d{3,4}\b/g);
-          return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
-        };
-
-        // Determine occupied / reserved rooms from live reservations
-        const occupied = new Set();
-        if (resRes && resRes.success && Array.isArray(resRes.data)) {
-          resRes.data.forEach(r => {
-            const s = String(r.status || '').toLowerCase().trim();
-            const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
-            if (!isInactive) {
-              const nums = extractNums(r);
-              nums.forEach(n => occupied.add(n));
-            }
-          });
-        }
-
-        // Filter ONLY available/vacant rooms (not occupied or reserved)
-        const availableRooms = dbRooms
-          .map(r => ({
-            num: String(r.roomNumber || r.num || ''),
-            type: r.category || r.roomType || 'Standard Room',
-            status: r.status || 'Available',
-            rate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
-          }))
-          .filter(r => {
-            if (!r.num) return false;
-            if (occupied.has(r.num)) return false; // Exclude occupied / reserved rooms
-            const roomStat = String(r.status || 'Available').toLowerCase().trim();
-            return roomStat === 'available' || roomStat === 'vacant';
-          });
-
-        // Deduplicate & sort
-        const uniqueAvailable = [];
-        const seen = new Set();
-        availableRooms.forEach(r => {
-          if (!seen.has(r.num)) {
-            seen.add(r.num);
-            uniqueAvailable.push(r);
-          }
-        });
-        uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
-        setAvailableRoomsList(uniqueAvailable);
-      } catch (e) {
-        console.error("Failed to load available rooms:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRoomsAndAvailability();
-  }, []);
-
   // Automatic calculation of duration (nights) and amount based on stay dates and room type
   const calculateTariff = (checkInDate, checkOutDate, selectedCategory) => {
-    let calculatedNights = 1;
+    let calculatedNights = "";
     if (checkInDate && checkOutDate) {
       const d1 = new Date(checkInDate);
       const d2 = new Date(checkOutDate);
       const diffTime = d2.getTime() - d1.getTime();
-      if (!isNaN(diffTime) && diffTime > 0) {
-        calculatedNights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-      }
+      calculatedNights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     }
 
     let totalAmount = "";
-    if (selectedCategory) {
+    if (calculatedNights !== "" && selectedCategory) {
       let ratePerNight = 3000;
       if (selectedCategory === "Executive Suite") ratePerNight = 6500;
       else if (selectedCategory === "Deluxe Room") ratePerNight = 4500;
       else if (selectedCategory === "Standard Room") ratePerNight = 3000;
 
-      const matchedRoom = rooms.find(r => (r.category || r.roomType) === selectedCategory && (r.currentRate || r.baseRate || r.rate));
+      // Check if dynamic rate is available from rooms
+      const matchedRoom = rooms.find(r => r.category === selectedCategory && (r.currentRate || r.baseRate || r.rate));
       if (matchedRoom) {
         ratePerNight = Number(matchedRoom.currentRate || matchedRoom.baseRate || matchedRoom.rate || ratePerNight);
       }
@@ -168,45 +110,42 @@ function ReceptionistNewBooking() {
     const nextCheckOut = field === "checkOut" ? val : form.checkOut;
     const { nights, amount } = calculateTariff(nextCheckIn, nextCheckOut, form.roomType);
 
-    const checkInIsToday = isDateToday(nextCheckIn);
-    let updatedStatus = form.status;
-    if (form.source === "Walk-in") {
-      updatedStatus = checkInIsToday ? "Checked-in" : "Confirmed";
-    }
+    setForm(prev => {
+      // If checkIn is tomorrow or later, walk-in should NOT be auto checked-in
+      const isToday = isDateToday(nextCheckIn);
+      let updatedStatus = prev.status;
+      if (prev.source === "Walk-in") {
+        updatedStatus = isToday ? "Checked-in" : "Confirmed";
+      }
 
-    setForm(prev => ({
-      ...prev,
-      [field]: val,
-      nights: nights,
-      amount: amount !== "" ? amount : prev.amount,
-      balance: 0,
-      status: updatedStatus
-    }));
+      return {
+        ...prev,
+        [field]: val,
+        nights: nights !== "" ? nights : (field === "checkIn" && !nextCheckOut ? "" : prev.nights),
+        amount: amount !== "" ? amount : (form.roomType ? "" : prev.amount),
+        balance: prev.balance !== "" ? prev.balance : 0,
+        status: updatedStatus
+      };
+    });
   };
 
   const handleRoomTypeChange = (category) => {
     const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, category);
-
-    // Filter available rooms of selected type if matching
-    const matchingRoom = availableRoomsList.find(r => r.type === category);
-    const assignedRoomNum = matchingRoom ? matchingRoom.num : form.roomNumber;
-
     setForm(prev => ({
       ...prev,
       roomType: category,
-      roomNumber: assignedRoomNum || prev.roomNumber,
-      nights: nights,
+      nights: nights !== "" ? nights : prev.nights,
       amount: amount !== "" ? amount : prev.amount,
-      balance: 0
+      balance: prev.balance !== "" ? prev.balance : 0
     }));
   };
 
   const handleNightsChange = (val) => {
-    const n = Number(val) || 1;
+    const n = Number(val) || 0;
     let totalAmount = "";
     if (n > 0 && form.roomType) {
       let ratePerNight = form.roomType === "Executive Suite" ? 6500 : form.roomType === "Deluxe Room" ? 4500 : 3000;
-      const matchedRoom = rooms.find(r => (r.category || r.roomType) === form.roomType && (r.currentRate || r.baseRate || r.rate));
+      const matchedRoom = rooms.find(r => r.category === form.roomType && (r.currentRate || r.baseRate || r.rate));
       if (matchedRoom) {
         ratePerNight = Number(matchedRoom.currentRate || matchedRoom.baseRate || matchedRoom.rate || ratePerNight);
       }
@@ -216,21 +155,7 @@ function ReceptionistNewBooking() {
       ...prev,
       nights: val,
       amount: totalAmount !== "" ? totalAmount : prev.amount,
-      balance: 0
-    }));
-  };
-
-  const handleSourceChange = (val) => {
-    const checkInIsToday = isDateToday(form.checkIn);
-    let updatedStatus = "Confirmed";
-    if (val === "Walk-in") {
-      updatedStatus = checkInIsToday ? "Checked-in" : "Confirmed";
-    }
-
-    setForm(prev => ({
-      ...prev,
-      source: val,
-      status: updatedStatus
+      balance: prev.balance !== "" ? prev.balance : 0
     }));
   };
 
@@ -260,13 +185,14 @@ function ReceptionistNewBooking() {
       setSaving(true);
       setError(null);
 
+      // Status rule: Walk-in is only Checked-in if check-in is TODAY, otherwise Confirmed
       const checkInIsToday = isDateToday(form.checkIn);
       let finalStatus = form.status || "Confirmed";
       if (form.source === "Walk-in") {
         finalStatus = checkInIsToday ? "Checked-in" : "Confirmed";
       }
 
-      // Payment rule: Always Paid with balance: 0 unless explicit balance left
+      // Payment rule: Always Paid (balance: 0) unless explicit balance is left
       const balanceNum = Number(form.balance || 0);
       const isPaid = balanceNum === 0;
 
@@ -283,7 +209,7 @@ function ReceptionistNewBooking() {
         checkOut: form.checkOut,
         nights: Number(form.nights) || 1,
         pax: form.pax || "2 Adults",
-        source: form.source || "Walk-in",
+        source: form.source || "Direct",
         amount: Number(form.amount) || 0,
         balance: balanceNum,
         status: finalStatus,
@@ -294,13 +220,13 @@ function ReceptionistNewBooking() {
         isGroupBooking: form.isGroupBooking
       };
 
-      const res = await receptionistService.createReservation(payload);
+      const res = await managerService.createReservation(payload);
       if (res.success) {
-        toast.success(finalStatus === "Checked-in" ? "Walk-in guest registered & checked-in successfully!" : "Reservation confirmed successfully!");
+        toast.success(finalStatus === "Checked-in" ? "Walk-in guest checked in successfully!" : "Reservation confirmed successfully!");
         import('@/services/socket').then(({ socket }) => {
           socket.emit('booking_created', { guest: form.guest, room: form.roomNumber });
         });
-        navigate({ to: "/reception/reservations" });
+        navigate({ to: "/manager/reservations" });
       } else {
         toast.error(res.message || "Failed to create reservation");
       }
@@ -311,13 +237,6 @@ function ReceptionistNewBooking() {
       setSaving(false);
     }
   };
-
-  // Filter available rooms in dropdown based on selected room category if category is chosen
-  const filteredAvailableRooms = form.roomType
-    ? availableRoomsList.filter(r => r.type === form.roomType)
-    : availableRoomsList;
-
-  const displayRooms = filteredAvailableRooms.length > 0 ? filteredAvailableRooms : availableRoomsList;
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">
@@ -387,6 +306,7 @@ function ReceptionistNewBooking() {
                   value={form.pax}
                   onChange={(e) => setForm({ ...form, pax: e.target.value })}
                 >
+                  <option value="">Select Guest Capacity</option>
                   <option value="1 Adult">1 Adult</option>
                   <option value="2 Adults">2 Adults</option>
                   <option value="2 Adults, 1 Child">2 Adults, 1 Child</option>
@@ -399,7 +319,7 @@ function ReceptionistNewBooking() {
           </Panel>
 
           {/* Stay & Room Configuration */}
-          <Panel title="Stay Itinerary & Room Allocation" description="Schedule dates, category tier, and available room allotment">
+          <Panel title="Stay Itinerary & Room Allocation" description="Schedule dates, category tier, and room assignment">
             <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
               <FormField label="Check-In Date *" required>
                 <Input
@@ -444,20 +364,30 @@ function ReceptionistNewBooking() {
                 </Select>
               </FormField>
 
-              <FormField label="Room Allotment (Available Only)">
+              <FormField label="Assign Room #">
                 <Select
                   value={form.roomNumber}
                   onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
                 >
-                  <option value="">Select Available Room</option>
-                  {displayRooms.length > 0 ? (
-                    displayRooms.map(rm => (
-                      <option key={rm.num} value={rm.num}>
-                        Room #{rm.num} ({rm.type}) - Available
+                  <option value="">Select Room Number</option>
+                  {rooms.length > 0 ? (
+                    rooms.map(rm => (
+                      <option key={rm.roomNumber || rm.room} value={rm.roomNumber || rm.room}>
+                        Room {rm.roomNumber || rm.room} ({rm.category || 'Standard'}) - {rm.status}
                       </option>
                     ))
                   ) : (
-                    <option value="" disabled>No vacant rooms available for this type</option>
+                    <>
+                      <option value="101">Room 101 (Standard Room)</option>
+                      <option value="102">Room 102 (Standard Room)</option>
+                      <option value="103">Room 103 (Standard Room)</option>
+                      <option value="201">Room 201 (Deluxe Room)</option>
+                      <option value="202">Room 202 (Deluxe Room)</option>
+                      <option value="203">Room 203 (Deluxe Room)</option>
+                      <option value="301">Room 301 (Executive Suite)</option>
+                      <option value="302">Room 302 (Executive Suite)</option>
+                      <option value="303">Room 303 (Executive Suite)</option>
+                    </>
                   )}
                 </Select>
               </FormField>
@@ -465,14 +395,17 @@ function ReceptionistNewBooking() {
               <FormField label="Booking Source / Channel">
                 <Select
                   value={form.source}
-                  onChange={(e) => handleSourceChange(e.target.value)}
+                  onChange={(e) => setForm({ ...form, source: e.target.value })}
                 >
-                  <option value="Walk-in">Walk-in Desk</option>
+                  <option value="">Select Booking Source</option>
                   <option value="Direct">Direct Web</option>
+                  <option value="Walk-in">Walk-in Desk</option>
                   <option value="Corporate">Corporate Account</option>
-                  <option value="MakeMyTrip">MakeMyTrip</option>
+                  <option value="Group">Group Booking</option>
                   <option value="Booking.com">Booking.com</option>
+                  <option value="MakeMyTrip">MakeMyTrip</option>
                   <option value="Agoda">Agoda</option>
+                  <option value="Expedia">Expedia</option>
                 </Select>
               </FormField>
             </div>
@@ -493,19 +426,20 @@ function ReceptionistNewBooking() {
               <FormField label="Outstanding Balance (₹)">
                 <Input
                   type="number"
-                  placeholder="0 (Paid)"
+                  placeholder="Enter balance (₹)"
                   value={form.balance}
                   onChange={(e) => setForm({ ...form, balance: Number(e.target.value) || 0 })}
                 />
               </FormField>
 
-              <FormField label="Payment Status">
+              <FormField label="Initial Reservation Status">
                 <Select
-                  value={form.balance === 0 || form.balance === "0" ? "Paid" : "Pending"}
-                  onChange={(e) => setForm({ ...form, balance: e.target.value === "Paid" ? 0 : form.balance || form.amount })}
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
                 >
-                  <option value="Paid">Paid (Full Settlement)</option>
-                  <option value="Pending">Pending Balance</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Checked-in">Checked-in (Instant Stay)</option>
+                  <option value="Pending">Pending Verification</option>
                 </Select>
               </FormField>
 
@@ -525,7 +459,7 @@ function ReceptionistNewBooking() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate({ to: "/reception/reservations" })}
+              onClick={() => navigate({ to: "/manager/reservations" })}
               className="h-9 px-5 text-xs font-bold border-slate-300 bg-white hover:bg-slate-100 text-slate-700 cursor-pointer transition-colors rounded-lg"
             >
               Cancel
@@ -535,7 +469,7 @@ function ReceptionistNewBooking() {
               disabled={saving}
               className="h-9 px-6 text-xs font-bold bg-[#0d1b2a] text-white hover:bg-[#1a2e40] active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-md hover:shadow-lg transition-all rounded-lg border border-navy/30 flex items-center gap-2"
             >
-              {saving ? "Registering..." : (form.source === "Walk-in" && isDateToday(form.checkIn) ? "Complete Walk-In Check-In" : "Confirm New Reservation")}
+              {saving ? "Registering..." : (form.source === "Walk-in" ? "Complete Walk-In Check-In" : "Confirm New Reservation")}
             </button>
           </div>
         </form>
@@ -544,8 +478,6 @@ function ReceptionistNewBooking() {
   );
 }
 
-export const Route = createFileRoute("/reception/new-booking")({
-  component: ReceptionistNewBooking
+export const Route = createFileRoute("/manager/reservations/add")({
+  component: ManagerAddReservation
 });
-
-export default ReceptionistNewBooking;

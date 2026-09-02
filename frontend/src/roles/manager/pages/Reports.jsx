@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -394,12 +394,6 @@ function ReportsDashboard() {
         <LoadingRows rows={5} />
       ) : (
         <>
-          {/* Breadcrumbs trail */}
-          <Crumbs items={[
-            { label: "Finance", to: "/manager/billing" },
-            { label: "Reports" }
-          ]} />
-
           {/* Essential KPI Cards (6 cards) */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             <PremiumStatCard
