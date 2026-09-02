@@ -124,6 +124,21 @@ function ManagerShiftsPage() {
 
   useEffect(() => {
     loadData();
+
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadData();
+      socket.on('staff_updated', handleRealtime);
+      socket.on('shift_assigned', handleRealtime);
+    });
+
+    return () => {
+      if (socketInst) {
+        socketInst.off('staff_updated');
+        socketInst.off('shift_assigned');
+      }
+    };
   }, []);
 
   const handleShiftChange = async (sid, newShift) => {

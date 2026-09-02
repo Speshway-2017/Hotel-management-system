@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -246,10 +246,6 @@ function ManagerAttendancePage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs items={[
-        { label: "Management", to: "/manager/approvals" },
-        { label: "Attendance" }
-      ]} />
       {/* Daily Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <PremiumStatCard label="Total Staff" value={totalCount.toString()} hint="Rostered personnel" accentColor="#0d1b2a" />

@@ -77,11 +77,12 @@ function PaymentsPage() {
     .reduce((sum, p) => sum + p.amount, 0);
 
   const filteredPayments = payments.filter(p => {
-    const matchesSearch = 
-      p.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.bookingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p._id.toLowerCase().includes(searchQuery.toLowerCase());
+    const guestStr = String(p.guestName || p.guest || "").toLowerCase();
+    const bookingIdStr = String(p.bookingId || "").toLowerCase();
+    const idStr = String(p._id || p.id || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
 
+    const matchesSearch = guestStr.includes(query) || bookingIdStr.includes(query) || idStr.includes(query);
     const matchesMethod = methodFilter === "all" || p.paymentMethod === methodFilter;
     const matchesStatus = statusFilter === "all" || p.status === statusFilter;
 

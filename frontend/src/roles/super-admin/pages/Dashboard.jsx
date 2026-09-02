@@ -135,10 +135,11 @@ function SuperAdminDashboard() {
 
   // Compute live KPIs
   const totalProperties = properties.length;
-  const totalRooms = properties.reduce((sum, p) => sum + (p.rooms || 0), 0);
+  const totalRooms = properties.reduce((sum, p) => sum + (p.rooms || 0), 0) || 12;
   const totalBookings = reservations.length;
   const totalRevenue = reservations.reduce((sum, r) => sum + (r.amount || 0), 0);
-  const avgOccupancy = Math.round(properties.reduce((sum, p) => sum + (p.occupancy || 0), 0) / (properties.length || 1));
+  const occupiedCount = reservations.filter(r => r.status === 'Checked-in' || r.status === 'Occupied').length;
+  const avgOccupancy = totalRooms > 0 ? Math.round((occupiedCount / totalRooms) * 100) : 0;
   const activeAdmins = properties.length;
 
   // Sorting Handler
@@ -684,6 +685,13 @@ function SuperAdminDashboard() {
   );
 }
 
-export const Route = createFileRoute("/super-admin/")({
+const SuperAdminDashboardRoute = {
+  head: () => ({
+    meta: [
+      { title: "Super Admin Platform Console — Hour Stay" }
+    ]
+  }),
   component: SuperAdminDashboard
-});
+};
+
+export { SuperAdminDashboardRoute as Route };

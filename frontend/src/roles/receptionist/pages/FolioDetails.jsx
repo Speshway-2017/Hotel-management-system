@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception/folio/$id")({
   component: ReceptionFolioDetailsPage
 });
 
+import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 
 function ReceptionFolioDetailsPage() {
@@ -42,6 +43,8 @@ function ReceptionFolioDetailsPage() {
           f.balance = f.balanceDue;
           f.type = 'Guest Room Billing';
           setFolio(f);
+        } else {
+          toast.error("Folio record not found.");
         }
       })
       .catch(err => console.error("Failed to query folio items:", err))
@@ -74,7 +77,7 @@ function ReceptionFolioDetailsPage() {
 
   const handlePostCharge = () => {
     if (!addPrice || isNaN(addPrice) || Number(addPrice) <= 0) {
-      alert("Please enter a valid numeric unit price!");
+      toast.error("Please enter a valid numeric unit price!");
       return;
     }
     const qty = parseInt(addQty || "1");
@@ -84,20 +87,22 @@ function ReceptionFolioDetailsPage() {
     receptionistService.postFolioCharge(realBookingId, itemTotal, addDesc, addCategory)
       .then(res => {
         if (res.success) {
-          alert("Incidental charge posted to guest folio successfully!");
+          toast.success("Incidental charge posted to guest folio successfully!");
           setAddPrice("");
           loadFolioDetails();
+        } else {
+          toast.error(res.message || "Failed to post charge.");
         }
       })
       .catch(err => {
         console.error("Failed to post folio charge:", err);
-        alert(err.message || "Failed to post folio charge.");
+        toast.error(err.message || "Failed to post folio charge.");
       });
   };
 
   const handleRecordPayment = () => {
     if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0) {
-      alert("Please enter a valid payment amount!");
+      toast.error("Please enter a valid payment amount!");
       return;
     }
     const payAmt = Number(paymentAmount);
@@ -105,14 +110,16 @@ function ReceptionFolioDetailsPage() {
     receptionistService.postFolioPayment(realBookingId, payAmt, paymentMethod)
       .then(res => {
         if (res.success) {
-          alert(`Payment of ₹${payAmt.toLocaleString()} recorded successfully via ${paymentMethod}!`);
+          toast.success(`Payment of ₹${payAmt.toLocaleString()} recorded successfully via ${paymentMethod}!`);
           setPaymentAmount("");
           loadFolioDetails();
+        } else {
+          toast.error(res.message || "Failed to record payment.");
         }
       })
       .catch(err => {
         console.error("Failed to record folio payment:", err);
-        alert(err.message || "Failed to record folio payment.");
+        toast.error(err.message || "Failed to record folio payment.");
       });
   };
 

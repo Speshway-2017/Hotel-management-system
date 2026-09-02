@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -235,6 +235,21 @@ function ManagerBillingPage() {
 
   useEffect(() => {
     loadData();
+
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadData();
+      socket.on('booking_updated', handleRealtime);
+      socket.on('payment_added', handleRealtime);
+    });
+
+    return () => {
+      if (socketInst) {
+        socketInst.off('booking_updated');
+        socketInst.off('payment_added');
+      }
+    };
   }, []);
 
   // KPI Calculations

@@ -9,7 +9,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell 
 } from "recharts";
 import { 
-  TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, 
+  TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, ArrowRight,
   Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, 
   Bed, RefreshCw, Clock, CheckCircle, Star, Wrench, MessageSquare,
   Building
@@ -55,9 +55,10 @@ function ManagerDashboard() {
   // Data sets
   const [bookings, setBookings] = useState([]);
   const [staff, setStaff] = useState([]);
+  const [pendingApprovalsList, setPendingApprovalsList] = useState([]);
+  const [feedbackList, setFeedbackList] = useState([]);
   
   // Operational tabs
-  const [opTab, setOpTab] = useState("arrivals");
   const [chartTab, setChartTab] = useState("revenue");
 
   const todayStr = "2026-08-21";
@@ -90,20 +91,31 @@ function ManagerDashboard() {
       }
 
       // Fetch all required resources
-      const [propRes, bookingsRes, staffRes] = await Promise.all([
-        managerService.getProperty(),
-        managerService.getReservations(),
-        managerService.getStaff()
+      const [propRes, bookingsRes, staffRes, approvalsRes, feedbackRes] = await Promise.all([
+        managerService.getProperty().catch(() => ({ success: true, data: null })),
+        managerService.getReservations().catch(() => ({ success: true, data: [] })),
+        managerService.getStaff().catch(() => ({ success: true, data: [] })),
+        managerService.getApprovals().catch(() => ({ success: true, data: [] })),
+        managerService.getFeedback().catch(() => ({ success: true, data: [] }))
       ]);
 
-      if (propRes.success) {
+      if (propRes && propRes.success && propRes.data) {
         setProperty(propRes.data);
+      } else {
+        setProperty({ name: "Hour Stay Luxury Hotel", rooms: 12, city: "Hyderabad" });
       }
-      if (bookingsRes.success) {
+
+      if (bookingsRes && bookingsRes.success && Array.isArray(bookingsRes.data)) {
         setBookings(bookingsRes.data);
       }
-      if (staffRes.success) {
+      if (staffRes && staffRes.success && Array.isArray(staffRes.data)) {
         setStaff(staffRes.data);
+      }
+      if (approvalsRes && approvalsRes.success && Array.isArray(approvalsRes.data)) {
+        setPendingApprovalsList(approvalsRes.data);
+      }
+      if (feedbackRes && feedbackRes.success && Array.isArray(feedbackRes.data)) {
+        setFeedbackList(feedbackRes.data);
       }
     } catch (err) {
       setError(err.message || "Failed to load dashboard data.");
@@ -114,6 +126,31 @@ function ManagerDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadDashboardData();
+      socket.on('booking_updated', handleRealtime);
+      socket.on('booking_created', handleRealtime);
+      socket.on('booking_deleted', handleRealtime);
+      socket.on('room_status_changed', handleRealtime);
+      socket.on('availability_changed', handleRealtime);
+      socket.on('payment_added', handleRealtime);
+      socket.on('staff_updated', handleRealtime);
+    });
+
+    return () => {
+      if (socketInst) {
+        socketInst.off('booking_updated');
+        socketInst.off('booking_created');
+        socketInst.off('booking_deleted');
+        socketInst.off('room_status_changed');
+        socketInst.off('availability_changed');
+        socketInst.off('payment_added');
+        socketInst.off('staff_updated');
+      }
+    };
   }, []);
 
   if (currentUser && currentUser.role !== "manager") {
@@ -156,23 +193,40 @@ function ManagerDashboard() {
   }
 
   // Calculate live scoped KPI metrics
+  const getTodayISO = () => new Date().toISOString().split('T')[0];
+  const getTodayFormatted = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  const isTodayDate = (dateStr) => {
+    if (!dateStr) return false;
+    const str = String(dateStr).trim();
+    const todayISO = getTodayISO();
+    const todayFormatted = getTodayFormatted();
+    const todaySimple = new Date().toDateString();
+    return str.includes(todayISO) || str.includes(todayFormatted) || new Date(str).toDateString() === todaySimple;
+  };
+
   const activeBookings = bookings.filter(b => b.status !== "Cancelled");
   
-  const arrivalsToday = activeBookings.filter(b => b.checkIn === todayStr);
-  const departuresToday = activeBookings.filter(b => b.checkOut === todayStr);
+  const arrivalsToday = activeBookings.filter(b => isTodayDate(b.checkIn) || b.status === "Checked-in");
+  const departuresToday = activeBookings.filter(b => isTodayDate(b.checkOut) || b.status === "Checked-out");
   
   const currentStays = activeBookings.filter(b => b.status === "Checked-in");
-  const pendingCheckins = activeBookings.filter(b => b.checkIn === todayStr && b.status === "Confirmed");
-  const pendingCheckouts = activeBookings.filter(b => b.checkOut === todayStr && b.status === "Checked-in");
+  const pendingCheckins = activeBookings.filter(b => isTodayDate(b.checkIn) && (b.status === "Confirmed" || b.status === "Pending"));
+  const pendingCheckouts = activeBookings.filter(b => (isTodayDate(b.checkOut) || b.status === "Checked-in") && b.status !== "Checked-out");
 
   // Occupancy, ADR, RevPAR computations
-  const totalRooms = property.rooms || 50;
+  const totalRooms = property.rooms || 12;
   const rawOccupancy = totalRooms > 0 ? (currentStays.length / totalRooms) * 100 : 0;
-  const occupancyPercent = rawOccupancy > 0 ? Math.round(rawOccupancy) : property.occupancy || 75;
+  const occupancyPercent = Math.round(rawOccupancy);
   
   const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
-  const adrValue = activeBookings.length > 0 ? Math.round(totalRevenue / activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0)) : property.adr || 8500;
-  const revparValue = Math.round(adrValue * (occupancyPercent / 100)) || property.revpar || 6375;
+  const adrValue = activeBookings.length > 0 ? Math.round(totalRevenue / activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0)) : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0);
+  const revparValue = Math.round(adrValue * (occupancyPercent / 100));
 
   // Mocked stats for visual completeness of Manager view
   const housekeepingClean = Math.round(totalRooms * 0.6);
@@ -380,235 +434,133 @@ function ManagerDashboard() {
           </Panel>
         </div>
 
-        {/* Right Side: Operations stack */}
+        {/* Right Side: Quick Manager Actions stack */}
         <div className="lg:col-span-1">
-          <Panel title="Today's Operations" description="Check-in flows and expected stays">
-            <div className="p-5 bg-white rounded-b-xl space-y-3.5 text-xs font-semibold text-navy">
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-indigo shrink-0" /> Total Arrivals</span>
-                <span className="font-bold text-navy">{arrivalsToday.length} booking(s)</span>
+          <div className="bg-white rounded-2xl border border-muted shadow-soft overflow-hidden h-full flex flex-col justify-between">
+            <div className="p-4 border-b border-muted/60 bg-gradient-to-r from-navy/5 via-transparent to-purple/5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                <h3 className="font-bold text-xs uppercase tracking-wider text-navy">Quick Manager Actions</h3>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-purple shrink-0" /> Total Departures</span>
-                <span className="font-bold text-navy">{departuresToday.length} booking(s)</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Users className="size-4 text-success shrink-0" /> Current Stays</span>
-                <span className="font-bold text-navy">{currentStays.length} guest(s)</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-muted">
-                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-warning shrink-0" /> Pending Check-ins</span>
-                <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-warning font-bold text-[10px]">{pendingCheckins.length} remaining</span>
-              </div>
-              <div className="flex items-center justify-between py-1.5">
-                <span className="flex items-center gap-2 text-muted-foreground"><Clock className="size-4 text-pink shrink-0" /> Pending Check-outs</span>
-                <span className="rounded-full bg-pink/15 px-2.5 py-0.5 text-pink font-bold text-[10px]">{pendingCheckouts.length} remaining</span>
-              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy/5 text-navy-deep border border-navy/10">Fast Access</span>
             </div>
-          </Panel>
+
+            <div className="p-3.5 space-y-2.5 flex-1 flex flex-col justify-between">
+              {/* Action 1: Operations */}
+              <Link
+                to="/manager/operations"
+                className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-indigo/40 hover:bg-gradient-to-r hover:from-indigo/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-9 rounded-xl bg-indigo/10 text-indigo flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-indigo group-hover:text-white transition-all duration-200 shadow-sm">
+                    <Building className="size-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-navy group-hover:text-indigo transition-colors leading-snug">Operations Grid</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Check-ins & Movements</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo/10 text-indigo">Live</span>
+                  <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-indigo group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </Link>
+
+              {/* Action 2: Approvals */}
+              <Link
+                to="/manager/approvals"
+                className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-warning/40 hover:bg-gradient-to-r hover:from-warning/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-9 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-warning group-hover:text-white transition-all duration-200 shadow-sm">
+                    <ShieldCheck className="size-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-navy group-hover:text-warning transition-colors leading-snug">Review Approvals</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Discounts & Overrides</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-warning/10 text-warning">{pendingApprovals.length} Pending</span>
+                  <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-warning group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </Link>
+
+              {/* Action 3: Shifts */}
+              <Link
+                to="/manager/shifts"
+                className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-emerald-500/40 hover:bg-gradient-to-r hover:from-emerald-500/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-200 shadow-sm">
+                    <Users className="size-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-navy group-hover:text-emerald-600 transition-colors leading-snug">Manage Shifts</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Rosters & Duty Logs</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">Active</span>
+                  <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </Link>
+
+              {/* Action 4: Reports */}
+              <Link
+                to="/manager/reports"
+                className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-purple/40 hover:bg-gradient-to-r hover:from-purple/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-9 rounded-xl bg-purple/10 text-purple flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-purple group-hover:text-white transition-all duration-200 shadow-sm">
+                    <TrendingUp className="size-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-navy group-hover:text-purple transition-colors leading-snug">Yield Reports</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">RevPAR & Revenue</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple/10 text-purple">Insights</span>
+                  <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-purple group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </Link>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      {/* Quick Manager Actions Panel */}
-      <Panel title="Quick Manager Actions" description="Fast track controls for property modules">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-white rounded-b-xl">
-          <Link to="/manager/operations" className="flex flex-col items-center justify-center p-4 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline">
-            <Building className="size-6 text-indigo group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold text-navy mt-2">Operations Grid</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">Live check-in flows</span>
-          </Link>
-
-          <Link to="/manager/approvals" className="flex flex-col items-center justify-center p-4 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline">
-            <ShieldCheck className="size-6 text-warning group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold text-navy mt-2">Review Approvals</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">{pendingApprovals.length} pending requests</span>
-          </Link>
-
-          <Link to="/manager/shifts" className="flex flex-col items-center justify-center p-4 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline">
-            <Users className="size-6 text-success group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold text-navy mt-2">Manage Shifts</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">Rosters and staff lists</span>
-          </Link>
-
-          <Link to="/manager/reports" className="flex flex-col items-center justify-center p-4 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline">
-            <TrendingUp className="size-6 text-purple group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold text-navy mt-2">Yield Reports</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">Revenue & ADR analysis</span>
-          </Link>
-        </div>
-      </Panel>
-
-      {/* Quick Operational Sub-sections Panel */}
-      <Panel
-        title="Quick Operational Workspace"
-        description="Immediate actions for arrivals, departures, stays, approvals, feedback, and maintenance lists."
-        actions={
-          <div className="flex flex-wrap gap-1 bg-[#fcfcfc] border border-muted p-1 rounded-lg">
-            {[
-              { id: "arrivals", label: "Arrivals" },
-              { id: "departures", label: "Departures" },
-              { id: "stays", label: "Current Stays" },
-              { id: "approvals", label: "Pending Approvals" },
-              { id: "feedback", label: "Recent Feedback" }
-            ].map((tab) => (
-              <Button
-                key={tab.id}
-                size="sm"
-                variant={opTab === tab.id ? "secondary" : "ghost"}
-                className="h-8 text-xs font-bold px-3.5"
-                onClick={() => setOpTab(tab.id)}
-              >
-                {tab.label}
-              </Button>
-            ))}
+      {/* Today's Operations Panel */}
+      <Panel title="Today's Operations" description="Check-in flows and expected stays">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-5 bg-white rounded-b-xl text-xs font-semibold text-navy">
+          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
+            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Calendar className="size-4 text-indigo shrink-0" /> Total Arrivals</span>
+            <span className="font-bold text-navy text-base mt-1">{arrivalsToday.length} booking(s)</span>
           </div>
-        }
-      >
-        <div className="p-4">
-          {opTab === "arrivals" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
-                    <th className="pb-3 px-3">Guest</th>
-                    <th className="pb-3 px-3">Room</th>
-                    <th className="pb-3 px-3">Stay Dates</th>
-                    <th className="pb-3 px-3">Source</th>
-                    <th className="pb-3 px-3 text-right">Payment</th>
-                    <th className="pb-3 px-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted">
-                  {arrivalsToday.length === 0 ? (
-                    <tr><td colSpan="6" className="py-6 text-center text-muted-foreground">No arrivals today.</td></tr>
-                  ) : (
-                    arrivalsToday.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#fcfcfc]">
-                        <td className="py-3 px-3 font-semibold text-navy">{item.guest}</td>
-                        <td className="py-3 px-3 font-mono">{item.room || "—"}</td>
-                        <td className="py-3 px-3">{item.checkIn} → {item.checkOut}</td>
-                        <td className="py-3 px-3"><Tag tone="brand">{item.source || "Direct"}</Tag></td>
-                        <td className="py-3 px-3 text-right font-bold">₹{item.amount?.toLocaleString()}</td>
-                        <td className="py-3 px-3 text-center">
-                          <Tag tone={item.status === "Confirmed" ? "success" : "warning"}>{item.status}</Tag>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {opTab === "departures" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
-                    <th className="pb-3 px-3">Guest</th>
-                    <th className="pb-3 px-3">Room</th>
-                    <th className="pb-3 px-3">Stay Dates</th>
-                    <th className="pb-3 px-3">Source</th>
-                    <th className="pb-3 px-3 text-right">Payment</th>
-                    <th className="pb-3 px-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted">
-                  {departuresToday.length === 0 ? (
-                    <tr><td colSpan="6" className="py-6 text-center text-muted-foreground">No departures today.</td></tr>
-                  ) : (
-                    departuresToday.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#fcfcfc]">
-                        <td className="py-3 px-3 font-semibold text-navy">{item.guest}</td>
-                        <td className="py-3 px-3 font-mono">{item.room || "—"}</td>
-                        <td className="py-3 px-3">{item.checkIn} → {item.checkOut}</td>
-                        <td className="py-3 px-3"><Tag tone="brand">{item.source || "Direct"}</Tag></td>
-                        <td className="py-3 px-3 text-right font-bold">₹{item.amount?.toLocaleString()}</td>
-                        <td className="py-3 px-3 text-center">
-                          <Tag tone={item.status === "Checked-out" ? "info" : "warning"}>{item.status}</Tag>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {opTab === "stays" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-muted text-[10px] uppercase font-bold text-muted-foreground">
-                    <th className="pb-3 px-3">Guest</th>
-                    <th className="pb-3 px-3">Room</th>
-                    <th className="pb-3 px-3">Stay Dates</th>
-                    <th className="pb-3 px-3">Pax</th>
-                    <th className="pb-3 px-3 text-right">Invoice Amount</th>
-                    <th className="pb-3 px-3 text-center">Ledger Balance</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted">
-                  {currentStays.length === 0 ? (
-                    <tr><td colSpan="6" className="py-6 text-center text-muted-foreground">No checked-in guests currently.</td></tr>
-                  ) : (
-                    currentStays.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#fcfcfc]">
-                        <td className="py-3 px-3 font-semibold text-navy">{item.guest}</td>
-                        <td className="py-3 px-3 font-mono">{item.room || "—"}</td>
-                        <td className="py-3 px-3">{item.checkIn} → {item.checkOut}</td>
-                        <td className="py-3 px-3">{item.pax || "2 Adults"}</td>
-                        <td className="py-3 px-3 text-right font-bold">₹{item.amount?.toLocaleString()}</td>
-                        <td className="py-3 px-3 text-center font-bold text-destructive">
-                          ₹{(item.balance || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {opTab === "approvals" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pendingApprovals.map((item) => (
-                <div key={item.id} className="p-4 rounded-xl border border-muted hover:bg-muted/15 flex items-center justify-between">
-                  <div>
-                    <span className="rounded bg-accent/15 px-2 py-0.5 text-[9px] font-bold text-navy uppercase">{item.type}</span>
-                    <h4 className="font-semibold text-navy mt-1.5 text-xs">{item.detail}</h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Guest: {item.guest}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="xs" className="bg-navy hover:bg-navy-deep text-white text-[10px] font-bold px-2.5 h-7">Approve</Button>
-                    <Button size="xs" variant="ghost" className="text-destructive hover:bg-destructive/5 text-[10px] px-2 h-7">Deny</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {opTab === "feedback" && (
-            <div className="space-y-4">
-              {recentFeedback.map((item) => (
-                <div key={item.id} className="p-4 rounded-xl border border-muted hover:bg-muted/15 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-navy text-xs">{item.guest}</span>
-                    <span className="flex items-center gap-1 text-[11px] font-bold text-brand"><Star className="size-3.5 fill-brand text-brand" /> {item.score} / 5</span>
-                  </div>
-                  <p className="text-xs italic text-muted-foreground">"{item.comment}"</p>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
+            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Calendar className="size-4 text-purple shrink-0" /> Total Departures</span>
+            <span className="font-bold text-navy text-base mt-1">{departuresToday.length} booking(s)</span>
+          </div>
+          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
+            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Users className="size-4 text-success shrink-0" /> Current Stays</span>
+            <span className="font-bold text-navy text-base mt-1">{currentStays.length} guest(s)</span>
+          </div>
+          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
+            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Clock className="size-4 text-warning shrink-0" /> Pending Check-ins</span>
+            <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-warning font-bold text-[10px] mt-1">{pendingCheckins.length} remaining</span>
+          </div>
+          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
+            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Clock className="size-4 text-pink shrink-0" /> Pending Check-outs</span>
+            <span className="rounded-full bg-pink/15 px-2.5 py-0.5 text-pink font-bold text-[10px] mt-1">{pendingCheckouts.length} remaining</span>
+          </div>
         </div>
       </Panel>
     </div>
   );
 }
 
-export const Route = createFileRoute("/manager/")({
+const ManagerDashboardRoute = {
   head: () => ({
     meta: [
       { title: "Manager Dashboard — Hour Stay" },
@@ -618,4 +570,6 @@ export const Route = createFileRoute("/manager/")({
     ]
   }),
   component: ManagerDashboard
-});
+};
+
+export { ManagerDashboardRoute as Route };

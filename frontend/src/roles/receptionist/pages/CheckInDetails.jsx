@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception/check-in/$id")({
   component: ReceptionCheckInDetailsPage
 });
 
+import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 
 function ReceptionCheckInDetailsPage() {
@@ -27,6 +28,7 @@ function ReceptionCheckInDetailsPage() {
 
   const [loading, setLoading] = useState(true);
   const [guest, setGuest] = useState(null);
+  const [rooms, setRooms] = useState([]);
 
   // Wizard state machine
   const [step, setStep] = useState(1); // 1: Profile verification, 2: ID Upload, 3: Surcharges & Room, 4: Settle & Check-in
@@ -44,37 +46,53 @@ function ReceptionCheckInDetailsPage() {
 
   useEffect(() => {
     setLoading(true);
-    receptionistService.getReservations()
-      .then(res => {
-        if (res.success && res.data) {
-          const found = res.data.find(b => b.id === id);
-          if (found) {
-            found.name = found.guest;
-            found.type = found.roomType || 'Deluxe Room';
-            found.amountPaid = found.amount - found.balance;
-            setGuest(found);
-            setAssignedRoom(found.room ? found.room.split(' ')[0] : '101');
-            setCollectedPayment(found.balance);
-          } else {
-            console.warn("Reservation not found for checkin.");
-          }
+    Promise.all([
+      receptionistService.getReservations().catch(() => ({})),
+      receptionistService.getRooms().catch(() => ({}))
+    ]).then(([resRes, roomsRes]) => {
+      if (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) {
+        setRooms(roomsRes.data);
+      }
+      if (resRes && resRes.success && resRes.data) {
+        const found = resRes.data.find(b => 
+          String(b._id) === String(id) || 
+          String(b.id) === String(id) || 
+          String(b.bookingId) === String(id)
+        );
+        if (found) {
+          found.name = found.guest || found.name;
+          found.type = found.roomType || 'Deluxe Room';
+          found.amountPaid = Number(found.amount || 0) - Number(found.balance || 0);
+          setGuest(found);
+          const initialRoom = found.room ? String(found.room).match(/\b\d{3,4}\b/)?.[0] || found.room.split(' ')[0] : '101';
+          setAssignedRoom(initialRoom);
+          setCollectedPayment(found.balance || 0);
+        } else {
+          toast.error("Reservation record not found.");
         }
-      })
-      .catch(err => console.error("Failed to load reservation details for checkin:", err))
-      .finally(() => setLoading(false));
+      }
+    })
+    .catch(err => console.error("Failed to load reservation details for checkin:", err))
+    .finally(() => setLoading(false));
   }, [id]);
 
   const handleFinishCheckIn = () => {
-    receptionistService.updateReservationStatus(guest.id || guest._id, 'Checked-in', assignedRoom)
+    if (!assignedRoom) {
+      toast.error("Please assign a room number before completing check-in.");
+      return;
+    }
+    receptionistService.updateReservationStatus(guest._id || guest.id, 'Checked-in', assignedRoom)
       .then(res => {
         if (res.success) {
-          alert(`Guest ${guest.name} successfully Checked In to Room #${assignedRoom}!`);
+          toast.success(`Guest ${guest.name} successfully Checked In to Room #${assignedRoom}!`);
           navigate("/reception/check-in");
+        } else {
+          toast.error(res.message || "Failed to check-in guest.");
         }
       })
       .catch(err => {
         console.error("Failed to check-in guest:", err);
-        alert(err.message || "Failed to check-in guest.");
+        toast.error(err.message || "Failed to check-in guest.");
       });
   };
 

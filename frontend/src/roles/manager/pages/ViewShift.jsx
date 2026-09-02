@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -112,11 +112,6 @@ function ManagerViewShift() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs items={[
-        { label: "Management", to: "/manager/approvals" },
-        { label: "Staff & Shifts", to: "/manager/shifts" },
-        { label: "Shift Details" }
-      ]} />
       <div className="flex items-center gap-3">
         <Link to="/manager/shifts" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
           <ChevronLeft className="size-4" />

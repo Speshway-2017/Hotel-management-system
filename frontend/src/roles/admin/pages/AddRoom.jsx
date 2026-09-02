@@ -174,8 +174,16 @@ function AddRoomPage() {
         bedType,
         amenities,
         description,
-        images
       });
+
+      // Realtime Socket broadcast so Admin, Manager, Receptionist auto-refresh
+      import('@/services/socket').then(({ socket }) => {
+        try {
+          socket.emit('room_status_changed', { action: 'room_added', roomNumber });
+          socket.emit('booking_updated', { action: 'room_added' });
+          socket.emit('availability_changed', { action: 'room_added' });
+        } catch (e) {}
+      }).catch(() => {});
 
       toast.success(`Room #${roomNumber} registered successfully with rate ₹${finalRate.toLocaleString('en-IN')}!`);
       navigate({ to: "/admin/rooms" });

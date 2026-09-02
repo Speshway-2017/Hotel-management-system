@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception/room-assignment/$id")({
   component: ReceptionRoomDetailsPage
 });
 
+import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 
 function ReceptionRoomDetailsPage() {
@@ -33,11 +34,16 @@ function ReceptionRoomDetailsPage() {
     receptionistService.getRooms()
       .then(res => {
         if (res.success && res.data) {
-          const found = res.data.find(r => r.room === id);
+          const found = res.data.find(r => 
+            String(r.room) === String(id) || 
+            String(r.roomNumber) === String(id) ||
+            String(r._id) === String(id) ||
+            String(r.id) === String(id)
+          );
           if (found) {
             setRoomObj(found);
           } else {
-            console.warn("Room details not found in properties query.");
+            toast.error("Room details not found in property inventory.");
           }
         }
       })
@@ -50,30 +56,36 @@ function ReceptionRoomDetailsPage() {
   }, [id]);
 
   const handleUpdateHousekeeping = (status) => {
-    receptionistService.updateRoomStatus(roomObj.room, undefined, status)
+    const roomNum = roomObj.roomNumber || roomObj.room;
+    receptionistService.updateRoomStatus(roomNum, undefined, status)
       .then(res => {
         if (res.success) {
-          alert(`Housekeeping status for Room #${roomObj.room} updated to ${status}!`);
+          toast.success(`Housekeeping status for Room #${roomNum} updated to ${status}!`);
           loadRoomDetails();
+        } else {
+          toast.error(res.message || "Failed to update housekeeping status.");
         }
       })
       .catch(err => {
         console.error("Failed to update housekeeping:", err);
-        alert(err.message || "Failed to update housekeeping status.");
+        toast.error(err.message || "Failed to update housekeeping status.");
       });
   };
 
   const handleUpdateStatus = (status) => {
-    receptionistService.updateRoomStatus(roomObj.room, status, undefined)
+    const roomNum = roomObj.roomNumber || roomObj.room;
+    receptionistService.updateRoomStatus(roomNum, status, undefined)
       .then(res => {
         if (res.success) {
-          alert(`Operational status for Room #${roomObj.room} updated to ${status}!`);
+          toast.success(`Operational status for Room #${roomNum} updated to ${status}!`);
           loadRoomDetails();
+        } else {
+          toast.error(res.message || "Failed to update room status.");
         }
       })
       .catch(err => {
         console.error("Failed to update status:", err);
-        alert(err.message || "Failed to update room operational status.");
+        toast.error(err.message || "Failed to update room operational status.");
       });
   };
 

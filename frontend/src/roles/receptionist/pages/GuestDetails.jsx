@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception/guest-search/$id")({
   component: ReceptionGuestDetailsPage
 });
 
+import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 
 function ReceptionGuestDetailsPage() {
@@ -38,12 +39,15 @@ function ReceptionGuestDetailsPage() {
     receptionistService.getGuests()
       .then(res => {
         if (res.success && res.data) {
-          const found = res.data.find(g => g.id === id);
+          const found = res.data.find(g => 
+            String(g._id) === String(id) || 
+            String(g.id) === String(id) || 
+            String(g.bookingId) === String(id)
+          );
           if (found) {
             setGuest(found);
           } else {
-            // fallback mock or alert
-            console.warn("Guest not found in in-house list.");
+            toast.error("Guest profile not found.");
           }
         }
       })
@@ -57,36 +61,40 @@ function ReceptionGuestDetailsPage() {
 
   const handlePostCharge = () => {
     if (!chargeAmount || isNaN(chargeAmount) || Number(chargeAmount) <= 0) {
-      alert("Please enter a valid numeric charge amount!");
+      toast.error("Please enter a valid numeric charge amount!");
       return;
     }
     const charge = Number(chargeAmount);
-    receptionistService.postGuestCharge(guest.id, charge, chargeDescription)
+    receptionistService.postGuestCharge(guest._id || guest.id, charge, chargeDescription)
       .then(res => {
         if (res.success) {
-          alert(`Posted charge of ₹${charge.toLocaleString()} successfully to guest room account.`);
+          toast.success(`Posted charge of ₹${charge.toLocaleString()} successfully to guest room account.`);
           setChargeAmount("");
           loadGuestDetails();
+        } else {
+          toast.error(res.message || "Failed to post charge.");
         }
       })
       .catch(err => {
         console.error("Failed to post charge:", err);
-        alert(err.message || "Failed to post charge.");
+        toast.error(err.message || "Failed to post charge.");
       });
   };
 
   const handleExtendStay = () => {
     const days = parseInt(extendDays || "1");
-    receptionistService.extendGuestStay(guest.id, days)
+    receptionistService.extendGuestStay(guest._id || guest.id, days)
       .then(res => {
         if (res.success) {
-          alert(`Stay extended by ${days} days successfully.`);
+          toast.success(`Stay extended by ${days} days successfully.`);
           loadGuestDetails();
+        } else {
+          toast.error(res.message || "Failed to extend stay.");
         }
       })
       .catch(err => {
         console.error("Failed to extend stay:", err);
-        alert(err.message || "Failed to extend stay.");
+        toast.error(err.message || "Failed to extend stay.");
       });
   };
 

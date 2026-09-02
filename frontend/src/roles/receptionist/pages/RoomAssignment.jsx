@@ -3,6 +3,7 @@ import { PageHeader, Panel, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { receptionistService } from "@/services/receptionist";
+import { toast } from "sonner";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
   Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
@@ -90,13 +91,14 @@ function RoomStatusPage() {
 
   // Filter computations
   const filteredRooms = rooms.filter(rm => {
-    const matchesSearch = 
-      rm.room.includes(searchQuery) ||
-      rm.roomType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rm.guest.toLowerCase().includes(searchQuery.toLowerCase());
+    const roomStr = String(rm.room || rm.roomNumber || "").toLowerCase();
+    const typeStr = String(rm.roomType || rm.category || "").toLowerCase();
+    const guestStr = String(rm.guest || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
 
+    const matchesSearch = roomStr.includes(query) || typeStr.includes(query) || guestStr.includes(query);
     const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
-    const matchesType = typeFilter === "all" || rm.roomType === typeFilter;
+    const matchesType = typeFilter === "all" || rm.roomType === typeFilter || rm.category === typeFilter;
     const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
     const matchesHousekeeping = housekeepingFilter === "all" || rm.housekeeping === housekeepingFilter;
 
@@ -108,50 +110,70 @@ function RoomStatusPage() {
     receptionistService.updateRoomStatus(roomNum, undefined, 'Clean')
       .then(res => {
         if (res.success) {
+          toast.success(`Room #${roomNum} marked as Clean!`);
           loadRooms();
         }
       })
-      .catch(err => console.error("Failed to mark room clean:", err));
+      .catch(err => {
+        console.error("Failed to mark room clean:", err);
+        toast.error(err.message || "Failed to mark room clean.");
+      });
   };
 
   const handleMarkInspected = (roomNum) => {
     receptionistService.updateRoomStatus(roomNum, undefined, 'Inspected')
       .then(res => {
         if (res.success) {
+          toast.success(`Room #${roomNum} marked as Inspected / Available!`);
           loadRooms();
         }
       })
-      .catch(err => console.error("Failed to mark room inspected:", err));
+      .catch(err => {
+        console.error("Failed to mark room inspected:", err);
+        toast.error(err.message || "Failed to mark room inspected.");
+      });
   };
 
   const handleMarkOutOfOrder = (roomNum) => {
     receptionistService.updateRoomStatus(roomNum, 'Out of Order', 'Dirty')
       .then(res => {
         if (res.success) {
+          toast.success(`Room #${roomNum} marked as Out of Order.`);
           loadRooms();
         }
       })
-      .catch(err => console.error("Failed to set OOO status:", err));
+      .catch(err => {
+        console.error("Failed to set OOO status:", err);
+        toast.error(err.message || "Failed to update room status.");
+      });
   };
 
   const handleChangeRoomStatus = (roomNum, newStatus) => {
     receptionistService.updateRoomStatus(roomNum, newStatus, undefined)
       .then(res => {
         if (res.success) {
+          toast.success(`Room #${roomNum} status changed to ${newStatus}`);
           loadRooms();
         }
       })
-      .catch(err => console.error("Failed to update status:", err));
+      .catch(err => {
+        console.error("Failed to update status:", err);
+        toast.error(err.message || "Failed to update status.");
+      });
   };
 
   const handleChangeHousekeepingStatus = (roomNum, newStatus) => {
     receptionistService.updateRoomStatus(roomNum, undefined, newStatus)
       .then(res => {
         if (res.success) {
+          toast.success(`Room #${roomNum} housekeeping set to ${newStatus}`);
           loadRooms();
         }
       })
-      .catch(err => console.error("Failed to update housekeeping status:", err));
+      .catch(err => {
+        console.error("Failed to update housekeeping status:", err);
+        toast.error(err.message || "Failed to update housekeeping status.");
+      });
   };
 
   return (
@@ -303,13 +325,15 @@ function RoomStatusPage() {
                   </span>
 
                   {/* Actions list */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 whitespace-nowrap select-none">
                     
                     {rm.housekeeping === "Dirty" && (
                       <Button
+                        size="xs"
+                        variant="outline"
                         onClick={() => handleMarkClean(rm.room)}
-                        className="bg-emerald-600 hover:bg-emerald-700 !text-white h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer"
-                        title="Mark clean immediately"
+                        className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                        title="Mark Clean"
                       >
                         Clean
                       </Button>
@@ -317,9 +341,11 @@ function RoomStatusPage() {
 
                     {rm.housekeeping === "Clean" && (
                       <Button
+                        size="xs"
+                        variant="outline"
                         onClick={() => handleMarkInspected(rm.room)}
-                        className="bg-blue-600 hover:bg-blue-700 !text-white h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer"
-                        title="Approve inspection"
+                        className="text-sky-700 border-sky-300 hover:bg-sky-50 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                        title="Approve Inspection"
                       >
                         Inspect
                       </Button>
@@ -327,9 +353,10 @@ function RoomStatusPage() {
 
                     {rm.status !== "Out of Order" && rm.status !== "Occupied" && (
                       <Button
-                        onClick={() => handleMarkOutOfOrder(rm.room)}
+                        size="xs"
                         variant="ghost"
-                        className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer"
+                        onClick={() => handleMarkOutOfOrder(rm.room)}
+                        className="text-rose-600 hover:bg-rose-50 border border-rose-200 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors"
                         title="Mark Out of Order"
                       >
                         OOO
@@ -338,8 +365,9 @@ function RoomStatusPage() {
 
                     <Button
                       asChild
-                      variant="ghost"
-                      className="bg-navy/5 hover:bg-navy/10 border border-navy/15 text-navy-deep h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer"
+                      size="xs"
+                      variant="outline"
+                      className="text-navy border-navy/30 hover:bg-navy/5 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                     >
                       <Link to={`/reception/room-assignment/${rm.room}`}>Details</Link>
                     </Button>

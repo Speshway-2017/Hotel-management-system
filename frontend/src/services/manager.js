@@ -27,6 +27,32 @@ export const managerService = {
   getReservations: async () => {
     return await request(`/manager/reservations?t=${Date.now()}`);
   },
+  getReservationById: async (id) => {
+    return await request(`/manager/reservations/${id}`);
+  },
+  createReservation: async (data) => {
+    return await request('/manager/reservations', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updateReservation: async (id, data) => {
+    return await request(`/manager/reservations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  assignRoom: async (id, roomNumber, roomType) => {
+    return await request(`/manager/reservations/${id}/assign-room`, {
+      method: 'POST',
+      body: JSON.stringify({ roomNumber, roomType })
+    });
+  },
+  deleteReservation: async (id) => {
+    return await request(`/manager/reservations/${id}`, {
+      method: 'DELETE'
+    });
+  },
   getRooms: async () => {
     return await request(`/manager/rooms?t=${Date.now()}`);
   },

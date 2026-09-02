@@ -90,6 +90,14 @@ function AdminStaffPage() {
     }
   }
 
+  const notifySocketEvents = (action = 'update') => {
+    import('@/services/socket').then(({ socket }) => {
+      if (socket) {
+        socket.emit('staff_updated', { action });
+      }
+    }).catch(() => {});
+  };
+
   useEffect(() => {
     loadStaff();
 
@@ -98,8 +106,20 @@ function AdminStaffPage() {
     };
     window.addEventListener('focus', handleFocus);
 
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadStaff();
+      socket.on('staff_updated', handleRealtime);
+      socket.on('user_updated', handleRealtime);
+    });
+
     return () => {
       window.removeEventListener('focus', handleFocus);
+      if (socketInst) {
+        socketInst.off('staff_updated');
+        socketInst.off('user_updated');
+      }
     };
   }, []);
 
@@ -110,6 +130,7 @@ function AdminStaffPage() {
         status: nextStatus
       });
       toast.success(`Staff status updated to ${nextStatus}`);
+      notifySocketEvents('toggle_status');
       loadStaff();
     } catch (err) {
       toast.error(`Status change error: ${err.message}`);
@@ -121,6 +142,7 @@ function AdminStaffPage() {
     try {
       await superAdminService.deleteUser(id);
       toast.warning("Staff profile removed successfully");
+      notifySocketEvents('delete');
       loadStaff();
     } catch (err) {
       toast.error(`Delete failed: ${err.message}`);

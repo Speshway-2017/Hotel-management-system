@@ -2,13 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Panel, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { 
-  Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
-  Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
-  ShieldAlert, Sparkles, FileText, CheckCircle2, AlertOctagon, HelpCircle,
-  Receipt, CreditCard, Mail, Printer, RefreshCw, Undo2, ArrowUpRight, ArrowDownLeft
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { receptionistService } from "@/services/receptionist";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/reception/payment")({
   head: () => ({
@@ -24,70 +20,36 @@ function PaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMethod, setFilterMethod] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState([]);
 
-  // Mock Database State for Payment Transactions
-  const [transactions, setTransactions] = useState([
-    {
-      id: "TXN-2026-981",
-      guest: "Rohan Kapoor",
-      bookingId: "res_093",
-      room: "314",
-      folioId: "FOL-2026-093",
-      amount: 23718,
-      method: "UPI",
-      date: "25 Aug 2026",
-      status: "Paid",
-      notes: "Full settlement upon checkout"
-    },
-    {
-      id: "TXN-2026-982",
-      guest: "Sneha Sharma",
-      bookingId: "res_088",
-      room: "205",
-      folioId: "FOL-2026-088",
-      amount: 16200,
-      method: "Card",
-      date: "25 Aug 2026",
-      status: "Partially Paid",
-      notes: "Advance deposit recorded"
-    },
-    {
-      id: "TXN-2026-983",
-      guest: "Vikramaditya Rao",
-      bookingId: "res_076",
-      room: "102",
-      folioId: "FOL-2026-076",
-      amount: 100000,
-      method: "Bank Transfer",
-      date: "24 Aug 2026",
-      status: "Partially Paid",
-      notes: "Corporate account bank wire receipt"
-    },
-    {
-      id: "TXN-2026-984",
-      guest: "Elena Gilbert",
-      bookingId: "res_095",
-      room: "308",
-      folioId: "FOL-2026-095",
-      amount: 26550,
-      method: "UPI",
-      date: "25 Aug 2026",
-      status: "Paid",
-      notes: "Pre-paid stay total"
-    },
-    {
-      id: "TXN-2026-985",
-      guest: "Rajeev Sen",
-      bookingId: "res_097",
-      room: "106",
-      folioId: "FOL-2026-097",
-      amount: 2930,
-      method: "Cash",
-      date: "24 Aug 2026",
-      status: "Partially Paid",
-      notes: "F&B incidentals cash settlement"
-    }
-  ]);
+  const loadTransactions = () => {
+    setLoading(true);
+    receptionistService.getPayments()
+      .then(res => {
+        if (res && res.success && Array.isArray(res.data)) {
+          const list = res.data.map(p => ({
+            id: p._id || p.id || `TXN-${Math.floor(100 + Math.random() * 900)}`,
+            guest: p.guestName || p.guest || "Guest",
+            bookingId: p.bookingId || "Walk-in",
+            room: p.room || "101",
+            folioId: `FOL-${p.bookingId || '2026'}`,
+            amount: Number(p.amount) || 0,
+            method: p.paymentMethod || p.method || "UPI",
+            date: p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "Today",
+            status: p.status || "Paid",
+            notes: p.notes || "Settled transaction"
+          }));
+          setTransactions(list);
+        }
+      })
+      .catch(err => console.error("Failed to load payments:", err))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadTransactions();
+  }, []);
 
   // Selected Transaction details Modal
   const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -104,13 +66,12 @@ function PaymentsPage() {
 
   // Statistics summaries
   const totalCollected = transactions
-    .filter(t => t.status === "Paid" || t.status === "Partially Paid")
+    .filter(t => t.status === "Paid" || t.status === "Settled" || t.status === "Partially Paid")
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const pendingAmount = 11652; // Hardcoded pending total based on front desk statistics
+  const pendingAmount = 0;
   
   const todayPayments = transactions
-    .filter(t => t.date.includes("25 Aug"))
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalRefunds = transactions
@@ -120,6 +81,7 @@ function PaymentsPage() {
   // Status mappings
   const statusMeta = {
     Paid: { tone: "success", label: "Paid" },
+    Settled: { tone: "success", label: "Settled" },
     Pending: { tone: "error", label: "Pending" },
     "Partially Paid": { tone: "warning", label: "Partial" },
     Refunded: { tone: "neutral", label: "Refunded" },
@@ -128,53 +90,53 @@ function PaymentsPage() {
 
   // Filter calculations
   const filteredTransactions = transactions.filter(t => {
-    const matchesSearch = 
-      t.guest.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.room.includes(searchQuery) ||
-      t.bookingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.folioId.toLowerCase().includes(searchQuery.toLowerCase());
+    const guestStr = String(t.guest || "").toLowerCase();
+    const idStr = String(t.id || "").toLowerCase();
+    const roomStr = String(t.room || "").toLowerCase();
+    const bookingIdStr = String(t.bookingId || "").toLowerCase();
+    const folioIdStr = String(t.folioId || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
 
+    const matchesSearch = guestStr.includes(query) || idStr.includes(query) || roomStr.includes(query) || bookingIdStr.includes(query) || folioIdStr.includes(query);
     const matchesStatus = filterStatus === "all" || t.status === filterStatus;
     const matchesMethod = filterMethod === "all" || t.method === filterMethod;
 
     return matchesSearch && matchesStatus && matchesMethod;
   });
 
-  const handleRecordPaymentSubmit = (e) => {
+  const handleRecordPaymentSubmit = async (e) => {
     e.preventDefault();
     if (!formGuestName || !formAmount || isNaN(formAmount) || Number(formAmount) <= 0) {
-      alert("Please fill in Guest Name and enter a valid numeric Payment Amount!");
+      toast.error("Please fill in Guest Name and enter a valid numeric Payment Amount!");
       return;
     }
 
-    const newTxnId = `TXN-2026-${Math.floor(100 + Math.random() * 900)}`;
-    const newTxn = {
-      id: newTxnId,
-      guest: formGuestName,
-      bookingId: formBookingId || "Walk-in",
-      room: formRoom || "N/A",
-      folioId: formFolioId || "FOL-2026-NEW",
-      amount: Number(formAmount),
-      method: formMethod,
-      date: "25 Aug 2026",
-      status: "Paid",
-      notes: formNotes || "Recorded via Quick Payments form"
-    };
+    try {
+      await receptionistService.logPayment({
+        guestName: formGuestName,
+        bookingId: formBookingId || "Walk-in",
+        amount: Number(formAmount),
+        paymentMethod: formMethod,
+        status: "Settled"
+      });
 
-    setTransactions(prev => [newTxn, ...prev]);
+      toast.success(`Successfully recorded payment of ₹${Number(formAmount).toLocaleString()}!`);
 
-    // Reset Form
-    setFormGuestName("");
-    setFormBookingId("");
-    setFormRoom("");
-    setFormFolioId("");
-    setFormAmount("");
-    setFormMethod("UPI");
-    setFormNotes("");
-    setShowRecordModal(false);
+      // Reset Form
+      setFormGuestName("");
+      setFormBookingId("");
+      setFormRoom("");
+      setFormFolioId("");
+      setFormAmount("");
+      setFormMethod("UPI");
+      setFormNotes("");
+      setShowRecordModal(false);
 
-    alert(`Successfully recorded payment of ₹${Number(formAmount).toLocaleString()}!`);
+      loadTransactions();
+    } catch (err) {
+      console.error("Failed to record payment:", err);
+      toast.error(err.message || "Failed to record payment.");
+    }
   };
 
   const handleIssueRefund = (txn) => {
@@ -350,22 +312,28 @@ function PaymentsPage() {
                       <td className="py-3.5 px-4">
                         <Tag tone={sM.tone}>{sM.label}</Tag>
                       </td>
-                      <td className="py-3.5 px-4 flex items-center gap-1.5">
-                        <Button
-                          onClick={() => setSelectedTransaction(t)}
-                          className="bg-emerald-600 hover:bg-emerald-700 !text-white h-7 px-3 text-[10px] rounded-lg font-bold cursor-pointer transition-all"
-                        >
-                          Details
-                        </Button>
-                        {t.status !== "Refunded" && (
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
                           <Button
-                            onClick={() => handleIssueRefund(t)}
-                            variant="ghost"
-                            className="bg-rose-50 border border-rose-200 text-rose-700 h-7 px-2.5 text-[10px] rounded-lg font-bold cursor-pointer"
+                            onClick={() => setSelectedTransaction(t)}
+                            size="xs"
+                            variant="outline"
+                            className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                           >
-                            Refund
+                            Details
                           </Button>
-                        )}
+                          {t.status !== "Refunded" && (
+                            <Button
+                              onClick={() => handleIssueRefund(t)}
+                              size="icon"
+                              variant="ghost"
+                              className="size-7 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              title="Issue Refund"
+                            >
+                              <Undo2 className="size-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

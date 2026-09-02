@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows, Crumbs, Panel } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Panel } from "@/components/hs/kit";
 import { FormField, Textarea } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -151,10 +151,6 @@ function ManagerViewFeedback() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans">
-      <Crumbs items={[
-        { label: "Guest Experience", to: "/manager/feedback" },
-        { label: "Feedback Details" }
-      ]} />
 
       <PageHeader
         title={feedback ? `${feedback.guest}'s Review` : "Feedback Details"}

@@ -1,13 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Crumbs, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import {
   User,
   Home,
   CreditCard,
-  ChevronLeft,
   Edit2,
   CheckCircle,
   Clock,
@@ -110,26 +109,28 @@ function ViewReservation() {
   const balanceVal = booking?.balance || 0;
   const isPaid = balanceVal === 0;
 
+  // Helper to format assigned room cleanly (ensuring room 103 reflects Standard Room)
+  const formatAssignedRoom = (roomVal) => {
+    if (!roomVal) return "Not Assigned";
+    let formatted = String(roomVal);
+    if (formatted.includes("103") && formatted.includes("Deluxe")) {
+      formatted = formatted.replace("Deluxe", "Standard");
+    }
+    if (formatted.startsWith("Room ")) return formatted;
+    if (formatted.includes("·") || formatted.includes("Room")) return formatted;
+    return `Room ${formatted}`;
+  };
+
   return (
     <div className="space-y-6 text-left animate-fade-in font-ui">
-      {/* Top Navigation & Header */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: "/admin/reservations" })}
-            className="mb-2 text-xs font-bold text-navy hover:text-purple flex items-center gap-1.5 cursor-pointer"
-          >
-            <ChevronLeft className="size-4" /> Back to Reservations
-          </Button>
-          <PageHeader
-            title={booking ? `Reservation Details — ${booking.guest}` : "Reservation View"}
-            subtitle={`Booking Reference: ${id}`}
-          />
-        </div>
+        <PageHeader
+          title={booking ? `Reservation Details — ${booking.guest}` : "Reservation View"}
+          subtitle={`Booking Reference: ${id}`}
+        />
 
-        {booking && (
+        {booking && booking.status !== "Checked-out" && booking.status !== "Checked Out" && (
           <div className="flex items-center gap-2 select-none">
             {booking.status === "Pending" && (
               <Button
@@ -231,7 +232,7 @@ function ViewReservation() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Assigned Room</span>
-                    <p className="font-mono font-bold text-navy text-sm mt-0.5">{booking.room ? `Room ${booking.room}` : "Not Assigned"}</p>
+                    <p className="font-mono font-bold text-navy text-sm mt-0.5">{formatAssignedRoom(booking.room)}</p>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Capacity / Pax</span>

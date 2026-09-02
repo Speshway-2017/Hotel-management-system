@@ -81,7 +81,6 @@ function AdminBillingPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
       try {
         const [res, approvalsRes] = await Promise.all([
           superAdminService.getReservations(),
@@ -111,6 +110,8 @@ function AdminBillingPage() {
             issuedDate: b.checkOut
           };
         });
+
+        const mappedDiscounts = (approvalsRes.data || []).filter(a => a.type === 'Discount' || a.category === 'Discount');
         setInvoices(mappedInvoices);
         setDiscounts(mappedDiscounts);
       } catch (err) {
@@ -120,6 +121,26 @@ function AdminBillingPage() {
       }
     };
     loadData();
+
+    const handleFocus = () => loadData();
+    window.addEventListener('focus', handleFocus);
+
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      socket.on('booking_updated', loadData);
+      socket.on('payment_added', loadData);
+      socket.on('availability_changed', loadData);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (socketInst) {
+        socketInst.off('booking_updated', loadData);
+        socketInst.off('payment_added', loadData);
+        socketInst.off('availability_changed', loadData);
+      }
+    };
   }, []);
 
   const handleApproveDiscount = async (id) => {

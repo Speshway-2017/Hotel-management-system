@@ -257,6 +257,21 @@ function ManagerApprovalsPage() {
 
   useEffect(() => {
     loadData();
+
+    let socketInst = null;
+    import('@/services/socket').then(({ socket }) => {
+      socketInst = socket;
+      const handleRealtime = () => loadData();
+      socket.on('booking_updated', handleRealtime);
+      socket.on('approval_updated', handleRealtime);
+    });
+
+    return () => {
+      if (socketInst) {
+        socketInst.off('booking_updated');
+        socketInst.off('approval_updated');
+      }
+    };
   }, []);
 
   const handleDecision = async (id, newStatus, reason = "Approved by Property Manager") => {
