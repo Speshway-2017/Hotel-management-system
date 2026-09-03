@@ -11,7 +11,8 @@ import {
   Eye, XCircle
 } from "lucide-react";
 
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/reception/check-in")({
   head: () => ({
@@ -48,52 +49,65 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 }
 
 function ArrivalsPage() {
-  const todayStr = "25 Aug 2026";
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterSource, setFilterSource] = useState("All");
   const [loading, setLoading] = useState(true);
   const [arrivals, setArrivals] = useState([]);
 
-  const loadArrivals = () => {
+  const loadArrivals = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getReservations()
       .then(res => {
         const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
         const list = allBookings
-          .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Checked-in' || b.status === 'Checked-In')
-          .map(b => ({
-            id: b.bookingId || b.id || b._id,
-            _id: b._id || b.id || b.bookingId,
-            name: b.guest || b.name || 'Guest',
-            guest: b.guest || b.name || 'Guest',
-            phone: b.phone || '--',
-            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
-            roomNumber: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
-            type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
-            roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
-            roomReady: true,
-            isEarly: false,
-            idVerification: 'Verified',
-            paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
-            source: b.source || 'Direct',
-            status: b.status === 'Confirmed' ? 'Pre-checked' : (b.status === 'Checked-in' ? 'Checked-In' : b.status),
-            time: b.checkIn || 'Today'
-          }));
+          .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked' || b.status === 'Checked-in' || b.status === 'Checked-In')
+          .map(b => {
+            const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
+            const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
+            return {
+              id: b.bookingId || b.id || b._id,
+              _id: b._id || b.id || b.bookingId,
+              bookingId: b.bookingId || b.id || b._id,
+              name: b.guest || b.name || 'Guest',
+              guest: b.guest || b.name || 'Guest',
+              phone: b.phone || '--',
+              email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+              room: rmNum,
+              roomNumber: rmNum,
+              type: rmType,
+              roomType: rmType,
+              roomReady: true,
+              isEarly: false,
+              idVerification: 'Verified',
+              paymentStatus: Number(b.balance || 0) === 0 || b.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
+              source: b.source || 'Direct Web',
+              status: b.status === 'Confirmed' ? 'Pre-checked' : (b.status === 'Checked-in' || b.status === 'Checked-In' ? 'Checked-In' : b.status),
+              time: b.checkIn || 'Today',
+              checkIn: b.checkIn || 'Today',
+              checkOut: b.checkOut || 'Tomorrow',
+              nights: b.nights || 1,
+              amount: b.amount || 0,
+              balance: b.balance || 0
+            };
+          });
 
         setArrivals(list);
       })
       .catch(err => console.error("Failed to load arrivals list:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    loadArrivals();
-    const interval = setInterval(loadArrivals, 10000);
-    const handleFocus = () => loadArrivals();
+    loadArrivals(false);
+    const interval = setInterval(() => loadArrivals(true), 10000);
+    const handleFocus = () => loadArrivals(true);
     window.addEventListener('focus', handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
-      loadArrivals();
+      loadArrivals(true);
     });
 
     return () => {
@@ -112,9 +126,9 @@ function ArrivalsPage() {
   }
 
   // Stats
-  const totalCount = arrivals.length; // 2
-  const pendingCount = arrivals.filter(a => a.status === "Pending").length; // 0
-  const checkedInCount = arrivals.filter(a => a.status === "Checked-In" || a.status === "Checked-in").length; // 2
+  const totalCount = arrivals.length;
+  const pendingCount = arrivals.filter(a => a.status === "Pending" || a.status === "Pre-checked" || a.status === "Confirmed").length;
+  const checkedInCount = arrivals.filter(a => a.status === "Checked-In" || a.status === "Checked-in").length;
   const precheckedCount = arrivals.filter(a => a.status === "Pre-checked" || a.status === "Confirmed").length;
   const earlyCount = arrivals.filter(a => a.isEarly).length;
   const noShowCount = arrivals.filter(a => a.status === "No-show" || a.status === "No-Show").length;
@@ -128,39 +142,58 @@ function ArrivalsPage() {
     const query = searchQuery.toLowerCase();
 
     const matchesSearch = nameStr.includes(query) || idStr.includes(query) || roomStr.includes(query) || phoneStr.includes(query);
-    const matchesStatus = filterStatus === "All" || a.status === filterStatus;
+    const matchesStatus = filterStatus === "All" || a.status === filterStatus || (filterStatus === "Pending" && (a.status === "Pre-checked" || a.status === "Confirmed" || a.status === "Pending"));
     const matchesSource = filterSource === "All" || a.source === filterSource;
 
     return matchesSearch && matchesStatus && matchesSource;
   });
 
   // Action methods
-  const handleCheckIn = async (id) => {
+  const handleCheckIn = async (id, roomNum) => {
     try {
-      await receptionistService.updateReservationStatus(id, "Checked-in");
+      await receptionistService.updateReservationStatus(id, "Checked-in", roomNum);
       setArrivals(prev => prev.map(a => 
         (a.id === id || a._id === id || a.bookingId === id)
-          ? { ...a, status: "Checked-in" } 
+          ? { ...a, status: "Checked-In", room: roomNum || a.room }
           : a
       ));
       toast.success("Guest checked in successfully!");
-      import('@/services/socket').then(({ socket }) => {
-        socket.emit('booking_updated', { id, status: 'Checked-in' });
-      });
+      emitRealtimeEvent('checkin_completed', { id, status: 'Checked-in', roomNumber: roomNum });
+      loadArrivals(true);
     } catch (err) {
-      console.error("Failed to check in:", err);
+      console.error("Failed to check in guest:", err);
       toast.error(err.message || "Failed to check in guest.");
+    }
+  };
+
+  const handleCheckOut = async (id) => {
+    try {
+      await receptionistService.updateReservationStatus(id, "Checked-out");
+      setArrivals(prev => prev.map(a => 
+        (a.id === id || a._id === id || a.bookingId === id)
+          ? { ...a, status: "Checked Out" }
+          : a
+      ));
+      toast.success("Guest checked out successfully!");
+      emitRealtimeEvent('checkout_completed', { id, status: 'Checked-out' });
+      loadArrivals(true);
+    } catch (err) {
+      console.error("Failed to check out guest:", err);
+      toast.error(err.message || "Failed to check out guest.");
     }
   };
 
   const handleMarkNoShow = async (id) => {
     try {
       await receptionistService.updateReservationStatus(id, "No-show");
-      setArrivals(prev => prev.map(a => (a.id === id || a._id === id) ? { ...a, status: "No-show" } : a));
+      setArrivals(prev => prev.map(a => 
+        (a.id === id || a._id === id || a.bookingId === id)
+          ? { ...a, status: "No-Show" }
+          : a
+      ));
       toast.success("Marked as No-Show.");
-      import('@/services/socket').then(({ socket }) => {
-        socket.emit('booking_updated', { id, status: 'No-show' });
-      });
+      emitRealtimeEvent('booking_updated', { id, status: 'No-show' });
+      loadArrivals(true);
     } catch (err) {
       console.error("Failed to mark no-show:", err);
       toast.error(err.message || "Failed to update status.");
@@ -317,7 +350,7 @@ function ArrivalsPage() {
                           <Button
                             size="xs"
                             variant="outline"
-                            onClick={() => handleCheckIn(guest.id || guest._id)}
+                            onClick={() => handleCheckIn(guest.id || guest._id, guest.roomNumber || guest.room)}
                             className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                           >
                             Check-In
@@ -326,12 +359,12 @@ function ArrivalsPage() {
 
                         {(guest.status === "Checked-In" || guest.status === "Checked-in") && (
                           <Button
-                            asChild
                             size="xs"
                             variant="outline"
+                            onClick={() => handleCheckOut(guest.id || guest._id)}
                             className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                           >
-                            <Link to={`/reception/check-out/${guest.id || guest._id}`}>Check-Out</Link>
+                            Check-Out
                           </Button>
                         )}
                         

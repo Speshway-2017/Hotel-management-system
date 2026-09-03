@@ -90,9 +90,9 @@ function GuestSettingsPage() {
         try {
           const u = JSON.parse(cached);
           setProfile({
-            name: u.name || "Aarav Mehta",
-            email: u.email || "aarav.mehta@example.com",
-            mobile: u.mobile || "+91 98204 33121",
+            name: u.name || "Guest",
+            email: u.email || "",
+            mobile: u.mobile || u.phone || "",
             city: u.city || "Hyderabad",
             address: u.address || "Hitech City, Hyderabad, Telangana",
             language: "English (IN)",
@@ -299,7 +299,7 @@ function GuestSettingsPage() {
                     value={profile.name}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                     required
-                    placeholder="Aarav Mehta"
+                    placeholder="Guest Full Name"
                     className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
                   />
                 </div>
@@ -314,7 +314,7 @@ function GuestSettingsPage() {
                     value={profile.email}
                     onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                     required
-                    placeholder="aarav.mehta@example.com"
+                    placeholder="guest@example.com"
                     className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
                   />
                 </div>
@@ -329,7 +329,7 @@ function GuestSettingsPage() {
                     value={profile.mobile}
                     onChange={(e) => setProfile({ ...profile, mobile: e.target.value })}
                     required
-                    placeholder="+91 98204 33121"
+                    placeholder="+91 98765 43210"
                     className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
                   />
                 </div>

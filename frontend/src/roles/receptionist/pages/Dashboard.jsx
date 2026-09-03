@@ -11,7 +11,8 @@ import {
   Clock, AlertTriangle, ClipboardCheck, ArrowRightLeft, CreditCard, Eye
 } from "lucide-react";
 
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { toast } from "sonner";
 
 const FrontDeskDashboardRoute = {
   head: () => ({
@@ -74,40 +75,32 @@ function FrontDeskDashboard() {
       const allBookings = resRes?.success && Array.isArray(resRes.data) ? resRes.data : [];
       const allRooms = roomsRes?.success && Array.isArray(roomsRes.data) ? roomsRes.data : [];
 
-      // 1. Dynamic Arrivals (Confirmed / Paid / Pending)
-      let finalArrivals = [];
-      if (dashRes?.success && Array.isArray(dashRes.data?.arrivals) && dashRes.data.arrivals.length > 0) {
-        finalArrivals = dashRes.data.arrivals;
-      } else {
-        finalArrivals = allBookings
-          .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending')
-          .map(b => ({
-            id: b.bookingId || b.id || b._id,
-            name: b.guest || b.name || 'Guest',
-            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
-            type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
-            time: b.checkIn,
-            source: b.source || 'Direct',
-            status: b.status === 'Confirmed' ? 'Pre-checked' : b.status
-          }));
-      }
+      // 1. Dynamic Arrivals (Confirmed / Paid / Pending / Pre-checked)
+      const finalArrivals = allBookings
+        .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked')
+        .map(b => ({
+          id: b.bookingId || b.id || b._id,
+          _id: b._id || b.id || b.bookingId,
+          name: b.guest || b.name || 'Guest',
+          room: b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101'),
+          type: b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room')),
+          time: b.checkIn || 'Today',
+          source: b.source || 'Direct Web',
+          status: b.status === 'Confirmed' ? 'Pre-checked' : b.status
+        }));
 
       // 2. Dynamic Departures (Checked-in / Checked-out)
-      let finalDepartures = [];
-      if (dashRes?.success && Array.isArray(dashRes.data?.departures) && dashRes.data.departures.length > 0) {
-        finalDepartures = dashRes.data.departures;
-      } else {
-        finalDepartures = allBookings
-          .filter(b => b.status === 'Checked-in' || b.status === 'Checked-out')
-          .map(b => ({
-            id: b.bookingId || b.id || b._id,
-            name: b.guest || b.name || 'Guest',
-            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
-            time: b.checkOut,
-            balance: Number(b.balance || 0),
-            status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
-          }));
-      }
+      const finalDepartures = allBookings
+        .filter(b => b.status === 'Checked-in' || b.status === 'Checked-out' || b.status === 'Checked In')
+        .map(b => ({
+          id: b.bookingId || b.id || b._id,
+          _id: b._id || b.id || b.bookingId,
+          name: b.guest || b.name || 'Guest',
+          room: b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101'),
+          time: b.checkOut || 'Today',
+          balance: Number(b.balance || 0),
+          status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+        }));
 
       // 3. Dynamic In-Stay count
       const inStayCount = allBookings.filter(b => b.status === 'Checked-in').length;
@@ -178,6 +171,31 @@ function FrontDeskDashboard() {
     };
   }, []);
 
+  // Action handlers
+  const handleCheckIn = async (id, roomNum) => {
+    try {
+      await receptionistService.updateReservationStatus(id, "Checked-in", roomNum);
+      toast.success("Guest checked in successfully!");
+      emitRealtimeEvent('checkin_completed', { id, status: 'Checked-in', roomNumber: roomNum });
+      fetchDashboardData();
+    } catch (err) {
+      console.error("Failed to check in:", err);
+      toast.error(err.message || "Failed to check in guest.");
+    }
+  };
+
+  const handleCheckOut = async (id) => {
+    try {
+      await receptionistService.updateReservationStatus(id, "Checked-out");
+      toast.success("Guest checked out successfully!");
+      emitRealtimeEvent('checkout_completed', { id, status: 'Checked-out' });
+      fetchDashboardData();
+    } catch (err) {
+      console.error("Failed to check out:", err);
+      toast.error(err.message || "Failed to check out guest.");
+    }
+  };
+
   const receptionistName = currentUser?.name || "Imran Sheikh";
   const currentShift = currentUser?.shift || "Afternoon (15:00 - 23:00)";
   const propertyName = propName;
@@ -192,7 +210,7 @@ function FrontDeskDashboard() {
   ];
 
   const alerts = [
-    { type: "Pending Check-ins", message: `${arrivals.filter(a => a.status === 'Pending').length} arrivals pending check-in`, icon: Clock, color: "text-amber-600 bg-amber-50" },
+    { type: "Pending Check-ins", message: `${arrivals.filter(a => a.status === 'Pending' || a.status === 'Pre-checked').length} arrivals pending check-in`, icon: Clock, color: "text-amber-600 bg-amber-50" },
     { type: "Late Check-outs", message: `${departures.filter(d => d.status === 'Late Checkout').length} departures requesting extensions`, icon: AlertTriangle, color: "text-red-600 bg-red-50" },
     { type: "Pending Payments", message: `${departures.filter(d => d.balance > 0).length} checkout rooms have pending folio balances`, icon: IndianRupee, color: "text-orange-600 bg-orange-50" }
   ];
@@ -214,8 +232,8 @@ function FrontDeskDashboard() {
       <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked').length} Pre-checked, ${arrivals.filter(a => a.status === 'Pending').length} Pending`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
-        <PremiumStatCard label="In-Stay" value={stats.inStay || stats.occupied || 1} hint={`${stats.occupied || 1} Rooms occupied`} icon={Users} accentColor="#10b981" />
-        <PremiumStatCard label="Available Rooms" value={stats.available || 11} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
+        <PremiumStatCard label="In-Stay" value={stats.inStay ?? 1} hint={`${stats.occupied ?? 1} Room occupied`} icon={Users} accentColor="#10b981" />
+        <PremiumStatCard label="Available Rooms" value={stats.available ?? 13} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
         <PremiumStatCard label="Total Revenue" value={`₹${Number(stats.totalRevenue || 0).toLocaleString('en-IN')}`} hint="Real-time ledger collection" icon={IndianRupee} accentColor="#10b981" />
       </div>
 
@@ -239,45 +257,51 @@ function FrontDeskDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                  {arrivals.map((arr) => (
-                    <tr key={arr.id} className="hover:bg-muted/5">
-                      <td className="py-3.5 px-4 font-bold text-navy">{arr.name}</td>
-                      <td className="py-3.5 px-4 font-mono text-muted-foreground">{arr.id}</td>
-                      <td className="py-3.5 px-4">
-                        <span className="font-semibold">{arr.type}</span>
-                        <span className="text-[10px] text-muted-foreground block font-bold">Room #{arr.room}</span>
-                      </td>
-                      <td className="py-3.5 px-4 font-semibold text-navy">{arr.time}</td>
-                      <td className="py-3.5 px-4">
-                        <Tag tone="brand">{arr.source}</Tag>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <Tag tone={arr.status === "Pre-checked" ? "success" : "warning"}>{arr.status}</Tag>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            asChild
-                            size="xs"
-                            variant="outline"
-                            className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                          >
-                            <Link to={arr.id ? `/reception/check-out/${arr.id}` : "/reception/check-out"}>Check-Out</Link>
-                          </Button>
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-navy hover:text-navy-deep hover:bg-navy/5 cursor-pointer rounded-lg"
-                          >
-                            <Link to={arr.id ? `/reception/reservations/${arr.id}` : "/reception/reservations"} title="View Booking Details">
-                              <Eye className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                        </div>
-                      </td>
+                  {arrivals.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-8 text-center text-muted-foreground font-semibold">No pending arrivals today</td>
                     </tr>
-                  ))}
+                  ) : (
+                    arrivals.map((arr) => (
+                      <tr key={arr.id} className="hover:bg-muted/5">
+                        <td className="py-3.5 px-4 font-bold text-navy">{arr.name}</td>
+                        <td className="py-3.5 px-4 font-mono text-muted-foreground">{arr.id}</td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-semibold">{arr.type}</span>
+                          <span className="text-[10px] text-muted-foreground block font-bold">Room #{arr.room}</span>
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-navy">{arr.time}</td>
+                        <td className="py-3.5 px-4">
+                          <Tag tone="brand">{arr.source}</Tag>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <Tag tone={arr.status === "Pre-checked" ? "success" : "warning"}>{arr.status}</Tag>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              onClick={() => handleCheckIn(arr.id || arr._id, arr.room)}
+                              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                            >
+                              Check-In
+                            </Button>
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-navy hover:text-navy-deep hover:bg-navy/5 cursor-pointer rounded-lg"
+                            >
+                              <Link to={arr.id ? `/reception/reservations/${arr.id}` : "/reception/reservations"} title="View Booking Details">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -298,35 +322,51 @@ function FrontDeskDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                  {departures.map((dep, idx) => (
-                    <tr key={dep.id || idx} className="hover:bg-muted/5">
-                      <td className="py-3.5 px-4 font-bold text-navy">{dep.name}</td>
-                      <td className="py-3.5 px-4 font-bold text-navy-deep">Room #{dep.room}</td>
-                      <td className="py-3.5 px-4 font-semibold text-navy">{dep.time}</td>
-                      <td className="py-3.5 px-4 font-black text-navy">
-                        ₹{dep.balance.toLocaleString("en-IN")}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <Tag tone={dep.balance > 0 ? "error" : dep.status === "Late Checkout" ? "warning" : "success"}>
-                          {dep.status === "Ready" ? "Checked Out" : dep.status}
-                        </Tag>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end">
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-navy hover:text-navy-deep hover:bg-navy/5 cursor-pointer rounded-lg"
-                          >
-                            <Link to={dep.id ? `/reception/reservations/${dep.id}` : "/reception/reservations"} title="View Booking Details">
-                              <Eye className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                        </div>
-                      </td>
+                  {departures.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-8 text-center text-muted-foreground font-semibold">No departures today</td>
                     </tr>
-                  ))}
+                  ) : (
+                    departures.map((dep, idx) => (
+                      <tr key={dep.id || idx} className="hover:bg-muted/5">
+                        <td className="py-3.5 px-4 font-bold text-navy">{dep.name}</td>
+                        <td className="py-3.5 px-4 font-bold text-navy-deep">Room #{dep.room}</td>
+                        <td className="py-3.5 px-4 font-semibold text-navy">{dep.time}</td>
+                        <td className="py-3.5 px-4 font-black text-navy">
+                          ₹{dep.balance.toLocaleString("en-IN")}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <Tag tone={dep.balance > 0 ? "error" : dep.status === "Late Checkout" ? "warning" : dep.status === "Checked Out" || dep.status === "Checked-out" ? "neutral" : "success"}>
+                            {dep.status === "Ready" ? "Checked-in" : dep.status}
+                          </Tag>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {dep.status !== "Checked-out" && dep.status !== "Checked Out" && (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleCheckOut(dep.id || dep._id)}
+                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                              >
+                                Check-Out
+                              </Button>
+                            )}
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-navy hover:text-navy-deep hover:bg-navy/5 cursor-pointer rounded-lg"
+                            >
+                              <Link to={dep.id ? `/reception/reservations/${dep.id}` : "/reception/reservations"} title="View Booking Details">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

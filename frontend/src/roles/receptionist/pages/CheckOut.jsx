@@ -11,7 +11,8 @@ import {
   Eye
 } from "lucide-react";
 
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/reception/check-out")({
   head: () => ({
@@ -115,9 +116,8 @@ function DeparturesPage() {
           : d
       ));
       toast.success("Guest checked out successfully!");
-      import('@/services/socket').then(({ socket }) => {
-        socket.emit('booking_updated', { id, status: 'Checked-out' });
-      });
+      emitRealtimeEvent('checkout_completed', { id, status: 'Checked-out' });
+      loadDepartures();
     } catch (err) {
       console.error("Failed to check out:", err);
       toast.error(err.message || "Failed to check out guest.");

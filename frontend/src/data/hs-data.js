@@ -167,155 +167,127 @@ export const roomTypes = [
 
 export const reservations = [
 {
-  id: "HS24-10241",
-  guest: "Aarav Mehta",
-  phone: "+91 98204 33121",
-  room: "312 · Premier Haveli",
-  checkIn: "12 Aug 2026",
-  checkOut: "15 Aug 2026",
-  nights: 3,
+  id: "BK-10301",
+  guest: "Surya",
+  phone: "+91 47362 54654",
+  room: "103 · Standard Room",
+  checkIn: "01 Sep 2026",
+  checkOut: "02 Sep 2026",
+  nights: 1,
   pax: "2 Adults",
-  source: "Direct",
-  status: "Confirmed",
-  amount: 37200,
+  source: "Direct Web",
+  status: "Checked-out",
+  amount: 8500,
   balance: 0
 },
 {
-  id: "HS24-10242",
-  guest: "Priya Iyer",
-  phone: "+91 90031 87740",
-  room: "204 · Deluxe Courtyard",
-  checkIn: "12 Aug 2026",
-  checkOut: "13 Aug 2026",
-  nights: 1,
-  pax: "1 Adult",
+  id: "BK-10101",
+  guest: "Mounika",
+  phone: "+91 99443 88120",
+  room: "101 · Standard Room",
+  checkIn: "02 Sep 2026",
+  checkOut: "04 Sep 2026",
+  nights: 2,
+  pax: "2 Adults",
   source: "MakeMyTrip",
   status: "Checked-in",
-  amount: 8900,
-  balance: 2100
-},
-{
-  id: "HS24-10243",
-  guest: "Rohan & Sneha Kulkarni",
-  phone: "+91 99870 21145",
-  room: "501 · Maharaja Suite",
-  checkIn: "13 Aug 2026",
-  checkOut: "17 Aug 2026",
-  nights: 4,
-  pax: "2 Adults, 1 Child",
-  source: "Booking.com",
-  status: "Confirmed",
-  amount: 98000,
-  balance: 49000
-},
-{
-  id: "HS24-10244",
-  guest: "Devendra Shastri",
-  phone: "+91 93450 09912",
-  room: "108 · Deluxe Courtyard",
-  checkIn: "11 Aug 2026",
-  checkOut: "12 Aug 2026",
-  nights: 1,
-  pax: "1 Adult",
-  source: "Walk-in",
-  status: "Checked-out",
-  amount: 9400,
+  amount: 11400,
   balance: 0
 },
 {
-  id: "HS24-10245",
-  guest: "Ananya Bose",
-  phone: "+91 98311 55420",
-  room: "410 · Premier Haveli",
-  checkIn: "14 Aug 2026",
-  checkOut: "16 Aug 2026",
-  nights: 2,
-  pax: "2 Adults",
-  source: "Goibibo",
-  status: "Pending",
-  amount: 24800,
-  balance: 24800
-},
-{
-  id: "HS24-10246",
-  guest: "Karthik Subramaniam",
-  phone: "+91 94440 76210",
-  room: "602 · Garden Pool Villa",
-  checkIn: "15 Aug 2026",
-  checkOut: "18 Aug 2026",
+  id: "BK-20202",
+  guest: "Aswini",
+  phone: "+91 98840 20203",
+  room: "202 · Deluxe Room",
+  checkIn: "02 Sep 2026",
+  checkOut: "05 Sep 2026",
   nights: 3,
   pax: "2 Adults",
-  source: "Direct",
-  status: "Confirmed",
-  amount: 116700,
-  balance: 58350
+  source: "Direct Web",
+  status: "Checked-in",
+  amount: 14500,
+  balance: 0
 },
 {
-  id: "HS24-10247",
-  guest: "Fatima Qureshi",
-  phone: "+91 99205 41188",
-  room: "215 · Deluxe Courtyard",
-  checkIn: "12 Aug 2026",
-  checkOut: "14 Aug 2026",
+  id: "BK-10202",
+  guest: "Vamsi",
+  phone: "+91 98765 10202",
+  room: "102 · Standard Room",
+  checkIn: "03 Sep 2026",
+  checkOut: "05 Sep 2026",
   nights: 2,
-  pax: "1 Adult",
-  source: "Agoda",
-  status: "Cancelled",
-  amount: 17800,
+  pax: "2 Adults",
+  source: "Direct Web",
+  status: "Confirmed",
+  amount: 7000,
+  balance: 0
+},
+{
+  id: "BK-30101",
+  guest: "Sai",
+  phone: "+91 98765 10404",
+  room: "301 · Executive Suite",
+  checkIn: "03 Sep 2026",
+  checkOut: "06 Sep 2026",
+  nights: 3,
+  pax: "2 Adults",
+  source: "Booking.com",
+  status: "Confirmed",
+  amount: 21000,
   balance: 0
 }];
 
 
 export const guests = [
 {
-  id: "G-2201",
-  name: "Aarav Mehta",
-  city: "Mumbai",
-  tier: "Platinum",
-  stays: 24,
-  spend: 942000,
-  lastStay: "12 Aug 2026",
-  email: "aarav.mehta@example.in"
-},
-{
-  id: "G-2202",
-  name: "Priya Iyer",
-  city: "Bengaluru",
-  tier: "Gold",
-  stays: 11,
-  spend: 318500,
-  lastStay: "12 Aug 2026",
-  email: "priya.iyer@example.in"
-},
-{
-  id: "G-2203",
-  name: "Rohan Kulkarni",
-  city: "Pune",
-  tier: "Gold",
-  stays: 9,
-  spend: 274300,
-  lastStay: "13 Aug 2026",
-  email: "rohan.k@example.in"
-},
-{
-  id: "G-2204",
-  name: "Ananya Bose",
-  city: "Kolkata",
+  id: "G-10301",
+  name: "Surya",
+  city: "Hyderabad",
   tier: "Silver",
-  stays: 4,
-  spend: 96400,
-  lastStay: "14 Aug 2026",
-  email: "ananya.bose@example.in"
+  stays: 3,
+  spend: 25500,
+  lastStay: "01 Sep 2026",
+  email: "surya@gmail.com"
 },
 {
-  id: "G-2205",
-  name: "Karthik Subramaniam",
-  city: "Chennai",
+  id: "G-10101",
+  name: "Mounika",
+  city: "Hyderabad",
+  tier: "Gold",
+  stays: 4,
+  spend: 38400,
+  lastStay: "02 Sep 2026",
+  email: "mounika@gmail.com"
+},
+{
+  id: "G-20202",
+  name: "Aswini",
+  city: "Hyderabad",
+  tier: "Gold",
+  stays: 5,
+  spend: 43500,
+  lastStay: "02 Sep 2026",
+  email: "aswini@gmail.com"
+},
+{
+  id: "G-10202",
+  name: "Vamsi",
+  city: "Hyderabad",
+  tier: "Silver",
+  stays: 2,
+  spend: 14000,
+  lastStay: "03 Sep 2026",
+  email: "vamsi@gmail.com"
+},
+{
+  id: "G-30101",
+  name: "Sai",
+  city: "Hyderabad",
   tier: "Platinum",
-  stays: 31,
-  spend: 1284000,
-  lastStay: "15 Aug 2026",
-  email: "karthik.s@example.in"
+  stays: 6,
+  spend: 63000,
+  lastStay: "03 Sep 2026",
+  email: "sai@gmail.com"
 }];
 
 
@@ -328,18 +300,19 @@ export const staff = [
 
 
 export const invoices = [
-{ id: "INV-2026-0841", guest: "Aarav Mehta", folio: "F-3312", date: "12 Aug 2026", amount: 37200, gst: 6696, status: "Paid", mode: "UPI" },
-{ id: "INV-2026-0842", guest: "Priya Iyer", folio: "F-3313", date: "12 Aug 2026", amount: 8900, gst: 1068, status: "Partial", mode: "Card" },
-{ id: "INV-2026-0843", guest: "Rohan Kulkarni", folio: "F-3314", date: "13 Aug 2026", amount: 98000, gst: 17640, status: "Unpaid", mode: "—" },
-{ id: "INV-2026-0844", guest: "Devendra Shastri", folio: "F-3315", date: "12 Aug 2026", amount: 9400, gst: 1128, status: "Paid", mode: "Cash" },
-{ id: "INV-2026-0845", guest: "Karthik Subramaniam", folio: "F-3316", date: "15 Aug 2026", amount: 116700, gst: 21006, status: "Partial", mode: "NetBanking" }];
+{ id: "INV-2026-10301", guest: "Surya", folio: "FOL-10301", date: "01 Sep 2026", amount: 8500, gst: 1296, status: "Paid", mode: "UPI" },
+{ id: "INV-2026-10101", guest: "Mounika", folio: "FOL-10101", date: "02 Sep 2026", amount: 11400, gst: 1738, status: "Paid", mode: "Card" },
+{ id: "INV-2026-20202", guest: "Aswini", folio: "FOL-20202", date: "02 Sep 2026", amount: 14500, gst: 2211, status: "Paid", mode: "UPI" },
+{ id: "INV-2026-10202", guest: "Vamsi", folio: "FOL-10202", date: "03 Sep 2026", amount: 7000, gst: 1067, status: "Paid", mode: "Direct" },
+{ id: "INV-2026-30101", guest: "Sai", folio: "FOL-30101", date: "03 Sep 2026", amount: 21000, gst: 3203, status: "Paid", mode: "NetBanking" }];
 
 
 export const payments = [
-{ id: "PAY-99120", guest: "Aarav Mehta", mode: "UPI · @okhdfcbank", amount: 37200, time: "Today, 09:12", status: "Success" },
-{ id: "PAY-99121", guest: "Priya Iyer", mode: "Card · HDFC ••4412", amount: 6800, time: "Today, 10:40", status: "Success" },
-{ id: "PAY-99122", guest: "Rohan Kulkarni", mode: "NetBanking · ICICI", amount: 49000, time: "Today, 11:05", status: "Pending" },
-{ id: "PAY-99123", guest: "Fatima Qureshi", mode: "UPI · @ybl", amount: 17800, time: "Yesterday, 18:22", status: "Refunded" }];
+{ id: "PAY-10301", guest: "Surya", mode: "UPI · @okhdfcbank", amount: 8500, time: "01 Sep, 12:12", status: "Success" },
+{ id: "PAY-10101", guest: "Mounika", mode: "Card · HDFC ••4412", amount: 11400, time: "02 Sep, 14:40", status: "Success" },
+{ id: "PAY-20202", guest: "Aswini", mode: "UPI · @okaxis", amount: 14500, time: "02 Sep, 15:05", status: "Success" },
+{ id: "PAY-10202", guest: "Vamsi", mode: "UPI · @ybl", amount: 7000, time: "03 Sep, 11:30", status: "Success" },
+{ id: "PAY-30101", guest: "Sai", mode: "NetBanking · ICICI", amount: 21000, time: "03 Sep, 10:15", status: "Success" }];
 
 
 export const revenueTrend = [
@@ -369,23 +342,23 @@ export const channels = [
 
 
 export const notifications = [
-{ id: 1, title: "Rate parity alert — Goibibo", body: "Deluxe Courtyard is ₹450 below direct rate.", time: "8 min ago", tone: "warning" },
-{ id: 2, title: "Suite 501 checked in", body: "Rohan & Sneha Kulkarni, 4 nights, anniversary note added.", time: "22 min ago", tone: "success" },
-{ id: 3, title: "Refund awaiting approval", body: "₹17,800 for booking HS24-10247 (Fatima Qureshi).", time: "1 hr ago", tone: "info" },
-{ id: 4, title: "Housekeeping backlog", body: "6 rooms on Floor 2 pending inspection before 14:00.", time: "2 hrs ago", tone: "error" }];
+{ id: 1, title: "Rate parity alert — Goibibo", body: "Deluxe Room is ₹450 below direct rate.", time: "8 min ago", tone: "warning" },
+{ id: 2, title: "Room 101 checked in", body: "Mounika, 2 nights stay active.", time: "22 min ago", tone: "success" },
+{ id: 3, title: "Checkout Folio Settled", body: "₹8,500 settled for booking BK-10301 (Surya).", time: "1 hr ago", tone: "info" },
+{ id: 4, title: "Housekeeping backlog", body: "2 rooms on Floor 1 pending inspection.", time: "2 hrs ago", tone: "error" }];
 
 
 export const auditLogs = [
-{ id: "L-88231", user: "vikram.rathore@hourstay.in", action: "Updated seasonal rate plan", entity: "Diwali Peak · Jaipur", ip: "103.21.58.14", time: "11 Aug 2026, 18:42" },
-{ id: "L-88230", user: "sneha.d@hourstay.in", action: "Approved refund", entity: "HS24-10247", ip: "103.21.58.22", time: "11 Aug 2026, 17:10" },
-{ id: "L-88229", user: "superadmin@hourstay.in", action: "Created property", entity: "Hour Stay Aerocity", ip: "49.36.180.5", time: "10 Aug 2026, 12:03" },
-{ id: "L-88228", user: "imran.s@hourstay.in", action: "Checked in guest", entity: "HS24-10242", ip: "103.21.58.30", time: "10 Aug 2026, 09:28" }];
+{ id: "L-88231", user: "vikram.rathore@hourstay.in", action: "Updated seasonal rate plan", entity: "Diwali Peak · Hyderabad", ip: "103.21.58.14", time: "01 Sep 2026, 18:42" },
+{ id: "L-88230", user: "sneha.d@hourstay.in", action: "Completed checkout folio", entity: "BK-10301", ip: "103.21.58.22", time: "02 Sep 2026, 11:10" },
+{ id: "L-88229", user: "superadmin@hourstay.in", action: "Synced property rooms", entity: "Hour Stay Rambagh", ip: "49.36.180.5", time: "02 Sep 2026, 12:03" },
+{ id: "L-88228", user: "receptionist@hourstay.com", action: "Checked in guest", entity: "BK-10101", ip: "103.21.58.30", time: "02 Sep 2026, 14:28" }];
 
 
 export const feedback = [
-{ id: "R-551", guest: "Aarav Mehta", rating: 5, title: "Spotless service", body: "The haveli courtyard breakfast was the highlight. Butler remembered our filter coffee order.", date: "10 Aug 2026", source: "Direct" },
-{ id: "R-552", guest: "Priya Iyer", rating: 4, title: "Great stay, slow check-in", body: "Room was lovely. Check-in took 20 minutes during the wedding rush.", date: "09 Aug 2026", source: "Google" },
-{ id: "R-553", guest: "Ananya Bose", rating: 3, title: "AC noisy", body: "Room 410 AC was noisy at night, engineering fixed it next morning.", date: "07 Aug 2026", source: "Booking.com" }];
+{ id: "R-551", guest: "Surya", rating: 5, title: "Spotless service", body: "The haveli courtyard breakfast was the highlight. Butler remembered our filter coffee order.", date: "02 Sep 2026", source: "Direct" },
+{ id: "R-552", guest: "Mounika", rating: 4, title: "Great stay, swift check-in", body: "Room was lovely. Front desk team made check-in seamless.", date: "02 Sep 2026", source: "Google" },
+{ id: "R-553", guest: "Aswini", rating: 5, title: "Wonderful experience", body: "The deluxe room was spotless and spacious. Will visit again.", date: "03 Sep 2026", source: "Direct" }];
 
 
 export const arrivals = reservations.filter((r) => r.checkIn === "12 Aug 2026");
@@ -393,7 +366,7 @@ export const departures = reservations.filter((r) => r.checkOut === "13 Aug 2026
 
 const statuses = ["clean", "occupied", "dirty", "cleaning", "ooo", "blocked"];
 const typeShort = ["Deluxe", "Premier", "Suite", "Villa"];
-const guestNames = ["Aarav Mehta", "Priya Iyer", "R. Kulkarni", "K. Subramaniam", "Ananya Bose", "N. Chatterjee", "S. Grewal", "—"];
+const guestNames = ["Surya", "Mounika", "Aswini", "Vamsi", "Sai", "—"];
 
 export const rooms = Array.from({ length: 48 }, (_, i) => {
   const floor = Math.floor(i / 12) + 1;
@@ -404,7 +377,7 @@ export const rooms = Array.from({ length: 48 }, (_, i) => {
     floor,
     type: typeShort[i % 4],
     status,
-    guest: status === "occupied" ? guestNames[i % 7] : "—",
+    guest: status === "occupied" ? guestNames[i % 5] : "—",
     nights: status === "occupied" ? i % 4 + 1 : 0,
     rate: [8900, 12400, 24500, 38900][i % 4]
   };
@@ -482,10 +455,11 @@ export const searchResults = [
 
 
 export const myBookings = [
-{ id: "HS24-10241", hotel: "Hour Stay Rambagh Residency", city: "Jaipur", room: "Premier Haveli Room", dates: "12–15 Aug 2026", status: "Upcoming", amount: 37200 },
-{ id: "HS24-09877", hotel: "Hour Stay Lake Palace View", city: "Udaipur", room: "Maharaja Suite", dates: "02–05 Mar 2026", status: "Completed", amount: 88400 },
-{ id: "HS24-09122", hotel: "Hour Stay Candolim Beach Resort", city: "Goa", room: "Garden Pool Villa", dates: "24–28 Dec 2025", status: "Completed", amount: 142600 },
-{ id: "HS24-08810", hotel: "Hour Stay Backwater Retreat", city: "Alleppey", room: "Deluxe Courtyard", dates: "09–10 Sep 2025", status: "Cancelled", amount: 7600 }];
+{ id: "BK-10301", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "103 · Standard Room", dates: "01–02 Sep 2026", status: "Completed", amount: 8500 },
+{ id: "BK-10101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "101 · Standard Room", dates: "02–04 Sep 2026", status: "Active", amount: 11400 },
+{ id: "BK-20202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "202 · Deluxe Room", dates: "02–05 Sep 2026", status: "Active", amount: 14500 },
+{ id: "BK-10202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "102 · Standard Room", dates: "03–05 Sep 2026", status: "Upcoming", amount: 7000 },
+{ id: "BK-30101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "301 · Executive Suite", dates: "03–06 Sep 2026", status: "Upcoming", amount: 21000 }];
 
 
 export const serviceRequests = [

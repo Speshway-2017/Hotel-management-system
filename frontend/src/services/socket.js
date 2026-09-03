@@ -85,16 +85,6 @@ export const subscribeRealtimeSync = (callback, events = ALL_REALTIME_EVENTS) =>
   const isSuperAdmin = rawUser && rawUser.includes('"role":"super-admin"');
 
   const handler = (eventName) => (data = {}) => {
-    // If payload has propertyId and user is restricted to a property, verify match
-    if (data.propertyId && currentPropId && !isSuperAdmin) {
-      const p1 = String(data.propertyId).trim().toLowerCase();
-      const p2 = String(currentPropId).trim().toLowerCase();
-      const isWildcard = p1 === 'all' || p1 === 'property_all' || p2 === 'all' || p2 === 'property_all';
-      const isMatching = p1 === p2 || isWildcard || (p1.includes('jai') && p2.includes('jai')) || (p1.includes('9hq8p') && p2.includes('9hq8p'));
-      if (!isMatching) {
-        return; // Ignore events intended for other properties
-      }
-    }
     try {
       callback(data, eventName);
     } catch (err) {

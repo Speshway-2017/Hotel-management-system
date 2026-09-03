@@ -113,6 +113,21 @@ export const managerService = {
   getBilling: async () => {
     return await request(`/manager/billing?t=${Date.now()}`);
   },
+  getPayments: async () => {
+    return await request(`/manager/payments?t=${Date.now()}`);
+  },
+  createPayment: async (data) => {
+    return await request('/manager/payments', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updatePayment: async (id, data) => {
+    return await request(`/manager/payments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
   recordPayment: async (id, amountPaid) => {
     return await request(`/manager/billing/${id}/payment`, {
       method: 'POST',

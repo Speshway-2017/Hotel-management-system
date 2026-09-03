@@ -55,20 +55,18 @@ const subModules = {
     "Operations": [
       { label: "Reservations", to: "/admin/reservations" },
       { label: "Rooms & Rates", to: "/admin/rooms" },
-      { label: "Front Desk", to: "/admin/front-desk" },
       { label: "Guests", to: "/admin/guests" }
     ],
     "Finance": [
       { label: "Billing", to: "/admin/billing" },
       { label: "Payments", to: "/admin/payments" },
-      { label: "Reports", to: "/admin/reports" },
       { label: "Subscription", to: "/admin/subscription" }
     ],
     "Management": [
       { label: "Staff", to: "/admin/staff" },
       { label: "Approvals", to: "/admin/approvals" },
       { label: "Channel Manager", to: "/admin/channels" },
-      { label: "CRM & Loyalty", to: "/admin/crm" }
+      { label: "Feedback", to: "/admin/feedback" }
     ],
     "Settings": [
       { label: "Hotel Profile", to: "/admin/settings?tab=hotel-info" },
@@ -87,10 +85,6 @@ const subModules = {
       { label: "Approvals", to: "/manager/approvals" },
       { label: "Staff & Shifts", to: "/manager/shifts" },
       { label: "Attendance", to: "/manager/attendance" }
-    ],
-    "Finance": [
-      { label: "Billing Overview", to: "/manager/billing" },
-      { label: "Reports", to: "/manager/reports" }
     ]
   },
   "reception": {
@@ -99,10 +93,6 @@ const subModules = {
       { label: "Departures", to: "/reception/check-out" },
       { label: "In-House Guests", to: "/reception/guest-search" },
       { label: "Room Status", to: "/reception/room-assignment" }
-    ],
-    "Billing": [
-      { label: "Invoices & Folios", to: "/reception/folio" },
-      { label: "Payments", to: "/reception/payments" }
     ]
   }
 };
@@ -530,15 +520,15 @@ export function DashShell({ role, children }) {
                   };
                 }
                 if (
-                  path.startsWith("/admin/billing") ||
                   path.startsWith("/admin/payments") ||
+                  path.startsWith("/admin/billing") ||
                   path.startsWith("/admin/approvals") ||
                   path.startsWith("/admin/taxes") ||
                   path.startsWith("/admin/subscription")
                 ) {
                   return {
-                    title: "Finance Center",
-                    subtitle: "Track invoices, payments, tax configurations, discounts, and refunds."
+                    title: "Payments & Financial Ledger",
+                    subtitle: "Track real-time guest transaction records, payment methods, revenue settlements, and receipts."
                   };
                 }
                 if (path.startsWith("/admin/reports")) {
@@ -569,6 +559,12 @@ export function DashShell({ role, children }) {
                   return {
                     title: "Distribution Channel Manager",
                     subtitle: "Configure global OTA channel links, adjust commission splits, audit XML synchronization logs, and toggle rate parity blocks."
+                  };
+                }
+                if (path.startsWith("/admin/feedback")) {
+                  return {
+                    title: "Guest Feedback & Reviews",
+                    subtitle: "Monitor guest reviews, star ratings, and post managerial responses."
                   };
                 }
                 if (path.startsWith("/admin/crm")) {
@@ -656,16 +652,10 @@ export function DashShell({ role, children }) {
                     subtitle: "Track live guest survey responses, scores, and review responses logs."
                   };
                 }
-                if (path.startsWith("/manager/billing")) {
+                if (path.startsWith("/manager/payments") || path.startsWith("/manager/billing")) {
                   return {
-                    title: "Billing Overview Ledger",
-                    subtitle: "Audit invoicing logs, GST rate slabs compliance, split bills, and pending payments."
-                  };
-                }
-                if (path.startsWith("/manager/reports")) {
-                  return {
-                    title: "Operational Analytics Reports",
-                    subtitle: "Generate and export property occupancies, ADR trends, RevPAR metrics, and channel mixes."
+                    title: "Payments & Financial Ledger",
+                    subtitle: "Reconcile real-time guest transaction records, payment channels, and settlement logs."
                   };
                 }
               }
@@ -711,16 +701,10 @@ export function DashShell({ role, children }) {
                     subtitle: "Look up guest logs, contact info, previous visits, and flags."
                   };
                 }
-                if (path.startsWith("/reception/folio")) {
+                if (path.startsWith("/reception/payments") || path.startsWith("/reception/folio")) {
                   return {
-                    title: "Invoices & Folios Overview",
-                    subtitle: "Audit split bills, GST calculations, guest folios, and receipts."
-                  };
-                }
-                if (path.startsWith("/reception/payments")) {
-                  return {
-                    title: "Folio Payments Ledger",
-                    subtitle: "Capture, verify, and refund reservation deposits and incidentals."
+                    title: "Payments Ledger",
+                    subtitle: "Capture front-desk payments, audit transaction history, and process settlement check-offs."
                   };
                 }
                 if (path.startsWith("/reception/notifications")) {
@@ -893,20 +877,18 @@ export function DashShell({ role, children }) {
                   { label: "Finance", to: "/admin/billing" },
                   { label: "Billing & Invoices" }
                 ],
-                "/admin/payments": [
-                  { label: "Finance", to: "/admin/billing" },
-                  { label: "Payments" }
-                ],
+                "/admin/payments": [{ label: "Payments" }],
+                "/admin/payments/:id": [{ label: "Payments", to: "/admin/payments" }, { label: "Payment Details" }],
                 "/admin/approvals": [
                   { label: "Management", to: "/admin/staff" },
                   { label: "Approvals" }
                 ],
                 "/admin/taxes": [
-                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Finance", to: "/admin/payments" },
                   { label: "Taxes & GST" }
                 ],
                 "/admin/reports": [
-                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Finance", to: "/admin/payments" },
                   { label: "Reports" }
                 ],
                 "/admin/staff": [
@@ -931,6 +913,10 @@ export function DashShell({ role, children }) {
                 "/admin/channels": [
                   { label: "Management", to: "/admin/staff" },
                   { label: "OTA Channels" }
+                ],
+                "/admin/feedback": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Feedback" }
                 ],
                 "/admin/crm": [
                   { label: "Management", to: "/admin/staff" },
@@ -982,22 +968,23 @@ export function DashShell({ role, children }) {
                 "/manager/shifts": [{ label: "Management" }, { label: "Staff & Shifts" }],
                 "/manager/staff": [{ label: "Management" }, { label: "Staff & Shifts" }],
                 "/manager/attendance": [{ label: "Management" }, { label: "Attendance" }],
-                "/manager/feedback": [{ label: "Guest Experience" }, { label: "Feedback" }],
-                "/manager/billing": [{ label: "Finance" }, { label: "Billing Overview" }],
-                "/manager/reports": [{ label: "Reports" }],
+                "/manager/feedback": [{ label: "Feedback" }],
+                "/manager/payments": [{ label: "Payments" }],
+                "/manager/payments/:id": [{ label: "Payments", to: "/manager/payments" }, { label: "Payment Details" }],
+                "/manager/billing": [{ label: "Payments", to: "/manager/payments" }, { label: "Ledger" }],
                 "/reception/check-in": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals" }],
                 "/reception/check-out": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures" }],
                 "/reception/guest-search": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests" }],
                 "/reception/room-assignment": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status" }],
                 "/reception/reservations": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger" }],
-                "/reception/new-booking": [{ label: "Reservations", to: "/reception/reservations" }, { label: "New Reservation" }],
-                "/reception/folio": [{ label: "Billing", to: "/reception/folio" }, { label: "Invoices & Folios" }],
-                "/reception/payments": [{ label: "Billing", to: "/reception/folio" }, { label: "Payments" }],
+                "/reception/payments": [{ label: "Payments" }],
+                "/reception/payments/:id": [{ label: "Payments", to: "/reception/payments" }, { label: "Payment Details" }],
+                "/reception/folio": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio" }],
                 "/reception/notifications": [{ label: "Notifications" }],
                 "/reception/profile": [{ label: "Profile" }],
                 "/reception/check-in/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals", to: "/reception/check-in" }, { label: "Check-in Details" }],
                 "/reception/check-out/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures", to: "/reception/check-out" }, { label: "Checkout Details" }],
-                "/reception/folio/:id": [{ label: "Billing", to: "/reception/folio" }, { label: "Invoices & Folios", to: "/reception/folio" }, { label: "Folio Details" }],
+                "/reception/folio/:id": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio Details" }],
                 "/reception/reservations/:id": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger", to: "/reception/reservations" }, { label: "Booking Details" }],
                 "/reception/room-assignment/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status", to: "/reception/room-assignment" }, { label: "Room Details" }],
                 "/reception/guest-search/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests", to: "/reception/guest-search" }, { label: "Guest Details" }],

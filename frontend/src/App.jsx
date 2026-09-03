@@ -38,6 +38,7 @@ import { Route as AdminViewGuest } from "./roles/admin/pages/ViewGuest";
 import { Route as AdminNotifications } from "./roles/admin/pages/Notifications";
 import { Route as AdminNotificationDetails } from "./roles/admin/pages/NotificationDetails";
 import { Route as AdminPayments } from "./roles/admin/pages/Payments";
+import { Route as AdminPaymentDetails } from "./roles/admin/pages/PaymentDetails";
 import { Route as AdminReports } from "./roles/admin/pages/Reports";
 import { Route as AdminReservations } from "./roles/admin/pages/Reservations";
 import { Route as AdminRooms } from "./roles/admin/pages/Rooms";
@@ -52,6 +53,7 @@ import { Route as AdminAddStaff } from "./roles/admin/pages/AddStaff";
 import { Route as AdminEditStaff } from "./roles/admin/pages/EditStaff";
 import { Route as AdminViewStaff } from "./roles/admin/pages/ViewStaff";
 import { Route as AdminTaxes } from "./roles/admin/pages/Taxes";
+import { Route as AdminFeedback } from "./roles/admin/pages/Feedback";
 import { Route as AdminCrm } from "./roles/admin/pages/Crm";
 import { Route as AdminSubscription } from "./roles/admin/pages/Subscription";
 import { Route as AdminProfile } from "./roles/admin/pages/Profile";
@@ -70,6 +72,8 @@ import { Route as ManagerFeedback } from "./roles/manager/pages/Feedback";
 import { Route as ManagerViewFeedback } from "./roles/manager/pages/ViewFeedback";
 import { Route as ManagerBilling } from "./roles/manager/pages/Billing";
 import { Route as ManagerViewBilling } from "./roles/manager/pages/ViewBilling";
+import { Route as ManagerPayments } from "./roles/manager/pages/Payments";
+import { Route as ManagerPaymentDetails } from "./roles/manager/pages/PaymentDetails";
 import { Route as ManagerGuests } from "./roles/manager/pages/Guests";
 import { Route as ManagerNotifications } from "./roles/manager/pages/Notifications";
 import { Route as ManagerNotificationDetails } from "./roles/manager/pages/NotificationDetails";
@@ -104,6 +108,7 @@ import { Route as ReceptionMaintenance } from "./roles/receptionist/pages/Mainte
 import { Route as ReceptionNewBooking } from "./roles/receptionist/pages/NewBooking";
 import { Route as ReceptionNotifications } from "./roles/receptionist/pages/Notifications";
 import { Route as ReceptionPayments } from "./roles/receptionist/pages/Payments";
+import { Route as ReceptionPaymentDetails } from "./roles/receptionist/pages/PaymentDetails";
 import { Route as ReceptionReservations } from "./roles/receptionist/pages/Reservations";
 import { Route as ReceptionRoomAssignment } from "./roles/receptionist/pages/RoomAssignment";
 import { Route as ReceptionProfile } from "./roles/receptionist/pages/Profile";
@@ -304,6 +309,8 @@ export default function App() {
             <Route path="/admin/notifications" element={<RouteWrapper routeObj={AdminNotifications} />} />
             <Route path="/admin/notifications/:id" element={<RouteWrapper routeObj={AdminNotificationDetails} />} />
             <Route path="/admin/payments" element={<RouteWrapper routeObj={AdminPayments} />} />
+            <Route path="/admin/payments/:id" element={<RouteWrapper routeObj={AdminPaymentDetails} />} />
+            <Route path="/admin/payments/view/:id" element={<RouteWrapper routeObj={AdminPaymentDetails} />} />
             <Route path="/admin/reports" element={<RouteWrapper routeObj={AdminReports} />} />
             <Route path="/admin/reservations" element={<RouteWrapper routeObj={AdminReservations} />} />
             <Route path="/admin/reservations/add" element={<RouteWrapper routeObj={AdminAddReservation} />} />
@@ -321,6 +328,7 @@ export default function App() {
             <Route path="/admin/staff/edit/:id" element={<RouteWrapper routeObj={AdminEditStaff} />} />
             <Route path="/admin/staff/view/:id" element={<RouteWrapper routeObj={AdminViewStaff} />} />
             <Route path="/admin/taxes" element={<RouteWrapper routeObj={AdminTaxes} />} />
+            <Route path="/admin/feedback" element={<RouteWrapper routeObj={AdminFeedback} />} />
             <Route path="/admin/crm" element={<RouteWrapper routeObj={AdminCrm} />} />
             <Route path="/admin/subscription" element={<RouteWrapper routeObj={AdminSubscription} />} />
             <Route path="/admin/profile" element={<RouteWrapper routeObj={AdminProfile} />} />
@@ -336,6 +344,9 @@ export default function App() {
             <Route path="/manager/feedback/view/:id" element={<RouteWrapper routeObj={ManagerViewFeedback} />} />
             <Route path="/manager/billing" element={<RouteWrapper routeObj={ManagerBilling} />} />
             <Route path="/manager/billing/view/:id" element={<RouteWrapper routeObj={ManagerViewBilling} />} />
+            <Route path="/manager/payments" element={<RouteWrapper routeObj={ManagerPayments} />} />
+            <Route path="/manager/payments/:id" element={<RouteWrapper routeObj={ManagerPaymentDetails} />} />
+            <Route path="/manager/payments/view/:id" element={<RouteWrapper routeObj={ManagerPaymentDetails} />} />
             <Route path="/manager/guests" element={<RouteWrapper routeObj={ManagerGuests} />} />
             <Route path="/manager/guests/view/:id" element={<RouteWrapper routeObj={ManagerViewGuest} />} />
             <Route path="/manager/notifications" element={<RouteWrapper routeObj={ManagerNotifications} />} />
@@ -371,6 +382,8 @@ export default function App() {
             <Route path="/reception/new-booking" element={<RouteWrapper routeObj={ReceptionNewBooking} />} />
             <Route path="/reception/notifications" element={<RouteWrapper routeObj={ReceptionNotifications} />} />
             <Route path="/reception/payments" element={<RouteWrapper routeObj={ReceptionPayments} />} />
+            <Route path="/reception/payments/:id" element={<RouteWrapper routeObj={ReceptionPaymentDetails} />} />
+            <Route path="/reception/payments/view/:id" element={<RouteWrapper routeObj={ReceptionPaymentDetails} />} />
             <Route path="/reception/reservations" element={<RouteWrapper routeObj={ReceptionReservations} />} />
             <Route path="/reception/room-assignment" element={<RouteWrapper routeObj={ReceptionRoomAssignment} />} />
             <Route path="/reception/profile" element={<RouteWrapper routeObj={ReceptionProfile} />} />

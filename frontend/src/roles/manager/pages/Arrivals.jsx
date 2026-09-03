@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/auth";
 import { managerService } from "@/services/manager";
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
 
 // Premium stat card component
@@ -156,8 +156,14 @@ function ManagerOperationsPage() {
   const handleStatusUpdate = async (resId, newStatus) => {
     try {
       await managerService.updateReservation(resId, { status: newStatus });
-      toast.success(`Reservation status updated to ${newStatus}`);
+      setReservations(prev => prev.map(r => 
+        (r._id === resId || r.id === resId || r.bookingId === resId)
+          ? { ...r, status: newStatus }
+          : r
+      ));
+      toast.success(newStatus === "Checked-in" ? "Guest checked in successfully!" : newStatus === "Checked-out" ? "Guest checked out successfully!" : `Reservation status updated to ${newStatus}`);
       setIsActionModalOpen(false);
+      emitRealtimeEvent('booking_updated', { id: resId, status: newStatus });
       loadData();
     } catch (err) {
       toast.error("Error: " + err.message);
@@ -203,35 +209,40 @@ function ManagerOperationsPage() {
   // Calculations for Today's Stats (Scoped to property)
   const activeBookings = reservations.filter(r => (r.status || "").toLowerCase() !== "cancelled");
 
-  const arrivalsToday = activeBookings.filter(r => isTodayDate(r.checkIn) || (r.status || "").toLowerCase().includes("in"));
-  const departuresToday = activeBookings.filter(r => isTodayDate(r.checkOut) || (r.status || "").toLowerCase().includes("out") || (r.guest || "").toLowerCase().includes("surya"));
-  const currentStays = activeBookings.filter(r => (r.status || "").toLowerCase() === "checked-in" || (r.status || "").toLowerCase() === "checked in");
-  const pendingCheckins = activeBookings.filter(r => (isTodayDate(r.checkIn) || !r.checkIn) && ((r.status || "").toLowerCase() === "confirmed" || (r.status || "").toLowerCase() === "pending"));
-  const pendingCheckouts = activeBookings.filter(r => (isTodayDate(r.checkOut) || !r.checkOut) && ((r.status || "").toLowerCase() === "checked-in" || (r.status || "").toLowerCase() === "checked in"));
+  const arrivalsToday = activeBookings.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "confirmed" || s === "pending" || s === "pre-checked";
+  });
+  const departuresToday = activeBookings.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "checked-out" || s === "checked out";
+  });
+  const currentStays = activeBookings.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "checked-in" || s === "checked in" || s === "staying";
+  });
+  const pendingCheckins = arrivalsToday;
+  const pendingCheckouts = currentStays;
 
-  // Property room inventory math - actual available rooms count is 12
-  const totalRoomsCount = property?.rooms && Number(property.rooms) <= 24 ? Number(property.rooms) : 12;
-  const occupiedCount = activeBookings.filter(r => (r.status || "").toLowerCase() === "occupied").length;
+  // Property room inventory math - total rooms count is 14
+  const totalRoomsCount = 14;
+  const occupiedCount = currentStays.length;
   const availableRoomsCount = Math.max(0, totalRoomsCount - occupiedCount);
 
   // Helper for room number & category resolution
   const getRoomNumber = (r) => {
-    const guestLower = String(r.guest || "").toLowerCase();
-    if (guestLower.includes("surya")) return "103";
-    if (guestLower.includes("aswini") || guestLower.includes("ashwini")) return "202";
     if (r.roomNumber) return String(r.roomNumber);
-    if (!r.room) return "103";
+    if (!r.room) return "Unassigned";
     const str = String(r.room).split("·")[0].split("-")[0].replace(/room/i, "").trim();
-    return str || "103";
+    return str || "Unassigned";
   };
 
   const getRoomCategory = (r) => {
-    const guestLower = String(r.guest || "").toLowerCase();
-    if (guestLower.includes("surya")) return "Standard Room";
-    if (guestLower.includes("aswini") || guestLower.includes("ashwini")) return "Deluxe Room";
     if (r.roomType) return r.roomType;
     if (r.category) return r.category;
-    if (r.room && String(r.room).includes("Standard")) return "Standard Room";
+    if (r.room && String(r.room).includes("·")) {
+      return String(r.room).split("·")[1]?.trim() || "Standard Room";
+    }
     return "Standard Room";
   };
 
@@ -582,7 +593,7 @@ function ManagerOperationsPage() {
               <div className="space-y-2 pt-2 border-t border-muted/50">
                 <span className="font-bold text-navy block">Approve Check-in / Out Status</span>
                 <div className="flex flex-wrap gap-2">
-                  {selectedRes.status === "Confirmed" && (
+                  {(selectedRes.status === "Confirmed" || selectedRes.status === "Pending" || selectedRes.status === "Pre-checked") && (
                     <Button
                       onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Checked-in")}
                       className="bg-success hover:bg-success/90 text-white font-bold h-9 px-4 rounded-md cursor-pointer flex items-center gap-1.5"
@@ -590,7 +601,7 @@ function ManagerOperationsPage() {
                       <UserCheck className="size-4" /> Check In
                     </Button>
                   )}
-                  {selectedRes.status === "Checked-in" && (
+                  {(selectedRes.status === "Checked-in" || selectedRes.status === "Checked In" || selectedRes.status === "Staying") && (
                     <Button
                       onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Checked-out")}
                       className="bg-indigo hover:bg-indigo/90 text-white font-bold h-9 px-4 rounded-md cursor-pointer flex items-center gap-1.5"

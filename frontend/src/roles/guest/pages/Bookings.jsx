@@ -198,7 +198,7 @@ function GuestBookingsPage() {
               <div className="text-xs font-semibold text-navy space-y-1">
                 <p>Room Type: <strong>{b.room || "Standard Suite"}</strong></p>
                 <p>Guests: <strong>{b.guests || "2 Guests (Adults)"}</strong></p>
-                <p className="text-navy/60 font-medium">Guest Name: {b.guest || "Aarav Mehta"}</p>
+                <p className="text-navy/60 font-medium">Guest Name: {b.guest || "Guest"}</p>
               </div>
             </div>
 

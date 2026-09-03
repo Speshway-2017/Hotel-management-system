@@ -12,7 +12,7 @@ import {
   CalendarCheck, Trash2, Eye, XCircle, Edit2
 } from "lucide-react";
 
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 
 export const Route = createFileRoute("/reception/reservations")({
   head: () => ({
@@ -26,7 +26,6 @@ export const Route = createFileRoute("/reception/reservations")({
 
 function ReservationsPage() {
   const navigate = useNavigate();
-  const todayStr = "25 Aug 2026";
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRoomType, setFilterRoomType] = useState("all");
@@ -34,14 +33,14 @@ function ReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [reservations, setReservations] = useState([]);
 
-  const loadReservations = () => {
-    setLoading(true);
+  const loadReservations = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getReservations()
       .then(res => {
         if (res.success && res.data) {
           const list = res.data.map(r => {
-            const rmNum = r.roomNumber || (r.room ? r.room.split(' ')[0] : 'Unassigned');
-            const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : 'Standard Room');
+            const rmNum = r.roomNumber || (r.room ? String(r.room).match(/\b\d{3,4}\b/)?.[0] || r.room.split(' ')[0] : '101');
+            const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : (r.room || 'Standard Room'));
             return {
               ...r,
               room: rmNum,
@@ -53,17 +52,19 @@ function ReservationsPage() {
         }
       })
       .catch(err => console.error("Failed to load reservations ledger:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    loadReservations();
-    const interval = setInterval(loadReservations, 10000);
-    const handleFocus = () => loadReservations();
+    loadReservations(false);
+    const interval = setInterval(() => loadReservations(true), 10000);
+    const handleFocus = () => loadReservations(true);
     window.addEventListener('focus', handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
-      loadReservations();
+      loadReservations(true);
     });
 
     return () => {
@@ -106,7 +107,11 @@ function ReservationsPage() {
     const query = searchQuery.toLowerCase();
 
     const matchesSearch = nameStr.includes(query) || idStr.includes(query) || roomStr.includes(query) || phoneStr.includes(query);
-    const matchesStatus = filterStatus === "all" || r.status === filterStatus;
+    const matchesStatus = filterStatus === "all" || 
+      r.status === filterStatus ||
+      (filterStatus === "Checked In" && (r.status === "Checked-in" || r.status === "Checked In")) ||
+      (filterStatus === "Checked Out" && (r.status === "Checked-out" || r.status === "Checked Out")) ||
+      (filterStatus === "No Show" && (r.status === "No-show" || r.status === "No Show"));
     const matchesRoomType = filterRoomType === "all" || r.roomType === filterRoomType;
     const matchesSource = filterSource === "all" || r.source === filterSource;
 
@@ -114,21 +119,20 @@ function ReservationsPage() {
   });
 
   // Action methods
-  const handleCheckIn = async (id) => {
+  const handleCheckIn = async (id, roomNum) => {
     try {
-      await receptionistService.updateReservationStatus(id, "Checked-in");
+      await receptionistService.updateReservationStatus(id, "Checked-in", roomNum);
       setReservations(prev => prev.map(r => 
         (r.id === id || r._id === id || r.bookingId === id)
           ? { ...r, status: "Checked-in" } 
           : r
       ));
-      if (selectedRes && (selectedRes.id === id || selectedRes._id === id)) {
+      if (selectedRes && (selectedRes.id === id || selectedRes._id === id || selectedRes.bookingId === id)) {
         setSelectedRes(prev => ({ ...prev, status: "Checked-in" }));
       }
       toast.success("Guest checked in successfully!");
-      import('@/services/socket').then(({ socket }) => {
-        socket.emit('booking_updated', { id, status: 'Checked-in' });
-      });
+      emitRealtimeEvent('checkin_completed', { id, status: 'Checked-in' });
+      loadReservations(true);
     } catch (err) {
       console.error("Failed to check in:", err);
       toast.error(err.message || "Failed to check in guest.");
@@ -143,13 +147,12 @@ function ReservationsPage() {
           ? { ...r, status: "Checked-out" } 
           : r
       ));
-      if (selectedRes && (selectedRes.id === id || selectedRes._id === id)) {
+      if (selectedRes && (selectedRes.id === id || selectedRes._id === id || selectedRes.bookingId === id)) {
         setSelectedRes(prev => ({ ...prev, status: "Checked-out" }));
       }
       toast.success("Guest checked out successfully!");
-      import('@/services/socket').then(({ socket }) => {
-        socket.emit('booking_updated', { id, status: 'Checked-out' });
-      });
+      emitRealtimeEvent('checkout_completed', { id, status: 'Checked-out' });
+      loadReservations(true);
     } catch (err) {
       console.error("Failed to check out:", err);
       toast.error(err.message || "Failed to check out guest.");
@@ -168,7 +171,7 @@ function ReservationsPage() {
             } 
           : r
       ));
-      if (selectedRes && (selectedRes.id === id || selectedRes._id === id)) {
+      if (selectedRes && (selectedRes.id === id || selectedRes._id === id || selectedRes.bookingId === id)) {
         setSelectedRes(prev => ({
           ...prev,
           status: "Cancelled",
@@ -333,11 +336,11 @@ function ReservationsPage() {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
                           {/* Check-In Button -> inline status update without navigating away */}
-                          {(res.status === "Pending" || res.status === "Confirmed") && (
+                          {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
                             <Button
                               size="xs"
                               variant="outline"
-                              onClick={() => handleCheckIn(res.id || res._id)}
+                              onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber)}
                               className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                             >
                               Check-In
@@ -345,11 +348,11 @@ function ReservationsPage() {
                           )}
 
                           {/* Check-Out Button -> enabled as soon as status is Checked-in */}
-                          {(res.status === "Checked In" || res.status === "Checked-in") && (
+                          {(res.status === "Checked In" || res.status === "Checked-in" || res.status === "Staying") && (
                             <Button
                               size="xs"
                               variant="outline"
-                              onClick={() => handleCheckOut(res.id || res._id)}
+                              onClick={() => handleCheckOut(res.id || res._id || res.bookingId)}
                               className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                             >
                               Check-Out

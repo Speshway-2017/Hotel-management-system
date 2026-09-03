@@ -12,7 +12,7 @@ import {
   TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, ArrowRight,
   Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, 
   Bed, RefreshCw, Clock, CheckCircle, Star, Wrench, MessageSquare,
-  Building
+  Building, Receipt, CreditCard
 } from "lucide-react";
 
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -478,22 +478,22 @@ function ManagerDashboard() {
                 </div>
               </Link>
 
-              {/* Action 4: Reports */}
+              {/* Action 4: Payments */}
               <Link
-                to="/manager/reports"
+                to="/manager/payments"
                 className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-purple/40 hover:bg-gradient-to-r hover:from-purple/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
               >
                 <div className="flex items-center gap-3">
                   <div className="size-9 rounded-xl bg-purple/10 text-purple flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-purple group-hover:text-white transition-all duration-200 shadow-sm">
-                    <TrendingUp className="size-4" />
+                    <CreditCard className="size-4" />
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-navy group-hover:text-purple transition-colors leading-snug">Yield Reports</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">RevPAR & Revenue</p>
+                    <p className="text-xs font-bold text-navy group-hover:text-purple transition-colors leading-snug">Payments Ledger</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Transactions & Settlements</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple/10 text-purple">Insights</span>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple/10 text-purple">Finance</span>
                   <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-purple group-hover:translate-x-0.5 transition-all" />
                 </div>
               </Link>

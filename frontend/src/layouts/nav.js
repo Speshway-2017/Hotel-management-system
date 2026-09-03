@@ -63,9 +63,9 @@ export const roleMeta = {
   },
   guest: {
     name: "Guest",
-    person: "Aarav Mehta",
-    caption: "Platinum member · 24 stays",
-    initials: "AM"
+    person: "Surya",
+    caption: "Guest Member",
+    initials: "SU"
   }
 };
 
@@ -90,7 +90,7 @@ export const navByRole = {
       items: [
         { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
         { label: "Operations", to: "/admin/reservations", icon: CalendarCheck },
-        { label: "Finance", to: "/admin/billing", icon: Receipt },
+        { label: "Payments", to: "/admin/payments", icon: CreditCard },
         { label: "Management", to: "/admin/staff", icon: UserCog },
         { label: "Settings", to: "/admin/settings", icon: Settings }
       ]
@@ -105,7 +105,7 @@ export const navByRole = {
         { label: "Operations", to: "/manager/operations", icon: CalendarCheck },
         { label: "Management", to: "/manager/approvals", icon: UserCog },
         { label: "Feedback", to: "/manager/feedback", icon: MessageSquareHeart },
-        { label: "Finance", to: "/manager/billing", icon: Receipt }
+        { label: "Payments", to: "/manager/payments", icon: CreditCard }
       ]
     }
   ],
@@ -117,7 +117,7 @@ export const navByRole = {
         { label: "Dashboard", to: "/reception", icon: LayoutDashboard },
         { label: "Front Desk", to: "/reception/check-in", icon: ConciergeBell },
         { label: "Reservations", to: "/reception/reservations", icon: CalendarCheck },
-        { label: "Billing", to: "/reception/folio", icon: Receipt }
+        { label: "Payments", to: "/reception/payments", icon: CreditCard }
       ]
     }
   ],

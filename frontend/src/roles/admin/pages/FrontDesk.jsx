@@ -265,9 +265,9 @@ function FrontDeskPage() {
   }, []);
 
   // Helper selectors
-  const activeCheckInsToday = reservations.filter(r => r.status === "Confirmed" || r.status === "Pending" || r.checkIn === targetDate);
-  const activeCheckOutsToday = reservations.filter(r => r.status === "Checked-out" || r.checkOut === targetDate);
-  const inHouseGuests = reservations.filter(r => r.status === "Checked-in");
+  const activeCheckInsToday = reservations.filter(r => r.status === "Confirmed" || r.status === "Pending" || r.status === "Pre-checked");
+  const activeCheckOutsToday = reservations.filter(r => r.status === "Checked-out" || r.status === "Checked Out");
+  const inHouseGuests = reservations.filter(r => r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying");
 
   // State modification logic
   const handleWalkinSubmit = async (e) => {

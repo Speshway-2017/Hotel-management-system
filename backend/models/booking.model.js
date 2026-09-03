@@ -58,16 +58,17 @@ const ensureDataFile = () => {
         _id: "BK-10301",
         bookingId: "BK-10301",
         guest: "Surya",
-        phone: "+91 98765 10301",
+        phone: "+91 47362 54654",
         email: "surya@gmail.com",
         room: "103 · Standard Room",
         roomNumber: "103",
+        roomType: "Standard Room",
         checkIn: "2026-09-01",
         checkOut: "2026-09-02",
         nights: 1,
         pax: "2 Adults",
         source: "Direct Web",
-        status: "Checked-in",
+        status: "Checked-out",
         amount: 8500,
         totalAmount: 8500,
         balance: 0,
@@ -75,31 +76,9 @@ const ensureDataFile = () => {
         propertyId: "HS-JAI"
       },
       {
-        id: "BK-20203",
-        _id: "BK-20203",
-        bookingId: "BK-20203",
-        guest: "Aswini",
-        phone: "+91 98840 20203",
-        email: "aswini@gmail.com",
-        room: "202 · Deluxe Room",
-        roomNumber: "202",
-        roomType: "Deluxe Room",
-        checkIn: "2026-09-02",
-        checkOut: "2026-09-04",
-        nights: 2,
-        pax: "2 Adults",
-        source: "Direct Web",
-        status: "Confirmed",
-        amount: 14500,
-        totalAmount: 14500,
-        balance: 0,
-        paymentStatus: "Paid",
-        propertyId: "HS-JAI"
-      },
-      {
-        id: "BK-20402",
-        _id: "BK-20402",
-        bookingId: "BK-20402",
+        id: "BK-10101",
+        _id: "BK-10101",
+        bookingId: "BK-10101",
         guest: "Mounika",
         phone: "+91 99443 88120",
         email: "mounika@gmail.com",
@@ -107,13 +86,35 @@ const ensureDataFile = () => {
         roomNumber: "101",
         roomType: "Standard Room",
         checkIn: "2026-09-02",
-        checkOut: "2026-09-03",
-        nights: 1,
+        checkOut: "2026-09-04",
+        nights: 2,
         pax: "2 Adults",
         source: "MakeMyTrip",
         status: "Checked-in",
         amount: 11400,
         totalAmount: 11400,
+        balance: 0,
+        paymentStatus: "Paid",
+        propertyId: "HS-JAI"
+      },
+      {
+        id: "BK-20202",
+        _id: "BK-20202",
+        bookingId: "BK-20202",
+        guest: "Aswini",
+        phone: "+91 98840 20203",
+        email: "aswini@gmail.com",
+        room: "202 · Deluxe Room",
+        roomNumber: "202",
+        roomType: "Deluxe Room",
+        checkIn: "2026-09-02",
+        checkOut: "2026-09-05",
+        nights: 3,
+        pax: "2 Adults",
+        source: "Direct Web",
+        status: "Checked-in",
+        amount: 14500,
+        totalAmount: 14500,
         balance: 0,
         paymentStatus: "Paid",
         propertyId: "HS-JAI"
@@ -128,77 +129,36 @@ const ensureDataFile = () => {
         room: "102 · Standard Room",
         roomNumber: "102",
         roomType: "Standard Room",
-        checkIn: "2026-09-02",
-        checkOut: "2026-09-03",
-        nights: 1,
+        checkIn: "2026-09-03",
+        checkOut: "2026-09-05",
+        nights: 2,
         pax: "2 Adults",
         source: "Direct Web",
-        status: "Checked-in",
-        amount: 3000,
-        totalAmount: 3000,
+        status: "Confirmed",
+        amount: 7000,
+        totalAmount: 7000,
         balance: 0,
         paymentStatus: "Paid",
         propertyId: "HS-JAI"
       },
       {
-        id: "HS24-10241",
-        _id: "HS24-10241",
-        bookingId: "HS24-10241",
-        guest: "Aarav Mehta",
-        phone: "+91 98204 33121",
-        email: "aarav.mehta@gmail.com",
-        room: "312 · Premier Haveli",
-        roomNumber: "312",
-        checkIn: "2026-09-01",
-        checkOut: "2026-09-04",
+        id: "BK-30101",
+        _id: "BK-30101",
+        bookingId: "BK-30101",
+        guest: "Sai",
+        phone: "+91 98765 10404",
+        email: "sai@gmail.com",
+        room: "301 · Executive Suite",
+        roomNumber: "301",
+        roomType: "Executive Suite",
+        checkIn: "2026-09-03",
+        checkOut: "2026-09-06",
         nights: 3,
         pax: "2 Adults",
-        source: "Direct",
-        status: "Confirmed",
-        amount: 37200,
-        totalAmount: 37200,
-        balance: 0,
-        paymentStatus: "Paid",
-        propertyId: "HS-JAI"
-      },
-      {
-        id: "HS24-10243",
-        _id: "HS24-10243",
-        bookingId: "HS24-10243",
-        guest: "Rohan & Sneha Kulkarni",
-        phone: "+91 99870 21145",
-        email: "rohan.k@gmail.com",
-        room: "501 · Maharaja Suite",
-        roomNumber: "501",
-        checkIn: "2026-09-03",
-        checkOut: "2026-09-07",
-        nights: 4,
-        pax: "2 Adults, 1 Child",
         source: "Booking.com",
         status: "Confirmed",
-        amount: 98000,
-        totalAmount: 98000,
-        balance: 49000,
-        paymentStatus: "Partial",
-        propertyId: "HS-JAI"
-      },
-      {
-        id: "HS24-10244",
-        _id: "HS24-10244",
-        bookingId: "HS24-10244",
-        guest: "Devendra Shastri",
-        phone: "+91 93450 09912",
-        email: "devendra@shastri.com",
-        room: "108 · Deluxe Courtyard",
-        roomNumber: "108",
-        checkIn: "2026-08-31",
-        checkOut: "2026-09-01",
-        nights: 1,
-        pax: "1 Adult",
-        source: "Walk-in",
-        status: "Checked-out",
-        amount: 9400,
-        totalAmount: 9400,
+        amount: 21000,
+        totalAmount: 21000,
         balance: 0,
         paymentStatus: "Paid",
         propertyId: "HS-JAI"
@@ -225,17 +185,19 @@ const writeBookings = (bookings) => {
 class BookingInstance {
   constructor(data) {
     Object.assign(this, data);
-    const cleanId = data.id || data._id;
+    const cleanId = data.bookingId || data.id || data._id;
+    this.bookingId = cleanId;
     this.id = cleanId;
     this._id = cleanId;
   }
 
   async save() {
     const bookings = readBookings();
-    const cleanId = this.id || this._id || "HS24-" + Math.floor(10000 + Math.random() * 90000);
+    const cleanId = this.bookingId || this.id || this._id || "HS24-" + Math.floor(10000 + Math.random() * 90000);
+    this.bookingId = cleanId;
     this.id = cleanId;
     this._id = cleanId;
-    const index = bookings.findIndex(b => b.id === cleanId);
+    const index = bookings.findIndex(b => b.id === cleanId || b._id === cleanId || b.bookingId === cleanId);
     
     this.updatedAt = new Date().toISOString();
     if (!this.createdAt) this.createdAt = new Date().toISOString();
@@ -265,21 +227,30 @@ const MockBooking = {
   findOne: async (query) => {
     const list = readBookings();
     const b = list.find(item => {
-      const qId = query._id || query.id;
-      if (qId) return item.id === qId || item._id === qId;
+      const qId = query._id || query.id || query.bookingId;
+      if (qId) return item.id === qId || item._id === qId || item.bookingId === qId;
+      if (query.$or && Array.isArray(query.$or)) {
+        return query.$or.some(q => {
+          if (q._id && (item._id === q._id || item.id === q._id || item.bookingId === q._id)) return true;
+          if (q.id && (item.id === q.id || item._id === q.id || item.bookingId === q.id)) return true;
+          if (q.bookingId && (item.bookingId === q.bookingId || item.id === q.bookingId || item._id === q.bookingId)) return true;
+          return false;
+        });
+      }
       return false;
     });
     return b ? new BookingInstance(b) : null;
   },
   findById: async (id) => {
     const list = readBookings();
-    const b = list.find(item => item.id === id || item._id === id);
+    const b = list.find(item => item.id === id || item._id === id || item.bookingId === id);
     return b ? new BookingInstance(b) : null;
   },
   create: async (data) => {
     const list = readBookings();
-    const id = "HS24-" + Math.floor(10000 + Math.random() * 90000);
+    const id = data.bookingId || data.id || "HS24-" + Math.floor(10000 + Math.random() * 90000);
     const newBooking = {
+      bookingId: id,
       id: id,
       _id: id,
       guest: data.guest,
@@ -304,19 +275,22 @@ const MockBooking = {
   },
   findByIdAndUpdate: async (id, update, options = {}) => {
     const list = readBookings();
-    const idx = list.findIndex(b => b.id === id || b._id === id);
+    const idx = list.findIndex(b => b.id === id || b._id === id || b.bookingId === id);
     if (idx === -1) return null;
 
     const current = list[idx];
+    const updateData = update.$set ? { ...update, ...update.$set } : update;
+    delete updateData.$set;
+
     const updated = {
       ...current,
-      ...update,
+      ...updateData,
       updatedAt: new Date().toISOString()
     };
 
-    if (update.amount !== undefined) updated.amount = Number(update.amount);
-    if (update.balance !== undefined) updated.balance = Number(update.balance);
-    if (update.nights !== undefined) updated.nights = Number(update.nights);
+    if (updateData.amount !== undefined) updated.amount = Number(updateData.amount);
+    if (updateData.balance !== undefined) updated.balance = Number(updateData.balance);
+    if (updateData.nights !== undefined) updated.nights = Number(updateData.nights);
 
     list[idx] = updated;
     writeBookings(list);
@@ -324,11 +298,109 @@ const MockBooking = {
   },
   findByIdAndDelete: async (id) => {
     const list = readBookings();
-    const idx = list.findIndex(b => b.id === id || b._id === id);
+    const idx = list.findIndex(b => b.id === id || b._id === id || b.bookingId === id);
     if (idx === -1) return null;
     const removed = list.splice(idx, 1)[0];
     writeBookings(list);
     return new BookingInstance(removed);
+  },
+  findOneAndUpdate: async (query, update, options = {}) => {
+    const list = readBookings();
+    const idx = list.findIndex(b => {
+      if (!query) return false;
+      if (query._id && (b._id === query._id || b.id === query._id)) return true;
+      if (query.id && (b.id === query.id || b._id === query.id)) return true;
+      if (query.bookingId && b.bookingId === query.bookingId) return true;
+      if (query.$or && Array.isArray(query.$or)) {
+        return query.$or.some(q => {
+          if (q._id && (b._id === q._id || b.id === q._id)) return true;
+          if (q.id && (b.id === q.id || b._id === q.id)) return true;
+          if (q.bookingId && b.bookingId === q.bookingId) return true;
+          if (q.propertyId && b.propertyId === q.propertyId) return true;
+          return false;
+        });
+      }
+      return false;
+    });
+
+    if (idx === -1) return null;
+    const current = list[idx];
+    const updateData = update.$set ? { ...update, ...update.$set } : update;
+    delete updateData.$set;
+
+    const updated = {
+      ...current,
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+    if (updateData.amount !== undefined) updated.amount = Number(updateData.amount);
+    if (updateData.balance !== undefined) updated.balance = Number(updateData.balance);
+    if (updateData.nights !== undefined) updated.nights = Number(updateData.nights);
+
+    list[idx] = updated;
+    writeBookings(list);
+    return new BookingInstance(updated);
+  },
+  findOneAndDelete: async (query) => {
+    const list = readBookings();
+    const idx = list.findIndex(b => {
+      if (!query) return false;
+      if (query._id && (b._id === query._id || b.id === query._id)) return true;
+      if (query.id && (b.id === query.id || b._id === query.id)) return true;
+      if (query.bookingId && b.bookingId === query.bookingId) return true;
+      if (query.$or && Array.isArray(query.$or)) {
+        return query.$or.some(q => {
+          if (q._id && (b._id === q._id || b.id === q._id)) return true;
+          if (q.id && (b.id === q.id || b._id === q.id)) return true;
+          if (q.bookingId && b.bookingId === q.bookingId) return true;
+          return false;
+        });
+      }
+      return false;
+    });
+    if (idx === -1) return null;
+    const removed = list.splice(idx, 1)[0];
+    writeBookings(list);
+    return new BookingInstance(removed);
+  },
+  updateMany: async (query, update) => {
+    const list = readBookings();
+    let modifiedCount = 0;
+    const updateData = update.$set ? { ...update, ...update.$set } : update;
+    delete updateData.$set;
+
+    list.forEach((b, idx) => {
+      let match = true;
+      if (query.propertyId && b.propertyId !== query.propertyId) match = false;
+      if (query.status && b.status !== query.status) match = false;
+      if (match) {
+        list[idx] = { ...b, ...updateData, updatedAt: new Date().toISOString() };
+        modifiedCount++;
+      }
+    });
+    writeBookings(list);
+    return { modifiedCount, matchedCount: modifiedCount };
+  },
+  deleteMany: async (query = {}) => {
+    let list = readBookings();
+    const initialLen = list.length;
+    if (query.propertyId) {
+      list = list.filter(b => b.propertyId !== query.propertyId);
+    } else if (Object.keys(query).length === 0) {
+      list = [];
+    }
+    writeBookings(list);
+    return { deletedCount: initialLen - list.length };
+  },
+  countDocuments: async (query = {}) => {
+    let list = readBookings();
+    if (query.propertyId) {
+      list = list.filter(b => b.propertyId === query.propertyId);
+    }
+    if (query.status) {
+      list = list.filter(b => b.status === query.status);
+    }
+    return list.length;
   }
 };
 
@@ -411,7 +483,12 @@ const Booking = {
   },
   findById: (id) => {
     return new QueryWrapper((isMongoose) => {
-      if (isMongoose) return MongooseBooking.findById(id);
+      if (isMongoose) {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return MongooseBooking.findById(id);
+        }
+        return MongooseBooking.findOne({ $or: [{ bookingId: id }, { id: id }] });
+      }
       return MockBooking.findById(id);
     });
   },
@@ -450,15 +527,47 @@ const Booking = {
   },
   findByIdAndUpdate: async (id, update, options) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseBooking.findByIdAndUpdate(id, update, { new: true, ...options });
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        const found = await MongooseBooking.findByIdAndUpdate(id, update, { new: true, ...options });
+        if (found) return found;
+      }
+      return await MongooseBooking.findOneAndUpdate(
+        { $or: [{ id }, { bookingId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : undefined }].filter(Boolean) },
+        update,
+        { new: true, ...options }
+      );
     }
     return await MockBooking.findByIdAndUpdate(id, update, options);
   },
   findByIdAndDelete: async (id) => {
     if (mongoose.connection.readyState === 1) {
-      return await MongooseBooking.findByIdAndDelete(id);
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        const found = await MongooseBooking.findByIdAndDelete(id);
+        if (found) return found;
+      }
+      return await MongooseBooking.findOneAndDelete({
+        $or: [{ id }, { bookingId: id }]
+      });
     }
     return await MockBooking.findByIdAndDelete(id);
+  },
+  updateMany: async (query, update, options) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseBooking.updateMany(query, update, options);
+    }
+    return await MockBooking.updateMany(query, update);
+  },
+  deleteMany: async (query, options) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseBooking.deleteMany(query, options);
+    }
+    return await MockBooking.deleteMany(query);
+  },
+  countDocuments: async (query = {}) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseBooking.countDocuments(query);
+    }
+    return await MockBooking.countDocuments(query);
   }
 };
 

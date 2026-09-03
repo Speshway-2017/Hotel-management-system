@@ -120,9 +120,6 @@ function ManagerReservationsPage() {
 
   // Room Helpers
   const getRoomDisplay = (res) => {
-    const guestLower = String(res?.guest || "").toLowerCase();
-    if (guestLower.includes("surya")) return "Room 103";
-    if (guestLower.includes("aswini") || guestLower.includes("ashwini")) return "Room 202";
     if (res?.roomNumber) return `Room ${res.roomNumber}`;
     if (!res?.room) return "Unassigned";
     const str = String(res.room).split('·')[0].split('-')[0].replace(/room/i, '').trim();
@@ -130,11 +127,11 @@ function ManagerReservationsPage() {
   };
 
   const getRoomCategoryDisplay = (res) => {
-    const guestLower = String(res?.guest || "").toLowerCase();
-    if (guestLower.includes("surya")) return "Standard Room";
-    if (guestLower.includes("aswini") || guestLower.includes("ashwini")) return "Deluxe Room";
     if (res?.roomType) return res.roomType;
     if (res?.category) return res.category;
+    if (res?.room && String(res.room).includes('·')) {
+      return String(res.room).split('·')[1]?.trim() || "Standard Room";
+    }
     return "Standard Room";
   };
 
@@ -145,7 +142,12 @@ function ManagerReservationsPage() {
       if (notes) payload.notes = notes;
       const res = await managerService.updateReservation(bookingId, payload);
       if (res.success) {
-        toast.success(`Reservation status updated to ${newStatus}`);
+        setReservations(prev => prev.map(r => 
+          (r._id === bookingId || r.id === bookingId || r.bookingId === bookingId)
+            ? { ...r, status: newStatus }
+            : r
+        ));
+        toast.success(newStatus === "Checked-in" ? "Guest checked in successfully!" : newStatus === "Checked-out" ? "Guest checked out successfully!" : `Reservation status updated to ${newStatus}`);
         notifySocketEvents('update_reservation_status', 'ALL');
         loadData();
       } else {
@@ -444,7 +446,7 @@ function ManagerReservationsPage() {
                       <td className="py-3.5 pl-3 pr-4 text-left align-middle">
                         <div className="flex items-center justify-start gap-1 whitespace-nowrap select-none">
                           {/* Admin-styled Check-In / Check-Out buttons */}
-                          {(res.status === "Confirmed" || res.status === "Pending") && (
+                          {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
                             <Button
                               onClick={() => handleStatusChange(res._id || res.id, "Checked-in")}
                               size="xs"

@@ -697,10 +697,23 @@ function AdminDashboard() {
                   <div className="text-center">Payment Status</div>
                 </div>
                 <div className="divide-y divide-muted/40">
-                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-8839</div><div className="text-left">Karan Malhotra</div><div className="text-left text-muted-foreground">Razorpay GDS</div><div className="text-right font-bold text-navy">₹24,500</div><div className="flex items-center justify-center"><Tag tone="success">Paid</Tag></div></div>
-                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-4739</div><div className="text-left">Aisha Sharma</div><div className="text-left text-muted-foreground">UPI QR Code</div><div className="text-right font-bold text-navy">₹11,400</div><div className="flex items-center justify-center"><Tag tone="success">Paid</Tag></div></div>
-                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-1029</div><div className="text-left">Rohan Varma</div><div className="text-left text-muted-foreground">Paytm Wallet</div><div className="text-right font-bold text-navy">₹4,500</div><div className="flex items-center justify-center"><Tag tone="warning">Pending</Tag></div></div>
-                  <div className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc]"><div className="text-left font-mono font-semibold text-navy">FOL-9988</div><div className="text-left">Meera Nair</div><div className="text-left text-muted-foreground">Card Swipe</div><div className="text-right font-bold text-navy">₹11,400</div><div className="flex items-center justify-center"><Tag tone="success">Paid</Tag></div></div>
+                  {reservations.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-muted-foreground font-semibold">No recent invoiced folios found.</div>
+                  ) : (
+                    reservations.slice(0, 5).map((r) => (
+                      <div key={r._id || r.id} className="grid grid-cols-5 gap-4 px-4 py-3 items-center hover:bg-[#fcfcfc] text-xs">
+                        <div className="text-left font-mono font-semibold text-navy">FOL-{r.bookingId || (r._id ? String(r._id).slice(-4) : r.id)}</div>
+                        <div className="text-left font-bold text-navy">{r.guest}</div>
+                        <div className="text-left text-muted-foreground">{r.source || "Direct Web"}</div>
+                        <div className="text-right font-bold text-navy">₹{(r.amount || 0).toLocaleString("en-IN")}</div>
+                        <div className="flex items-center justify-center">
+                          <Tag tone={r.paymentStatus === "Paid" || r.balance === 0 ? "success" : "warning"}>
+                            {r.paymentStatus || (r.balance === 0 ? "Paid" : "Pending")}
+                          </Tag>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
