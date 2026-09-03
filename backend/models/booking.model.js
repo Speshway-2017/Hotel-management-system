@@ -9,6 +9,7 @@ const DATA_FILE = path.join(__dirname, '../data/bookings.json');
 
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String },
+  guestId: { type: String, default: null, index: true },
   guest: { type: String, required: true },
   email: { type: String },
   phone: { type: String },

@@ -6,6 +6,7 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Users,
   Search,
@@ -125,19 +126,16 @@ function ManagerShiftsPage() {
   useEffect(() => {
     loadData();
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData();
-      socket.on('staff_updated', handleRealtime);
-      socket.on('shift_assigned', handleRealtime);
+    const handleFocus = () => loadData();
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
     });
 
     return () => {
-      if (socketInst) {
-        socketInst.off('staff_updated');
-        socketInst.off('shift_assigned');
-      }
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

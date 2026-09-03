@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/utils";
@@ -94,8 +95,8 @@ function SuperAdminReports() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  const loadCommissionData = async () => {
-    setLoading(true);
+  const loadCommissionData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const res = await superAdminService.getCommissionReports();
@@ -103,14 +104,26 @@ function SuperAdminReports() {
         setReportData(res.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load platform commission records");
+      if (!isSilent) setError(err.message || "Failed to load platform commission records");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCommissionData();
+    loadCommissionData(false);
+
+    const handleFocus = () => loadCommissionData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadCommissionData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleExportCSV = () => {
@@ -336,27 +349,27 @@ function SuperAdminReports() {
           <div className="text-center py-12 text-muted-foreground">No property commission statement records found matching filters.</div>
         ) : (
           <div className="w-full overflow-x-auto">
-            <table className="w-full text-xs border-collapse min-w-[1100px] table-fixed">
+            <table className="w-full text-xs border-collapse min-w-[1050px]">
               <thead>
                 <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                  <th className="p-4 text-left w-[18%]">Property</th>
-                  <th className="p-4 text-left w-[10%]">Bookings Count</th>
-                  <th className="p-4 text-left w-[10%]">Commission Rate</th>
-                  <th className="p-4 text-left w-[12%]">Total Commission</th>
-                  <th className="p-4 text-left w-[12%]">Pending Amount</th>
-                  <th className="p-4 text-left w-[12%]">Settled Amount</th>
-                  <th className="p-4 text-left w-[12%]">Status</th>
-                  <th className="p-4 text-left w-[10%]">Settlement Date</th>
-                  <th className="p-4 text-left w-[6%]">Actions</th>
+                  <th className="p-4 pl-6 text-left">Property</th>
+                  <th className="p-4 text-left">Bookings Count</th>
+                  <th className="p-4 text-left">Commission Rate</th>
+                  <th className="p-4 text-left">Total Commission</th>
+                  <th className="p-4 text-left">Pending Amount</th>
+                  <th className="p-4 text-left">Settled Amount</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-left">Settlement Date</th>
+                  <th className="p-4 text-right pr-6 w-24 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
                 {filteredData.map((r) => (
                   <tr key={r.id} className="hover:bg-muted/15 transition-colors">
-                    <td className="p-4 text-left font-semibold text-navy truncate" title={r.propertyName}>
-                      <div className="flex items-center gap-1.5 truncate">
+                    <td className="p-4 pl-6 text-left font-semibold text-navy" title={r.propertyName}>
+                      <div className="flex items-center gap-1.5">
                         <Building className="size-3.5 text-purple shrink-0" />
-                        <span className="truncate">{r.propertyName}</span>
+                        <span>{r.propertyName}</span>
                       </div>
                     </td>
                     <td className="p-4 text-left text-muted-foreground font-semibold font-mono">{r.bookingCount} Stays</td>
@@ -370,14 +383,14 @@ function SuperAdminReports() {
                       </Tag>
                     </td>
                     <td className="p-4 text-left text-muted-foreground font-mono">{r.settlementDate}</td>
-                    <td className="p-4 text-left">
-                      <div className="flex justify-start items-center">
+                    <td className="p-4 text-right pr-6 w-24 whitespace-nowrap">
+                      <div className="flex justify-end items-center">
                         <button
                           onClick={() => { setSelectedRecord(r); setModalOpen(true); }}
-                          className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer flex items-center justify-center h-7 w-7"
+                          className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer flex items-center justify-center h-8 w-8"
                           title="View commission statement details"
                         >
-                          <Eye className="size-3.5" />
+                          <Eye className="size-4" />
                         </button>
                       </div>
                     </td>

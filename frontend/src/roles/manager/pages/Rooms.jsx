@@ -6,6 +6,7 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Bed,
   CheckCircle,
@@ -43,27 +44,6 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
     </div>
   );
 }
-
-const ROOM_DEFINITIONS = [
-  { room: "101", roomType: "Villa Suite", floor: "Floor 1" },
-  { room: "102", roomType: "Villa Suite", floor: "Floor 1" },
-  { room: "103", roomType: "Standard Room", floor: "Floor 1" },
-  { room: "104", roomType: "Deluxe Room", floor: "Floor 1" },
-  { room: "105", roomType: "Standard Room", floor: "Floor 1" },
-  { room: "106", roomType: "Standard Room", floor: "Floor 1" },
-  { room: "201", roomType: "Executive Room", floor: "Floor 2" },
-  { room: "202", roomType: "Executive Room", floor: "Floor 2" },
-  { room: "203", roomType: "Deluxe Room", floor: "Floor 2" },
-  { room: "204", roomType: "Deluxe Room", floor: "Floor 2" },
-  { room: "205", roomType: "Executive Room", floor: "Floor 2" },
-  { room: "206", roomType: "Standard Room", floor: "Floor 2" },
-  { room: "301", roomType: "Presidential Suite", floor: "Floor 3" },
-  { room: "302", roomType: "Suite Room", floor: "Floor 3" },
-  { room: "303", roomType: "Suite Room", floor: "Floor 3" },
-  { room: "304", roomType: "Deluxe Room", floor: "Floor 3" },
-  { room: "305", roomType: "Deluxe Room", floor: "Floor 3" },
-  { room: "306", roomType: "Standard Room", floor: "Floor 3" }
-];
 
 function ManagerRoomsPage() {
   const navigate = useNavigate();
@@ -153,31 +133,18 @@ function ManagerRoomsPage() {
   useEffect(() => {
     loadData(false);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData(true);
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('booking_deleted', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
-    });
-
     const handleFocus = () => {
       loadData(true);
     };
     window.addEventListener('focus', handleFocus);
 
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
     return () => {
       window.removeEventListener('focus', handleFocus);
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('booking_created');
-        socketInst.off('booking_deleted');
-        socketInst.off('room_status_changed');
-        socketInst.off('availability_changed');
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

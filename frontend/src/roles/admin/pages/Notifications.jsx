@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HorizontalRouteTabs, Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
@@ -11,6 +11,9 @@ import {
   CheckCheck,
   Building
 } from "lucide-react";
+import { notificationsService } from "@/services/notifications";
+import { subscribeRealtimeSync } from "@/services/socket";
+import { toast } from "sonner";
 
 const managementTabs = [
   { label: "Staff Management", to: "/admin/staff", icon: UserCog },
@@ -29,54 +32,6 @@ export const Route = createFileRoute("/admin/notifications")({
   component: AdminNotificationsPage
 });
 
-// Mock Initial Notifications Dataset Scoped to Speshway Luxury Hotel (Property ID: HS-JAI)
-const initialNotifications = [
-  {
-    id: "NTF-101",
-    title: "OTA Parity Sync Warning",
-    message: "Booking.com connection returned timeout error during room availability sync for Suite rooms.",
-    type: "OTA Sync",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "10 mins ago",
-    read: false,
-    body: "The OTA connection channel manager reported a parity discrepancy for Speshway Luxury Hotel Standard Room pricing between Agoda and Booking.com. Automated sync was retried 3 times and timed out. Action required to verify rate parity settings manually."
-  },
-  {
-    id: "NTF-102",
-    title: "Security Alert: Unauthorized Console login",
-    message: "Multiple failed login attempts detected on admin dashboard from IP 192.168.1.105.",
-    type: "Security Warning",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "2 hours ago",
-    read: false,
-    body: "Security systems logged 5 consecutive failed authorization requests for GM account on Speshway Luxury Hotel dashboard panel. Device fingerprint: Chrome on Linux. Recommended actions: Trigger password reset or IP access check."
-  },
-  {
-    id: "NTF-103",
-    title: "Overbooking Check-in Alert",
-    message: "Overbooking conflict detected for Maharaja Suite Room 302 on August 18.",
-    type: "Property Audit",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "4 hours ago",
-    read: true,
-    body: "The reservation engine flagged overlapping Confirmed bookings for Room 302 (Karan Malhotra & Vikram Gokhale) check-ins. Please reassign the waitlist guest to prevent double occupancy disputes."
-  },
-  {
-    id: "NTF-104",
-    title: "Razorpay Webhook Latency",
-    message: "UPI transaction captured successfully but ledger webhook response delayed by 7 seconds.",
-    type: "Payment Alert",
-    propertyId: "HS-JAI",
-    propertyName: "Speshway Luxury Hotel",
-    timestamp: "1 day ago",
-    read: true,
-    body: "Transaction capture hook FOL-9022 returned 502 Bad Gateway response. Payment confirmed on Razorpay Dashboard. Folio outstanding balance manually cleared to 0."
-  }
-];
-
 function getToneForType(type) {
   switch (type) {
     case "OTA Sync":
@@ -91,17 +46,13 @@ function getToneForType(type) {
   }
 }
 
-import { notificationsService } from "@/services/notifications";
-import { useEffect } from "react";
-import { toast } from "sonner";
-
 function AdminNotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [filterType, setFilterType] = useState("All");
   const [loading, setLoading] = useState(true);
 
-  const loadNotifications = async () => {
-    setLoading(true);
+  const loadNotifications = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const res = await notificationsService.getNotifications();
       if (res.success && res.data) {
@@ -119,14 +70,26 @@ function AdminNotificationsPage() {
         setNotifications(mapped);
       }
     } catch (err) {
-      toast.error("Failed to load alerts feed.");
+      if (!isSilent) toast.error("Failed to load alerts feed.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadNotifications();
+    loadNotifications(false);
+
+    const handleFocus = () => loadNotifications(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadNotifications(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleMarkAllAsRead = async () => {

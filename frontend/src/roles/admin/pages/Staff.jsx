@@ -44,11 +44,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
   );
 }
 
-const mockActivityLog = [
-  { time: "10:45 AM", user: "Vikram Rathore", action: "Approved discount waiver on BKG-9081", module: "Approvals" },
-  { time: "09:30 AM", user: "Sneha Deshpande", action: "Assigned Room 104 to Aisha Sharma", module: "Reception" },
-  { time: "08:15 AM", user: "Kunal Shah", action: "Completed Morning Shift audit log", module: "Audits" }
-];
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function AdminStaffPage() {
   const navigate = useNavigate();
@@ -61,9 +57,9 @@ function AdminStaffPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  async function loadStaff() {
+  async function loadStaff(isSilent = false) {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const [usersRes, propertiesRes] = await Promise.all([
         superAdminService.getUsers(),
@@ -84,42 +80,27 @@ function AdminStaffPage() {
       });
       setStaff(staffList);
     } catch (err) {
-      setError(err.message || "Failed to load staff list");
+      if (!isSilent) setError(err.message || "Failed to load staff list");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }
 
-  const notifySocketEvents = (action = 'update') => {
-    import('@/services/socket').then(({ socket }) => {
-      if (socket) {
-        socket.emit('staff_updated', { action });
-      }
-    }).catch(() => {});
-  };
-
   useEffect(() => {
-    loadStaff();
+    loadStaff(false);
 
     const handleFocus = () => {
-      loadStaff();
+      loadStaff(true);
     };
     window.addEventListener('focus', handleFocus);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadStaff();
-      socket.on('staff_updated', handleRealtime);
-      socket.on('user_updated', handleRealtime);
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadStaff(true);
     });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      if (socketInst) {
-        socketInst.off('staff_updated');
-        socketInst.off('user_updated');
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

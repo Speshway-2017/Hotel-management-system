@@ -11,6 +11,8 @@ import {
   Eye
 } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 export const Route = createFileRoute("/reception/check-out")({
   head: () => ({
     meta: [
@@ -57,60 +59,30 @@ function DeparturesPage() {
     receptionistService.getReservations()
       .then(res => {
         const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
-        const dynamicDepartures = allBookings
-          .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Checked-out' || b.status === 'Checked Out')
-          .map(b => {
-            const gName = String(b.guest || b.name || '').toLowerCase();
-            const rmNum = gName.includes('surya') ? '103' : (b.roomNumber || (b.room ? b.room.split(' ')[0] : '103'));
-            const rmType = gName.includes('surya') ? 'Standard Room' : (b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room'));
-            const isOut = b.status === 'Checked-out' || b.status === 'Checked Out';
-            const bal = Number(b.balance || 0);
-            return {
-              id: b.bookingId || b.id || b._id,
-              _id: b._id || b.id || b.bookingId,
-              name: b.guest || b.name || 'Guest',
-              guest: b.guest || b.name || 'Guest',
-              phone: b.phone || '+91 98765 00000',
-              room: rmNum,
-              roomNumber: rmNum,
-              type: rmType,
-              roomType: rmType,
-              nights: b.nights || 1,
-              duration: `${b.nights || 1} Nights`,
-              time: b.checkOut || '2026-09-02',
-              checkOut: b.checkOut || '2026-09-02',
-              isLate: false,
-              isCorporate: b.isCorporate || false,
-              corporateAccount: b.corporateName || '',
-              balance: bal,
-              paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
-              status: isOut ? 'Checked Out' : (bal > 0 ? 'Payment Pending' : 'Ready')
-            };
-          });
-
-        setDepartures(dynamicDepartures.length > 0 ? dynamicDepartures : [
-          {
-            id: 'BK-10301',
-            _id: 'BK-10301',
-            name: 'Surya',
-            guest: 'Surya',
-            phone: '+91 98765 10301',
-            room: '103',
-            roomNumber: '103',
-            type: 'Standard Room',
-            roomType: 'Standard Room',
-            nights: 1,
-            duration: '1 Nights',
-            time: '2026-09-02',
-            checkOut: '2026-09-02',
+        const list = allBookings
+          .filter(b => b.status === 'Checked-in' || b.status === 'Checked-out')
+          .map(b => ({
+            id: b.bookingId || b.id || b._id,
+            _id: b._id || b.id || b.bookingId,
+            name: b.guest || b.name || 'Guest',
+            guest: b.guest || b.name || 'Guest',
+            phone: b.phone || '--',
+            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+            roomNumber: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+            type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
+            roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
+            nights: Number(b.nights || 1),
+            duration: `${b.nights || 1} Nights`,
+            time: b.checkOut || 'Today',
+            checkOut: b.checkOut || 'Today',
             isLate: false,
             isCorporate: false,
             corporateAccount: '',
-            balance: 0,
-            paymentStatus: 'Paid',
-            status: 'Ready'
-          }
-        ]);
+            balance: Number(b.balance || 0),
+            paymentStatus: Number(b.balance || 0) === 0 ? 'Paid' : 'Pending',
+            status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+          }));
+        setDepartures(list);
       })
       .catch(err => console.error("Failed to load departures list:", err))
       .finally(() => setLoading(false));
@@ -118,26 +90,18 @@ function DeparturesPage() {
 
   useEffect(() => {
     loadDepartures();
-    const interval = setInterval(loadDepartures, 8000);
+    const interval = setInterval(loadDepartures, 10000);
     const handleFocus = () => loadDepartures();
     window.addEventListener('focus', handleFocus);
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtime = () => loadDepartures();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-
-      return () => {
-        socket.off('booking_updated', handleRealtime);
-        socket.off('booking_created', handleRealtime);
-        socket.off('room_status_changed', handleRealtime);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadDepartures();
     });
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

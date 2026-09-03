@@ -82,7 +82,12 @@ function ManagerViewReport() {
       setLoading(true);
       setError(null);
       try {
-        const decoded = atob(id);
+        let decoded = id;
+        try {
+          decoded = atob(id);
+        } catch (e) {
+          decoded = id;
+        }
         setReportTitle(decoded);
 
         const resRes = await managerService.getReservations();

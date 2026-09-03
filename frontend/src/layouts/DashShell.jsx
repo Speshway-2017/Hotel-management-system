@@ -10,6 +10,7 @@ import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -34,11 +35,8 @@ const subModules = {
   "super-admin": {
     "Operations": [
       { label: "Properties", to: "/super-admin/properties" },
-      { label: "Reservations", to: "/super-admin/reservations" },
-      { label: "Channel Manager", to: "/super-admin/channel-manager" }
-    ],
-    "Analytics & Reports": [
-      { label: "Revenue Reports", to: "/super-admin/reports" }
+      { label: "Channel Manager", to: "/super-admin/channel-manager" },
+      { label: "Contact Requests", to: "/super-admin/contacts" }
     ],
     "Access & Security": [
       { label: "Guests Portfolio", to: "/super-admin/users" },
@@ -131,7 +129,8 @@ export function DashShell({ role, children }) {
         const token = localStorage.getItem('hms_token');
         if (!token) return;
         
-        const res = await fetch('http://localhost:5000/api/notifications/unread-count', {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiBase}/notifications/unread-count`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -151,9 +150,14 @@ export function DashShell({ role, children }) {
     const handleForceRefresh = () => fetchUnreadCount();
     window.addEventListener('refresh-unread-notifications-count', handleForceRefresh);
 
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchUnreadCount();
+    });
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('refresh-unread-notifications-count', handleForceRefresh);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
@@ -953,12 +957,15 @@ export function DashShell({ role, children }) {
                 "/super-admin/reservations/view": [{ label: "Reservations", to: "/super-admin/reservations" }, { label: "Reservation Details" }],
                 "/super-admin/reports": [{ label: "Reports" }],
                 "/super-admin/channel-manager": [{ label: "Channel Manager" }],
+                "/super-admin/contacts": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests" }],
+                "/super-admin/contacts/view": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests", to: "/super-admin/contacts" }, { label: "Inquiry Details" }],
                 "/super-admin/branding": [{ label: "Branding" }],
                 "/super-admin/coupons": [{ label: "Promo Coupons" }],
                 "/super-admin/coupons/add": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Add Coupon" }],
                 "/super-admin/coupons/edit": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Edit Coupon" }],
                 "/super-admin/coupons/view": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Coupon Details" }],
                 "/super-admin/subscription": [{ label: "Plans & Billing" }],
+                "/super-admin/subscription/requests/view": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Request Details" }],
                 "/super-admin/subscription/add": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Add Plan" }],
                 "/super-admin/subscription/edit": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Edit Plan" }],
                 "/super-admin/subscription/view": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Plan Details" }],

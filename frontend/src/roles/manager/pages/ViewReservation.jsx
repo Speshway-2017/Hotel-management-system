@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { Calendar, User, Home, CreditCard, ChevronLeft, ShieldAlert } from "lucide-react";
 
@@ -16,6 +17,26 @@ function ManagerViewReservation() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
 
+  const loadBookingDetail = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    setError(null);
+    try {
+      const res = await managerService.getReservations();
+      if (res.success && Array.isArray(res.data)) {
+        const matched = res.data.find(b => String(b._id) === String(id) || String(b.id) === String(id) || String(b.bookingId) === String(id));
+        if (matched) {
+          setBooking(matched);
+        } else if (!isSilent) {
+          setError("Reservation record not found.");
+        }
+      }
+    } catch (err) {
+      if (!isSilent) setError(err.message || "Failed to load reservation details.");
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const user = authService.getCurrentUser();
     setCurrentUser(user);
@@ -26,26 +47,15 @@ function ManagerViewReservation() {
       return;
     }
 
-    const loadBookingDetail = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await managerService.getReservations();
-        if (res.success && Array.isArray(res.data)) {
-          const matched = res.data.find(b => String(b._id) === String(id) || String(b.id) === String(id));
-          if (matched) {
-            setBooking(matched);
-          } else {
-            setError("Reservation record not found.");
-          }
-        }
-      } catch (err) {
-        setError(err.message || "Failed to load reservation details.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (id) loadBookingDetail();
+    if (id) {
+      loadBookingDetail();
+      const unsubscribe = subscribeRealtimeSync(() => {
+        loadBookingDetail(true);
+      });
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    }
   }, [id]);
 
   if (!isAuthorized) {

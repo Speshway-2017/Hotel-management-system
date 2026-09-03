@@ -15,6 +15,8 @@ import {
   Building
 } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
   const isPositive = delta >= 0;
@@ -54,14 +56,13 @@ function ManagerDashboard() {
   
   // Data sets
   const [bookings, setBookings] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [staff, setStaff] = useState([]);
   const [pendingApprovalsList, setPendingApprovalsList] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
   
   // Operational tabs
   const [chartTab, setChartTab] = useState("revenue");
-
-  const todayStr = "2026-08-21";
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -91,9 +92,10 @@ function ManagerDashboard() {
       }
 
       // Fetch all required resources
-      const [propRes, bookingsRes, staffRes, approvalsRes, feedbackRes] = await Promise.all([
+      const [propRes, bookingsRes, roomsRes, staffRes, approvalsRes, feedbackRes] = await Promise.all([
         managerService.getProperty().catch(() => ({ success: true, data: null })),
         managerService.getReservations().catch(() => ({ success: true, data: [] })),
+        managerService.getRooms().catch(() => ({ success: true, data: [] })),
         managerService.getStaff().catch(() => ({ success: true, data: [] })),
         managerService.getApprovals().catch(() => ({ success: true, data: [] })),
         managerService.getFeedback().catch(() => ({ success: true, data: [] }))
@@ -107,6 +109,9 @@ function ManagerDashboard() {
 
       if (bookingsRes && bookingsRes.success && Array.isArray(bookingsRes.data)) {
         setBookings(bookingsRes.data);
+      }
+      if (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) {
+        setRooms(roomsRes.data);
       }
       if (staffRes && staffRes.success && Array.isArray(staffRes.data)) {
         setStaff(staffRes.data);
@@ -127,29 +132,18 @@ function ManagerDashboard() {
   useEffect(() => {
     loadDashboardData();
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadDashboardData();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('booking_deleted', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
-      socket.on('payment_added', handleRealtime);
-      socket.on('staff_updated', handleRealtime);
+    const handleFocus = () => {
+      loadDashboardData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadDashboardData();
     });
 
     return () => {
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('booking_created');
-        socketInst.off('booking_deleted');
-        socketInst.off('room_status_changed');
-        socketInst.off('availability_changed');
-        socketInst.off('payment_added');
-        socketInst.off('staff_updated');
-      }
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
@@ -220,7 +214,7 @@ function ManagerDashboard() {
   const pendingCheckouts = activeBookings.filter(b => (isTodayDate(b.checkOut) || b.status === "Checked-in") && b.status !== "Checked-out");
 
   // Occupancy, ADR, RevPAR computations
-  const totalRooms = property.rooms || 12;
+  const totalRooms = rooms.length > 0 ? rooms.length : (property.rooms || 12);
   const rawOccupancy = totalRooms > 0 ? (currentStays.length / totalRooms) * 100 : 0;
   const occupancyPercent = Math.round(rawOccupancy);
   
@@ -228,36 +222,17 @@ function ManagerDashboard() {
   const adrValue = activeBookings.length > 0 ? Math.round(totalRevenue / activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0)) : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0);
   const revparValue = Math.round(adrValue * (occupancyPercent / 100));
 
-  // Mocked stats for visual completeness of Manager view
-  const housekeepingClean = Math.round(totalRooms * 0.6);
-  const housekeepingDirty = Math.round(totalRooms * 0.3);
-  const housekeepingInspect = totalRooms - housekeepingClean - housekeepingDirty;
+  // Dynamic Room Counts from MongoDB
+  const housekeepingClean = rooms.filter(r => r.status === 'Available' || r.housekeeping === 'Clean').length;
+  const housekeepingDirty = rooms.filter(r => r.status === 'Dirty' || r.housekeeping === 'Dirty').length;
+  const housekeepingInspect = rooms.filter(r => r.housekeeping === 'Inspected').length;
+  const oooCount = rooms.filter(r => r.status === 'Maintenance' || r.status === 'Out of Order' || r.status === 'Blocked').length;
+  const cleaningCount = rooms.filter(r => r.housekeeping === 'Cleaning').length;
 
-  const activeMaintenance = [
-    { id: "MNT-01", room: "302", issue: "AC fan noise override", priority: "Medium", status: "In Progress" },
-    { id: "MNT-02", room: "104", issue: "Geyser thermostat replacement", priority: "High", status: "Assigned" }
-  ];
+  const pendingApprovals = pendingApprovalsList.filter(a => a.status === "Pending");
+  const recentFeedback = feedbackList.slice(0, 5);
 
-  const pendingApprovals = [
-    { id: "APP-01", type: "Discount Request", detail: "10% void for Corporate stay", guest: "Rohan Deshmukh" },
-    { id: "APP-02", type: "Rate Overrule", detail: "Early check-in fee waiver", guest: "Devendra Shastri" }
-  ];
-
-  const recentFeedback = [
-    { id: "FDB-01", guest: "Karan Malhotra", score: 5, comment: "Fabulous service, clean rooms and friendly receptionist" },
-    { id: "FDB-02", guest: "Aisha Sharma", score: 4, comment: "Spacious luxury room, but front desk check-in queue took longer than usual" }
-  ];
-
-  const serviceRequests = [
-    { room: "302", item: "Extra towel set", time: "10 mins ago" },
-    { room: "104", item: "UPI invoice dispatch", time: "25 mins ago" }
-  ];
-
-  const complaints = [
-    { room: "205", text: "Wifi speed slow", status: "Pending" }
-  ];
-
-  // Simulated Trends for charts
+  // Dynamic Trends for charts
   const baseRevenue = totalRevenue > 0 ? totalRevenue : (totalRooms * 1.5 * adrValue) || 450000;
   const revenueTrendData = [
     { date: "15 Aug", revenue: Math.round(baseRevenue * 0.12) || 45000, occupancy: Math.max(10, occupancyPercent - 5), adr: adrValue - 100, revpar: revparValue - 80 },
@@ -268,7 +243,7 @@ function ManagerDashboard() {
     { date: "20 Aug", revenue: Math.round(baseRevenue * 0.21) || 82000, occupancy: occupancyPercent || 75, adr: adrValue, revpar: revparValue }
   ];
 
-  // Booking sources breakdown
+  // Dynamic Booking sources breakdown
   const sourcePerformanceData = [
     { name: "Direct", value: activeBookings.filter(b => b.source === "Direct" || b.source === "Walk-in").length || 4, color: "#8b5cf6" },
     { name: "MakeMyTrip", value: activeBookings.filter(b => b.source === "MakeMyTrip").length || 3, color: "#f5c06a" },
@@ -276,17 +251,14 @@ function ManagerDashboard() {
     { name: "Agoda", value: activeBookings.filter(b => b.source === "Agoda").length || 1, color: "#ef4444" }
   ];
 
-  const cleaningCount = 2;
-  const dirtyCount = 3;
-  const oooCount = activeMaintenance.length;
   const occupiedCount = currentStays.length;
-  const vacantCleanCount = Math.max(0, totalRooms - occupiedCount - dirtyCount - cleaningCount - oooCount);
+  const vacantCleanCount = Math.max(0, totalRooms - occupiedCount - housekeepingDirty - cleaningCount - oooCount);
 
-  const vacantPct = (vacantCleanCount / totalRooms) * 100;
-  const occupiedPct = (occupiedCount / totalRooms) * 100;
-  const dirtyPct = (dirtyCount / totalRooms) * 100;
-  const cleaningPct = (cleaningCount / totalRooms) * 100;
-  const oooPct = (oooCount / totalRooms) * 100;
+  const vacantPct = totalRooms > 0 ? (vacantCleanCount / totalRooms) * 100 : 0;
+  const occupiedPct = totalRooms > 0 ? (occupiedCount / totalRooms) * 100 : 0;
+  const dirtyPct = totalRooms > 0 ? (housekeepingDirty / totalRooms) * 100 : 0;
+  const cleaningPct = totalRooms > 0 ? (cleaningCount / totalRooms) * 100 : 0;
+  const oooPct = totalRooms > 0 ? (oooCount / totalRooms) * 100 : 0;
 
   return (
     <div className="space-y-6 text-left">

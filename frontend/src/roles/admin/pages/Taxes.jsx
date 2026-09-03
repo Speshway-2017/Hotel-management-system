@@ -33,6 +33,8 @@ export const Route = createFileRoute("/admin/taxes")({
   component: TaxesGstPage
 });
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 function TaxesGstPage() {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,8 +47,8 @@ function TaxesGstPage() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const res = await superAdminService.getReservations();
@@ -54,14 +56,26 @@ function TaxesGstPage() {
         setReservations(res.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load tax records.");
+      if (!isSilent) setError(err.message || "Failed to load tax records.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleExport = (format) => {
@@ -82,16 +96,17 @@ function TaxesGstPage() {
     
     // Search query filter
     const matchesSearch =
-      r.guest.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r._id && r._id.toLowerCase().includes(searchQuery.toLowerCase()));
+      (r.guest || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r._id && r._id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (r.bookingId && r.bookingId.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (!matchesSearch) return false;
 
     const checkInDate = new Date(r.checkIn);
-    const today = new Date("2026-08-17"); // Anchor to system seeded timeline date
+    const today = new Date();
 
     if (dateFilter === "Today") {
-      return r.checkIn === "2026-08-17" || r.checkIn === "2026-08-18";
+      return checkInDate.toDateString() === today.toDateString();
     }
 
     if (dateFilter === "7") {

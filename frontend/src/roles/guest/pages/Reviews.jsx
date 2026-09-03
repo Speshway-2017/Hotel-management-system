@@ -38,6 +38,8 @@ function GuestReviewsPage() {
   const [comments, setComments] = useState("");
   const [formError, setFormError] = useState("");
 
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
   const fetchData = async () => {
     setLoading(true);
     setError("");
@@ -47,7 +49,7 @@ function GuestReviewsPage() {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       // 1. Fetch Guest Feedback from Backend/MongoDB
-      const revRes = await fetch('http://localhost:5000/api/v1/guest/feedback', { headers });
+      const revRes = await fetch(`${API_URL}/v1/guest/feedback`, { headers });
       const revData = await revRes.json();
 
       if (revData && revData.success && Array.isArray(revData.data)) {
@@ -57,7 +59,7 @@ function GuestReviewsPage() {
       }
 
       // 2. Fetch Guest Bookings for the form dropdown
-      const bookRes = await fetch('http://localhost:5000/api/v1/guest/bookings', { headers });
+      const bookRes = await fetch(`${API_URL}/v1/guest/bookings`, { headers });
       const bookData = await bookRes.json();
       if (bookData && bookData.success && Array.isArray(bookData.data)) {
         setBookings(bookData.data);
@@ -107,7 +109,7 @@ function GuestReviewsPage() {
         comments
       };
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/feedback', {
+      const res = await fetch(`${API_URL}/v1/guest/feedback`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload)

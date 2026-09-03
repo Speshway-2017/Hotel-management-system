@@ -35,6 +35,9 @@ function getToneForCategory(cat) {
   }
 }
 
+import { notificationsService } from "@/services/notifications";
+import { subscribeRealtimeSync } from "@/services/socket";
+
 function GuestNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
@@ -42,16 +45,11 @@ function GuestNotificationsPage() {
   const [error, setError] = useState("");
   const [markingAll, setMarkingAll] = useState(false);
 
-  const fetchNotifications = async () => {
-    setLoading(true);
+  const fetchNotifications = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem('hms_token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch('http://localhost:5000/api/v1/guest/notifications', { headers });
-      const result = await res.json();
+      const result = await notificationsService.getNotifications();
 
       if (result && result.success && Array.isArray(result.data)) {
         const compiled = result.data.map((n) => ({
@@ -59,9 +57,9 @@ function GuestNotificationsPage() {
           title: n.title,
           message: n.message,
           category: n.category || "General",
-          timestamp: new Date(n.createdAt || Date.now()).toLocaleDateString('en-IN', {
+          timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-IN', {
             day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-          }),
+          }) : "Today",
           read: Boolean(n.isRead)
         }));
         setNotifications(compiled);
@@ -70,26 +68,32 @@ function GuestNotificationsPage() {
       }
     } catch (err) {
       console.error("Failed to load notifications:", err);
-      setError("Unable to connect to backend server.");
+      if (!isSilent) setError("Unable to connect to backend server.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications(false);
+
+    const handleFocus = () => fetchNotifications(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchNotifications(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleMarkAsRead = async (id) => {
     try {
-      const token = localStorage.getItem('hms_token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      await fetch(`http://localhost:5000/api/v1/guest/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers
-      });
+      await notificationsService.markNotificationRead(id);
+      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
 
       // Update local state
       setNotifications(prev =>
@@ -103,14 +107,8 @@ function GuestNotificationsPage() {
   const handleMarkAllAsRead = async () => {
     setMarkingAll(true);
     try {
-      const token = localStorage.getItem('hms_token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      await fetch('http://localhost:5000/api/v1/guest/notifications/read-all', {
-        method: 'PATCH',
-        headers
-      });
+      await notificationsService.markAllNotificationsRead();
+      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
 
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (err) {

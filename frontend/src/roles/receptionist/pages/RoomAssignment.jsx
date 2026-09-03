@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { receptionistService } from "@/services/receptionist";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
   Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
@@ -31,8 +32,8 @@ function RoomStatusPage() {
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState([]);
 
-  const loadRooms = () => {
-    setLoading(true);
+  const loadRooms = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getRooms()
       .then(res => {
         if (res.success && res.data) {
@@ -40,27 +41,29 @@ function RoomStatusPage() {
         }
       })
       .catch(err => console.error("Failed to load property rooms status:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    loadRooms();
+    loadRooms(false);
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtime = () => {
-        console.log('⚡ Socket event received on Room Status grid. Refreshing rooms...');
-        loadRooms();
-      };
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('booking_updated', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
+    const interval = setInterval(() => {
+      loadRooms(true);
+    }, 10000);
+    const handleFocus = () => loadRooms(true);
+    window.addEventListener('focus', handleFocus);
 
-      return () => {
-        socket.off('room_status_changed', handleRealtime);
-        socket.off('booking_updated', handleRealtime);
-        socket.off('availability_changed', handleRealtime);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadRooms(true);
     });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Selected Room Details Modal

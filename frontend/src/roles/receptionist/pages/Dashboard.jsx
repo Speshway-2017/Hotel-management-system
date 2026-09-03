@@ -11,6 +11,8 @@ import {
   Clock, AlertTriangle, ClipboardCheck, ArrowRightLeft, CreditCard, Eye
 } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 const FrontDeskDashboardRoute = {
   head: () => ({
     meta: [
@@ -72,68 +74,65 @@ function FrontDeskDashboard() {
       const allBookings = resRes?.success && Array.isArray(resRes.data) ? resRes.data : [];
       const allRooms = roomsRes?.success && Array.isArray(roomsRes.data) ? roomsRes.data : [];
 
-      // 1. Dynamic Arrivals from DB (Confirmed / Pending / Pre-checked)
-      const dynamicArrivals = allBookings
-        .filter(b => b.status === 'Confirmed' || b.status === 'Pending' || b.status === 'Pre-checked')
-        .map(b => {
-          const gName = String(b.guest || b.name || '').toLowerCase();
-          const rmNum = gName.includes('mounika') ? '101' : (b.roomNumber || (b.room ? b.room.split(' ')[0] : '101'));
-          const rmType = gName.includes('mounika') ? 'Standard Room' : (b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room'));
-          return {
+      // 1. Dynamic Arrivals (Confirmed / Paid / Pending)
+      let finalArrivals = [];
+      if (dashRes?.success && Array.isArray(dashRes.data?.arrivals) && dashRes.data.arrivals.length > 0) {
+        finalArrivals = dashRes.data.arrivals;
+      } else {
+        finalArrivals = allBookings
+          .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending')
+          .map(b => ({
             id: b.bookingId || b.id || b._id,
             name: b.guest || b.name || 'Guest',
-            room: rmNum,
-            type: rmType,
-            time: b.checkIn || '2026-09-02',
-            source: b.source || 'MakeMyTrip',
+            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+            type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
+            time: b.checkIn,
+            source: b.source || 'Direct',
             status: b.status === 'Confirmed' ? 'Pre-checked' : b.status
-          };
-        });
+          }));
+      }
 
-      // 2. Dynamic Departures from DB (Checked-in / Checked-out)
-      const dynamicDepartures = allBookings
-        .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Checked-out' || b.status === 'Checked Out')
-        .map(b => {
-          const gName = String(b.guest || b.name || '').toLowerCase();
-          const rmNum = gName.includes('surya') ? '103' : (b.roomNumber || (b.room ? b.room.split(' ')[0] : '103'));
-          const isOut = b.status === 'Checked-out' || b.status === 'Checked Out';
-          return {
+      // 2. Dynamic Departures (Checked-in / Checked-out)
+      let finalDepartures = [];
+      if (dashRes?.success && Array.isArray(dashRes.data?.departures) && dashRes.data.departures.length > 0) {
+        finalDepartures = dashRes.data.departures;
+      } else {
+        finalDepartures = allBookings
+          .filter(b => b.status === 'Checked-in' || b.status === 'Checked-out')
+          .map(b => ({
             id: b.bookingId || b.id || b._id,
             name: b.guest || b.name || 'Guest',
-            room: rmNum,
-            time: b.checkOut || '2026-09-02',
+            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+            time: b.checkOut,
             balance: Number(b.balance || 0),
-            status: isOut ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
-          };
-        });
+            status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+          }));
+      }
 
-      // 3. Dynamic In-Stay count (Checked-in stays)
-      const inStayCount = allBookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked In').length || 1;
+      // 3. Dynamic In-Stay count
+      const inStayCount = allBookings.filter(b => b.status === 'Checked-in').length;
 
-      // 4. Dynamic Available rooms
+      // 4. Dynamic Room metrics
       const totalRoomsCount = allRooms.length > 0 ? allRooms.length : 12;
-      const availableRoomsCount = Math.max(0, totalRoomsCount - inStayCount);
+      const occupiedRoomsCount = allRooms.filter(r => r.status === 'Occupied').length || inStayCount;
+      const availableRoomsCount = Math.max(0, totalRoomsCount - occupiedRoomsCount);
 
-      // 5. Dynamic Total Revenue from active bookings in DB
+      // 5. Dynamic Total Revenue
       const revenue = allBookings
         .filter(b => b.status !== 'Cancelled')
-        .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0) || dashRes?.data?.stats?.totalRevenue || 58800;
+        .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0) || dashRes?.data?.stats?.totalRevenue || 0;
 
-      setArrivals(dynamicArrivals.length > 0 ? dynamicArrivals : [
-        { id: 'BK-20402', name: 'Mounika', room: '101', type: 'Standard Room', time: '2026-09-02', source: 'MakeMyTrip', status: 'Pre-checked' }
-      ]);
-      setDepartures(dynamicDepartures.length > 0 ? dynamicDepartures : [
-        { id: 'BK-10301', name: 'Surya', room: '103', time: '2026-09-02', balance: 0, status: 'Ready' }
-      ]);
+      setArrivals(finalArrivals);
+      setDepartures(finalDepartures);
 
       setStats({
         available: availableRoomsCount,
-        occupied: inStayCount,
+        occupied: occupiedRoomsCount,
         inStay: inStayCount,
-        dirty: allRooms.filter(r => r.status === 'Dirty').length || 0,
-        cleaning: allRooms.filter(r => r.status === 'Cleaning').length || 0,
-        ooo: allRooms.filter(r => r.status === 'Out of Order').length || 0,
-        blocked: allRooms.filter(r => r.status === 'Blocked').length || 0,
+        dirty: allRooms.filter(r => r.status === 'Dirty').length,
+        cleaning: allRooms.filter(r => r.status === 'Cleaning').length,
+        ooo: allRooms.filter(r => r.status === 'Out of Order').length,
+        blocked: allRooms.filter(r => r.status === 'Blocked').length,
         totalRevenue: revenue
       });
     })
@@ -165,26 +164,18 @@ function FrontDeskDashboard() {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 15000); // 15 seconds poll fallback
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtime = () => {
-        fetchDashboardData();
-      };
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
-      socket.on('payment_logged', handleRealtime);
+    const handleFocus = () => fetchDashboardData();
+    window.addEventListener('focus', handleFocus);
 
-      return () => {
-        socket.off('booking_updated', handleRealtime);
-        socket.off('booking_created', handleRealtime);
-        socket.off('room_status_changed', handleRealtime);
-        socket.off('availability_changed', handleRealtime);
-        socket.off('payment_logged', handleRealtime);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchDashboardData();
     });
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const receptionistName = currentUser?.name || "Imran Sheikh";

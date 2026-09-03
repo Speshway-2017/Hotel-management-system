@@ -81,8 +81,8 @@ function Booking() {
       .catch(() => {});
   }, []);
 
-  const checkInDate = localStorage.getItem('booking_check_in') || '2026-09-01';
-  const checkOutDate = localStorage.getItem('booking_check_out') || '2026-09-03';
+  const checkInDate = localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0];
+  const checkOutDate = localStorage.getItem('booking_check_out') || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   // Calculate pricing & tariff
   const roomRate = Number(selectedRoom?.currentRate || selectedRoom?.baseRate || selectedRoom?.dailyRate || 3000);
@@ -131,16 +131,23 @@ function Booking() {
 
       const res = await publicService.createBooking(bookingPayload);
       if (res && res.success && res.data) {
-        const created = res.data;
+        const created = res.data.booking || res.data;
         const bId = created.bookingId || created._id || created.id;
 
-        localStorage.setItem('latest_booking_id', bId);
-        localStorage.setItem('latest_booking', JSON.stringify(created));
+        if (res.data.token) {
+          localStorage.setItem('hms_token', res.data.token);
+        }
+        if (res.data.user) {
+          localStorage.setItem('hms_user', JSON.stringify(res.data.user));
+          window.dispatchEvent(new Event('user-profile-updated'));
+        }
 
         // Clear transient booking selection
         localStorage.removeItem('selected_room_data');
         localStorage.removeItem('booking_check_in');
         localStorage.removeItem('booking_check_out');
+        localStorage.removeItem('latest_booking');
+        localStorage.removeItem('latest_booking_id');
 
         // Redirect to Guest Dashboard -> My Bookings
         window.location.href = `/guest/bookings?id=${bId}`;

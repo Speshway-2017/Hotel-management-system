@@ -6,6 +6,7 @@ import { RevenueChart, OccupancyChart } from "@/components/hs/Charts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { 
   Building2, TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, 
   Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, AlertTriangle, 
@@ -82,14 +83,15 @@ function SuperAdminDashboard() {
     { name: "RBAC Session Auditor", status: "Healthy", desc: "Audits synchronized" }
   ];
 
-  async function loadDashboardData() {
+  async function loadDashboardData(isSilent = false) {
     try {
+      if (!isSilent) setLoading(true);
       const [statsRes, propertiesRes, reservationsRes, logsRes, requestsRes] = await Promise.all([
-        superAdminService.getDashboardStats(),
-        superAdminService.getProperties(),
-        superAdminService.getReservations(),
-        superAdminService.getAuditLogs(),
-        superAdminService.getSubscriptionRequests()
+        superAdminService.getDashboardStats().catch(() => ({})),
+        superAdminService.getProperties().catch(() => ({})),
+        superAdminService.getReservations().catch(() => ({})),
+        superAdminService.getAuditLogs().catch(() => ({})),
+        superAdminService.getSubscriptionRequests().catch(() => ({}))
       ]);
       
       if (statsRes.success) setStats(statsRes.data.stats);
@@ -98,20 +100,32 @@ function SuperAdminDashboard() {
       if (logsRes.success) setLogs(logsRes.data);
       if (requestsRes.success) setSubscriptionRequests(requestsRes.data);
     } catch (err) {
-      setError(err.message || "Failed to sync dashboard data.");
+      if (!isSilent) setError(err.message || "Failed to sync dashboard data.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
       setRefreshing(false);
     }
   }
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData(false);
+
+    const handleFocus = () => loadDashboardData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadDashboardData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadDashboardData();
+    loadDashboardData(false);
   };
 
   const handleDecide = async (id, action, reason = "") => {

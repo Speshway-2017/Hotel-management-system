@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Users,
   CheckCircle,
@@ -172,23 +173,18 @@ function ManagerGuestsPage() {
   useEffect(() => {
     loadData();
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('booking_deleted', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
     });
 
     return () => {
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('booking_created');
-        socketInst.off('booking_deleted');
-        socketInst.off('room_status_changed');
-      }
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

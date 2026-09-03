@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { 
   CreditCard, Search, ArrowUpRight, CheckCircle2, AlertTriangle, 
   TrendingUp, RefreshCw, Landmark, Wallet, Plus, Download, Filter
@@ -48,8 +49,8 @@ function PaymentsPage() {
   const [methodFilter, setMethodFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const loadPayments = () => {
-    setLoading(true);
+  const loadPayments = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getPayments()
       .then(res => {
         if (res.success && res.data) {
@@ -57,11 +58,25 @@ function PaymentsPage() {
         }
       })
       .catch(err => console.error("Failed to load payments ledger:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    loadPayments();
+    loadPayments(false);
+
+    const handleFocus = () => loadPayments(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadPayments(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const totalCollected = payments

@@ -7,6 +7,7 @@ import {
   CheckCircle2, Eye, ArrowLeft 
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/guest/folio")({
   head: () => ({
@@ -31,108 +32,28 @@ function GuestFolioPage() {
   const pathId = location.pathname.split('/guest/folio/')[1];
   const activeId = routeParams?.id || pathId || new URLSearchParams(location.search).get('id');
 
-  const fetchFolioData = async () => {
-    setLoading(true);
+  const fetchFolioData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError("");
     try {
       const token = localStorage.getItem('hms_token');
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/folio', { headers });
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${apiBase}/v1/guest/folio`, { headers });
       const result = await res.json();
 
       let list = [];
-      if (result && result.success && result.data && Array.isArray(result.data.folios) && result.data.folios.length > 0) {
+      if (result && result.success && result.data && Array.isArray(result.data.folios)) {
         list = result.data.folios;
-      } else {
-        const stored = localStorage.getItem('latest_booking');
-        if (stored) {
-          try {
-            const b = JSON.parse(stored);
-            const baseAmount = Number(b.amount || 0);
-            const roomCharges = Math.round(baseAmount * 0.82);
-            const gstTax = Math.round(baseAmount * 0.18);
-            const services = [
-              { name: 'Room Service & Refreshments', amount: 350, date: b.checkIn || '2026-09-01' }
-            ];
-            const serviceTotal = 350;
-            const totalCharges = baseAmount + serviceTotal;
-            const paidAmount = baseAmount;
-            const balance = serviceTotal;
-            list = [{
-              folioId: `FOL-${b.bookingId || b.id || '1001'}`,
-              id: `FOL-${b.bookingId || b.id || '1001'}`,
-              bookingId: b.bookingId || b.id || '1001',
-              hotel: b.hotel || 'Speshway Hotel & Suites',
-              city: b.city || 'Hyderabad',
-              address: 'Hitech City, Hyderabad, Telangana',
-              gstNo: '36AABCS1429B1Z5',
-              guestName: b.guest || 'Aarav Mehta',
-              guestPhone: b.phone || '+91 98204 33121',
-              guestEmail: b.email || 'aarav.mehta@example.com',
-              room: b.room || 'Standard Suite',
-              checkIn: b.checkIn || '2026-09-01',
-              checkOut: b.checkOut || '2026-09-03',
-              dates: `${b.checkIn || '2026-09-01'} → ${b.checkOut || '2026-09-03'}`,
-              status: b.status || 'Confirmed',
-              roomCharges,
-              gstTax,
-              services,
-              serviceTotal,
-              discount: 0,
-              totalCharges,
-              paidAmount,
-              balance,
-              paymentStatus: balance === 0 ? 'Settled' : 'Pending Balance',
-              invoiceAvailable: true
-            }];
-          } catch (e) {}
-        }
       }
       setFolios(list);
     } catch (err) {
       console.error("Failed to load digital folios:", err);
-      const stored = localStorage.getItem('latest_booking');
-      if (stored) {
-        try {
-          const b = JSON.parse(stored);
-          const baseAmount = Number(b.amount || 0);
-          setFolios([{
-            folioId: `FOL-${b.bookingId || b.id || '1001'}`,
-            id: `FOL-${b.bookingId || b.id || '1001'}`,
-            bookingId: b.bookingId || b.id || '1001',
-            hotel: b.hotel || 'Speshway Hotel & Suites',
-            city: b.city || 'Hyderabad',
-            address: 'Hitech City, Hyderabad, Telangana',
-            gstNo: '36AABCS1429B1Z5',
-            guestName: b.guest || 'Aarav Mehta',
-            guestPhone: b.phone || '+91 98204 33121',
-            guestEmail: b.email || 'aarav.mehta@example.com',
-            room: b.room || 'Standard Suite',
-            checkIn: b.checkIn || '2026-09-01',
-            checkOut: b.checkOut || '2026-09-03',
-            dates: `${b.checkIn || '2026-09-01'} → ${b.checkOut || '2026-09-03'}`,
-            status: b.status || 'Confirmed',
-            roomCharges: Math.round(baseAmount * 0.82),
-            gstTax: Math.round(baseAmount * 0.18),
-            services: [{ name: 'Room Service & Refreshments', amount: 350, date: b.checkIn || '2026-09-01' }],
-            serviceTotal: 350,
-            discount: 0,
-            totalCharges: baseAmount + 350,
-            paidAmount: baseAmount,
-            balance: 350,
-            paymentStatus: 'Pending Balance',
-            invoiceAvailable: true
-          }]);
-        } catch (e) {
-          setError("Failed to load digital folios from server.");
-        }
-      } else {
-        setError("Failed to load digital folios from server.");
-      }
+      setError("Failed to load digital folios from server.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -146,7 +67,19 @@ function GuestFolioPage() {
   };
 
   useEffect(() => {
-    fetchFolioData();
+    fetchFolioData(false);
+
+    const handleFocus = () => fetchFolioData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchFolioData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

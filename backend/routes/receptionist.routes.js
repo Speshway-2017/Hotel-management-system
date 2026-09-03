@@ -11,6 +11,7 @@ import {
   ReceptionistNotification
 } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
+import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 
 import mongoose from 'mongoose';
 
@@ -108,39 +109,37 @@ router.get('/dashboard', async (req, res) => {
       .filter(b => b.status !== 'Cancelled')
       .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
 
-    // Arrivals: Incoming stays for today / pending check-in (Confirmed / Pending with checkIn 2026-09-02)
-    const todayArrivals = bookings.filter(b => (b.status === 'Confirmed' || b.status === 'Pending') && (b.checkIn === '2026-09-02' || b.checkIn === '2026-09-01'));
-    const arrivalsList = (todayArrivals.length > 0 ? todayArrivals : bookings.filter(b => b.status === 'Confirmed' || b.status === 'Pending').slice(0, 1))
-      .map(b => ({
-        id: b.bookingId || b.id || b._id,
-        _id: b._id || b.id || b.bookingId,
-        name: b.guest || b.name || 'Guest',
-        room: b.roomNumber || (b.room ? b.room.split(' ')[0] : '204'),
-        type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Executive Suite' : 'Executive Suite'),
-        time: b.checkIn,
-        checkIn: b.checkIn,
-        source: b.source || 'MakeMyTrip',
-        status: b.status === 'Confirmed' ? 'Pre-checked' : 'Pending'
-      }));
+    // Arrivals: Incoming stays for today / pending check-in (Confirmed / Pending / Paid)
+    const arrivals = bookings.filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending');
+    const arrivalsList = arrivals.map(b => ({
+      id: b.bookingId || b.id || b._id,
+      _id: b._id || b.id || b.bookingId,
+      name: b.guest || b.name || 'Guest',
+      room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+      type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
+      time: b.checkIn,
+      checkIn: b.checkIn,
+      source: b.source || 'Direct',
+      status: b.status === 'Confirmed' ? 'Pre-checked' : b.status
+    }));
 
-    // Departures: Stays currently checked in or scheduled for checkout today e.g. Surya
-    const todayDepartures = bookings.filter(b => b.status === 'Checked-in' || (b.status === 'Checked-out' && (b.checkOut === '2026-09-02' || b.checkOut === '2026-09-01')));
-    const departuresList = (todayDepartures.length > 0 ? todayDepartures : bookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked-out').slice(0, 1))
-      .map(b => ({
-        id: b.bookingId || b.id || b._id,
-        _id: b._id || b.id || b.bookingId,
-        name: b.guest || b.name || 'Guest',
-        room: b.roomNumber || (b.room ? b.room.split(' ')[0] : '103'),
-        time: b.checkOut,
-        checkOut: b.checkOut,
-        balance: b.balance !== undefined ? Number(b.balance) : 0,
-        status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
-      }));
+    // Departures: Stays currently checked in or completed
+    const departures = bookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked-out');
+    const departuresList = departures.map(b => ({
+      id: b.bookingId || b.id || b._id,
+      _id: b._id || b.id || b.bookingId,
+      name: b.guest || b.name || 'Guest',
+      room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+      time: b.checkOut,
+      checkOut: b.checkOut,
+      balance: b.balance !== undefined ? Number(b.balance) : 0,
+      status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+    }));
 
-    const inStayCount = departuresList.filter(d => d.status !== 'Checked Out').length || 1;
+    const inStayCount = bookings.filter(b => b.status === 'Checked-in').length;
     const occupiedCount = inStayCount;
     const totalRoomsCount = rooms.length > 0 ? rooms.length : 12;
-    const availableCount = Math.max(0, totalRoomsCount - occupiedCount); // 12 - 1 = 11
+    const availableCount = Math.max(0, totalRoomsCount - occupiedCount);
 
     const stats = {
       available: availableCount,
@@ -150,7 +149,7 @@ router.get('/dashboard', async (req, res) => {
       cleaning: rooms.filter(r => r.status === 'Cleaning').length,
       ooo: rooms.filter(r => r.status === 'Out of Order').length,
       blocked: rooms.filter(r => r.status === 'Blocked').length,
-      totalRevenue: totalRevenue || 58800
+      totalRevenue: totalRevenue
     };
 
     return sendSuccess(res, 200, {
@@ -406,6 +405,14 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
       category: 'Maintenance'
     });
 
+    // Notify Realtime (Socket.io)
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'room_status_changed', { propertyId, roomNumber: req.params.roomNumber, status: updated.status });
+      emitRealtimeSync(io, propertyId, 'availability_changed', { propertyId, roomNumber: req.params.roomNumber });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'room_status_changed' });
+    }
+
     return sendSuccess(res, 200, updated, 'Room status updated successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -492,17 +499,33 @@ router.post('/reservations', async (req, res) => {
       }
     }
 
+    // Check if an existing Guest Account already exists for this guest
+    let guestId = null;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPhone = String(phone || '').trim();
+
+    if (cleanEmail || cleanPhone) {
+      const query = [];
+      if (cleanEmail) query.push({ email: cleanEmail });
+      if (cleanPhone) query.push({ mobile: cleanPhone });
+      const existingGuest = await User.findOne({ $or: query, role: 'guest' });
+      if (existingGuest) {
+        guestId = existingGuest._id || existingGuest.id;
+      }
+    }
+
     const newBooking = await Booking.create({
       guest,
-      phone: phone || '',
-      email: email || '',
+      guestId,
+      phone: cleanPhone,
+      email: cleanEmail,
       room: room || '',
       roomId: assignedRoomId,
       checkIn,
       checkOut,
       nights: Number(nights) || 1,
       pax: pax || '2 Adults',
-      source: source || 'Direct',
+      source: source || 'Walk-in',
       status: 'Confirmed',
       amount: Number(amount),
       balance: Number(balance !== undefined ? balance : amount),
@@ -530,8 +553,10 @@ router.post('/reservations', async (req, res) => {
     // Notify Realtime (Socket.io)
     const io = req.app.get('socketio');
     if (io) {
-      io.emit('booking_updated', { type: 'CREATED', booking: newBooking });
-      io.emit('availability_changed', { propertyId, roomId: assignedRoomId });
+      emitRealtimeSync(io, propertyId, 'booking_created', { booking: newBooking, propertyId });
+      emitRealtimeSync(io, propertyId, 'booking_updated', { type: 'CREATED', booking: newBooking, propertyId });
+      emitRealtimeSync(io, propertyId, 'availability_changed', { propertyId, roomId: assignedRoomId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'booking_created' });
     }
 
     return sendSuccess(res, 201, newBooking, 'Reservation created successfully.');
@@ -553,6 +578,9 @@ router.put('/reservations/:id/status', async (req, res) => {
 
     const updateData = { status };
     if (room) updateData.room = room;
+    if (status === 'Checked-in' && (!booking.balance || booking.balance === 0)) {
+      updateData.paymentStatus = 'Paid';
+    }
 
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, updateData, { new: true });
 
@@ -563,8 +591,8 @@ router.put('/reservations/:id/status', async (req, res) => {
         // Operational status -> Occupied on Check-in
         await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId }, { status: 'Occupied' });
       } else if (status === 'Checked-out') {
-        // Operational status -> Dirty on Check-out
-        await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId }, { status: 'Dirty' });
+        // Operational status -> Available / Dirty on Check-out
+        await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId }, { status: 'Available' });
       } else if (status === 'Cancelled' || status === 'No-show') {
         // Release inventory reservation
         await Room.findOneAndUpdate({ roomNumber: roomNum, propertyId, status: 'Occupied' }, { status: 'Available' });
@@ -573,6 +601,7 @@ router.put('/reservations/:id/status', async (req, res) => {
 
     // Trigger notifications
     await triggerNotification({
+      req,
       role: 'manager',
       propertyId,
       title: `Reservation ${status}`,
@@ -580,6 +609,7 @@ router.put('/reservations/:id/status', async (req, res) => {
       category: status === 'Cancelled' || status === 'No-show' ? 'Alerts' : 'Operations'
     });
     await triggerNotification({
+      req,
       role: 'receptionist',
       propertyId,
       title: `Reservation ${status}`,
@@ -587,11 +617,31 @@ router.put('/reservations/:id/status', async (req, res) => {
       category: status === 'Cancelled' || status === 'No-show' ? 'Alerts' : 'Operations'
     });
 
-    // Notify Realtime (Socket.io)
+    if (booking.guestId) {
+      await triggerNotification({
+        req,
+        userId: booking.guestId,
+        role: 'guest',
+        title: status === 'Checked-in' ? 'Check-in Confirmed!' : (status === 'Checked-out' ? 'Check-out Completed' : `Booking Status: ${status}`),
+        message: status === 'Checked-in' 
+          ? `Welcome! You have checked in to Room ${roomNum || 'assigned room'}. Enjoy your stay!`
+          : (status === 'Checked-out' 
+            ? 'Thank you for choosing Hour Stay. We hope you had a pleasant experience!' 
+            : `Your reservation status is now ${status}.`),
+        category: status === 'Checked-in' || status === 'Checked-out' ? 'Booking Confirmation' : 'General'
+      });
+    }
+
+    // Notify Realtime (Socket.io) across all dashboards
     const io = req.app.get('socketio');
     if (io) {
-      io.emit('booking_updated', { type: 'STATUS_CHANGE', booking: updated });
-      io.emit('room_status_changed', { propertyId, roomNumber: roomNum, status });
+      const action = status === 'Checked-in' ? 'checkin' : status === 'Checked-out' ? 'checkout' : 'status_change';
+      broadcastCheckinCheckout(io, propertyId, {
+        action,
+        booking: updated,
+        roomNumber: roomNum,
+        status
+      });
     }
 
     return sendSuccess(res, 200, updated, `Reservation status marked as ${status}.`);
@@ -676,6 +726,21 @@ router.post('/folios/:id/charges', async (req, res) => {
       balance: Number(booking.balance) + Number(amount)
     }, { new: true });
 
+    // Trigger notification
+    await triggerNotification({
+      role: 'manager',
+      propertyId,
+      title: 'Incidental Charge Posted',
+      message: `Charge of ₹${amount} (${description || 'service charge'}) posted to folio for guest ${booking.guest}.`,
+      category: 'General'
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'booking_updated', { booking: updated, propertyId, action: 'charge_added' });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'charge_added' });
+    }
+
     return sendSuccess(res, 200, updated, 'Incidental charge posted successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -708,6 +773,7 @@ router.post('/folios/:id/payments', async (req, res) => {
 
     // Trigger notifications
     await triggerNotification({
+      req,
       role: 'manager',
       propertyId,
       title: 'Payment Received',
@@ -715,12 +781,32 @@ router.post('/folios/:id/payments', async (req, res) => {
       category: 'Payments'
     });
     await triggerNotification({
+      req,
       role: 'receptionist',
       propertyId,
       title: 'Payment Received',
       message: `Payment of ₹${amount} received from guest ${booking.guest} via ${method || 'UPI'}.`,
       category: 'Payments'
     });
+
+    if (booking.guestId) {
+      await triggerNotification({
+        req,
+        userId: booking.guestId,
+        role: 'guest',
+        title: 'Payment Received',
+        message: `Payment of ₹${amount} processed successfully via ${method || 'UPI'}.`,
+        category: 'Payment Update'
+      });
+    }
+
+    // Notify Realtime (Socket.io)
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'payment_logged', { bookingId: booking.id || booking._id, amount, propertyId });
+      emitRealtimeSync(io, propertyId, 'booking_updated', { booking: updated, propertyId, action: 'payment' });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'payment_logged' });
+    }
 
     return sendSuccess(res, 200, updated, 'Payment recorded successfully.');
   } catch (err) {
@@ -754,6 +840,12 @@ router.post('/payments', async (req, res) => {
       status: status || 'Settled',
       propertyId
     });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'payment_added', { payment: newPayment, propertyId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'payment_added' });
+    }
 
     return sendSuccess(res, 201, newPayment, 'Payment logged successfully.');
   } catch (err) {

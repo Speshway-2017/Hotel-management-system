@@ -1,10 +1,15 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 import CMS from '../models/cms.model.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import Booking from '../models/booking.model.js';
-import { Room } from '../models/managerData.model.js';
+import User from '../models/user.model.js';
+import { Room, ContactMessage } from '../models/managerData.model.js';
+import SubscriptionPlan from '../models/subscriptionPlan.model.js';
+import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
+import { triggerNotification } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -301,16 +306,57 @@ router.post('/bookings', async (req, res) => {
       bookingCity = targetProp?.settings?.city || targetProp?.city || 'Hyderabad';
     }
 
+    // 2. Identify or Create Guest Account (Website -> First Booking creates account and links booking)
+    let guestUser = null;
+
+    // Check if Authorization token provided
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      try {
+        const tokenVal = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(tokenVal, process.env.JWT_SECRET || 'secret123');
+        if (decoded?.id) {
+          guestUser = await User.findById(decoded.id);
+        }
+      } catch (e) {}
+    }
+
+    if (!guestUser && req.body.guestId) {
+      guestUser = await User.findById(req.body.guestId).catch(() => null);
+    }
+
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPhone = String(phone || '').trim();
+
+    if (!guestUser && cleanEmail) {
+      guestUser = await User.findOne({ email: cleanEmail });
+    }
+
+    if (!guestUser) {
+      // Create new Guest account in MongoDB
+      const defaultPassword = `Guest@${Math.floor(1000 + Math.random() * 9000)}`;
+      guestUser = await User.create({
+        name: gName,
+        email: cleanEmail,
+        mobile: cleanPhone,
+        role: 'guest',
+        password: defaultPassword,
+        status: 'Active'
+      });
+    }
+
+    const guestId = guestUser ? (guestUser._id || guestUser.id) : null;
+
     const bookingId = `BK${Date.now().toString().slice(-6)}`;
 
     const newBooking = await Booking.create({
       bookingId,
+      guestId,
       propertyId: targetPropId,
       roomId: assignedRoomId,
       city: bookingCity,
       guest: gName,
-      email,
-      phone,
+      email: cleanEmail,
+      phone: cleanPhone,
       checkIn: cIn,
       checkOut: cOut,
       room: assignedRoomNumber ? `${rType || 'Room'} (Room ${assignedRoomNumber})` : (rType || 'Standard Room'),
@@ -322,20 +368,179 @@ router.post('/bookings', async (req, res) => {
       totalAmount: amt,
       specialRequests: specialRequests || '',
       source: 'Website Direct',
-      status: 'Confirmed',
-      paymentStatus: 'Paid'
+      status: 'Confirmed'
     });
 
-    // Notify Realtime (Socket.io)
+    // Notify Realtime (Socket.io) across all dashboards and guest view
     const io = req.app.get('socketio');
     if (io) {
-      io.emit('booking_updated', { type: 'CREATED', booking: newBooking });
-      io.emit('availability_changed', { propertyId: targetPropId, roomId: assignedRoomId });
+      broadcastCheckinCheckout(io, targetPropId, {
+        action: 'status_change',
+        booking: newBooking,
+        roomNumber: assignedRoomNumber,
+        status: 'Confirmed'
+      });
     }
 
-    return sendSuccess(res, 201, newBooking, 'Booking confirmed successfully');
+    // Trigger Notifications
+    await triggerNotification({
+      req,
+      propertyId: targetPropId,
+      title: 'New Online Reservation',
+      message: `Guest ${gName} booked ${rType || 'Room'} (${checkIn} → ${checkOut}) for ₹${amt}.`,
+      category: 'New Reservation'
+    });
+
+    if (guestUser) {
+      await triggerNotification({
+        req,
+        userId: guestUser._id || guestUser.id,
+        role: 'guest',
+        title: 'Booking Confirmed!',
+        message: `Your reservation at ${prop?.name || 'Hotel'} is confirmed for ${checkIn} - ${checkOut}. Ref: #${newBooking.bookingId || newBooking._id}`,
+        category: 'Booking Confirmation'
+      });
+    }
+
+    // Generate JWT token for guest
+    const token = guestUser ? jwt.sign({ id: guestUser._id || guestUser.id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' }) : null;
+
+    const responsePayload = {
+      ...(newBooking.toObject ? newBooking.toObject() : newBooking),
+      booking: newBooking,
+      token,
+      user: guestUser ? {
+        id: guestUser._id || guestUser.id,
+        _id: guestUser._id || guestUser.id,
+        name: guestUser.name,
+        email: guestUser.email,
+        mobile: guestUser.mobile,
+        role: guestUser.role
+      } : null
+    };
+
+    return sendSuccess(res, 201, responsePayload, 'Booking confirmed successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to create booking');
+  }
+});
+
+// POST /api/v1/public/contact
+router.post('/contact', async (req, res) => {
+  try {
+    const { name, email, phone, hotelName, subject, message, propertyId } = req.body;
+    if (!name || !email || !message) {
+      return sendError(res, 400, 'Name, email, and message are required.');
+    }
+
+    const targetPropId = propertyId || 'HS-9HQ8P';
+    const newContact = await ContactMessage.create({
+      name,
+      email,
+      phone: phone || '',
+      subject: subject || hotelName || 'General Inquiry',
+      message,
+      propertyId: targetPropId,
+      status: 'New'
+    });
+
+    await triggerNotification({
+      req,
+      role: 'admin',
+      propertyId: targetPropId,
+      title: 'New Contact Inquiry',
+      message: `${name} (${email}): ${subject || hotelName || message.substring(0, 40)}`,
+      category: 'General'
+    });
+
+    await triggerNotification({
+      req,
+      role: 'super-admin',
+      title: 'New Public Contact Request',
+      message: `${name} submitted an inquiry: "${subject || hotelName || message.substring(0, 40)}"`,
+      category: 'General'
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'contact_created', { contact: newContact });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'contact_created' });
+    }
+
+    return sendSuccess(res, 201, newContact, 'Thank you! Your message has been received.');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to submit contact form');
+  }
+});
+
+// GET /api/v1/public/contact
+router.get('/contact', async (req, res) => {
+  try {
+    const propertyId = req.query.propertyId || 'HS-9HQ8P';
+    const prop = await Property.findById(propertyId).catch(() => null);
+    const cms = await CMS.findOne().catch(() => null);
+
+    const contactInfo = {
+      name: prop?.settings?.hotelName || prop?.name || cms?.contact?.name || "Hour Stay Speshway Luxury Hotel",
+      email: prop?.settings?.reservationEmail || prop?.settings?.email || cms?.contact?.email || "stay@hourstay.in",
+      phone: prop?.settings?.contactNumber || prop?.settings?.phone || cms?.contact?.phone || "+91 141 4055 900",
+      address: prop?.settings?.address ? `${prop.settings.address}, ${prop.city || 'Hyderabad'}` : (cms?.contact?.address || "2nd Floor, Gulmohar House, Amber Fort Road, Jaipur"),
+      hours: `Check-in: ${prop?.settings?.checkInTime || '12:00'} · Check-out: ${prop?.settings?.checkOutTime || '11:00'} (Front Desk 24/7)`
+    };
+
+    return sendSuccess(res, 200, contactInfo, 'Contact information retrieved');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// GET /api/v1/public/plans
+router.get('/plans', async (req, res) => {
+  try {
+    let plans = await SubscriptionPlan.find({ status: 'Active' }).sort({ monthlyPrice: 1 });
+    if (!plans || plans.length === 0) {
+      // Seed standard default plans if empty
+      const defaultPlans = [
+        {
+          name: "Starter Tier",
+          description: "Essential suite for boutique properties and standalone guesthouses.",
+          monthlyPrice: 3999,
+          yearlyPrice: 39990,
+          propertyLimit: 1,
+          roomLimit: 25,
+          includedFeatures: ["Front Desk Console", "Direct Booking Engine", "GST Split Invoicing", "Mobile Housekeeping"],
+          status: "Active",
+          activeSubscribers: 12
+        },
+        {
+          name: "Professional Suite",
+          description: "Full-featured management platform for expanding city hotels and resorts.",
+          monthlyPrice: 7999,
+          yearlyPrice: 79990,
+          propertyLimit: 3,
+          roomLimit: 75,
+          includedFeatures: ["Real-time 2-Way Channel Sync", "Advanced Guest CRM", "Dynamic Rate Calendar", "Shift Roster & Biometrics", "POS Restaurant Billing"],
+          status: "Active",
+          activeSubscribers: 28
+        },
+        {
+          name: "Enterprise Pro",
+          description: "Unlimited portfolio management for multi-branch chains and heritage groups.",
+          monthlyPrice: 14999,
+          yearlyPrice: 149990,
+          propertyLimit: 10,
+          roomLimit: 300,
+          includedFeatures: ["Multi-Property Central Ledger", "Custom API & Webhooks", "Dedicated SLA Account Manager", "Custom WhatsApp Invoicing", "Auditor & CA Export Portal"],
+          status: "Active",
+          activeSubscribers: 8
+        }
+      ];
+      await SubscriptionPlan.insertMany(defaultPlans);
+      plans = await SubscriptionPlan.find({ status: 'Active' }).sort({ monthlyPrice: 1 });
+    }
+    return sendSuccess(res, 200, plans, 'Active subscription plans retrieved');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to retrieve subscription plans');
   }
 });
 

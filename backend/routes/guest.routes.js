@@ -10,44 +10,30 @@ import { sendSuccess, sendError } from '../utils/response.js';
 
 const router = express.Router();
 
-const softAuth = async (req, res, next) => {
+const guestAuth = async (req, res, next) => {
   try {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       const token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
       req.user = await User.findById(decoded.id).select('-password');
     }
   } catch (e) {}
   
   if (!req.user) {
-    req.user = {
-      name: 'Aarav Mehta',
-      email: 'aarav.mehta@example.com',
-      mobile: '+91 98204 33121'
-    };
+    return sendError(res, 401, 'Authentication required to access guest portal');
   }
   next();
 };
 
-router.use(softAuth);
+router.use(guestAuth);
 
 router.get('/bookings', async (req, res) => {
   try {
     const properties = await Property.find({});
-    const userMobile = req.user?.mobile || '';
-    const userName = req.user?.name || '';
-    const userEmail = req.user?.email || '';
+    const userId = req.user._id || req.user.id;
 
-    const query = [];
-    if (userName) query.push({ guest: userName });
-    if (userMobile) query.push({ phone: userMobile });
-    if (userEmail) query.push({ email: userEmail });
-
-    let bookings = await Booking.find(query.length > 0 ? { $or: query } : {}).sort({ createdAt: -1 });
-
-    if (bookings.length === 0) {
-      bookings = await Booking.find({}).sort({ createdAt: -1 });
-    }
+    // Show ONLY bookings linked to the logged-in guest's guestId/accountId
+    const bookings = await Booking.find({ guestId: userId }).sort({ createdAt: -1 });
 
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
@@ -59,6 +45,8 @@ router.get('/bookings', async (req, res) => {
       return {
         id: b.bookingId || b._id || b.id,
         bookingId: b.bookingId || b._id || b.id,
+        guestId: b.guestId,
+        guest: b.guest || req.user.name,
         hotel: propName,
         city: city,
         room: b.room || b.roomType || 'Standard Room',
@@ -67,6 +55,8 @@ router.get('/bookings', async (req, res) => {
         dates: `${checkIn} → ${checkOut}`,
         amount: Number(b.amount || b.totalAmount || 0),
         status: b.status || 'Confirmed',
+        paymentStatus: b.paymentStatus || 'Paid',
+        balance: Number(b.balance || 0),
         createdAt: b.createdAt
       };
     });
@@ -80,25 +70,14 @@ router.get('/bookings', async (req, res) => {
 router.get('/dashboard', async (req, res) => {
   try {
     const properties = await Property.find({});
-    const userMobile = req.user?.mobile || '';
-    const userName = req.user?.name || '';
-    const userEmail = req.user?.email || '';
+    const userId = req.user._id || req.user.id;
 
-    const query = [];
-    if (userName) query.push({ guest: userName });
-    if (userMobile) query.push({ phone: userMobile });
-    if (userEmail) query.push({ email: userEmail });
-
-    let bookings = await Booking.find(query.length > 0 ? { $or: query } : {}).sort({ createdAt: -1 });
-
-    // Fallback: If no guest-specific bookings found, get all recent bookings from MongoDB
-    if (bookings.length === 0) {
-      bookings = await Booking.find({}).sort({ createdAt: -1 });
-    }
+    // Show ONLY bookings linked to the logged-in guest's guestId/accountId
+    const bookings = await Booking.find({ guestId: userId }).sort({ createdAt: -1 });
 
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
-      const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Speshway Hotel & Suites');
+      const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
       const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
       const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
@@ -106,19 +85,23 @@ router.get('/dashboard', async (req, res) => {
       return {
         id: b.bookingId || b._id || b.id,
         bookingId: b.bookingId || b._id || b.id,
+        guestId: b.guestId,
+        guest: b.guest || req.user.name,
         hotel: propName,
         city: city,
-        room: b.room || b.roomType || 'Standard Suite',
+        room: b.room || b.roomType || 'Standard Room',
         checkIn: checkIn,
         checkOut: checkOut,
         dates: `${checkIn} → ${checkOut}`,
         amount: Number(b.amount || b.totalAmount || 0),
         status: b.status || 'Confirmed',
+        paymentStatus: b.paymentStatus || 'Paid',
+        balance: Number(b.balance || 0),
         createdAt: b.createdAt
       };
     });
 
-    const upcomingBooking = mapped.find(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending') || mapped[0] || null;
+    const upcomingBooking = mapped.find(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending') || null;
     const currentStay = mapped.find(b => b.status === 'Checked-in') || null;
     const totalStays = mapped.length;
     const totalSpent = mapped.reduce((acc, b) => acc + Number(b.amount || 0), 0);
@@ -144,25 +127,15 @@ router.get('/dashboard', async (req, res) => {
 router.get('/folio', async (req, res) => {
   try {
     const properties = await Property.find({});
-    const userMobile = req.user?.mobile || '';
-    const userName = req.user?.name || '';
-    const userEmail = req.user?.email || '';
+    const userId = req.user._id || req.user.id;
 
-    const query = [];
-    if (userName) query.push({ guest: userName });
-    if (userMobile) query.push({ phone: userMobile });
-    if (userEmail) query.push({ email: userEmail });
-
-    let bookings = await Booking.find(query.length > 0 ? { $or: query } : {}).sort({ createdAt: -1 });
-
-    if (bookings.length === 0) {
-      bookings = await Booking.find({}).sort({ createdAt: -1 });
-    }
+    // Show ONLY folios linked to the logged-in guest's guestId/accountId
+    const bookings = await Booking.find({ guestId: userId }).sort({ createdAt: -1 });
 
     const folios = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
 
-      const hotel = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Speshway Hotel & Suites');
+      const hotel = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
       const address = prop ? (prop.settings?.address || prop.address || `${city}, India`) : 'Hitech City, Hyderabad, Telangana';
       const gstNo = prop?.settings?.gstin || '36AABCS1429B1Z5';
@@ -173,9 +146,7 @@ router.get('/folio', async (req, res) => {
       
       const services = Array.isArray(b.services) && b.services.length > 0
         ? b.services
-        : [
-            { name: 'Room Service & Refreshments', amount: 350, date: b.checkIn || '2026-09-01' }
-          ];
+        : [];
       
       const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
       const discount = Number(b.discount || 0);
@@ -188,14 +159,15 @@ router.get('/folio', async (req, res) => {
         folioId: `FOL-${b.bookingId || b._id || '1001'}`,
         id: `FOL-${b.bookingId || b._id || '1001'}`,
         bookingId: b.bookingId || b._id || b.id,
+        guestId: b.guestId,
         hotel,
         city,
         address,
         gstNo,
-        guestName: b.guest || req.user?.name || 'Aarav Mehta',
-        guestPhone: b.phone || req.user?.mobile || '+91 98204 33121',
-        guestEmail: b.email || req.user?.email || 'aarav.mehta@example.com',
-        room: b.room || b.roomType || 'Standard Suite',
+        guestName: b.guest || req.user.name,
+        guestPhone: b.phone || req.user.mobile || '',
+        guestEmail: b.email || req.user.email || '',
+        room: b.room || b.roomType || 'Standard Room',
         checkIn: b.checkIn || '2026-09-01',
         checkOut: b.checkOut || '2026-09-03',
         dates: `${b.checkIn || '2026-09-01'} → ${b.checkOut || '2026-09-03'}`,
@@ -279,11 +251,11 @@ router.get('/profile', async (req, res) => {
   try {
     const user = req.user;
     return sendSuccess(res, 200, {
-      name: user.name || 'Aarav Mehta',
-      email: user.email || 'aarav.mehta@example.com',
-      mobile: user.mobile || '+91 98204 33121',
+      name: user.name || 'Guest User',
+      email: user.email || '',
+      mobile: user.mobile || '',
       city: user.city || 'Hyderabad',
-      address: user.address || 'Hitech City, Hyderabad, Telangana',
+      address: user.address || '',
       language: user.language || 'English (IN)',
       currency: user.currency || 'INR (₹)',
       notifications: user.notificationPrefs || {
@@ -327,8 +299,8 @@ router.put('/profile', async (req, res) => {
       name: name || req.user.name,
       email: email || req.user.email,
       mobile: mobile || req.user.mobile,
-      city: city || 'Hyderabad',
-      address: address || 'Hitech City, Hyderabad',
+      city: city || req.user.city || 'Hyderabad',
+      address: address || req.user.address || '',
       language: language || 'English (IN)',
       currency: currency || 'INR (₹)'
     }, 'Profile information updated successfully in MongoDB');

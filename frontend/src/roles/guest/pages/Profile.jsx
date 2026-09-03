@@ -70,6 +70,7 @@ function GuestProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [notification, setNotification] = useState(null);
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
   const fetchProfileData = async () => {
     setLoading(true);
@@ -78,7 +79,7 @@ function GuestProfilePage() {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/profile', { headers });
+      const res = await fetch(`${API_URL}/v1/guest/profile`, { headers });
       const result = await res.json();
 
       if (result && result.success && result.data) {
@@ -149,7 +150,7 @@ function GuestProfilePage() {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/profile', {
+      const res = await fetch(`${API_URL}/v1/guest/profile`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -212,7 +213,7 @@ function GuestProfilePage() {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/change-password', {
+      const res = await fetch(`${API_URL}/v1/guest/change-password`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { toast } from "sonner";
 import {
   AreaChart, Area,
@@ -147,24 +148,27 @@ function ReportsDashboard() {
 
   const processReportData = (allReservations, range, start, end) => {
     // 1. Determine date range window
-    const todayStr = "2026-08-24";
-    let startDate = "2026-08-01";
-    let endDate = "2026-08-24";
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    let startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    let endDate = todayStr;
 
     if (range === "today") {
       startDate = todayStr;
       endDate = todayStr;
     } else if (range === "this-week") {
-      startDate = "2026-08-18";
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      startDate = d.toISOString().split("T")[0];
       endDate = todayStr;
     } else if (range === "this-month") {
-      startDate = "2026-08-01";
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
       endDate = todayStr;
     } else if (range === "last-month") {
-      startDate = "2026-07-01";
-      endDate = "2026-07-31";
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split("T")[0];
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0];
     } else if (range === "custom") {
-      startDate = start || "2026-08-01";
+      startDate = start || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
       endDate = end || todayStr;
     }
 
@@ -297,6 +301,20 @@ function ReportsDashboard() {
 
   useEffect(() => {
     loadData();
+
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleRangeChange = (val) => {

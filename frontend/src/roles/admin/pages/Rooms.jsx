@@ -6,6 +6,7 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Bed,
   Users,
@@ -83,21 +84,8 @@ function RoomsRatesPage() {
 
   // Tab navigation: 'rooms' | 'types' | 'plans' | 'availability' | 'restrictions'
   const [activeTab, setActiveTab] = useState("rooms");
-  // Core Data States (Initialized with clean seeded room types)
-  const [roomsList, setRoomsList] = useState([
-    { _id: "R-101", roomNumber: "101", category: "Standard Room", floor: "Floor 1", status: "Available", ratePlan: "Standard Plan", currentRate: 3000, dailyRate: 3000 },
-    { _id: "R-102", roomNumber: "102", category: "Standard Room", floor: "Floor 1", status: "Occupied", ratePlan: "Standard Plan", currentRate: 3000, dailyRate: 3000 },
-    { _id: "R-103", roomNumber: "103", category: "Standard Room", floor: "Floor 1", status: "Available", ratePlan: "Standard Plan", currentRate: 3000, dailyRate: 3000 },
-    { _id: "R-201", roomNumber: "201", category: "Deluxe Room", floor: "Floor 2", status: "Available", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
-    { _id: "R-202", roomNumber: "202", category: "Deluxe Room", floor: "Floor 2", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
-    { _id: "R-203", roomNumber: "203", category: "Deluxe Room", floor: "Floor 2", status: "Blocked", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
-    { _id: "R-301", roomNumber: "301", category: "Executive Suite", floor: "Floor 3", status: "Available", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
-    { _id: "R-302", roomNumber: "302", category: "Executive Suite", floor: "Floor 3", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
-    { _id: "R-303", roomNumber: "303", category: "Executive Suite", floor: "Floor 3", status: "Available", ratePlan: "Deluxe Plan", currentRate: 6500, dailyRate: 6500 },
-    { _id: "R-401", roomNumber: "401", category: "Deluxe Room", floor: "Floor 4", status: "Available", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
-    { _id: "R-402", roomNumber: "402", category: "Deluxe Room", floor: "Floor 4", status: "Occupied", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 },
-    { _id: "R-403", roomNumber: "403", category: "Deluxe Room", floor: "Floor 4", status: "Blocked", ratePlan: "Deluxe Plan", currentRate: 4500, dailyRate: 4500 }
-  ]);
+  // Core Data States
+  const [roomsList, setRoomsList] = useState([]);
 
   const [roomTypesList, setRoomTypesList] = useState(() => {
     const saved = localStorage.getItem("hms_room_types_list_v2");
@@ -291,25 +279,13 @@ function RoomsRatesPage() {
     };
     window.addEventListener('focus', handleFocus);
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtime = () => {
-        console.log('⚡ Realtime Socket event received on Admin Rooms page. Refreshing...');
-        loadData(true);
-      };
-
-      socket.on('booking_updated', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
-
-      return () => {
-        socket.off('booking_updated', handleRealtime);
-        socket.off('room_status_changed', handleRealtime);
-        socket.off('availability_changed', handleRealtime);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
     });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

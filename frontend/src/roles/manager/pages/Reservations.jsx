@@ -6,6 +6,7 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Search,
   Eye,
@@ -91,32 +92,29 @@ function ManagerReservationsPage() {
   }
 
   const notifySocketEvents = (action, room) => {
-    import('@/services/socket').then(({ socket }) => {
-      socket.emit('booking_updated', { action, room, timestamp: new Date().toISOString() });
-      socket.emit('room_status_changed', { action, room, timestamp: new Date().toISOString() });
+    import('@/services/socket').then(({ emitRealtimeEvent }) => {
+      emitRealtimeEvent('booking_updated', { action, room });
+      emitRealtimeEvent('room_status_changed', { action, room });
+      emitRealtimeEvent('availability_changed', { action, room });
+      emitRealtimeEvent('dashboard_sync', { action, room });
     });
   };
 
   useEffect(() => {
     loadData();
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('booking_deleted', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
     });
 
     return () => {
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('booking_created');
-        socketInst.off('booking_deleted');
-        socketInst.off('room_status_changed');
-      }
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

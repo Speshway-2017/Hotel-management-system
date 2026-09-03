@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   CreditCard, Search, Eye, CheckCircle2, XCircle, ArrowUpRight, DollarSign,
   Undo2, RefreshCw, Layers, ShieldAlert, Sparkles
@@ -94,15 +95,13 @@ function AdminPaymentsPage() {
     const handleFocus = () => loadTransactions();
     window.addEventListener('focus', handleFocus);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      socket.on('payment_added', loadTransactions);
-      socket.on('booking_updated', loadTransactions);
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadTransactions();
     });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

@@ -137,6 +137,8 @@ import { Route as GuestSettings } from "./roles/guest/pages/Settings";
 import { Route as SuperAdminLayout } from "./roles/super-admin/pages/SuperAdminLayout";
 import { Route as SuperAdminDashboard } from "./roles/super-admin/pages/Dashboard";
 import { Route as SuperAdminChannelManager } from "./roles/super-admin/pages/ChannelManager";
+import { Route as SuperAdminContactRequests } from "./roles/super-admin/pages/ContactRequests";
+import { Route as SuperAdminViewContactRequest } from "./roles/super-admin/pages/ViewContactRequest";
 import { Route as SuperAdminNotifications } from "./roles/super-admin/pages/Notifications";
 import { Route as SuperAdminNotificationDetails } from "./roles/super-admin/pages/NotificationDetails";
 import { Route as SuperAdminOccupancy } from "./roles/super-admin/pages/Occupancy";
@@ -155,6 +157,7 @@ import { Route as SuperAdminUsers } from "./roles/super-admin/pages/Users";
 import { Route as SuperAdminViewGuest } from "./roles/super-admin/pages/ViewGuest";
 import { Route as SuperAdminBranding } from "./roles/super-admin/pages/Branding";
 import { Route as SuperAdminSubscription } from "./roles/super-admin/pages/Subscription";
+import { Route as SuperAdminViewSubscriptionRequest } from "./roles/super-admin/pages/ViewSubscriptionRequest";
 import { Route as SuperAdminAddPlan } from "./roles/super-admin/pages/AddPlan";
 import { Route as SuperAdminEditPlan } from "./roles/super-admin/pages/EditPlan";
 import { Route as SuperAdminViewPlan } from "./roles/super-admin/pages/ViewPlan";
@@ -412,6 +415,8 @@ export default function App() {
             <Route path="/super-admin/properties/add" element={<RouteWrapper routeObj={SuperAdminAddProperty} />} />
             <Route path="/super-admin/properties/view/:id" element={<RouteWrapper routeObj={SuperAdminViewProperty} />} />
             <Route path="/super-admin/properties/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditProperty} />} />
+            <Route path="/super-admin/contacts" element={<RouteWrapper routeObj={SuperAdminContactRequests} />} />
+            <Route path="/super-admin/contacts/view/:id" element={<RouteWrapper routeObj={SuperAdminViewContactRequest} />} />
             <Route path="/super-admin/reports" element={<RouteWrapper routeObj={SuperAdminReports} />} />
             <Route path="/super-admin/reservations" element={<RouteWrapper routeObj={SuperAdminReservations} />} />
             <Route path="/super-admin/reservations/view/:id" element={<RouteWrapper routeObj={SuperAdminViewReservation} />} />
@@ -423,6 +428,7 @@ export default function App() {
             <Route path="/super-admin/admins/view/:id" element={<RouteWrapper routeObj={SuperAdminViewAdmin} />} />
             <Route path="/super-admin/branding" element={<RouteWrapper routeObj={SuperAdminBranding} />} />
             <Route path="/super-admin/subscription" element={<RouteWrapper routeObj={SuperAdminSubscription} />} />
+            <Route path="/super-admin/subscription/requests/view/:id" element={<RouteWrapper routeObj={SuperAdminViewSubscriptionRequest} />} />
             <Route path="/super-admin/subscription/add" element={<RouteWrapper routeObj={SuperAdminAddPlan} />} />
             <Route path="/super-admin/subscription/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditPlan} />} />
             <Route path="/super-admin/subscription/view/:id" element={<RouteWrapper routeObj={SuperAdminViewPlan} />} />

@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 async function request(path, options = {}) {
   const token = localStorage.getItem('hms_token');
@@ -176,6 +176,24 @@ export const superAdminService = {
     return await request(`/super-admin/subscription/requests/${id}/decide`, {
       method: 'POST',
       body: JSON.stringify({ action, rejectionReason })
+    });
+  },
+
+  getContactRequests: async () => {
+    return await request('/super-admin/contacts');
+  },
+  getContactRequest: async (id) => {
+    return await request(`/super-admin/contacts/${id}`);
+  },
+  updateContactRequestStatus: async (id, status) => {
+    return await request(`/super-admin/contacts/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+  },
+  deleteContactRequest: async (id) => {
+    return await request(`/super-admin/contacts/${id}`, {
+      method: 'DELETE'
     });
   }
 };

@@ -8,152 +8,10 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/utils/utils";
 import { Eye, X, Building, ChevronDown, Edit2, Sliders } from "lucide-react";
 
-// Mock Rooms & Rates Dataset
-const initialRoomsData = [
-  {
-    id: "RM-STD-01",
-    propertyId: "HS-JAI",
-    propertyName: "Rambagh Residency",
-    roomType: "Standard",
-    totalRooms: 20,
-    available: 12,
-    occupied: 6,
-    blocked: 2,
-    baseRate: 6500,
-    currentRate: 7200,
-    ratePlan: "Standard",
-    status: "Available"
-  },
-  {
-    id: "RM-DLX-02",
-    propertyId: "HS-JAI",
-    propertyName: "Rambagh Residency",
-    roomType: "Deluxe",
-    totalRooms: 15,
-    available: 8,
-    occupied: 7,
-    blocked: 0,
-    baseRate: 8500,
-    currentRate: 9200,
-    ratePlan: "Standard",
-    status: "Available"
-  },
-  {
-    id: "RM-SUT-03",
-    propertyId: "HS-JAI",
-    propertyName: "Rambagh Residency",
-    roomType: "Suite",
-    totalRooms: 5,
-    available: 1,
-    occupied: 3,
-    blocked: 1,
-    baseRate: 15000,
-    currentRate: 16500,
-    ratePlan: "Corporate",
-    status: "Occupied"
-  },
-  {
-    id: "LP-DLX-01",
-    propertyId: "HS-UDA",
-    propertyName: "Lake Palace View",
-    roomType: "Deluxe",
-    totalRooms: 20,
-    available: 10,
-    occupied: 8,
-    blocked: 2,
-    baseRate: 9500,
-    currentRate: 8800,
-    ratePlan: "Promotional",
-    status: "Available"
-  },
-  {
-    id: "LP-SUT-02",
-    propertyId: "HS-UDA",
-    propertyName: "Lake Palace View",
-    roomType: "Suite",
-    totalRooms: 10,
-    available: 3,
-    occupied: 5,
-    blocked: 2,
-    baseRate: 22000,
-    currentRate: 22000,
-    ratePlan: "Standard",
-    status: "Blocked"
-  },
-  {
-    id: "CB-STD-01",
-    propertyId: "HS-GOA",
-    propertyName: "Candolim Beach Resort",
-    roomType: "Standard",
-    totalRooms: 40,
-    available: 25,
-    occupied: 12,
-    blocked: 3,
-    baseRate: 5500,
-    currentRate: 4950,
-    ratePlan: "Non-refundable",
-    status: "Available"
-  },
-  {
-    id: "CB-DLX-02",
-    propertyId: "HS-GOA",
-    propertyName: "Candolim Beach Resort",
-    roomType: "Deluxe",
-    totalRooms: 30,
-    available: 18,
-    occupied: 10,
-    blocked: 2,
-    baseRate: 7500,
-    currentRate: 7500,
-    ratePlan: "Standard",
-    status: "Available"
-  },
-  {
-    id: "CB-SUT-03",
-    propertyId: "HS-GOA",
-    propertyName: "Candolim Beach Resort",
-    roomType: "Suite",
-    totalRooms: 10,
-    available: 4,
-    occupied: 5,
-    blocked: 1,
-    baseRate: 14000,
-    currentRate: 15400,
-    ratePlan: "Standard",
-    status: "Out of Order"
-  },
-  {
-    id: "BR-STD-01",
-    propertyId: "HS-KER",
-    propertyName: "Backwater Retreat",
-    roomType: "Standard",
-    totalRooms: 8,
-    available: 5,
-    occupied: 3,
-    blocked: 0,
-    baseRate: 8000,
-    currentRate: 8000,
-    ratePlan: "Standard",
-    status: "Available"
-  },
-  {
-    id: "BR-SUT-02",
-    propertyId: "HS-KER",
-    propertyName: "Backwater Retreat",
-    roomType: "Suite",
-    totalRooms: 7,
-    available: 2,
-    occupied: 4,
-    blocked: 1,
-    baseRate: 18000,
-    currentRate: 16200,
-    ratePlan: "Promotional",
-    status: "Occupied"
-  }
-];
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function SuperAdminRoomsRates() {
-  const [roomsData, setRoomsData] = useState(initialRoomsData);
+  const [roomsData, setRoomsData] = useState([]);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -179,36 +37,87 @@ function SuperAdminRoomsRates() {
   const [ratePlan, setRatePlan] = useState("Standard");
   const [status, setStatus] = useState("Available");
 
-  const loadProperties = async () => {
-    setLoading(true);
+  const loadProperties = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
-      const res = await superAdminService.getProperties();
-      if (res.success) {
-        setProperties(res.data);
-      }
+      const [propsRes, resRes] = await Promise.all([
+        superAdminService.getProperties().catch(() => ({})),
+        superAdminService.getReservations().catch(() => ({}))
+      ]);
+
+      const propsList = propsRes.success && propsRes.data ? propsRes.data : [];
+      const bookingsList = resRes.success && resRes.data ? resRes.data : [];
+      setProperties(propsList);
+
+      const dynamicRooms = [];
+      propsList.forEach((p) => {
+        const pId = p._id || p.id;
+        const pName = p.name;
+        const pBookings = bookingsList.filter(b => b.propertyId === pId || b.propertyId === p.id);
+        const pOccupied = pBookings.filter(b => b.status === 'Checked-in' || b.status === 'Occupied').length;
+
+        const defaultTypes = [
+          { type: "Standard Room", rate: 3000, plan: "Standard Plan", count: Math.round((p.rooms || 12) * 0.4) },
+          { type: "Deluxe Room", rate: 4500, plan: "Deluxe Plan", count: Math.round((p.rooms || 12) * 0.35) },
+          { type: "Executive Suite", rate: 6500, plan: "Deluxe Plan", count: Math.round((p.rooms || 12) * 0.15) },
+          { type: "Villa Suite", rate: 12500, plan: "Weekend Plan", count: Math.max(1, Math.round((p.rooms || 12) * 0.1)) }
+        ];
+
+        const roomTypes = (p.settings && p.settings.roomTypes && p.settings.roomTypes.length > 0)
+          ? p.settings.roomTypes.map(rt => ({
+              type: rt.category || rt.name,
+              rate: rt.baseRate || 3500,
+              plan: rt.plan || "Standard Plan",
+              count: Array.isArray(rt.rooms) ? rt.rooms.length : 3
+            }))
+          : defaultTypes;
+
+        roomTypes.forEach((rt, idx) => {
+          const catOccupied = Math.min(rt.count, Math.round(pOccupied * (rt.count / (p.rooms || 12))));
+          const catBlocked = idx === 3 ? 1 : 0;
+          const catAvail = Math.max(0, rt.count - catOccupied - catBlocked);
+
+          dynamicRooms.push({
+            id: `RM-${pId.substring(0, 4).toUpperCase()}-0${idx + 1}`,
+            propertyId: pId,
+            propertyName: pName,
+            roomType: rt.type,
+            totalRooms: rt.count,
+            available: catAvail,
+            occupied: catOccupied,
+            blocked: catBlocked,
+            baseRate: rt.rate,
+            currentRate: rt.rate,
+            ratePlan: rt.plan,
+            status: catAvail > 0 ? "Available" : "Occupied"
+          });
+        });
+      });
+
+      setRoomsData(dynamicRooms);
     } catch (err) {
-      setError(err.message || "Failed to load hotel properties");
+      if (!isSilent) setError(err.message || "Failed to load hotel properties");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProperties();
-  }, []);
+    loadProperties(false);
 
-  useEffect(() => {
-    if (properties.length > 0) {
-      setRoomsData(prev => prev.map(r => {
-        const prop = properties.find(p => p._id === r.propertyId || p.id === r.propertyId);
-        return {
-          ...r,
-          propertyName: prop ? prop.name : r.propertyName
-        };
-      }));
-    }
-  }, [properties]);
+    const handleFocus = () => loadProperties(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadProperties(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   const handleOpenModal = (type, room) => {
     setSelectedRoom(room);

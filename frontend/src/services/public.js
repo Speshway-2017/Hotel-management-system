@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api/v1/public';
+const API_URL = import.meta.env.VITE_PUBLIC_API_URL || (import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1/public` : 'http://localhost:5000/api/v1/public');
 
 async function request(path, options = {}) {
   const headers = {
@@ -62,5 +62,14 @@ export const publicService = {
       method: 'POST',
       body: JSON.stringify(bookingData)
     });
+  },
+  submitContact: async (contactData) => {
+    return await request('/contact', {
+      method: 'POST',
+      body: JSON.stringify(contactData)
+    });
+  },
+  getSubscriptionPlans: async () => {
+    return await request('/plans');
   }
 };

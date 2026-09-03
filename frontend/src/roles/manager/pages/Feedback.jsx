@@ -50,94 +50,7 @@ function StarRating({ rating }) {
   );
 }
 
-const generateFeedbackFromBookings = (bookings, propertyId) => {
-  const cacheKey = `hms_feedback_${propertyId}`;
-  const stored = localStorage.getItem(cacheKey);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  // Generate realistic reviews mapped to real booking entries
-  const list = [];
-  const commentOptions = [
-    "Absolutely gorgeous stay! The front office receptionist was extremely polite and check-in was completed in 2 minutes.",
-    "Clean room and beautiful courtyard. The room housekeeping was delayed during morning hours, but overall the experience was great.",
-    "Decent stay, but the bathroom shower temperature regulator was tricky. Service was highly responsive.",
-    "Exceptional hospitality! The manager Vikram helped upgrade our room complimentary due to a minor delay."
-  ];
-
-  if (bookings.length > 0) {
-    bookings.forEach((b, idx) => {
-      const bid = b._id || b.id || `MOCK-${idx}`;
-      const bidStr = typeof bid === "string" ? bid : String(bid);
-      const prefix = bidStr.substring(0, 4).toUpperCase();
-      const overall = idx % 3 === 0 ? 5 : idx % 3 === 1 ? 4 : 3;
-      const clean = idx % 2 === 0 ? 5 : 4;
-      const service = overall;
-      const room = clean;
-
-      // Submit date is checkout date
-      const submitDate = b.checkOut;
-
-      list.push({
-        id: `FDB-${prefix}-${idx + 1}`,
-        bookingId: bidStr,
-        guest: b.guest,
-        room: b.room || `10${idx + 1}`,
-        stayDates: `${b.checkIn} → ${b.checkOut}`,
-        overall,
-        cleanliness: clean,
-        service,
-        roomRating: room,
-        comments: commentOptions[idx % commentOptions.length],
-        submittedDate: submitDate,
-        status: idx % 2 === 0 ? "Pending Response" : "Responded",
-        response: idx % 2 === 0 ? null : "Thank you for sharing your feedback. We look forward to welcoming you back!"
-      });
-    });
-  }
-
-  // Fallbacks if data is low
-  if (list.length < 4) {
-    list.push({
-      id: "FDB-MOCK-01",
-      bookingId: "HS-MOCK-99",
-      guest: "Rajesh Kumar",
-      room: "302",
-      stayDates: "2026-08-20 → 2026-08-21",
-      overall: 5,
-      cleanliness: 5,
-      service: 5,
-      roomRating: 5,
-      comments: "Fabulous service, clean rooms and friendly receptionist. Will visit again.",
-      submittedDate: "2026-08-22",
-      status: "Pending Response",
-      response: null
-    });
-    list.push({
-      id: "FDB-MOCK-02",
-      bookingId: "HS-MOCK-98",
-      guest: "Sneha Reddy",
-      room: "104",
-      stayDates: "2026-08-19 → 2026-08-20",
-      overall: 2,
-      cleanliness: 3,
-      service: 2,
-      roomRating: 3,
-      comments: "AC cooling was slow initially, and checkout service was delayed significantly during checkout hours.",
-      submittedDate: "2026-08-21",
-      status: "Responded",
-      response: "Dear Guest, we apologize for the service delay. We are auditing our front office operations today."
-    });
-  }
-
-  localStorage.setItem(cacheKey, JSON.stringify(list));
-  return list;
-};
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ManagerFeedbackPage() {
   const navigate = useNavigate();
@@ -157,22 +70,22 @@ function ManagerFeedbackPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  async function loadData() {
+  async function loadData(isSilent = false) {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const user = authService.getCurrentUser();
       setCurrentUser(user);
 
       if (!user || user.role !== "manager") {
         setIsAuthorized(false);
-        setLoading(false);
+        if (!isSilent) setLoading(false);
         return;
       }
 
       const [propRes, feedbackRes] = await Promise.all([
-        managerService.getProperty(),
-        managerService.getFeedback()
+        managerService.getProperty().catch(() => ({})),
+        managerService.getFeedback().catch(() => ({}))
       ]);
 
       if (propRes.success && propRes.data) {
@@ -182,17 +95,20 @@ function ManagerFeedbackPage() {
       if (feedbackRes.success && feedbackRes.data) {
         const compiled = feedbackRes.data.map((f, idx) => {
           const fid = f._id || f.id;
-          const overall = Math.round((f.ratings.cleanliness + f.ratings.service + f.ratings.room) / 3);
+          const cleanliness = f.ratings?.cleanliness || 5;
+          const service = f.ratings?.service || 5;
+          const room = f.ratings?.room || 5;
+          const overall = Math.round((cleanliness + service + room) / 3);
           return {
             id: fid,
             bookingId: f.bookingId,
             guest: f.guestName,
             room: f.room || "101",
-            stayDates: "stay dates",
+            stayDates: f.stayDates || "Recent Stay",
             overall,
-            cleanliness: f.ratings.cleanliness,
-            service: f.ratings.service,
-            roomRating: f.ratings.room,
+            cleanliness,
+            service,
+            roomRating: room,
             comments: f.comment,
             submittedDate: new Date(f.createdAt).toISOString().split('T')[0],
             status: f.response ? "Responded" : "Pending Response",

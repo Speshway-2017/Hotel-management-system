@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import {
   User,
@@ -106,8 +107,8 @@ function ManagerViewGuest() {
     }
   };
 
-  const loadGuestDetail = async () => {
-    setLoading(true);
+  const loadGuestDetail = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const decodedKey = atob(id);
@@ -152,14 +153,14 @@ function ManagerViewGuest() {
             complaint,
             stays: guestBookings
           });
-        } else {
+        } else if (!isSilent) {
           setError("Guest CRM profile record not found.");
         }
       }
     } catch (err) {
-      setError(err.message || "Failed to load guest profiles details.");
+      if (!isSilent) setError(err.message || "Failed to load guest profiles details.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -173,7 +174,15 @@ function ManagerViewGuest() {
       return;
     }
 
-    if (id) loadGuestDetail();
+    if (id) {
+      loadGuestDetail();
+      const unsubscribe = subscribeRealtimeSync(() => {
+        loadGuestDetail(true);
+      });
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    }
   }, [id]);
 
   if (!isAuthorized) {

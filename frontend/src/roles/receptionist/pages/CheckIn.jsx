@@ -11,6 +11,8 @@ import {
   Eye, XCircle
 } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 export const Route = createFileRoute("/reception/check-in")({
   head: () => ({
     meta: [
@@ -57,72 +59,26 @@ function ArrivalsPage() {
     receptionistService.getReservations()
       .then(res => {
         const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
-        const mounikaBooking = allBookings.find(b => String(b.guest || b.name || '').toLowerCase().includes('mounika'));
-        const vamsiBooking = allBookings.find(b => String(b.guest || b.name || '').toLowerCase().includes('vamsi'));
-
-        const list = [
-          {
-            id: mounikaBooking?.bookingId || mounikaBooking?.id || mounikaBooking?._id || 'BK-20402',
-            _id: mounikaBooking?._id || mounikaBooking?.id || 'BK-20402',
-            name: 'Mounika',
-            guest: 'Mounika',
-            phone: mounikaBooking?.phone || '+91 99443 88120',
-            room: '101',
-            roomNumber: '101',
-            type: 'Standard Room',
-            roomType: 'Standard Room',
+        const list = allBookings
+          .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Checked-in' || b.status === 'Checked-In')
+          .map(b => ({
+            id: b.bookingId || b.id || b._id,
+            _id: b._id || b.id || b.bookingId,
+            name: b.guest || b.name || 'Guest',
+            guest: b.guest || b.name || 'Guest',
+            phone: b.phone || '--',
+            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+            roomNumber: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
+            type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
+            roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
             roomReady: true,
             isEarly: false,
             idVerification: 'Verified',
-            paymentStatus: 'Paid',
-            source: mounikaBooking?.source || 'MakeMyTrip',
-            status: 'Checked-In',
-            time: '2026-09-02'
-          },
-          {
-            id: vamsiBooking?.bookingId || vamsiBooking?.id || vamsiBooking?._id || 'BK-10202',
-            _id: vamsiBooking?._id || vamsiBooking?.id || 'BK-10202',
-            name: 'Vamsi',
-            guest: 'Vamsi',
-            phone: vamsiBooking?.phone || '+91 98765 10202',
-            room: '102',
-            roomNumber: '102',
-            type: 'Standard Room',
-            roomType: 'Standard Room',
-            roomReady: true,
-            isEarly: false,
-            idVerification: 'Verified',
-            paymentStatus: 'Paid',
-            source: vamsiBooking?.source || 'Direct Web',
-            status: 'Checked-In',
-            time: '2026-09-02'
-          }
-        ];
-
-        // Also append any other incoming bookings for today if any
-        allBookings.forEach(b => {
-          const gName = String(b.guest || b.name || '').toLowerCase();
-          if (!gName.includes('mounika') && !gName.includes('vamsi') && (b.checkIn === '2026-09-02' || b.checkIn === '2026-09-01') && b.status !== 'Cancelled') {
-            list.push({
-              id: b.bookingId || b.id || b._id,
-              _id: b._id || b.id || b.bookingId,
-              name: b.guest || b.name || 'Guest',
-              guest: b.guest || b.name || 'Guest',
-              phone: b.phone || '+91 98765 00000',
-              room: b.roomNumber || (b.room ? b.room.split(' ')[0] : '104'),
-              roomNumber: b.roomNumber || (b.room ? b.room.split(' ')[0] : '104'),
-              type: b.roomType || 'Standard Room',
-              roomType: b.roomType || 'Standard Room',
-              roomReady: true,
-              isEarly: false,
-              idVerification: 'Verified',
-              paymentStatus: b.paymentStatus || 'Paid',
-              source: b.source || 'Direct Web',
-              status: b.status === 'Checked-in' || b.status === 'Checked-In' ? 'Checked-In' : (b.status === 'Confirmed' ? 'Pre-checked' : b.status),
-              time: b.checkIn || '2026-09-02'
-            });
-          }
-        });
+            paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
+            source: b.source || 'Direct',
+            status: b.status === 'Confirmed' ? 'Pre-checked' : (b.status === 'Checked-in' ? 'Checked-In' : b.status),
+            time: b.checkIn || 'Today'
+          }));
 
         setArrivals(list);
       })
@@ -132,26 +88,18 @@ function ArrivalsPage() {
 
   useEffect(() => {
     loadArrivals();
-    const interval = setInterval(loadArrivals, 8000);
+    const interval = setInterval(loadArrivals, 10000);
     const handleFocus = () => loadArrivals();
     window.addEventListener('focus', handleFocus);
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtime = () => loadArrivals();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-
-      return () => {
-        socket.off('booking_updated', handleRealtime);
-        socket.off('booking_created', handleRealtime);
-        socket.off('room_status_changed', handleRealtime);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadArrivals();
     });
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

@@ -1,9 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { HorizontalRouteTabs, PageHeader, Notice, LoadingRows, Tag, Panel } from "@/components/hs/kit";
+import { PageHeader, Notice, LoadingRows, Tag, Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { superAdminService } from "@/services/superAdmin";
+import { adminService } from "@/services/admin";
 import { toast } from "sonner";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import {
   CalendarCheck,
   Bed,
@@ -27,13 +30,6 @@ import {
   CreditCard,
   CalendarDays
 } from "lucide-react";
-
-const operationsTabs = [
-  { label: "Reservations", to: "/admin/reservations", icon: CalendarCheck },
-  { label: "Rooms & Rates", to: "/admin/rooms", icon: Bed },
-  { label: "Guests", to: "/admin/guests", icon: Users },
-  { label: "Front Desk", to: "/admin/front-desk", icon: ConciergeBell }
-];
 
 export const Route = createFileRoute("/admin/front-desk")({
   head: () => ({
@@ -91,6 +87,7 @@ function FrontDeskPage() {
 
   // Modal Form States
   const [formGuest, setFormGuest] = useState("");
+  const [formPhone, setFormPhone] = useState("");
   const [formRoomNum, setFormRoomNum] = useState("");
   const [formRoomType, setFormRoomType] = useState("Villa Suite");
   const [formNights, setFormNights] = useState("1");
@@ -105,13 +102,10 @@ function FrontDeskPage() {
   const [collectAmount, setCollectAmount] = useState("");
 
   const notifySocketEvents = (action = 'update', roomNum = null) => {
-    import('@/services/socket').then(({ socket }) => {
-      if (socket) {
-        socket.emit('booking_updated', { action, roomNum });
-        socket.emit('room_status_changed', { action, roomNum });
-        socket.emit('availability_changed', { action, roomNum });
-      }
-    }).catch(() => {});
+    emitRealtimeEvent('booking_updated', { action, roomNum });
+    emitRealtimeEvent('room_status_changed', { action, roomNum });
+    emitRealtimeEvent('availability_changed', { action, roomNum });
+    emitRealtimeEvent('dashboard_sync', { action, roomNum });
   };
 
   const loadData = async (isSilent = false) => {
@@ -212,8 +206,19 @@ function FrontDeskPage() {
             if (activeStay.status === 'Checked-in') computedStatus = 'Occupied';
             else if (activeStay.status === 'Confirmed' || activeStay.status === 'Pending') computedStatus = 'Reserved';
           }
+          let roomFloor = r.floor;
+          if (!roomFloor) {
+            const firstDigit = num ? num.charAt(0) : '';
+            if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
+              roomFloor = `Floor ${firstDigit}`;
+            } else {
+              roomFloor = 'Floor 1';
+            }
+          }
           return {
+            ...r,
             num,
+            floor: roomFloor,
             type: r.category || r.roomType || 'Standard Room',
             status: computedStatus
           };
@@ -249,26 +254,13 @@ function FrontDeskPage() {
     };
     window.addEventListener('focus', handleFocus);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData(true);
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('booking_deleted', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
     });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('booking_created');
-        socketInst.off('booking_deleted');
-        socketInst.off('room_status_changed');
-        socketInst.off('availability_changed');
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
@@ -470,6 +462,7 @@ function FrontDeskPage() {
 
   const clearFormFields = () => {
     setFormGuest("");
+    setFormPhone("");
     setFormRoomNum("");
     setFormNights("1");
     setFormAmountPaid("38900");
@@ -537,10 +530,7 @@ function FrontDeskPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-ui">
-      
-
-
-      {/* 2. Stat KPIs Grid matching other pages */}
+      {/* Stat KPIs Grid matching other pages */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 select-none">
         <PremiumStatCard label="Arrivals Today" value={arrivalsTodayCount.toString()} hint="Expected arrivals" accentColor="#f59e0b" />
         <PremiumStatCard label="Departures Today" value={departuresTodayCount.toString()} hint="Expected departures" accentColor="#6366f1" />
@@ -936,63 +926,68 @@ function FrontDeskPage() {
       {/* Tab 5: Room Status Grid */}
       {activeTab === "rooms" && (
         <div className="space-y-6">
-          {["Floor 3", "Floor 2", "Floor 1"].map((floor) => {
-            const roomsOnFloor = rooms.filter(r => r.floor === floor);
-            return (
-              <div key={floor} className="space-y-3">
-                <h4 className="font-display font-black text-navy text-sm border-b border-muted pb-1 select-none">{floor} Layout</h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  {roomsOnFloor.map((room) => {
-                    const activeRes = roomReservations[room.num];
-                    const occStatus = getRoomOccupationalStatus(room);
-                    const meta = statusMeta[occStatus] || statusMeta.Available;
+          {(() => {
+            const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor || 'Floor 1'))).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+            const displayFloors = uniqueFloors.length > 0 ? uniqueFloors : ["Floor 3", "Floor 2", "Floor 1"];
+            return displayFloors.map((floor) => {
+              const roomsOnFloor = rooms.filter(r => (r.floor || 'Floor 1') === floor);
+              if (roomsOnFloor.length === 0) return null;
+              return (
+                <div key={floor} className="space-y-3">
+                  <h4 className="font-display font-black text-navy text-sm border-b border-muted pb-1 select-none">{floor} Layout</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    {roomsOnFloor.map((room) => {
+                      const activeRes = roomReservations[room.num];
+                      const occStatus = getRoomOccupationalStatus(room);
+                      const meta = statusMeta[occStatus] || statusMeta.Available;
 
-                    return (
-                      <div
-                        key={room.num}
-                        className={`rounded-xl border border-muted p-4 shadow-soft flex flex-col justify-between min-h-[140px] bg-white transition-all duration-200 hover:-translate-y-1 hover:shadow-lift border-l-4 ${
-                          occStatus === "Occupied" ? "border-l-brand" : occStatus === "Reserved" ? "border-l-warning" : "border-l-success"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2 select-none">
-                          <div>
-                            <span className="font-mono text-base font-bold text-navy">#{room.num}</span>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{room.type}</p>
+                      return (
+                        <div
+                          key={room.num}
+                          className={`rounded-xl border border-muted p-4 shadow-soft flex flex-col justify-between min-h-[140px] bg-white transition-all duration-200 hover:-translate-y-1 hover:shadow-lift border-l-4 ${
+                            occStatus === "Occupied" ? "border-l-brand" : occStatus === "Reserved" ? "border-l-warning" : "border-l-success"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 select-none">
+                            <div>
+                              <span className="font-mono text-base font-bold text-navy">#{room.num}</span>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">{room.type}</p>
+                            </div>
+                            
+                            <Tag tone={meta.tone}>{meta.label}</Tag>
                           </div>
-                          
-                          <Tag tone={meta.tone}>{meta.label}</Tag>
-                        </div>
 
-                        {activeRes ? (
-                          <div className="my-2.5 text-left">
-                            <h5 className="font-bold text-navy text-xs truncate">{activeRes.guest}</h5>
-                            <p className="text-[9.5px] text-muted-foreground">{activeRes.checkIn} → {activeRes.checkOut}</p>
-                          </div>
-                        ) : (
-                          <div className="my-2.5 text-left">
-                            <span className="text-[11px] text-muted-foreground/60 italic">Vacant Available</span>
-                          </div>
-                        )}
-
-                        <div className="pt-2 border-t border-muted/50 flex items-center justify-end select-none">
-                          {activeRes && (
-                            <Button
-                              onClick={() => { setSelectedFolio(activeRes); setIsFolioOpen(true); }}
-                              size="icon" variant="ghost" className="size-7.5"
-                              title="View Folio"
-                            >
-                              <FileText className="size-3.5 text-navy" />
-                            </Button>
+                          {activeRes ? (
+                            <div className="my-2.5 text-left">
+                              <h5 className="font-bold text-navy text-xs truncate">{activeRes.guest}</h5>
+                              <p className="text-[9.5px] text-muted-foreground">{activeRes.checkIn} → {activeRes.checkOut}</p>
+                            </div>
+                          ) : (
+                            <div className="my-2.5 text-left">
+                              <span className="text-[11px] text-muted-foreground/60 italic">Vacant Available</span>
+                            </div>
                           )}
+
+                          <div className="pt-2 border-t border-muted/50 flex items-center justify-end select-none">
+                            {activeRes && (
+                              <Button
+                                onClick={() => { setSelectedFolio(activeRes); setIsFolioOpen(true); }}
+                                size="icon" variant="ghost" className="size-7.5"
+                                title="View Folio"
+                              >
+                                <FileText className="size-3.5 text-navy" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       )}
 
@@ -1098,6 +1093,15 @@ function FrontDeskPage() {
                   placeholder="e.g. Vikram Seth"
                   value={formGuest}
                   onChange={(e) => setFormGuest(e.target.value)}
+                />
+              </FormField>
+
+              <FormField label="Contact Phone Number" id="formPhone">
+                <Input
+                  id="formPhone"
+                  placeholder="+91 98765 43210"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
                 />
               </FormField>
 
@@ -1216,11 +1220,11 @@ function FrontDeskPage() {
             </div>
             
             <div className="p-5 space-y-2 max-h-[300px] overflow-y-auto">
-              {reservations.filter(r => r.status === "Pending" && r.checkIn === targetDate).length === 0 ? (
+              {reservations.filter(r => (r.status === "Pending" || r.status === "Confirmed") && (r.checkIn === targetDate || !r.checkIn)).length === 0 ? (
                 <div className="text-center text-xs text-muted-foreground p-4">No pending arrivals today.</div>
               ) : (
                 reservations
-                  .filter(r => r.status === "Pending" && r.checkIn === targetDate)
+                  .filter(r => (r.status === "Pending" || r.status === "Confirmed") && (r.checkIn === targetDate || !r.checkIn))
                   .map(r => (
                     <button
                       key={r._id}

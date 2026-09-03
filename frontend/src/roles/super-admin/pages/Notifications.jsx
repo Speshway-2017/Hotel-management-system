@@ -8,75 +8,9 @@ import {
   CheckCheck
 } from "lucide-react";
 
-// Mock Notifications Dataset
-const initialNotifications = [
-  {
-    id: "NTF-001",
-    title: "OTA Parity Sync Issue",
-    message: "Booking.com connection returned timeout error during room availability sync for Suite rooms.",
-    type: "OTA Sync",
-    propertyId: "HS-JAI",
-    propertyName: "Rambagh Residency",
-    timestamp: "10 mins ago",
-    read: false,
-    body: "The OTA connection channel manager reported a parity discrepancy for Rambagh Residency Standard Room pricing between Agoda and Booking.com. Automated sync was retried 3 times and timed out. Action required to verify rate parity settings manually."
-  },
-  {
-    id: "NTF-002",
-    title: "New Property Onboarded",
-    message: "Onboarded 'Backwater Retreat' in Alleppey, Kerala. Default inventory mapping initialized.",
-    type: "Property Audit",
-    propertyId: "HS-KER",
-    propertyName: "Backwater Retreat",
-    timestamp: "2 hours ago",
-    read: false,
-    body: "Super Admin onboarded Backwater Retreat under category Luxury Resort. Generated property manager seed credentials and default room pricing sheets (Standard tariff: ₹4,500/night). Connection test to PMS completed successfully."
-  },
-  {
-    id: "NTF-003",
-    title: "Security Alert: Unauthorized Login",
-    message: "Multiple failed login attempts detected on Rambagh Residency admin console from IP 192.168.1.105.",
-    type: "Security Warning",
-    propertyId: "HS-JAI",
-    propertyName: "Rambagh Residency",
-    timestamp: "4 hours ago",
-    read: true,
-    body: "Security systems logged 5 consecutive failed authorization requests for GM account on Rambagh Residency dashboard panel. Device fingerprint: Chrome on Linux. Recommended actions: Trigger password reset or IP access check."
-  },
-  {
-    id: "NTF-004",
-    title: "Admin Account Assigned",
-    message: "Administrator user 'Vikram Mehta' assigned as GM to Lake Palace View, Udaipur.",
-    type: "Access Control",
-    propertyId: "HS-UDA",
-    propertyName: "Lake Palace View",
-    timestamp: "1 day ago",
-    read: true,
-    body: "Assigned Vikram Mehta (vikram@hourstay.com) to property Lake Palace View, Udaipur. Inherited administrative role permissions for room rates, check-ins, check-outs, and staff registrations."
-  },
-  {
-    id: "NTF-005",
-    title: "Payment Gateway Connection Issue",
-    message: "Razorpay webhook returned response code 502 for transaction booking capture FOL-9021.",
-    type: "Payment Alert",
-    propertyId: "All",
-    propertyName: "Global System",
-    timestamp: "1 day ago",
-    read: false,
-    body: "Merchant account payment notification hook failed to respond on endpoint /api/payments/razorpay. The payment was captured by payment gateway but pending confirmation in local folio records. Resolved payment manually via super-admin control panel."
-  },
-  {
-    id: "NTF-006",
-    title: "Property Activated",
-    message: "Hotel 'Candolim Beach Resort' status successfully set to Active after validation check.",
-    type: "Property Audit",
-    propertyId: "HS-GOA",
-    propertyName: "Candolim Beach Resort",
-    timestamp: "2 days ago",
-    read: true,
-    body: "Super Admin approved activation status for Candolim Beach Resort, Goa following successful KYC verify checks, GST details registration, and room inventory sync confirmations."
-  }
-];
+import { notificationsService } from "@/services/notifications";
+import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function getToneForType(type) {
   switch (type) {
@@ -93,15 +27,12 @@ function getToneForType(type) {
   }
 }
 
-import { notificationsService } from "@/services/notifications";
-import { superAdminService } from "@/services/superAdmin";
-
 function SuperAdminNotifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchAlerts = () => {
-    setLoading(true);
+  const fetchAlerts = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     superAdminService.getProperties()
       .then(propRes => {
         const propertiesList = propRes.success && propRes.data ? propRes.data : [];
@@ -116,7 +47,7 @@ function SuperAdminNotifications() {
                   message: n.message,
                   type: n.category || 'General',
                   propertyName: matched ? matched.name : (n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel'),
-                  timestamp: new Date(n.createdAt).toLocaleDateString(),
+                  timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
                   read: n.isRead,
                   body: n.message
                 };
@@ -125,7 +56,7 @@ function SuperAdminNotifications() {
             }
           })
           .catch(err => console.error("Failed to load super admin alerts:", err))
-          .finally(() => setLoading(false));
+          .finally(() => { if (!isSilent) setLoading(false); });
       })
       .catch(() => {
         notificationsService.getNotifications()
@@ -137,7 +68,7 @@ function SuperAdminNotifications() {
                 message: n.message,
                 type: n.category || 'General',
                 propertyName: n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel',
-                timestamp: new Date(n.createdAt).toLocaleDateString(),
+                timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
                 read: n.isRead,
                 body: n.message
               }));
@@ -145,12 +76,24 @@ function SuperAdminNotifications() {
             }
           })
           .catch(err => console.error(err))
-          .finally(() => setLoading(false));
+          .finally(() => { if (!isSilent) setLoading(false); });
       });
   };
 
   useEffect(() => {
-    fetchAlerts();
+    fetchAlerts(false);
+
+    const handleFocus = () => fetchAlerts(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchAlerts(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const [filterType, setFilterType] = useState("All");

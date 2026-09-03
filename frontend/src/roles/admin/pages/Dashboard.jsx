@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { 
@@ -197,28 +198,13 @@ function AdminDashboard() {
     };
     window.addEventListener('focus', handleFocus);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadDashboardData(true);
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('booking_deleted', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-      socket.on('availability_changed', handleRealtime);
-      socket.on('payment_added', handleRealtime);
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadDashboardData(true);
     });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('booking_created');
-        socketInst.off('booking_deleted');
-        socketInst.off('room_status_changed');
-        socketInst.off('availability_changed');
-        socketInst.off('payment_added');
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
@@ -255,7 +241,7 @@ function AdminDashboard() {
   const propName = property?.name || "Speshway Luxury Hotel";
   const propCity = property?.city || "Madhapur, Hyderabad";
   
-  const totalRooms = rooms.length > 0 ? rooms.length : 12;
+  const totalRooms = rooms.length;
 
   const occupiedRoomNums = new Set();
   const reservedRoomNums = new Set();
@@ -284,23 +270,19 @@ function AdminDashboard() {
   });
 
   const occupiedRooms = occupiedRoomNums.size;
-  const reservedRooms = Math.max(
-    reservedRoomNums.size,
-    reservations.filter(r => {
-      const s = String(r.status || '').toLowerCase().trim();
-      return s === 'confirmed' || s === 'pending' || s === 'reserved' || s === 'booked';
-    }).length,
-    2
-  );
-  const availableRooms = Math.max(12 - occupiedRooms, totalRooms - occupiedRooms);
+  const reservedRooms = reservedRoomNums.size || reservations.filter(r => {
+    const s = String(r.status || '').toLowerCase().trim();
+    return s === 'confirmed' || s === 'pending' || s === 'reserved' || s === 'booked';
+  }).length;
+  const availableRooms = Math.max(0, totalRooms - occupiedRooms);
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 
   const revenueToday = reservations.filter(r => r.status !== 'Cancelled').reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const adr = occupiedRooms > 0 ? Math.round(revenueToday / occupiedRooms) : (totalRooms > 0 ? Math.round(revenueToday / totalRooms) : 0);
   const revpar = totalRooms > 0 ? Math.round(revenueToday / totalRooms) : 0;
 
-  const dirtyRooms = Math.max(0, Math.round(occupiedRooms * 0.1));
-  const outOfOrderRooms = rooms.filter(r => r.status === "Maintenance" || r.status === "Out of Order").length;
+  const dirtyRooms = rooms.filter(r => r.status === 'Dirty' || r.housekeeping === 'Dirty').length;
+  const outOfOrderRooms = rooms.filter(r => r.status === "Maintenance" || r.status === "Out of Order" || r.status === "Blocked").length;
   const activeBookingsCount = reservations.filter(r => r.status !== 'Checked-out' && r.status !== 'Cancelled').length;
   const pendingPayments = reservations.reduce((sum, r) => sum + Number(r.balance || 0), 0);
   
@@ -318,13 +300,7 @@ function AdminDashboard() {
       roomTypeCounts[t].occupied += 1;
     }
   });
-  const roomTypeStats = Object.values(roomTypeCounts).length > 0
-    ? Object.values(roomTypeCounts)
-    : [
-        { type: "Standard Room", count: 3, occupied: 0, rate: 3000 },
-        { type: "Deluxe Room", count: 6, occupied: 0, rate: 4500 },
-        { type: "Executive Suite", count: 3, occupied: 0, rate: 6500 }
-      ];
+  const roomTypeStats = Object.values(roomTypeCounts);
 
   // Chart Mappings scaled to live metrics
   const localRevenueTrend = revenueTrend.map(item => {
@@ -353,13 +329,34 @@ function AdminDashboard() {
     { type: "success", title: "Live Atlas Sync", msg: "Dashboard synchronized with MongoDB database.", time: "1 min ago" }
   ];
 
-  // Booking sources breakdown
-  const sourcePerformanceData = [
-    { name: "Direct / Walk-in", value: sourceMix.find(s => s.name === "Direct")?.value || 35, color: "#8b5cf6" },
-    { name: "MakeMyTrip", value: sourceMix.find(s => s.name === "MakeMyTrip")?.value || 25, color: "#f5c06a" },
-    { name: "Booking.com", value: sourceMix.find(s => s.name === "Booking.com")?.value || 20, color: "#3b82f6" },
-    { name: "Agoda", value: sourceMix.find(s => s.name === "Agoda")?.value || 20, color: "#ef4444" }
-  ];
+  // Dynamic Booking sources breakdown calculated from live reservations
+  const sourceCounts = {};
+  reservations.forEach(r => {
+    const src = r.source || "Direct";
+    sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+  });
+  const totalBookingsCount = reservations.length || 1;
+  const sourceColors = {
+    "Direct": "#8b5cf6",
+    "Direct Web": "#8b5cf6",
+    "Walk-in": "#8b5cf6",
+    "MakeMyTrip": "#f5c06a",
+    "Booking.com": "#3b82f6",
+    "Agoda": "#ef4444",
+    "Expedia": "#10b981"
+  };
+  const sourcePerformanceData = Object.keys(sourceCounts).length > 0
+    ? Object.entries(sourceCounts).map(([name, count]) => ({
+        name,
+        value: Math.round((count / totalBookingsCount) * 100),
+        color: sourceColors[name] || "#6366f1"
+      }))
+    : [
+        { name: "Direct / Walk-in", value: 40, color: "#8b5cf6" },
+        { name: "MakeMyTrip", value: 30, color: "#f5c06a" },
+        { name: "Booking.com", value: 20, color: "#3b82f6" },
+        { name: "Agoda", value: 10, color: "#ef4444" }
+      ];
 
   if (loading) {
     return (

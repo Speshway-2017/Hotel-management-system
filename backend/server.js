@@ -42,6 +42,55 @@ const startServer = async () => {
 
   io.on('connection', (socket) => {
     console.log('⚡ Socket.io client connected:', socket.id);
+
+    // Join property-specific room
+    socket.on('join_property', (propertyId) => {
+      if (propertyId) {
+        const cleanProp = String(propertyId).replace(/^property_/, '');
+        const roomName = `property_${cleanProp}`;
+        socket.join(roomName);
+        if (cleanProp === 'all') {
+          socket.join('property_all');
+        }
+        console.log(`📡 Socket ${socket.id} joined room: ${roomName}`);
+      }
+    });
+
+    // Leave property room
+    socket.on('leave_property', (propertyId) => {
+      if (propertyId) {
+        const cleanProp = String(propertyId).replace(/^property_/, '');
+        socket.leave(`property_${cleanProp}`);
+      }
+    });
+
+    // Rebroadcast client actions across property room & global
+    const relayEvents = [
+      'booking_updated',
+      'booking_created',
+      'booking_deleted',
+      'room_status_changed',
+      'availability_changed',
+      'checkin_completed',
+      'checkout_completed',
+      'payment_logged',
+      'payment_added',
+      'payment_updated',
+      'guest_updated',
+      'dashboard_sync'
+    ];
+
+    relayEvents.forEach((evt) => {
+      socket.on(evt, (payload = {}) => {
+        const propId = payload.propertyId;
+        if (propId) {
+          socket.to(`property_${propId}`).emit(evt, payload);
+        }
+        socket.to('property_all').emit(evt, payload);
+        socket.broadcast.emit(evt, payload);
+      });
+    });
+
     socket.on('disconnect', () => {
       console.log('🔌 Socket.io client disconnected:', socket.id);
     });

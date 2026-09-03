@@ -4,6 +4,7 @@ import { createFileRoute, useNavigate, useLocation } from "@tanstack/react-route
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 
 
@@ -41,29 +42,41 @@ function SuperAdminPlatform() {
     status: "Onboarding"
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const [propsRes, usersRes, reservationsRes] = await Promise.all([
-        superAdminService.getProperties(),
-        superAdminService.getUsers(),
-        superAdminService.getReservations()
+        superAdminService.getProperties().catch(() => ({})),
+        superAdminService.getUsers().catch(() => ({})),
+        superAdminService.getReservations().catch(() => ({}))
       ]);
       if (propsRes.success) setProperties(propsRes.data);
       if (usersRes.success) setUsers(usersRes.data);
       if (reservationsRes.success) setReservations(reservationsRes.data);
     } catch (err) {
-      setError(err.message || "Failed to load platform data.");
+      if (!isSilent) setError(err.message || "Failed to load platform data.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   const location = useLocation();
  
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, [location.pathname]);
 
   const getPropertyName = (pId) => {
@@ -183,10 +196,10 @@ function SuperAdminPlatform() {
             <LoadingRows rows={5} />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                    <th className="p-4">Property Name</th>
+                    <th className="p-4 pl-6">Property Name</th>
                     <th className="p-4">Property ID</th>
                     <th className="p-4">Location</th>
                     <th className="p-4">Total Rooms</th>
@@ -194,7 +207,7 @@ function SuperAdminPlatform() {
                     <th className="p-4">Revenue</th>
                     <th className="p-4">Assigned Admin</th>
                     <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
+                    <th className="p-4 text-right pr-6 w-32 whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y font-sans">
@@ -204,7 +217,7 @@ function SuperAdminPlatform() {
 
                     return (
                       <tr key={p.id || p._id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 font-semibold text-navy text-sm">{p.name}</td>
+                        <td className="p-4 pl-6 font-semibold text-navy text-sm">{p.name}</td>
                         <td className="p-4 font-mono text-xs text-muted-foreground">{p.id || p._id}</td>
                         <td className="p-4 text-muted-foreground">{p.city}</td>
                         <td className="p-4 font-semibold text-navy">{p.rooms} Keys</td>
@@ -214,23 +227,23 @@ function SuperAdminPlatform() {
                         <td className="p-4">
                           <Tag tone={statusTone(p.status)}>{p.status}</Tag>
                         </td>
-                        <td className="p-4 text-right">
-                          <div className="flex gap-2 justify-end">
-                            <button onClick={() => navigate({ to: `/super-admin/properties/view/${p._id || p.id}` })} className="p-1.5 rounded-full hover:bg-muted text-navy-deep" title="View details">
-                              <Eye className="size-3.5" />
+                        <td className="p-4 text-right pr-6 w-32 whitespace-nowrap">
+                          <div className="flex gap-2 justify-end items-center">
+                            <button onClick={() => navigate({ to: `/super-admin/properties/view/${p._id || p.id}` })} className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer" title="View details">
+                              <Eye className="size-4" />
                             </button>
 
                             {p.status === "Active" ? (
-                              <button onClick={() => handleUpdateStatus(p, "Suspended")} className="p-1.5 rounded-full hover:bg-warning/10 text-warning" title="Deactivate">
+                              <button onClick={() => handleUpdateStatus(p, "Suspended")} className="p-1.5 rounded-full hover:bg-warning/10 text-warning cursor-pointer" title="Deactivate">
                                 <X className="size-4" />
                               </button>
                             ) : (
-                              <button onClick={() => handleUpdateStatus(p, "Active")} className="p-1.5 rounded-full hover:bg-success/10 text-success" title="Activate">
+                              <button onClick={() => handleUpdateStatus(p, "Active")} className="p-1.5 rounded-full hover:bg-success/10 text-success cursor-pointer" title="Activate">
                                 <Check className="size-4" />
                               </button>
                             )}
-                            <button onClick={() => navigate({ to: `/super-admin/properties/edit/${p._id || p.id}` })} className="p-1.5 rounded-full hover:bg-muted text-navy-deep" title="Edit">
-                              <Edit2 className="size-3.5" />
+                            <button onClick={() => navigate({ to: `/super-admin/properties/edit/${p._id || p.id}` })} className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer" title="Edit">
+                              <Edit2 className="size-4" />
                             </button>
                           </div>
                         </td>

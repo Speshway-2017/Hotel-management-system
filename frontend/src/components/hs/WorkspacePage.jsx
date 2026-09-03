@@ -193,12 +193,13 @@ export function WorkspacePage({
   const [rows, setRows] = useState(ds ? ds.rows : []);
 
   useEffect(() => {
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
     if (dataset === "notifications") {
       const fetchGuestNotifications = async () => {
         try {
           const token = localStorage.getItem('hms_token');
           if (!token) return;
-          const res = await fetch('http://localhost:5000/api/notifications', {
+          const res = await fetch(`${apiBase}/notifications`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -223,7 +224,7 @@ export function WorkspacePage({
         try {
           const token = localStorage.getItem('hms_token');
           if (!token) return;
-          const res = await fetch('http://localhost:5000/api/guest/bookings', {
+          const res = await fetch(`${apiBase}/guest/bookings`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
