@@ -20,6 +20,7 @@ export const Route = createFileRoute("/admin/guests/view/$id")({
 });
 
 import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 // Utility helpers for date handling
 const formatDateToYYYYMMDD = (dateStr) => {
@@ -106,8 +107,8 @@ function ViewGuestPage() {
     }
   };
 
-  const loadGuestDetail = async () => {
-    setLoading(true);
+  const loadGuestDetail = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const [usersRes, resRes] = await Promise.all([
@@ -149,21 +150,29 @@ function ViewGuestPage() {
             })),
             latestStay: latest
           });
-        } else {
+        } else if (!isSilent) {
           setError("Guest record not found.");
         }
-      } else {
+      } else if (!isSilent) {
         setError("Failed to retrieve guests.");
       }
     } catch (err) {
-      setError(err.message || "Failed to load guest data.");
+      if (!isSilent) setError(err.message || "Failed to load guest data.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (id) loadGuestDetail();
+    if (id) {
+      loadGuestDetail();
+      const unsubscribe = subscribeRealtimeSync(() => {
+        loadGuestDetail(true);
+      });
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    }
   }, [id]);
 
   function handleVerifyPasscode(e) {

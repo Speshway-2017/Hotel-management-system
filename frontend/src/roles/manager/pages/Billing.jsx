@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Receipt,
   Search,
@@ -45,115 +46,6 @@ const formatRupee = (num) => {
     currency: "INR",
     maximumFractionDigits: 0
   }).format(num);
-};
-
-// Generates dynamic invoice folios based on reservations database scoped to propertyId
-const generateInvoicesFromReservations = (reservations, propertyId) => {
-  const cacheKey = `hms_billing_${propertyId}`;
-  const stored = localStorage.getItem(cacheKey);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  const list = [];
-  if (reservations.length > 0) {
-    reservations.forEach((r, idx) => {
-      const rid = r._id || r.id || `MOCK-${idx}`;
-      const ridStr = typeof rid === "string" ? rid : String(rid);
-      const prefix = ridStr.substring(0, 4).toUpperCase();
-      const totalAmount = r.amount || 4500;
-      
-      // Determine payment status and paid amount
-      let paymentStatus = r.paymentStatus || r.payment || "Paid";
-      if (paymentStatus === "paid") paymentStatus = "Paid";
-      if (paymentStatus === "pending") paymentStatus = "Unpaid";
-      if (paymentStatus === "unpaid") paymentStatus = "Unpaid";
-
-      let paidAmount = 0;
-      if (paymentStatus === "Paid") {
-        paidAmount = totalAmount;
-      } else if (paymentStatus === "Partial") {
-        paidAmount = Math.round(totalAmount * 0.4);
-      }
-
-      const balance = totalAmount - paidAmount;
-
-      // Breakdowns
-      const roomCharges = Math.round(totalAmount * 0.75);
-      const serviceCharges = Math.round(totalAmount * 0.1);
-      const discounts = Math.round(totalAmount * 0.05);
-      const taxes = totalAmount - (roomCharges + serviceCharges - discounts);
-
-      // Invoice status
-      const invoiceStatus = idx % 8 === 0 ? "Draft" : idx % 12 === 0 ? "Cancelled" : "Issued";
-
-      list.push({
-        id: `INV-${prefix}-10${idx + 1}`,
-        bookingId: ridStr,
-        guest: r.guest,
-        room: r.room || `20${idx + 1}`,
-        checkIn: r.checkIn,
-        checkOut: r.checkOut,
-        roomCharges,
-        serviceCharges,
-        discounts,
-        taxes,
-        totalAmount,
-        paidAmount,
-        balance,
-        paymentStatus,
-        invoiceStatus,
-        issuedDate: r.checkIn
-      });
-    });
-  }
-
-  // Seed fallbacks if data is low
-  if (list.length < 3) {
-    list.push({
-      id: "INV-JAI-101",
-      bookingId: "BK-JAI-201",
-      guest: "Arjun Rampal",
-      room: "102",
-      checkIn: "2026-08-22",
-      checkOut: "2026-08-23",
-      roomCharges: 3500,
-      serviceCharges: 500,
-      discounts: 200,
-      taxes: 400,
-      totalAmount: 4200,
-      paidAmount: 4200,
-      balance: 0,
-      paymentStatus: "Paid",
-      invoiceStatus: "Issued",
-      issuedDate: "2026-08-22"
-    });
-    list.push({
-      id: "INV-JAI-102",
-      bookingId: "BK-JAI-202",
-      guest: "Priyanka Chopra",
-      room: "305",
-      checkIn: "2026-08-23",
-      checkOut: "2026-08-24",
-      roomCharges: 8000,
-      serviceCharges: 1200,
-      discounts: 500,
-      taxes: 1100,
-      totalAmount: 9800,
-      paidAmount: 4000,
-      balance: 5800,
-      paymentStatus: "Partial",
-      invoiceStatus: "Issued",
-      issuedDate: "2026-08-23"
-    });
-  }
-
-  localStorage.setItem(cacheKey, JSON.stringify(list));
-  return list;
 };
 
 function ManagerBillingPage() {
@@ -236,19 +128,18 @@ function ManagerBillingPage() {
   useEffect(() => {
     loadData();
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('payment_added', handleRealtime);
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
     });
 
     return () => {
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('payment_added');
-      }
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

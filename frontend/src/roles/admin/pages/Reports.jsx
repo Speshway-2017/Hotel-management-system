@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
@@ -126,8 +127,13 @@ function AdminReportsDashboard() {
     };
     window.addEventListener('focus', handleFocus);
 
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadReportsData();
+    });
+
     return () => {
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
@@ -143,10 +149,11 @@ function AdminReportsDashboard() {
 
   // KPI Calculations
   const roomRevenue = filteredData.reduce((acc, curr) => acc + curr.amount, 0);
-  const occupancyPercentage = Math.round((filteredData.filter(b => b.status === "Checked-in").length / 10) * 100) || 72;
+  const checkedInCount = filteredData.filter(b => b.status === "Checked-in" || b.status === "Occupied").length;
   const totalReservationsCount = filteredData.length;
+  const occupancyPercentage = totalReservationsCount > 0 ? Math.min(100, Math.round((checkedInCount / totalReservationsCount) * 100)) : 0;
   const adr = Math.round(roomRevenue / Math.max(1, totalReservationsCount));
-  const revpar = Math.round(roomRevenue / 120); // 120 rooms capacity
+  const revpar = Math.round(roomRevenue / Math.max(1, totalReservationsCount));
   const totalPaymentsCollected = filteredData.filter(b => b.payment === "Paid").reduce((acc, curr) => acc + curr.amount, 0);
 
   // Revenue chart data over dates

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { managerService } from "@/services/manager";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/admin/guests")({
   head: () => ({
@@ -225,8 +226,13 @@ function GuestsCrmPage() {
     };
     window.addEventListener('focus', handleFocus);
 
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadGuests();
+    });
+
     return () => {
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

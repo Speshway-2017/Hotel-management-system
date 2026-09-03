@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,12 +19,12 @@ function SuperAdminAdmins() {
   const [propertyFilter, setPropertyFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const [usersRes, propertiesRes] = await Promise.all([
-        superAdminService.getUsers(),
-        superAdminService.getProperties()
+        superAdminService.getUsers().catch(() => ({})),
+        superAdminService.getProperties().catch(() => ({}))
       ]);
 
       if (usersRes.success && propertiesRes.success) {
@@ -33,14 +34,26 @@ function SuperAdminAdmins() {
         setProperties(propertiesRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load admin management details");
+      if (!isSilent) setError(err.message || "Failed to load admin management details");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleToggleStatus = async (admin) => {
@@ -148,67 +161,67 @@ function SuperAdminAdmins() {
               <div className="text-center py-12 text-muted-foreground">No property administrators registered.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse min-w-[1000px] table-fixed">
+                <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
                   <thead>
                     <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4 w-[12%] text-left">Admin Name</th>
-                      <th className="p-4 w-[16%] text-left">Email</th>
-                      <th className="p-4 w-[10%] text-left">Phone</th>
-                      <th className="p-4 w-[14%] text-left">Assigned Property</th>
-                      <th className="p-4 w-[10%] text-left">Property Location</th>
-                      <th className="p-4 w-[12%] text-left">Last Login</th>
-                      <th className="p-4 w-[10%] text-left">Status</th>
-                      <th className="p-4 w-[16%] text-left">Actions</th>
+                      <th className="p-4 pl-6">Admin Name</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4">Phone</th>
+                      <th className="p-4">Assigned Property</th>
+                      <th className="p-4">Location</th>
+                      <th className="p-4">Last Login</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
                     {filteredAdmins.map((a) => (
                       <tr key={a.id || a._id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 w-[12%] text-left font-semibold text-navy text-sm truncate" title={a.name}>{a.name}</td>
-                        <td className="p-4 w-[16%] text-left text-muted-foreground truncate" title={a.email}>{a.email}</td>
-                        <td className="p-4 w-[10%] text-left font-mono text-xs text-muted-foreground truncate" title={a.mobile}>{a.mobile || "—"}</td>
-                        <td className="p-4 w-[14%] text-left">
-                          <div className="flex items-center gap-1.5 text-navy font-semibold truncate" title={getPropertyName(a.propertyId)}>
+                        <td className="p-4 pl-6 font-semibold text-navy text-sm" title={a.name}>{a.name}</td>
+                        <td className="p-4 text-muted-foreground" title={a.email}>{a.email}</td>
+                        <td className="p-4 font-mono text-xs text-muted-foreground" title={a.mobile}>{a.mobile || "—"}</td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5 text-navy font-semibold" title={getPropertyName(a.propertyId)}>
                             <Building className="size-3.5 text-purple shrink-0" />
-                            <span className="truncate">{getPropertyName(a.propertyId)}</span>
+                            <span>{getPropertyName(a.propertyId)}</span>
                           </div>
                         </td>
-                        <td className="p-4 w-[10%] text-left text-muted-foreground truncate" title={getPropertyLocation(a.propertyId)}>{getPropertyLocation(a.propertyId)}</td>
-                        <td className="p-4 w-[12%] text-left text-muted-foreground font-mono text-[10px] truncate" title={a.lastLogin || "14 Aug 2026, 11:20 AM"}>
+                        <td className="p-4 text-muted-foreground" title={getPropertyLocation(a.propertyId)}>{getPropertyLocation(a.propertyId)}</td>
+                        <td className="p-4 text-muted-foreground font-mono text-[10px]" title={a.lastLogin || "14 Aug 2026, 11:20 AM"}>
                           {a.lastLogin || "14 Aug 2026, 11:20 AM"}
                         </td>
-                        <td className="p-4 w-[10%] text-left">
+                        <td className="p-4">
                           <Tag tone={statusTone(a.status || "Active")}>{a.status || "Active"}</Tag>
                         </td>
-                        <td className="p-4 w-[16%] text-left">
-                          <div className="flex gap-1.5 justify-start items-center">
+                        <td className="p-4 text-right pr-6 w-36 whitespace-nowrap">
+                          <div className="flex gap-1.5 justify-end items-center">
                             <button
                               onClick={() => navigate({ to: `/super-admin/admins/view/${a.id || a._id}` })}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                               title="View Admin Details"
                             >
-                              <Eye className="size-3.5" />
+                              <Eye className="size-4" />
                             </button>
                             <button
                               onClick={() => navigate({ to: `/super-admin/admins/edit/${a.id || a._id}` })}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                               title="Edit Credentials"
                             >
-                              <Edit2 className="size-3.5" />
+                              <Edit2 className="size-4" />
                             </button>
                             <button
                               onClick={() => handleToggleStatus(a)}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                               title={a.status === "Active" ? "Deactivate" : "Activate"}
                             >
                               {a.status === "Active" ? <X className="size-4 text-warning" /> : <Check className="size-4 text-success" />}
                             </button>
                             <button
                               onClick={() => handleResetPassword(a)}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep"
+                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                               title="Reset Password"
                             >
-                              <Lock className="size-3.5 text-gold" />
+                              <Lock className="size-4 text-gold" />
                             </button>
                           </div>
                         </td>

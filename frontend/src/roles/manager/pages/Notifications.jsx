@@ -52,53 +52,67 @@ function getToneForType(type) {
   }
 }
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 function ManagerNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [filterType, setFilterType] = useState("All"); // 'All' | 'Unread' | 'Operations' | 'Alerts'
   const [userProperty, setUserProperty] = useState(null);
 
-  useEffect(() => {
-    const loadNotifications = async () => {
-      setLoading(true);
-      try {
-        const user = authService.getCurrentUser();
-        if (!user) return;
+  const loadNotifications = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) return;
 
-        const [propRes, notificationsRes] = await Promise.all([
-          managerService.getProperty(),
-          notificationsService.getNotifications()
-        ]);
+      const [propRes, notificationsRes] = await Promise.all([
+        managerService.getProperty().catch(() => ({})),
+        notificationsService.getNotifications().catch(() => ({}))
+      ]);
 
-        let propertyName = "Assigned Hotel";
-        if (propRes.success && propRes.data) {
-          setUserProperty(propRes.data);
-          propertyName = propRes.data.name;
-        }
-
-        if (notificationsRes.success && notificationsRes.data) {
-          const compiled = notificationsRes.data.map((n, idx) => ({
-            id: n._id || n.id,
-            title: n.title,
-            message: n.message,
-            type: n.category || "General",
-            propertyId: n.propertyId,
-            propertyName,
-            timestamp: new Date(n.createdAt).toLocaleDateString(),
-            read: n.isRead,
-            body: n.message
-          }));
-          setNotifications(compiled);
-        }
-
-      } catch (err) {
-        console.error("Failed to load notifications:", err);
-      } finally {
-        setLoading(false);
+      let propertyName = "Assigned Hotel";
+      if (propRes.success && propRes.data) {
+        setUserProperty(propRes.data);
+        propertyName = propRes.data.name;
       }
-    };
 
-    loadNotifications();
+      if (notificationsRes.success && notificationsRes.data) {
+        const compiled = notificationsRes.data.map((n, idx) => ({
+          id: n._id || n.id,
+          title: n.title,
+          message: n.message,
+          type: n.category || "General",
+          propertyId: n.propertyId,
+          propertyName,
+          timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
+          read: n.isRead,
+          body: n.message
+        }));
+        setNotifications(compiled);
+      }
+
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications(false);
+
+    const handleFocus = () => loadNotifications(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadNotifications(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleMarkAllAsRead = async () => {

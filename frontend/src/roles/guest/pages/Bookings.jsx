@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
 import { Button } from "@/components/ui/button";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/guest/bookings")({
   head: () => ({
@@ -31,34 +32,21 @@ function GuestBookingsPage() {
   const [activeTab, setActiveTab] = useState(initialTab); // 'all', 'upcoming', 'check-ins', 'check-outs'
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  const fetchBookings = async () => {
-    setLoading(true);
+  const fetchBookings = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError("");
     try {
       const token = localStorage.getItem('hms_token');
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/bookings', { headers });
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${apiBase}/v1/guest/bookings`, { headers });
       const result = await res.json();
       
       let list = [];
-      const stored = localStorage.getItem('latest_booking');
-      let localBooking = null;
-      if (stored) {
-        try { localBooking = JSON.parse(stored); } catch (e) {}
-      }
-
-      if (result && result.success && Array.isArray(result.data) && result.data.length > 0) {
+      if (result && result.success && Array.isArray(result.data)) {
         list = result.data;
-        if (localBooking) {
-          const exists = list.some(b => b.id === localBooking.id || b.bookingId === localBooking.id || b.bookingId === localBooking.bookingId);
-          if (!exists) {
-            list = [localBooking, ...list];
-          }
-        }
-      } else if (localBooking) {
-        list = [localBooking];
       }
       setBookings(list);
 
@@ -68,18 +56,9 @@ function GuestBookingsPage() {
       }
     } catch (err) {
       console.error("Failed to load guest bookings:", err);
-      const stored = localStorage.getItem('latest_booking');
-      if (stored) {
-        try {
-          setBookings([JSON.parse(stored)]);
-        } catch (e) {
-          setError("Network or server connection error. Please try again.");
-        }
-      } else {
-        setError("Failed to load bookings from backend.");
-      }
+      setError("Failed to load bookings from backend.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -94,24 +73,14 @@ function GuestBookingsPage() {
   };
 
   useEffect(() => {
-    fetchBookings();
+    fetchBookings(false);
 
-    // Listen for realtime Socket.io updates
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtimeUpdate = () => {
-        console.log('⚡ Socket event received. Refreshing bookings ledger...');
-        fetchBookings();
-      };
+    const handleFocus = () => fetchBookings(true);
+    window.addEventListener('focus', handleFocus);
 
-      socket.on('booking_updated', handleRealtimeUpdate);
-      socket.on('room_status_changed', handleRealtimeUpdate);
-      socket.on('availability_changed', handleRealtimeUpdate);
-
-      return () => {
-        socket.off('booking_updated', handleRealtimeUpdate);
-        socket.off('room_status_changed', handleRealtimeUpdate);
-        socket.off('availability_changed', handleRealtimeUpdate);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      console.log('⚡ Socket event received. Refreshing bookings ledger...');
+      fetchBookings(true);
     });
 
     const handlePopState = () => {
@@ -123,7 +92,11 @@ function GuestBookingsPage() {
     };
 
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('popstate', handlePopState);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   if (loading) {

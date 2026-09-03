@@ -63,17 +63,13 @@ function ManagerEditReservation() {
             setGuest(match.guest || "");
             setPhone(match.phone || "");
             
-            // Surya & Aswini room resolution
             let currentRoomNum = match.roomNumber || match.room || "";
             let category = match.roomType || match.category || "Standard Room";
-            if (String(match.guest || "").toLowerCase().includes("surya")) {
-              currentRoomNum = "103";
-              category = "Standard Room";
-            } else if (String(match.guest || "").toLowerCase().includes("aswini") || String(match.guest || "").toLowerCase().includes("ashwini")) {
-              currentRoomNum = "202";
-              category = "Deluxe Room";
-            } else if (currentRoomNum.includes("·")) {
+            if (currentRoomNum.includes("·")) {
               currentRoomNum = currentRoomNum.split("·")[0].trim();
+            }
+            if (currentRoomNum.toLowerCase().includes("room")) {
+              currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
             }
             
             setRoom(currentRoomNum);

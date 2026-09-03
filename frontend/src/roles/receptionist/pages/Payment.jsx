@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { receptionistService } from "@/services/receptionist";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/reception/payment")({
   head: () => ({
@@ -23,8 +24,8 @@ function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
 
-  const loadTransactions = () => {
-    setLoading(true);
+  const loadTransactions = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getPayments()
       .then(res => {
         if (res && res.success && Array.isArray(res.data)) {
@@ -44,11 +45,25 @@ function PaymentsPage() {
         }
       })
       .catch(err => console.error("Failed to load payments:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    loadTransactions();
+    loadTransactions(false);
+
+    const handleFocus = () => loadTransactions(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadTransactions(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Selected Transaction details Modal

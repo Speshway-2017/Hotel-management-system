@@ -143,14 +143,17 @@ function Contact() {
     subject: "", 
     message: "" 
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
 
   const toggleFaq = (idx) => {
     setOpenFaq(openFaq === idx ? null : idx);
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setServerError("");
     const next = {};
     if (!form.name.trim()) next["name"] = "Please enter your name";
     if (!/^\S+@\S+\.\S+$/.test(form.email)) next["email"] = "Enter a valid email address";
@@ -162,19 +165,39 @@ function Contact() {
     
     setErrors(next);
     const hasNoErrors = Object.keys(next).length === 0;
-    setSent(hasNoErrors);
+    if (!hasNoErrors) return;
 
-    if (hasNoErrors) {
-      // Clear form
-      setForm({
-        name: "",
-        email: "",
-        phone: "",
-        hotelName: "",
-        subject: "",
-        message: ""
+    setSubmitting(true);
+    try {
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
+      const res = await publicService.submitContact({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        hotelName: form.hotelName.trim(),
+        subject: form.hotelName.trim(),
+        message: form.message.trim(),
+        propertyId: activeId
       });
-      setTimeout(() => setSent(false), 6000);
+
+      if (res && res.success) {
+        setSent(true);
+        setForm({
+          name: "",
+          email: "",
+          phone: "",
+          hotelName: "",
+          subject: "",
+          message: ""
+        });
+        setTimeout(() => setSent(false), 8000);
+      } else {
+        setServerError(res?.message || "Failed to submit inquiry. Please try again.");
+      }
+    } catch (err) {
+      setServerError(err.message || "Failed to submit inquiry. Please check your connection.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -304,7 +327,12 @@ function Contact() {
               <form onSubmit={submit} noValidate className="space-y-5">
                 {sent && (
                   <Notice tone="success" title="Message sent" className="mb-5">
-                    Our Jaipur team replies within one working day.
+                    Thank you! Your message has been saved and our hospitality team will reply promptly.
+                  </Notice>
+                )}
+                {serverError && (
+                  <Notice tone="error" title="Submission failed" className="mb-5">
+                    {serverError}
                   </Notice>
                 )}
 
@@ -395,9 +423,10 @@ function Contact() {
 
                 <button 
                   type="submit" 
-                  className="w-full font-bold bg-navy hover:bg-[#081420] text-cream py-3 rounded-full shadow-[rgba(13,27,42,0.25)_0px_20px_10px_-15px] cursor-pointer border-none transition-all duration-200 ease-in-out hover:scale-[1.03] hover:shadow-[rgba(13,27,42,0.25)_0px_23px_10px_-20px] active:scale-[0.95] active:shadow-[rgba(13,27,42,0.25)_0px_15px_10px_-10px] text-xs uppercase tracking-wide h-12 mt-4"
+                  disabled={submitting}
+                  className="w-full font-bold bg-navy hover:bg-[#081420] text-cream py-3 rounded-full shadow-[rgba(13,27,42,0.25)_0px_20px_10px_-15px] cursor-pointer border-none transition-all duration-200 ease-in-out hover:scale-[1.03] hover:shadow-[rgba(13,27,42,0.25)_0px_23px_10px_-20px] active:scale-[0.95] active:shadow-[rgba(13,27,42,0.25)_0px_15px_10px_-10px] text-xs uppercase tracking-wide h-12 mt-4 disabled:opacity-50"
                 >
-                  Send Message
+                  {submitting ? "Sending..." : "Send Message"}
                 </button>
               </form>
             </div>

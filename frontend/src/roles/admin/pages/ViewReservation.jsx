@@ -19,6 +19,7 @@ import {
   Building
 } from "lucide-react";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ViewReservation() {
   const { id } = Route.useParams();
@@ -27,30 +28,38 @@ function ViewReservation() {
   const [error, setError] = useState(null);
   const [booking, setBooking] = useState(null);
 
-  const loadBookingDetail = async () => {
-    setLoading(true);
+  const loadBookingDetail = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       let matched = null;
       const res = await superAdminService.getReservations();
       if (res && res.data) {
-        matched = res.data.find(b => b._id === id || b.id === id);
+        matched = res.data.find(b => b._id === id || b.id === id || b.bookingId === id);
       }
 
       if (matched) {
         setBooking(matched);
-      } else {
+      } else if (!isSilent) {
         setError("Reservation record not found.");
       }
     } catch (err) {
-      setError(err.message || "Failed to load reservation details.");
+      if (!isSilent) setError(err.message || "Failed to load reservation details.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (id) loadBookingDetail();
+    if (id) {
+      loadBookingDetail();
+      const unsubscribe = subscribeRealtimeSync(() => {
+        loadBookingDetail(true);
+      });
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    }
   }, [id]);
 
   async function handleStatusChange(newStatus, notes = "") {

@@ -39,8 +39,8 @@ export function RoomDetailsPage() {
   const [loading, setLoading] = useState(true);
 
   // Reservation Date Selectors
-  const [checkInDate, setCheckInDate] = useState("2026-09-01");
-  const [checkOutDate, setCheckOutDate] = useState("2026-09-03");
+  const [checkInDate, setCheckInDate] = useState(() => localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0]);
+  const [checkOutDate, setCheckOutDate] = useState(() => localStorage.getItem('booking_check_out') || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
   useEffect(() => {
     let isMounted = true;

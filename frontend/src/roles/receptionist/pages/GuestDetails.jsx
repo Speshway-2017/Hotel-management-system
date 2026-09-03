@@ -21,6 +21,7 @@ export const Route = createFileRoute("/reception/guest-search/$id")({
 
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ReceptionGuestDetailsPage() {
   const { id } = useParams();
@@ -34,8 +35,8 @@ function ReceptionGuestDetailsPage() {
   const [chargeDescription, setChargeDescription] = useState("Restaurant POS");
   const [extendDays, setExtendDays] = useState("1");
 
-  const loadGuestDetails = () => {
-    setLoading(true);
+  const loadGuestDetails = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getGuests()
       .then(res => {
         if (res.success && res.data) {
@@ -46,17 +47,25 @@ function ReceptionGuestDetailsPage() {
           );
           if (found) {
             setGuest(found);
-          } else {
+          } else if (!isSilent) {
             toast.error("Guest profile not found.");
           }
         }
       })
       .catch(err => console.error("Failed to load guest details:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
     loadGuestDetails();
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadGuestDetails(true);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [id]);
 
   const handlePostCharge = () => {

@@ -42,144 +42,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
   );
 }
 
-const generateApprovals = (bookings, propertyId, propertyName) => {
-  const stored = localStorage.getItem(`hms_approvals_${propertyId}`);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  // Generate dynamic request entries scoped to bookings
-  const list = [];
-  if (bookings.length > 0) {
-    bookings.forEach((b, idx) => {
-      const bid = b._id || b.id;
-      const guest = b.guest;
-      
-      if (idx === 0) {
-        list.push({
-          id: `REQ-${bid.substring(0, 4)}-01`,
-          bookingId: bid,
-          guest: guest,
-          type: "Discounts",
-          propertyId,
-          propertyName,
-          amountChange: "₹15,400 → ₹13,860 (10% Off)",
-          originalValue: "₹15,400",
-          newValue: "₹13,860",
-          reason: "Corporate client loyalty rate correction requested by receptionist",
-          requestedBy: "Receptionist Shrey",
-          requestedDate: "2026-08-23",
-          status: "Pending"
-        });
-      }
-      if (idx === 1) {
-        list.push({
-          id: `REQ-${bid.substring(0, 4)}-02`,
-          bookingId: bid,
-          guest: guest,
-          type: "Refunds",
-          propertyId,
-          propertyName,
-          amountChange: "₹3,500 Refund Credit",
-          originalValue: "₹0",
-          newValue: "₹3,500",
-          reason: "Guest checked out early due to AC compressor failure in room",
-          requestedBy: "Duty Manager Shreyas",
-          requestedDate: "2026-08-24",
-          status: "Pending"
-        });
-      }
-      if (idx === 2) {
-        list.push({
-          id: `REQ-${bid.substring(0, 4)}-03`,
-          bookingId: bid,
-          guest: guest,
-          type: "Complimentary Upgrades",
-          propertyId,
-          propertyName,
-          amountChange: "Deluxe Room → Presidential Suite",
-          originalValue: "Deluxe Room",
-          newValue: "Presidential Suite",
-          reason: "Repeat elite guest milestone stay complimentary upgrade request",
-          requestedBy: "Front Office Executive",
-          requestedDate: "2026-08-24",
-          status: "Pending"
-        });
-      }
-      if (idx === 3) {
-        list.push({
-          id: `REQ-${bid.substring(0, 4)}-04`,
-          bookingId: bid,
-          guest: guest,
-          type: "Rate Overrides",
-          propertyId,
-          propertyName,
-          amountChange: "₹12,500 → ₹10,000 / Night",
-          originalValue: "₹12,500",
-          newValue: "₹10,000",
-          reason: "Matched corporate competitor contract tariff directly",
-          requestedBy: "Agent Riya",
-          requestedDate: "2026-08-22",
-          status: "Pending"
-        });
-      }
-    });
-  }
-
-  // Seeding default ones to fill out remaining types
-  list.push({
-    id: "REQ-GEN-05",
-    bookingId: "HS-MOCK-99",
-    guest: "Rajesh Kumar",
-    type: "Cancellation Exceptions",
-    propertyId,
-    propertyName,
-    amountChange: "Waive ₹4,500 fee",
-    originalValue: "₹4,500 fee",
-    newValue: "₹0 fee",
-    reason: "Medical emergency cancellation under free-policy waiver rules",
-    requestedBy: "Agent Riya",
-    requestedDate: "2026-08-24",
-    status: "Pending"
-  });
-  list.push({
-    id: "REQ-GEN-06",
-    bookingId: "HS-MOCK-98",
-    guest: "Sneha Reddy",
-    type: "Complimentary Services",
-    propertyId,
-    propertyName,
-    amountChange: "₹1,200 Spa Voucher",
-    originalValue: "₹0",
-    newValue: "₹1,200 Voucher",
-    reason: "Service recovery for delayed room assignment check-in slot",
-    requestedBy: "Receptionist Shrey",
-    requestedDate: "2026-08-24",
-    status: "Pending"
-  });
-  list.push({
-    id: "REQ-GEN-07",
-    bookingId: "HS-MOCK-97",
-    guest: "Arjun Mehta",
-    type: "Room Assignment Overrides",
-    propertyId,
-    propertyName,
-    amountChange: "Room 205 → Room 101",
-    originalValue: "Room 205",
-    newValue: "Room 101",
-    reason: "Accessibility request override (Ground floor required)",
-    requestedBy: "Duty Manager Shreyas",
-    requestedDate: "2026-08-24",
-    status: "Pending"
-  });
-
-  localStorage.setItem(`hms_approvals_${propertyId}`, JSON.stringify(list));
-  return list;
-};
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ManagerApprovalsPage() {
   const navigate = useNavigate();
@@ -197,22 +60,22 @@ function ManagerApprovalsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  async function loadData() {
+  async function loadData(isSilent = false) {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const user = authService.getCurrentUser();
       setCurrentUser(user);
 
       if (!user || user.role !== "manager") {
         setIsAuthorized(false);
-        setLoading(false);
+        if (!isSilent) setLoading(false);
         return;
       }
 
       const [propRes, appRes] = await Promise.all([
-        managerService.getProperty(),
-        managerService.getApprovals()
+        managerService.getProperty().catch(() => ({})),
+        managerService.getApprovals().catch(() => ({}))
       ]);
 
       if (propRes.success && propRes.data) {
@@ -233,12 +96,12 @@ function ManagerApprovalsPage() {
           newValue: "--",
           reason: app.reason,
           requestedBy: app.requestedBy,
-          requestedDate: new Date(app.createdAt).toISOString().split('T')[0],
+          requestedDate: app.createdAt ? new Date(app.createdAt).toISOString().split('T')[0] : "Today",
           status: app.status,
           decisionLog: app.status !== "Pending" ? {
             user: app.decidedBy,
             email: app.decidedBy,
-            timestamp: new Date(app.decidedAt).toLocaleString(),
+            timestamp: app.decidedAt ? new Date(app.decidedAt).toLocaleString() : "Recently",
             action: app.status,
             originalValue: "--",
             newValue: "--",
@@ -249,28 +112,25 @@ function ManagerApprovalsPage() {
       }
 
     } catch (err) {
-      setError(err.message || "Failed to load approvals dataset");
+      if (!isSilent) setError(err.message || "Failed to load approvals dataset");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadData();
+    loadData(false);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      const handleRealtime = () => loadData();
-      socket.on('booking_updated', handleRealtime);
-      socket.on('approval_updated', handleRealtime);
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
     });
 
     return () => {
-      if (socketInst) {
-        socketInst.off('booking_updated');
-        socketInst.off('approval_updated');
-      }
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

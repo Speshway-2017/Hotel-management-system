@@ -8,6 +8,7 @@ import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Plus,
   Search,
@@ -44,22 +45,34 @@ function SuperAdminCoupons() {
     action: null
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const couponsRes = await superAdminService.getPromoCoupons();
       if (couponsRes.success) {
         setCoupons(couponsRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to sync coupons data.");
+      if (!isSilent) setError(err.message || "Failed to sync coupons data.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Filtered coupons list
@@ -183,20 +196,20 @@ function SuperAdminCoupons() {
                 <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4">Coupon Code</th>
+                      <th className="p-4 pl-6">Coupon Code</th>
                       <th className="p-4">Discount Details</th>
                       <th className="p-4">Validity Range</th>
                       <th className="p-4">Min Spend</th>
                       <th className="p-4">Usage Limits</th>
                       <th className="p-4">Used Count</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                      <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
                     {paginatedCoupons.map((c) => (
                       <tr key={c._id || c.id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 font-bold text-navy flex items-center gap-2">
+                        <td className="p-4 pl-6 font-bold text-navy flex items-center gap-2">
                           <Ticket className="size-4 text-purple" />
                           <div>
                             <div className="font-bold text-navy">{c.code}</div>
@@ -218,7 +231,7 @@ function SuperAdminCoupons() {
                         <td className="p-4">
                           <Tag tone={c.status === "Active" ? "success" : "neutral"}>{c.status}</Tag>
                         </td>
-                        <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                        <td className="p-4 text-right pr-6 w-36 whitespace-nowrap space-x-1">
                           <Link
                             to={`/super-admin/coupons/view/${c._id || c.id}`}
                             className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"

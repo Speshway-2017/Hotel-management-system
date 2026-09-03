@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -55,13 +56,13 @@ function SuperAdminSubscription() {
     action: null
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const [plansRes, reqsRes] = await Promise.all([
-        superAdminService.getSubscriptionPlans(),
-        superAdminService.getSubscriptionRequests()
+        superAdminService.getSubscriptionPlans().catch(() => ({})),
+        superAdminService.getSubscriptionRequests().catch(() => ({}))
       ]);
       if (plansRes.success) {
         setPlans(plansRes.data);
@@ -70,14 +71,26 @@ function SuperAdminSubscription() {
         setSubscriptionRequests(reqsRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load data.");
+      if (!isSilent) setError(err.message || "Failed to load data.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Filtered plans
@@ -232,22 +245,22 @@ function SuperAdminSubscription() {
             ) : (
               <div className="space-y-4">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                  <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
                     <thead>
                       <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                        <th className="p-4">Plan Name</th>
+                        <th className="p-4 pl-6">Plan Name</th>
                         <th className="p-4">Monthly Rate</th>
                         <th className="p-4">Yearly Rate</th>
                         <th className="p-4">Property / Room Limits</th>
                         <th className="p-4">Active Subscribers</th>
                         <th className="p-4">Status</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y font-sans">
                       {paginatedPlans.map((p) => (
                         <tr key={p._id || p.id} className="hover:bg-muted/15 transition-colors">
-                          <td className="p-4">
+                          <td className="p-4 pl-6">
                             <div className="font-bold text-navy">{p.name}</div>
                             {p.description && <div className="text-[10px] text-muted-foreground mt-0.5">{p.description}</div>}
                           </td>
@@ -263,7 +276,7 @@ function SuperAdminSubscription() {
                           <td className="p-4">
                             <Tag tone={p.status === "Active" ? "success" : "neutral"}>{p.status}</Tag>
                           </td>
-                          <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                          <td className="p-4 text-right pr-6 w-36 whitespace-nowrap space-x-1">
                             <Link
                               to={`/super-admin/subscription/view/${p._id || p.id}`}
                               className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
@@ -307,20 +320,20 @@ function SuperAdminSubscription() {
                     <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
                     <div className="flex gap-2">
                       <Button
-                        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                        disabled={page === 1}
                         variant="outline"
                         size="sm"
-                        className="rounded-full border-muted hover:bg-muted font-semibold"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                        className="rounded-lg text-xs"
                       >
                         Previous
                       </Button>
                       <Button
-                        onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={page === totalPages}
                         variant="outline"
                         size="sm"
-                        className="rounded-full border-muted hover:bg-muted font-semibold"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                        className="rounded-lg text-xs"
                       >
                         Next
                       </Button>
@@ -332,8 +345,8 @@ function SuperAdminSubscription() {
           </div>
         </Panel>
       ) : (
-        <div className="space-y-6">
-          <Panel title="Subscription Requests Directory" description="Review property-level plan activation requests, approve upgrades, or reject with feedback.">
+        <div className="space-y-4">
+          <Panel title="Incoming Subscription Upgrade & Renewal Requests" description="Review subscription requests submitted by property administrators.">
             <div className="p-4 bg-white rounded-b-xl space-y-4">
               {/* Controls */}
               <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
@@ -361,25 +374,27 @@ function SuperAdminSubscription() {
 
               {/* Requests Table */}
               {filteredRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-xs font-medium">No subscription requests matched your criteria.</div>
+                <div className="text-center py-12 text-muted-foreground text-xs font-semibold">
+                  No subscription requests found matching the filter.
+                </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+                  <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
                     <thead>
                       <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-bold select-none">
-                        <th className="p-4">Property Branch</th>
+                        <th className="p-4 pl-6">Property Branch</th>
                         <th className="p-4">Requested Plan</th>
                         <th className="p-4">Admin</th>
                         <th className="p-4 text-right">Price</th>
                         <th className="p-4 text-center">Status</th>
                         <th className="p-4">Request Date</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y font-sans">
                       {filteredRequests.map((req) => (
                         <tr key={req._id || req.id} className="hover:bg-muted/15 transition-colors">
-                          <td className="p-4 font-bold text-navy">{req.propertyName}</td>
+                          <td className="p-4 pl-6 font-bold text-navy">{req.propertyName}</td>
                           <td className="p-4 font-semibold text-navy-deep">{req.planName}</td>
                           <td className="p-4 text-muted-foreground font-medium">{req.adminName}</td>
                           <td className="p-4 text-right font-bold text-navy">₹{req.price.toLocaleString("en-IN")}</td>
@@ -391,9 +406,9 @@ function SuperAdminSubscription() {
                           <td className="p-4 text-muted-foreground font-semibold">
                             {new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
                           </td>
-                          <td className="p-4 text-right space-x-1 whitespace-nowrap">
+                          <td className="p-4 text-right pr-6 w-36 whitespace-nowrap space-x-1">
                             <Button
-                              onClick={() => setSelectedRequest(req)}
+                              onClick={() => navigate({ to: `/super-admin/subscription/requests/view/${req._id || req.id}` })}
                               variant="ghost"
                               className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
                               title="View Request Details"

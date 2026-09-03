@@ -12,7 +12,9 @@ import { upload, uploadImageToCloudinary, deleteImageFromCloudinary } from '../u
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import PromoCoupon from '../models/promoCoupon.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
+import { Room, ContactMessage } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
+import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 
 const router = express.Router();
 
@@ -486,11 +488,54 @@ router.get('/reservations', checkPropertyStatus, async (req, res) => {
 router.post('/reservations', checkPropertyStatus, async (req, res) => {
   try {
     const bookingData = { ...req.body };
-    if (req.user.role !== 'super-admin') {
-      bookingData.propertyId = req.user.propertyId;
+    if (req.user.role !== 'super-admin' && !bookingData.propertyId) {
+      bookingData.propertyId = req.user.propertyId || 'HS-JAI';
     }
+    const targetPropId = bookingData.propertyId || 'HS-JAI';
+
+    let guestId = bookingData.guestId || null;
+    const cleanEmail = String(bookingData.email || '').trim().toLowerCase();
+    const cleanPhone = String(bookingData.phone || '').trim();
+
+    if (!guestId && (cleanEmail || cleanPhone)) {
+      const query = [];
+      if (cleanEmail) query.push({ email: cleanEmail });
+      if (cleanPhone) query.push({ mobile: cleanPhone });
+      const existingGuest = await User.findOne({ $or: query, role: 'guest' });
+      if (existingGuest) {
+        guestId = existingGuest._id || existingGuest.id;
+      }
+    }
+    bookingData.guestId = guestId;
+    bookingData.email = cleanEmail;
+    bookingData.phone = cleanPhone;
+
     const booking = await Booking.create(bookingData);
     await logAction(req.user, 'Created Booking', `${booking.guest}`, req);
+
+    let roomNum = booking.roomNumber || booking.room;
+    if (typeof roomNum === 'string' && roomNum.includes('·')) roomNum = roomNum.split('·')[0].trim();
+    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) roomNum = roomNum.replace(/room/i, '').trim();
+
+    if (roomNum) {
+      const rmStatus = booking.status === 'Checked-in' ? 'Occupied' : 'Reserved';
+      await Room.findOneAndUpdate(
+        { roomNumber: roomNum, propertyId: targetPropId },
+        { status: rmStatus }
+      );
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, targetPropId, 'booking_created', { booking, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'booking_updated', { type: 'CREATED', booking, propertyId: targetPropId });
+      if (roomNum) {
+        emitRealtimeSync(io, targetPropId, 'room_status_changed', { propertyId: targetPropId, roomNumber: roomNum, status: booking.status === 'Checked-in' ? 'Occupied' : 'Reserved' });
+        emitRealtimeSync(io, targetPropId, 'availability_changed', { propertyId: targetPropId, roomNumber: roomNum });
+      }
+      emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'booking_created' });
+    }
+
     return sendSuccess(res, 201, booking, 'Booking created successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to create booking');
@@ -507,6 +552,38 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
     const booking = await Booking.findOneAndUpdate({ $or: bookingQuery }, req.body, { new: true });
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Updated Booking', `${booking.guest}`, req);
+
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    let roomNum = booking.roomNumber || booking.room;
+    if (typeof roomNum === 'string' && roomNum.includes('·')) roomNum = roomNum.split('·')[0].trim();
+    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) roomNum = roomNum.replace(/room/i, '').trim();
+
+    // Sync Room operational status on check-in, check-out, or cancellation
+    if (roomNum) {
+      let rmStatus = 'Available';
+      if (booking.status === 'Checked-in') rmStatus = 'Occupied';
+      else if (booking.status === 'Confirmed' || booking.status === 'Pending') rmStatus = 'Reserved';
+      else if (booking.status === 'Checked-out') rmStatus = 'Available';
+      else if (booking.status === 'Cancelled' || booking.status === 'No-show') rmStatus = 'Available';
+
+      await Room.findOneAndUpdate(
+        { roomNumber: roomNum, propertyId: targetPropId },
+        { status: rmStatus }
+      );
+    }
+
+    // Realtime broadcast across all dashboards
+    const io = req.app.get('socketio');
+    if (io) {
+      const action = booking.status === 'Checked-in' ? 'checkin' : booking.status === 'Checked-out' ? 'checkout' : 'status_change';
+      broadcastCheckinCheckout(io, targetPropId, {
+        action,
+        booking,
+        roomNumber: roomNum,
+        status: booking.status
+      });
+    }
+
     return sendSuccess(res, 200, booking, 'Booking updated successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to update booking');
@@ -523,6 +600,26 @@ router.delete('/reservations/:id', checkPropertyStatus, async (req, res) => {
     const booking = await Booking.findOneAndDelete({ $or: bookingQuery });
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Deleted Booking', `${booking.guest}`, req);
+
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    if (booking.roomNumber || booking.room) {
+      let rNum = booking.roomNumber || booking.room;
+      if (typeof rNum === 'string' && rNum.includes('·')) rNum = rNum.split('·')[0].trim();
+      if (typeof rNum === 'string' && rNum.toLowerCase().includes('room')) rNum = rNum.replace(/room/i, '').trim();
+
+      await Room.findOneAndUpdate(
+        { roomNumber: rNum, propertyId: targetPropId },
+        { status: 'Available' }
+      );
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, targetPropId, 'booking_deleted', { id, bookingId: booking.bookingId, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'room_status_changed', { propertyId: targetPropId, status: 'Available' });
+      emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'booking_deleted' });
+    }
+
     return sendSuccess(res, 200, booking, 'Booking deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete booking');
@@ -821,8 +918,146 @@ router.delete('/plans/:id', authorize('super-admin'), async (req, res) => {
 });
 
 // ==========================================
-// 8.5 SUBSCRIPTION REQUESTS & APPROVALS
+// 8.5 SUBSCRIPTION PLANS & REQUESTS
 // ==========================================
+router.get('/plans', authorize('super-admin'), async (req, res) => {
+  try {
+    let plans = await SubscriptionPlan.find({}).sort({ monthlyPrice: 1 });
+    if (!plans || plans.length === 0) {
+      const defaultPlans = [
+        {
+          name: "Starter Tier",
+          description: "Essential suite for boutique properties and standalone guesthouses.",
+          monthlyPrice: 3999,
+          yearlyPrice: 39990,
+          propertyLimit: 1,
+          roomLimit: 25,
+          includedFeatures: ["Front Desk Console", "Direct Booking Engine", "GST Split Invoicing", "Mobile Housekeeping"],
+          status: "Active",
+          activeSubscribers: 12
+        },
+        {
+          name: "Professional Suite",
+          description: "Full-featured management platform for expanding city hotels and resorts.",
+          monthlyPrice: 7999,
+          yearlyPrice: 79990,
+          propertyLimit: 3,
+          roomLimit: 75,
+          includedFeatures: ["Real-time 2-Way Channel Sync", "Advanced Guest CRM", "Dynamic Rate Calendar", "Shift Roster & Biometrics", "POS Restaurant Billing"],
+          status: "Active",
+          activeSubscribers: 28
+        },
+        {
+          name: "Enterprise Pro",
+          description: "Unlimited portfolio management for multi-branch chains and heritage groups.",
+          monthlyPrice: 14999,
+          yearlyPrice: 149990,
+          propertyLimit: 10,
+          roomLimit: 300,
+          includedFeatures: ["Multi-Property Central Ledger", "Custom API & Webhooks", "Dedicated SLA Account Manager", "Custom WhatsApp Invoicing", "Auditor & CA Export Portal"],
+          status: "Active",
+          activeSubscribers: 8
+        }
+      ];
+      plans = await SubscriptionPlan.insertMany(defaultPlans);
+    }
+    return sendSuccess(res, 200, plans, 'Subscription plans retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve subscription plans');
+  }
+});
+
+router.post('/plans', authorize('super-admin'), async (req, res) => {
+  try {
+    const { name, description, monthlyPrice, yearlyPrice, propertyLimit, roomLimit, includedFeatures, status } = req.body;
+    if (!name || monthlyPrice === undefined) {
+      return sendError(res, 400, 'Plan name and monthly price are required.');
+    }
+    const newPlan = await SubscriptionPlan.create({
+      name,
+      description: description || '',
+      monthlyPrice: Number(monthlyPrice),
+      yearlyPrice: Number(yearlyPrice || (Number(monthlyPrice) * 10)),
+      propertyLimit: Number(propertyLimit || 1),
+      roomLimit: Number(roomLimit || 50),
+      includedFeatures: Array.isArray(includedFeatures) ? includedFeatures : [],
+      status: status || 'Active'
+    });
+
+    await logAction(req.user, 'Created Subscription Plan', newPlan.name, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'subscription_plan_updated', { plan: newPlan, action: 'created' });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_plan_updated' });
+    }
+
+    return sendSuccess(res, 201, newPlan, 'Subscription plan created successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to create subscription plan');
+  }
+});
+
+router.put('/plans/:id', authorize('super-admin'), async (req, res) => {
+  try {
+    const updated = await SubscriptionPlan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return sendError(res, 404, 'Subscription plan not found');
+
+    await logAction(req.user, 'Updated Subscription Plan', updated.name, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'subscription_plan_updated', { plan: updated, action: 'updated' });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_plan_updated' });
+    }
+
+    return sendSuccess(res, 200, updated, 'Subscription plan updated successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to update subscription plan');
+  }
+});
+
+router.patch('/plans/:id/toggle', authorize('super-admin'), async (req, res) => {
+  try {
+    const plan = await SubscriptionPlan.findById(req.params.id);
+    if (!plan) return sendError(res, 404, 'Subscription plan not found');
+
+    plan.status = plan.status === 'Active' ? 'Inactive' : 'Active';
+    await plan.save();
+
+    await logAction(req.user, 'Toggled Subscription Plan Status', `${plan.name} -> ${plan.status}`, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'subscription_plan_updated', { plan, action: 'status_toggled' });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_plan_updated' });
+    }
+
+    return sendSuccess(res, 200, plan, `Subscription plan marked as ${plan.status}`);
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to toggle plan status');
+  }
+});
+
+router.delete('/plans/:id', authorize('super-admin'), async (req, res) => {
+  try {
+    const deleted = await SubscriptionPlan.findByIdAndDelete(req.params.id);
+    if (!deleted) return sendError(res, 404, 'Subscription plan not found');
+
+    await logAction(req.user, 'Deleted Subscription Plan', deleted.name, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'subscription_plan_updated', { planId: req.params.id, action: 'deleted' });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_plan_updated' });
+    }
+
+    return sendSuccess(res, 200, deleted, 'Subscription plan deleted successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to delete subscription plan');
+  }
+});
+
 router.get('/subscription/requests', authorize('super-admin'), async (req, res) => {
   try {
     const list = await SubscriptionRequest.find({}).sort({ createdAt: -1 });
@@ -866,6 +1101,24 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
       });
 
       await logAction(req.user, 'Approved Subscription Request', `${requestObj.planName} for ${requestObj.propertyName}`, req);
+
+      await triggerNotification({
+        req,
+        role: 'admin',
+        propertyId: requestObj.propertyId,
+        title: `Subscription Plan Approved`,
+        message: `Your subscription upgrade to ${requestObj.planName} has been approved by Super Admin.`,
+        category: 'Subscription'
+      });
+      await triggerNotification({
+        req,
+        role: 'manager',
+        propertyId: requestObj.propertyId,
+        title: `Subscription Plan Approved`,
+        message: `Your subscription upgrade to ${requestObj.planName} has been approved by Super Admin.`,
+        category: 'Subscription'
+      });
+
       return sendSuccess(res, 200, requestObj, 'Subscription request approved successfully.');
     } else {
       if (!rejectionReason) {
@@ -882,6 +1135,24 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
       });
 
       await logAction(req.user, 'Rejected Subscription Request', `${requestObj.planName} for ${requestObj.propertyName}`, req);
+
+      await triggerNotification({
+        req,
+        role: 'admin',
+        propertyId: requestObj.propertyId,
+        title: `Subscription Request Rejected`,
+        message: `Your subscription request for ${requestObj.planName} was rejected: ${rejectionReason}`,
+        category: 'Subscription'
+      });
+      await triggerNotification({
+        req,
+        role: 'manager',
+        propertyId: requestObj.propertyId,
+        title: `Subscription Request Rejected`,
+        message: `Your subscription request for ${requestObj.planName} was rejected: ${rejectionReason}`,
+        category: 'Subscription'
+      });
+
       return sendSuccess(res, 200, requestObj, 'Subscription request rejected.');
     }
   } catch (error) {
@@ -957,6 +1228,105 @@ router.delete('/coupons/:id', authorize('super-admin'), async (req, res) => {
     return sendSuccess(res, 200, deleted, 'Coupon deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete coupon');
+  }
+});
+
+// ==========================================
+// 10. CONTACT REQUESTS & INQUIRIES
+// ==========================================
+router.get('/contacts', authorize('super-admin'), async (req, res) => {
+  try {
+    let list = await ContactMessage.find({}).sort({ createdAt: -1 });
+    if (list.length === 0) {
+      const seeded = await ContactMessage.create([
+        {
+          name: "Vikramaditya Oberoi",
+          email: "vikram@oberoipalaces.in",
+          phone: "+91 98290 44123",
+          subject: "Enterprise Onboarding & 84-Key Setup",
+          message: "We operate a heritage palace haveli in Udaipur with 84 keys. Looking for direct booking engine setup, GST split billing, and 2-way MMT channel manager sync.",
+          propertyId: "HS-UDA",
+          status: "New"
+        },
+        {
+          name: "Ananya Deshmukh",
+          email: "ananya.resorts@gmail.com",
+          phone: "+91 98450 11987",
+          subject: "Boutique Beach Resort Integration",
+          message: "Interested in onboarding our 40-key beachfront property in North Goa with automated POS restaurant billing folio linking.",
+          propertyId: "HS-GOA",
+          status: "In Progress"
+        },
+        {
+          name: "Captain Rajesh Nair",
+          email: "rajesh@keralaretreats.com",
+          phone: "+91 94470 55662",
+          subject: "Multi-Property Chain Inquiries",
+          message: "Need central owner audit dashboards across 3 backwater properties in Alleppey and Kumarakom.",
+          propertyId: "HS-KER",
+          status: "Resolved"
+        }
+      ]);
+      list = seeded;
+    }
+    return sendSuccess(res, 200, list, 'Contact requests retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve contact requests');
+  }
+});
+
+router.get('/contacts/:id', authorize('super-admin'), async (req, res) => {
+  try {
+    const contact = await ContactMessage.findById(req.params.id);
+    if (!contact) return sendError(res, 404, 'Contact request not found');
+    return sendSuccess(res, 200, contact, 'Contact request details retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.patch('/contacts/:id/status', authorize('super-admin'), async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status) return sendError(res, 400, 'Status is required.');
+
+    const updated = await ContactMessage.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    if (!updated) return sendError(res, 404, 'Contact request not found');
+
+    await logAction(req.user, 'Updated Contact Request Status', `${updated.name} -> ${status}`, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'contact_updated', { contact: updated });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'contact_updated' });
+    }
+
+    return sendSuccess(res, 200, updated, `Contact request status updated to ${status}`);
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.delete('/contacts/:id', authorize('super-admin'), async (req, res) => {
+  try {
+    const deleted = await ContactMessage.findByIdAndDelete(req.params.id);
+    if (!deleted) return sendError(res, 404, 'Contact request not found');
+
+    await logAction(req.user, 'Deleted Contact Request', deleted.name, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'contact_deleted', { id: req.params.id });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'contact_deleted' });
+    }
+
+    return sendSuccess(res, 200, deleted, 'Contact request deleted successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message);
   }
 });
 

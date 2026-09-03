@@ -21,6 +21,7 @@ export const Route = createFileRoute("/reception/folio/$id")({
 
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ReceptionFolioDetailsPage() {
   const { id } = useParams();
@@ -31,8 +32,8 @@ function ReceptionFolioDetailsPage() {
 
   const realBookingId = id.replace(/^FOL-\d{4}-|^FOL-/, '');
 
-  const loadFolioDetails = () => {
-    setLoading(true);
+  const loadFolioDetails = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getFolioDetails(realBookingId)
       .then(res => {
         if (res.success && res.data) {
@@ -43,16 +44,24 @@ function ReceptionFolioDetailsPage() {
           f.balance = f.balanceDue;
           f.type = 'Guest Room Billing';
           setFolio(f);
-        } else {
+        } else if (!isSilent) {
           toast.error("Folio record not found.");
         }
       })
       .catch(err => console.error("Failed to query folio items:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
     loadFolioDetails();
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadFolioDetails(true);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [id]);
 
   // Quick Action form inputs

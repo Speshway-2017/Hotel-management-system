@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
   Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
@@ -29,7 +30,8 @@ function InvoicesAndFolioPage() {
   const [loading, setLoading] = useState(true);
   const [folios, setFolios] = useState([]);
 
-  useEffect(() => {
+  const loadFolios = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getFolios()
       .then(res => {
         if (res.success && res.data) {
@@ -47,7 +49,29 @@ function InvoicesAndFolioPage() {
         }
       })
       .catch(err => console.error("Failed to fetch folios:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadFolios(false);
+
+    const interval = setInterval(() => {
+      loadFolios(true);
+    }, 10000);
+    const handleFocus = () => loadFolios(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadFolios(true);
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Selected Folio Details Modal Overlay

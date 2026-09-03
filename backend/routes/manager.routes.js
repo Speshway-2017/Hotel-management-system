@@ -15,6 +15,7 @@ import {
   Payment
 } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
+import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 
 const router = express.Router();
 
@@ -244,11 +245,28 @@ router.post('/reservations', async (req, res) => {
       roomNum = roomNum.replace(/room/i, '').trim();
     }
 
+    let guestId = req.body.guestId || null;
+    const cleanEmail = String(req.body.email || '').trim().toLowerCase();
+    const cleanPhone = String(req.body.phone || '').trim();
+
+    if (!guestId && (cleanEmail || cleanPhone)) {
+      const query = [];
+      if (cleanEmail) query.push({ email: cleanEmail });
+      if (cleanPhone) query.push({ mobile: cleanPhone });
+      const existingGuest = await User.findOne({ $or: query, role: 'guest' });
+      if (existingGuest) {
+        guestId = existingGuest._id || existingGuest.id;
+      }
+    }
+
     const payload = {
       ...req.body,
       bookingId,
+      guestId,
       id: bookingId,
       propertyId: propId,
+      email: cleanEmail,
+      phone: cleanPhone,
       room: req.body.room || (roomNum ? `${roomNum} · ${req.body.roomType || 'Standard Room'}` : ''),
       roomNumber: roomNum,
       roomType: req.body.roomType || 'Standard Room',
@@ -265,6 +283,17 @@ router.post('/reservations', async (req, res) => {
         { roomNumber: roomNum, propertyId: propId },
         { status: rmStatus }
       );
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'booking_created', { booking: newBooking, propertyId: propId });
+      emitRealtimeSync(io, propId, 'booking_updated', { type: 'CREATED', booking: newBooking, propertyId: propId });
+      if (roomNum) {
+        emitRealtimeSync(io, propId, 'room_status_changed', { propertyId: propId, roomNumber: roomNum, status: payload.status === 'Checked-in' ? 'Occupied' : 'Reserved' });
+        emitRealtimeSync(io, propId, 'availability_changed', { propertyId: propId, roomNumber: roomNum });
+      }
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'booking_created' });
     }
 
     return sendSuccess(res, 201, newBooking, 'Reservation created successfully');
@@ -305,8 +334,8 @@ router.put('/reservations/:id', async (req, res) => {
     if (!updated) return sendError(res, 404, 'Reservation not found');
 
     // Update Room table accordingly
+    let rmStatus = 'Available';
     if (roomNum) {
-      let rmStatus = 'Available';
       if (updated.status === 'Checked-in') rmStatus = 'Occupied';
       else if (updated.status === 'Confirmed' || updated.status === 'Pending') rmStatus = 'Reserved';
       else if (updated.status === 'Checked-out') rmStatus = 'Available';
@@ -316,6 +345,18 @@ router.put('/reservations/:id', async (req, res) => {
         { roomNumber: roomNum, propertyId: propId },
         { status: rmStatus }
       );
+    }
+
+    // Realtime broadcast across all dashboards
+    const io = req.app.get('socketio');
+    if (io) {
+      const action = updated.status === 'Checked-in' ? 'checkin' : updated.status === 'Checked-out' ? 'checkout' : 'status_change';
+      broadcastCheckinCheckout(io, propId, {
+        action,
+        booking: updated,
+        roomNumber: roomNum,
+        status: updated.status
+      });
     }
 
     return sendSuccess(res, 200, updated, 'Reservation updated successfully');
@@ -347,10 +388,21 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
 
     if (!updated) return sendError(res, 404, 'Reservation not found');
 
+    const rmStatus = updated.status === 'Checked-in' ? 'Occupied' : 'Reserved';
     await Room.findOneAndUpdate(
       { roomNumber: String(roomNumber), propertyId: propId },
-      { status: updated.status === 'Checked-in' ? 'Occupied' : 'Reserved' }
+      { status: rmStatus }
     );
+
+    const io = req.app.get('socketio');
+    if (io) {
+      broadcastCheckinCheckout(io, propId, {
+        action: 'room_assigned',
+        booking: updated,
+        roomNumber: String(roomNumber),
+        status: rmStatus
+      });
+    }
 
     return sendSuccess(res, 200, updated, `Room ${roomNumber} assigned successfully`);
   } catch (err) {
@@ -367,22 +419,26 @@ router.delete('/reservations/:id', async (req, res) => {
       query.unshift({ _id: id });
     }
 
-    const booking = await Booking.findOne({ $or: query });
-    if (!booking) return sendError(res, 404, 'Reservation not found');
+    const deleted = await Booking.findOneAndDelete({ $or: query });
+    if (!deleted) return sendError(res, 404, 'Reservation not found');
 
-    booking.status = 'Cancelled';
-    await booking.save();
-
-    if (booking.roomNumber) {
+    if (deleted.roomNumber) {
       await Room.findOneAndUpdate(
-        { roomNumber: booking.roomNumber, propertyId: propId },
+        { roomNumber: deleted.roomNumber, propertyId: propId },
         { status: 'Available' }
       );
     }
 
-    return sendSuccess(res, 200, booking, 'Reservation cancelled and inventory released');
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'booking_deleted', { id, bookingId: deleted.bookingId, propertyId: propId });
+      emitRealtimeSync(io, propId, 'room_status_changed', { propertyId: propId, roomNumber: deleted.roomNumber, status: 'Available' });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'booking_deleted' });
+    }
+
+    return sendSuccess(res, 200, deleted, 'Reservation deleted successfully');
   } catch (err) {
-    return sendError(res, 500, err.message || 'Failed to cancel reservation');
+    return sendError(res, 500, err.message || 'Failed to delete reservation');
   }
 });
 
@@ -511,6 +567,13 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
     if (!updated) {
       return sendError(res, 404, 'Room not found.');
     }
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, req.user.propertyId, 'room_status_changed', { propertyId: req.user.propertyId, roomNumber: req.params.roomNumber, status });
+      emitRealtimeSync(io, req.user.propertyId, 'availability_changed', { propertyId: req.user.propertyId, roomNumber: req.params.roomNumber });
+      emitRealtimeSync(io, req.user.propertyId, 'dashboard_sync', { propertyId: req.user.propertyId, action: 'room_status_changed' });
+    }
+
     return sendSuccess(res, 200, updated, 'Room operational status override updated.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -681,6 +744,30 @@ router.post('/approvals/:id', async (req, res) => {
 
     if (!updated) {
       return sendError(res, 404, 'Approval request log file not found.');
+    }
+
+    await triggerNotification({
+      req,
+      role: 'admin',
+      propertyId: req.user.propertyId,
+      title: `Approval Decision: ${updated.type || 'Request'} ${action}`,
+      message: `Request for ${updated.guest || 'Guest'} was ${action} by Manager ${req.user.name || ''}.`,
+      category: 'Approvals'
+    });
+
+    await triggerNotification({
+      req,
+      role: 'receptionist',
+      propertyId: req.user.propertyId,
+      title: `Approval Decision: ${updated.type || 'Request'} ${action}`,
+      message: `Request for ${updated.guest || 'Guest'} was ${action} by Manager.`,
+      category: 'Approvals'
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, req.user.propertyId, 'approval_updated', { approval: updated, propertyId: req.user.propertyId });
+      emitRealtimeSync(io, req.user.propertyId, 'dashboard_sync', { propertyId: req.user.propertyId, action: 'approval_updated' });
     }
 
     return sendSuccess(res, 200, updated, `Approval request decision marked as ${action}.`);

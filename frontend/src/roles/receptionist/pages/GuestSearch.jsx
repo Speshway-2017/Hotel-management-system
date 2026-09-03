@@ -10,6 +10,8 @@ import {
   User, CheckCircle, ArrowRight, Eye
 } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 export const Route = createFileRoute("/reception/guest-search")({
   head: () => ({
     meta: [
@@ -61,56 +63,33 @@ function InHouseGuestsPage() {
         const inHouseBookings = allBookings
           .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying')
           .map(b => {
-            const gName = String(b.guest || b.name || '').toLowerCase();
-            const rmNum = gName.includes('mounika') ? '101' : (b.roomNumber || (b.room ? b.room.split(' ')[0] : '101'));
-            const rmType = gName.includes('mounika') ? 'Standard Room' : (b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room'));
+            const rmNum = b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned');
+            const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
             const bal = Number(b.balance || 0);
             return {
               id: b.bookingId || b.id || b._id,
               _id: b._id || b.id || b.bookingId,
               name: b.guest || b.name || 'Guest',
-              phone: b.phone || '+91 99443 88120',
+              phone: b.phone || '--',
               email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
               room: rmNum,
               roomType: rmType,
-              checkIn: b.checkIn || '2026-09-02',
-              checkOut: b.checkOut || '2026-09-03',
+              checkIn: b.checkIn || 'Today',
+              checkOut: b.checkOut || 'Tomorrow',
               duration: `${b.nights || 1} Nights`,
               pax: b.pax || '2 Adults',
               balance: bal,
               paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
               status: 'Staying',
               vipTier: 'Gold Elite',
-              specialRequests: b.notes || 'High floor preference.',
+              specialRequests: b.notes || b.specialRequests || 'None',
               timeline: [
-                { time: b.checkIn || '2026-09-02', action: 'Guest in-house active stay.' }
+                { time: b.checkIn || 'Today', action: 'Guest in-house active stay.' }
               ]
             };
           });
 
-        setGuests(inHouseBookings.length > 0 ? inHouseBookings : [
-          {
-            id: 'BK-20402',
-            _id: 'BK-20402',
-            name: 'Mounika',
-            phone: '+91 99443 88120',
-            email: 'mounika@gmail.com',
-            room: '101',
-            roomType: 'Standard Room',
-            checkIn: '2026-09-02',
-            checkOut: '2026-09-03',
-            duration: '1 Nights',
-            pax: '2 Adults',
-            balance: 0,
-            paymentStatus: 'Paid',
-            status: 'Staying',
-            vipTier: 'Gold Elite',
-            specialRequests: 'High floor preference.',
-            timeline: [
-              { time: '2026-09-02', action: 'Guest in-house active stay.' }
-            ]
-          }
-        ]);
+        setGuests(inHouseBookings);
       })
       .catch(err => console.error("Failed to load in-house guests:", err))
       .finally(() => {
@@ -123,29 +102,21 @@ function InHouseGuestsPage() {
 
     const interval = setInterval(() => {
       loadGuests(true);
-    }, 6000);
+    }, 10000);
 
     const handleFocus = () => {
       loadGuests(true);
     };
     window.addEventListener('focus', handleFocus);
 
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtime = () => loadGuests(true);
-      socket.on('booking_updated', handleRealtime);
-      socket.on('booking_created', handleRealtime);
-      socket.on('room_status_changed', handleRealtime);
-
-      return () => {
-        socket.off('booking_updated', handleRealtime);
-        socket.off('booking_created', handleRealtime);
-        socket.off('room_status_changed', handleRealtime);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadGuests(true);
     });
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

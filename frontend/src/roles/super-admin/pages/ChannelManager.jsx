@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader, Panel, Tag, statusTone, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Activity, Sliders, CheckCircle2, AlertTriangle, AlertCircle, X, ShieldAlert, Key, Eye, EyeOff } from "lucide-react";
+import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function SuperAdminChannelManager() {
   const [loading, setLoading] = useState(false);
@@ -14,45 +16,77 @@ function SuperAdminChannelManager() {
   const [channels, setChannels] = useState([
     {
       name: "MakeMyTrip",
-      properties: 6,
+      properties: 4,
       status: "Connected",
       lastSync: "2 min ago",
       inventoryStatus: "Synced",
       rateStatus: "In Parity",
-      reservations: 284,
+      reservations: 12,
       details: "MMT Indian market lead connectivity. High availability channel mapping dynamic pricing schema."
     },
     {
       name: "Goibibo",
-      properties: 6,
-      status: "Sync Issue",
-      lastSync: "11 min ago",
+      properties: 4,
+      status: "Connected",
+      lastSync: "5 min ago",
       inventoryStatus: "Synced",
-      rateStatus: "Rate Mismatch",
-      reservations: 142,
+      rateStatus: "In Parity",
+      reservations: 8,
       details: "Goibibo distribution node. Rate discrepancy detected on Deluxe Courtyard room category."
     },
     {
       name: "Booking.com",
-      properties: 5,
-      status: "Syncing",
-      lastSync: "Syncing...",
-      inventoryStatus: "Mismatch",
+      properties: 4,
+      status: "Connected",
+      lastSync: "Just now",
+      inventoryStatus: "Synced",
       rateStatus: "In Parity",
-      reservations: 395,
+      reservations: 15,
       details: "Global OTA mapping connector. Active inventory mismatch logged for Lake Palace View property."
     },
     {
       name: "Agoda",
       properties: 4,
-      status: "Disconnected",
-      lastSync: "1 day ago",
-      inventoryStatus: "—",
-      rateStatus: "—",
-      reservations: 89,
-      details: "Pan-Asian market distribution node. Connection offline since August 16th due to auth token expiry."
+      status: "Connected",
+      lastSync: "12 min ago",
+      inventoryStatus: "Synced",
+      rateStatus: "In Parity",
+      reservations: 6,
+      details: "Pan-Asian market distribution node. Connection online and synced."
     }
   ]);
+
+  const loadChannelData = async () => {
+    try {
+      const [propsRes, resRes] = await Promise.all([
+        superAdminService.getProperties().catch(() => ({})),
+        superAdminService.getReservations().catch(() => ({}))
+      ]);
+      const totalProps = propsRes.success && propsRes.data ? propsRes.data.length : 4;
+      const bookings = resRes.success && resRes.data ? resRes.data : [];
+
+      setChannels(prev => prev.map(c => {
+        const count = bookings.filter(b => b.source === c.name || (c.name === "MakeMyTrip" && b.source === "Direct")).length;
+        return {
+          ...c,
+          properties: totalProps,
+          reservations: count > 0 ? count : (c.reservations || 5)
+        };
+      }));
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadChannelData();
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadChannelData();
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   const handleSyncChannel = (index) => {
     setLoading(true);
@@ -142,23 +176,23 @@ function SuperAdminChannelManager() {
         <div className="lg:col-span-2 space-y-4">
           <Panel title="Connected Distribution Channels" description="XML mapping state and synced transactions across Indian & global OTAs.">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                 <thead>
                   <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                    <th className="p-4">Channel Name</th>
+                    <th className="p-4 pl-6">Channel Name</th>
                     <th className="p-4">Connected Properties</th>
                     <th className="p-4">Sync Status</th>
                     <th className="p-4">Last Sync</th>
                     <th className="p-4">Inventory Status</th>
                     <th className="p-4">Rate Status</th>
                     <th className="p-4">Reservations Synced</th>
-                    <th className="p-4 text-right">Actions</th>
+                    <th className="p-4 text-right pr-6 w-28 whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {channels.map((c, idx) => (
                     <tr key={c.name} className="hover:bg-muted/15 transition-colors">
-                      <td className="p-4 font-semibold text-navy text-sm">{c.name}</td>
+                      <td className="p-4 pl-6 font-semibold text-navy text-sm">{c.name}</td>
                       <td className="p-4 font-medium text-navy-deep text-xs">{c.properties} Properties</td>
                       <td className="p-4">
                         <Tag tone={getSyncStatusTone(c.status)}>{c.status}</Tag>
@@ -175,21 +209,21 @@ function SuperAdminChannelManager() {
                         </Tag>
                       </td>
                       <td className="p-4 font-semibold text-navy font-mono text-xs">{c.reservations}</td>
-                      <td className="p-4 text-right">
-                        <div className="flex gap-1.5 justify-end">
+                      <td className="p-4 text-right pr-6 w-28 whitespace-nowrap">
+                        <div className="flex gap-1.5 justify-end items-center">
                           <button
                             onClick={() => handleOpenModal(c, "view")}
                             className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                             title="View Details"
                           >
-                            <Eye className="size-3.5" />
+                            <Eye className="size-4" />
                           </button>
                           <button
                             onClick={() => handleOpenModal(c, "manage")}
                             className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                             title="Manage Connection"
                           >
-                            <Sliders className="size-3.5" />
+                            <Sliders className="size-4" />
                           </button>
                         </div>
                       </td>

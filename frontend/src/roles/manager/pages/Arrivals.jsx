@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/auth";
 import { managerService } from "@/services/manager";
+import { subscribeRealtimeSync } from "@/services/socket";
+import { toast } from "sonner";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -119,41 +121,58 @@ function ManagerOperationsPage() {
 
   useEffect(() => {
     loadData();
+
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Action Handlers
   const handleAssignRoom = async (resId) => {
     if (!assignRoomNum.trim()) {
-      alert("Please specify a valid room number");
+      toast.error("Please specify a valid room number");
       return;
     }
     try {
-      await superAdminService.updateReservation(resId, { room: assignRoomNum });
+      await managerService.assignRoom(resId, assignRoomNum, "Standard Room");
+      toast.success(`Room #${assignRoomNum} assigned successfully.`);
       setIsActionModalOpen(false);
       loadData();
     } catch (err) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message);
     }
   };
 
   const handleStatusUpdate = async (resId, newStatus) => {
     try {
-      await superAdminService.updateReservation(resId, { status: newStatus });
+      await managerService.updateReservation(resId, { status: newStatus });
+      toast.success(`Reservation status updated to ${newStatus}`);
       setIsActionModalOpen(false);
       loadData();
     } catch (err) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message);
     }
   };
 
   const handleException = async (resId, exceptionType) => {
-    const notes = exceptionType === "No-Show" ? "Marked as no-show by GM" : "Late checkout request processed";
+    const notes = exceptionType === "No-Show" ? "Marked as no-show by Manager" : "Late checkout request processed";
     try {
-      await superAdminService.updateReservation(resId, { status: exceptionType === "No-Show" ? "Cancelled" : "Checked-in", notes });
+      await managerService.updateReservation(resId, { status: exceptionType === "No-Show" ? "Cancelled" : "Checked-in", notes });
+      toast.success(`Exception logged: ${exceptionType}`);
       setIsActionModalOpen(false);
       loadData();
     } catch (err) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message);
     }
   };
 

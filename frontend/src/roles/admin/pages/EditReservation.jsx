@@ -41,15 +41,12 @@ function EditReservation() {
           const match = res.data.find(r => r._id === id || r.id === id);
           if (match) {
             setGuest(match.guest || "");
-            setPhone(match.phone || "");
-            const gName = String(match.guest || "").toLowerCase();
             let currentRoomNum = match.room || match.roomNumber || "";
-            if (gName.includes("surya")) {
-              currentRoomNum = "103";
-            } else if (gName.includes("aswini") || gName.includes("ashwini")) {
-              currentRoomNum = "202";
-            } else if (currentRoomNum.includes("·")) {
+            if (currentRoomNum.includes("·")) {
               currentRoomNum = currentRoomNum.split("·")[0].trim();
+            }
+            if (currentRoomNum.toLowerCase().includes("room")) {
+              currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
             }
             setRoom(currentRoomNum);
             if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));

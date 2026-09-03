@@ -12,6 +12,8 @@ import {
   CalendarCheck, Trash2, Eye, XCircle, Edit2
 } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 export const Route = createFileRoute("/reception/reservations")({
   head: () => ({
     meta: [
@@ -38,16 +40,8 @@ function ReservationsPage() {
       .then(res => {
         if (res.success && res.data) {
           const list = res.data.map(r => {
-            const gName = String(r.guest || r.name || '').toLowerCase();
-            let rmNum = r.roomNumber || (r.room ? r.room.split(' ')[0] : '101');
-            let rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : 'Standard Room');
-            if (gName.includes('surya')) {
-              rmNum = '103';
-              rmType = 'Standard Room';
-            } else if (gName.includes('mounika')) {
-              rmNum = '101';
-              rmType = 'Standard Room';
-            }
+            const rmNum = r.roomNumber || (r.room ? r.room.split(' ')[0] : 'Unassigned');
+            const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : 'Standard Room');
             return {
               ...r,
               room: rmNum,
@@ -64,6 +58,19 @@ function ReservationsPage() {
 
   useEffect(() => {
     loadReservations();
+    const interval = setInterval(loadReservations, 10000);
+    const handleFocus = () => loadReservations();
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadReservations();
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Selected Reservation details Drawer State

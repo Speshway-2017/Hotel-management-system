@@ -58,11 +58,16 @@ function ManagerViewFeedback() {
       setLoading(true);
       setError(null);
       try {
-        const decodedId = atob(id);
+        let decodedId = id;
+        try {
+          decodedId = atob(id);
+        } catch (e) {
+          decodedId = id;
+        }
         const feedbackRes = await managerService.getFeedback();
         if (feedbackRes.success && feedbackRes.data) {
           const list = feedbackRes.data;
-          const matched = list.find(f => f._id === decodedId || f.id === decodedId);
+          const matched = list.find(f => f._id === decodedId || f.id === decodedId || f._id === id || f.id === id);
           if (matched) {
             const overall = Math.round((matched.ratings.cleanliness + matched.ratings.service + matched.ratings.room) / 3);
             const compiled = {

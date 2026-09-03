@@ -117,3 +117,18 @@ const paymentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 export const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
+
+// ==========================================
+// CONTACT / INQUIRY MESSAGES MODEL
+// ==========================================
+const contactMessageSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, default: '' },
+  subject: { type: String, default: '' },
+  message: { type: String, required: true },
+  propertyId: { type: String, default: 'HS-9HQ8P' },
+  status: { type: String, enum: ['New', 'In Progress', 'Resolved', 'Read', 'Replied'], default: 'New' }
+}, { timestamps: true });
+
+export const ContactMessage = mongoose.models.ContactMessage || mongoose.model('ContactMessage', contactMessageSchema);

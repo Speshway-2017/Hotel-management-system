@@ -1,34 +1,38 @@
-import { FormField, Input, Select, Textarea, Checkbox, Switch } from "@/components/hs/FormFields";
-import { Label } from "@/components/ui/label";
-import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useMemo } from "react";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
-
-
-import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Search,
-  Calendar,
   Building,
   User,
   Eye,
-  X,
-  XCircle,
-  AlertTriangle,
   Mail,
   Phone,
-  Bookmark,
-  Receipt,
-  Trash2
+  Calendar,
+  Sparkles,
+  ShieldCheck,
+  RefreshCw
 } from "lucide-react";
 
+export const Route = createFileRoute("/super-admin/users")({
+  head: () => ({
+    meta: [
+      { title: "Guests Portfolio — Super Admin | Hour Stay" },
+      { name: "description", content: "Consolidated guest accounts, portfolio profiles, and guest loyalty registry across all properties." }
+    ]
+  }),
+  component: SuperAdminGuests
+});
+
 function SuperAdminGuests() {
+  const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [properties, setProperties] = useState([]);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -36,446 +40,355 @@ function SuperAdminGuests() {
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
 
   // Pagination
   const [page, setPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
 
-  // Confirmation Modal State
-  const [confirmModal, setConfirmModal] = useState({
-    open: false,
-    title: "",
-    message: "",
-    action: null
-  });
-
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
-      const [bookingsRes, propertiesRes, usersRes] = await Promise.all([
-        superAdminService.getReservations(),
-        superAdminService.getProperties(),
-        superAdminService.getUsers()
+      const [usersRes, bookingsRes, propertiesRes] = await Promise.all([
+        superAdminService.getUsers().catch(() => ({})),
+        superAdminService.getReservations().catch(() => ({})),
+        superAdminService.getProperties().catch(() => ({}))
       ]);
 
-      if (bookingsRes.success) setBookings(bookingsRes.data);
-      if (propertiesRes.success) setProperties(propertiesRes.data);
-      if (usersRes.success) setUsers(usersRes.data);
+      if (usersRes.success && Array.isArray(usersRes.data)) {
+        setUsers(usersRes.data);
+      }
+      if (bookingsRes.success && Array.isArray(bookingsRes.data)) {
+        setBookings(bookingsRes.data);
+      }
+      if (propertiesRes.success && Array.isArray(propertiesRes.data)) {
+        setProperties(propertiesRes.data);
+      }
     } catch (err) {
-      setError(err.message || "Failed to load guest directory data.");
+      if (!isSilent) setError(err.message || "Failed to load guests directory.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener("focus", handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
-  // Helper to map property ID to Property Name
   const getPropertyName = (propertyId) => {
-    const prop = properties.find(p => p.id === propertyId || p._id === propertyId);
-    return prop ? prop.name : "Unknown Property";
+    if (!propertyId || propertyId === "all") return "Central Portfolio";
+    const prop = properties.find((p) => p.id === propertyId || p._id === propertyId);
+    return prop ? prop.name : "All Properties";
   };
 
-  // Consolidate Guests list (only those who registered OR made bookings)
-  const getConsolidatedGuests = () => {
-    const list = [];
-    const processedBookingIds = new Set();
-    const guestUsers = users.filter(u => u.role === "guest");
+  // Build guests directory (all registered guests with aggregated stay metrics)
+  const guestDirectory = useMemo(() => {
+    const guestUsers = users.filter((u) => u.role === "guest");
 
-    // 1. Process all bookings
-    bookings.forEach((b) => {
-      processedBookingIds.add(b._id || b.id);
-      
-      // Find matching guest user
-      const matchedUser = guestUsers.find(
-        u => (u.name && b.guest && u.name.toLowerCase() === b.guest.toLowerCase()) || 
-             (u.mobile && b.phone && u.mobile.replace(/\s+/g, '') === b.phone.replace(/\s+/g, ''))
+    return guestUsers.map((u) => {
+      const userBookings = bookings.filter(
+        (b) =>
+          (b.email && u.email && b.email.toLowerCase() === u.email.toLowerCase()) ||
+          (b.phone && u.mobile && b.phone.replace(/\s+/g, "") === u.mobile.replace(/\s+/g, "")) ||
+          (b.guest && u.name && b.guest.toLowerCase() === u.name.toLowerCase())
       );
 
-      list.push({
-        id: b._id || b.id,
-        name: b.guest || "Unknown Guest",
-        email: matchedUser ? matchedUser.email : ((b.guest || "guest").toLowerCase().replace(/[^a-z0-9]/g, '') + "@example.com"),
-        phone: b.phone || (matchedUser ? matchedUser.mobile : "—"),
-        bookingId: b.id || b._id,
-        propertyId: b.propertyId,
-        propertyName: getPropertyName(b.propertyId),
-        room: b.room || "—",
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
-        bookingStatus: b.status,
-        paymentStatus: b.balance === 0 ? "Paid" : "Pending",
-        booking: b
-      });
+      const totalStays = userBookings.length;
+      const latestBooking = userBookings[0] || null;
+
+      return {
+        id: u._id || u.id,
+        name: u.name || "Guest",
+        email: u.email || "—",
+        phone: u.mobile || "—",
+        propertyId: u.propertyId || (latestBooking ? latestBooking.propertyId : "all"),
+        propertyName: getPropertyName(u.propertyId || (latestBooking ? latestBooking.propertyId : "all")),
+        status: u.status || "Active",
+        totalStays,
+        joinedAt: u.createdAt || u.joinedAt || null,
+        city: u.city || (latestBooking ? latestBooking.city : "—")
+      };
     });
+  }, [users, bookings, properties]);
 
-    // 2. Add registered guest users who have no bookings
-    guestUsers.forEach((u) => {
-      const hasBooking = list.some(
-        item => (item.name && u.name && item.name.toLowerCase() === u.name.toLowerCase()) || 
-                (item.phone && item.phone !== "—" && u.mobile && item.phone.replace(/\s+/g, '') === u.mobile.replace(/\s+/g, ''))
-      );
+  // Filtered dataset
+  const filteredGuests = useMemo(() => {
+    return guestDirectory.filter((g) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        g.name.toLowerCase().includes(q) ||
+        g.email.toLowerCase().includes(q) ||
+        g.phone.includes(q) ||
+        g.propertyName.toLowerCase().includes(q);
 
-      if (!hasBooking) {
-        list.push({
-          id: u._id || u.id,
-          name: u.name || "Unknown Guest",
-          email: u.email || "",
-          phone: u.mobile || "—",
-          bookingId: "—",
-          propertyId: u.propertyId || "",
-          propertyName: u.propertyId ? getPropertyName(u.propertyId) : "—",
-          room: "—",
-          checkIn: "—",
-          checkOut: "—",
-          bookingStatus: "—",
-          paymentStatus: "—",
-          booking: null
-        });
-      }
+      const matchesProperty = propertyFilter === "All" || g.propertyId === propertyFilter;
+      const matchesStatus = statusFilter === "All" || g.status.toLowerCase() === statusFilter.toLowerCase();
+
+      return matchesSearch && matchesProperty && matchesStatus;
     });
+  }, [guestDirectory, searchQuery, propertyFilter, statusFilter]);
 
-    return list;
-  };
-
-  const consolidatedGuests = getConsolidatedGuests();
-
-  // Filter Consolidated Guests
-  const filteredGuests = consolidatedGuests.filter((item) => {
-    // Search
-    const matchesSearch =
-      searchQuery === "" ||
-      (item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.email && item.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.phone && item.phone.includes(searchQuery)) ||
-      (item.bookingId && item.bookingId.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    // Property
-    const matchesProperty = propertyFilter === "All" || item.propertyId === propertyFilter;
-
-    // Status
-    const matchesStatus = statusFilter === "All" || item.bookingStatus === statusFilter;
-
-    // Date Range
-    let matchesDate = true;
-    if (startDate || endDate) {
-      if (item.checkIn && item.checkIn !== "—") {
-        const itemDate = new Date(item.checkIn);
-        if (startDate) {
-          const start = new Date(startDate);
-          if (itemDate < start) matchesDate = false;
-        }
-        if (endDate) {
-          const end = new Date(endDate);
-          if (itemDate > end) matchesDate = false;
-        }
-      } else {
-        matchesDate = false;
-      }
-    }
-
-    return matchesSearch && matchesProperty && matchesStatus && matchesDate;
-  });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredGuests.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredGuests.length / itemsPerPage) || 1;
   const paginatedGuests = filteredGuests.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-  const handleCancelBooking = (guestItem) => {
-    setConfirmModal({
-      open: true,
-      title: "Cancel Guest Booking",
-      message: `Are you sure you want to cancel booking "${guestItem.bookingId}" for guest "${guestItem.name}"?`,
-      action: async () => {
-        try {
-          const res = await superAdminService.updateReservation(guestItem.id, {
-            status: "Cancelled"
-          });
-          if (res.success) {
-            toast.success("Booking cancelled successfully.");
-            loadData();
-          }
-        } catch (err) {
-          toast.error(err.message || "Failed to cancel booking.");
-        } finally {
-          setConfirmModal({ open: false, title: "", message: "", action: null });
-        }
-      }
-    });
-  };
-
-  const handleDeleteBooking = (guestItem) => {
-    setConfirmModal({
-      open: true,
-      title: "Delete Booking Record",
-      message: `Are you sure you want to permanently delete booking "${guestItem.bookingId}"? This cannot be undone.`,
-      action: async () => {
-        try {
-          const res = await superAdminService.deleteReservation(guestItem.id);
-          if (res.success) {
-            toast.success("Booking deleted successfully.");
-            loadData();
-          }
-        } catch (err) {
-          toast.error(err.message || "Failed to delete booking.");
-        } finally {
-          setConfirmModal({ open: false, title: "", message: "", action: null });
-        }
-      }
-    });
-  };
-
   return (
-    <div className="space-y-6 text-left">
-
+    <div className="space-y-6 text-left font-ui">
       <PageHeader
-        title="Guest & Customer Directory"
-        subtitle="View and manage consolidated guest records, active hotel stays, check-in schedules, and redemptions."
+        title="Guests Portfolio & Profiles"
+        subtitle="Overview of registered guest directory, contact coordinates, preferred locations, and lifetime stay metrics."
       />
 
-      {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
+      {error && <Notice tone="error" title="Synchronization Notice">{error}</Notice>}
 
-      {/* Toolbar Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-card border rounded-xl p-4 shadow-soft">
-        {/* Search */}
-        <div className="relative w-full">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, phone..."
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-            className="pl-9 h-10 rounded-full border-muted text-xs bg-white"
-          />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Guests</span>
+            <span className="p-2 rounded-lg bg-navy/5 text-navy"><User className="size-4" /></span>
+          </div>
+          <p className="mt-2 text-2xl font-extrabold text-navy font-display">{guestDirectory.length}</p>
+          <span className="text-[11px] text-muted-foreground">Registered profile accounts</span>
         </div>
 
-        {/* Property Filter */}
-        <div>
-          <Select
-            value={propertyFilter}
-            onChange={(e) => { setPropertyFilter(e.target.value); setPage(1); }}
-            className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
-          >
-            <option value="All">All Properties</option>
-            {properties.map((p) => (
-              <option key={p.id || p._id} value={p.id || p._id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
+        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-purple uppercase tracking-wider">Active Members</span>
+            <span className="p-2 rounded-lg bg-purple/10 text-purple"><ShieldCheck className="size-4" /></span>
+          </div>
+          <p className="mt-2 text-2xl font-extrabold text-purple font-display">
+            {guestDirectory.filter((g) => g.status === "Active").length}
+          </p>
+          <span className="text-[11px] text-muted-foreground">In good standing</span>
         </div>
 
-        {/* Status Filter */}
-        <div>
-          <Select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="w-full bg-white border border-muted px-3.5 h-10 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple cursor-pointer shadow-soft text-muted-foreground"
-          >
-            <option value="All">All Statuses</option>
-            <option value="Confirmed">Confirmed</option>
-            <option value="Checked-in">Checked-in</option>
-            <option value="Checked-out">Checked-out</option>
-            <option value="Pending">Pending</option>
-            <option value="Cancelled">Cancelled</option>
-          </Select>
-        </div>
-
-        {/* Date Range Start */}
-        <div>
-          <Input
-            type="date"
-            placeholder="From Date"
-            value={startDate}
-            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="h-10 rounded-full border-muted text-xs bg-white text-muted-foreground"
-          />
-        </div>
-
-        {/* Date Range End */}
-        <div>
-          <Input
-            type="date"
-            placeholder="To Date"
-            value={endDate}
-            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-            className="h-10 rounded-full border-muted text-xs bg-white text-muted-foreground"
-          />
+        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Total Completed Stays</span>
+            <span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><Sparkles className="size-4" /></span>
+          </div>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-display">
+            {guestDirectory.reduce((sum, g) => sum + g.totalStays, 0)}
+          </p>
+          <span className="text-[11px] text-muted-foreground">Lifetime bookings aggregated</span>
         </div>
       </div>
 
-      {/* Directory Database */}
-      <Panel title="Guest Database Records" description={`Showing ${filteredGuests.length} total guest accounts`}>
-        <div className="p-4 bg-white rounded-b-xl space-y-4">
-          {loading ? (
-            <LoadingRows rows={5} />
-          ) : paginatedGuests.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-xs font-semibold">
-              No matching guests or reservation records found.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse min-w-[1100px]">
-                  <thead>
-                    <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                      <th className="p-4 text-left whitespace-nowrap">Guest Details</th>
-                      <th className="p-4 text-left whitespace-nowrap">Contact</th>
-                      <th className="p-4 text-left whitespace-nowrap">Booking ID</th>
-                      <th className="p-4 text-left whitespace-nowrap">Assigned Property</th>
-                      <th className="p-4 text-left whitespace-nowrap">Room Stays</th>
-                      <th className="p-4 text-left whitespace-nowrap">Check-In</th>
-                      <th className="p-4 text-left whitespace-nowrap">Check-Out</th>
-                      <th className="p-4 text-left whitespace-nowrap">Status</th>
-                      <th className="p-4 text-left whitespace-nowrap">Payment</th>
-                      <th className="p-4 text-right whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y font-sans">
-                    {paginatedGuests.map((g) => (
-                      <tr key={g.id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 whitespace-nowrap text-left">
-                          <div className="font-bold text-navy text-sm flex items-center gap-1.5">
-                            <User className="size-3.5 text-purple shrink-0" />
-                            {g.name}
-                          </div>
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-left">
-                          <div className="text-navy font-semibold">{g.email}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{g.phone}</div>
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-left font-mono font-bold text-purple">{g.bookingId}</td>
-                        <td className="p-4 whitespace-nowrap text-left font-semibold text-navy">
-                          <div className="flex items-center gap-1.5">
-                            <Building className="size-3 text-navy/40 shrink-0" />
-                            {g.propertyName}
-                          </div>
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-left font-semibold text-muted-foreground">{g.room}</td>
-                        <td className="p-4 whitespace-nowrap text-left font-semibold text-navy">{g.checkIn}</td>
-                        <td className="p-4 whitespace-nowrap text-left font-semibold text-navy">{g.checkOut}</td>
-                        <td className="p-4 whitespace-nowrap text-left">
-                          <Tag tone={
-                            g.bookingStatus === "Confirmed" || g.bookingStatus === "Checked-in" ? "success" :
-                            g.bookingStatus === "Checked-out" ? "neutral" :
-                            g.bookingStatus === "Cancelled" ? "error" : "warning"
-                          }>
-                            {g.bookingStatus}
-                          </Tag>
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-left">
-                          <Tag tone={g.paymentStatus === "Paid" ? "success" : g.paymentStatus === "—" ? "neutral" : "warning"}>
-                            {g.paymentStatus}
-                          </Tag>
-                        </td>
-                        <td className="p-4 text-right space-x-1 whitespace-nowrap">
-                          <Link
-                            to={`/super-admin/users/view/${g.id}`}
-                            className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer flex items-center justify-center inline-flex"
-                            title="View Guest Record"
-                          >
-                            <Eye className="size-4" />
-                          </Link>
-                          {g.booking && g.bookingStatus !== "Cancelled" && g.bookingStatus !== "Checked-out" && (
-                            <Button
-                              onClick={() => handleCancelBooking(g)}
-                              variant="ghost"
-                              className="size-8 p-0 rounded-full text-warning hover:bg-warning/10 cursor-pointer"
-                              title="Cancel Booking"
-                            >
-                              <XCircle className="size-4" />
-                            </Button>
-                          )}
-                          {g.booking && (
-                            <Button
-                              onClick={() => handleDeleteBooking(g)}
-                              variant="ghost"
-                              className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
-                              title="Delete Booking"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* Filters */}
+      <Panel title="Guest Directory Index" description={`Displaying ${filteredGuests.length} registered guest accounts.`}>
+        <div className="p-4 border-b border-navy/5 bg-cream/20 flex flex-wrap gap-3 justify-between items-center">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Search guest by name, email, phone..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              className="pl-10 text-xs bg-white h-9 rounded-lg"
+            />
+          </div>
 
-              {/* Pagination controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t pt-4 text-xs font-semibold">
-                  <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                      disabled={page === 1}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-muted hover:bg-muted font-bold"
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={page === totalPages}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-muted hover:bg-muted font-bold"
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <select
+              value={propertyFilter}
+              onChange={(e) => {
+                setPropertyFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-9 px-3 text-xs bg-white rounded-lg border border-navy/15 focus:ring-1 focus:ring-purple font-medium cursor-pointer"
+            >
+              <option value="All">All Properties</option>
+              {properties.map((p) => (
+                <option key={p.id || p._id} value={p.id || p._id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-9 px-3 text-xs bg-white rounded-lg border border-navy/15 focus:ring-1 focus:ring-purple font-medium cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadData(false)}
+              className="h-9 px-3 rounded-lg text-xs"
+              title="Refresh Directory"
+            >
+              <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
-      </Panel>
 
+        {/* Table Content */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[950px]">
+            <thead>
+              <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-bold">
+                <th className="p-3.5 pl-6">Guest Profile</th>
+                <th className="p-3.5">Contact Coordinates</th>
+                <th className="p-3.5">Preferred Property</th>
+                <th className="p-3.5">Lifetime Stays</th>
+                <th className="p-3.5">Joined Date</th>
+                <th className="p-3.5">Status</th>
+                <th className="p-3.5 text-right pr-6 w-28 whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y font-sans">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="p-6">
+                    <LoadingRows count={5} />
+                  </td>
+                </tr>
+              ) : paginatedGuests.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
+                    <User className="size-8 mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="font-semibold text-sm text-navy">No Guest Profiles Found</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {searchQuery || propertyFilter !== "All" || statusFilter !== "All"
+                        ? "Try adjusting your search query or property filters."
+                        : "Registered guests will appear here automatically."}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedGuests.map((g) => {
+                  const dateFormatted = g.joinedAt
+                    ? new Date(g.joinedAt).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric"
+                      })
+                    : "—";
 
-      {/* Confirmation Modal */}
-      {confirmModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-deep/60 backdrop-blur-sm animate-fade-in text-left">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-[0_20px_50px_rgba(13,27,42,0.35)] border border-navy/5 relative">
-            <div className="flex items-center gap-2 pb-2 mb-2">
-              <AlertTriangle className="size-5 text-error" />
-              <h4 className="font-display font-bold text-navy text-base">{confirmModal.title}</h4>
-            </div>
-            <p className="text-xs text-muted-foreground leading-normal mb-4 font-medium">{confirmModal.message}</p>
-            <div className="flex gap-2 justify-end border-t pt-4">
+                  return (
+                    <tr key={g.id} className="hover:bg-muted/15 transition-colors">
+                      <td className="p-3.5 pl-6">
+                        <div className="flex items-center gap-2.5">
+                          <div className="size-8 rounded-full bg-purple/10 text-purple flex items-center justify-center font-bold text-xs shrink-0">
+                            {g.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-navy text-xs">{g.name}</div>
+                            <div className="text-[10px] text-muted-foreground">ID: {String(g.id).slice(-6).toUpperCase()}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="p-3.5">
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                          <Mail className="size-3 shrink-0 text-purple" />
+                          <span className="truncate">{g.email}</span>
+                        </div>
+                        {g.phone && g.phone !== "—" && (
+                          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                            <Phone className="size-3 shrink-0 text-emerald-600" />
+                            <span>{g.phone}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-1.5 text-navy font-semibold text-xs">
+                          <Building className="size-3.5 text-purple shrink-0" />
+                          <span>{g.propertyName}</span>
+                        </div>
+                      </td>
+
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cream/70 border border-navy/10 text-[11px] font-bold text-navy">
+                          {g.totalStays} {g.totalStays === 1 ? "Stay" : "Stays"}
+                        </span>
+                      </td>
+
+                      <td className="p-3.5 text-[11px] text-muted-foreground whitespace-nowrap">
+                        {dateFormatted}
+                      </td>
+
+                      <td className="p-3.5">
+                        <Tag tone={g.status === "Active" ? "success" : "neutral"} className="text-[10px] font-bold">
+                          {g.status}
+                        </Tag>
+                      </td>
+
+                      <td className="p-3.5 text-right pr-6 w-28 whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate({ to: `/super-admin/users/view/${g.id}` })}
+                          className="h-8 px-2.5 rounded-full hover:bg-purple/10 text-purple text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                          title="View Guest Details"
+                        >
+                          <Eye className="size-3.5" />
+                          <span>View</span>
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-navy/5 flex justify-between items-center text-xs">
+            <span className="text-muted-foreground">
+              Page {page} of {totalPages} ({filteredGuests.length} guests)
+            </span>
+            <div className="flex gap-2">
               <Button
-                variant="ghost"
-                onClick={() => setConfirmModal({ open: false, title: "", message: "", action: null })}
-                className="rounded-full text-xs font-semibold"
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                className="rounded-lg text-xs"
               >
-                Cancel
+                Previous
               </Button>
               <Button
-                onClick={confirmModal.action}
-                className="bg-error hover:bg-error/90 text-cream rounded-full px-5 text-xs font-semibold cursor-pointer"
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                className="rounded-lg text-xs"
               >
-                Confirm Action
+                Next
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Panel>
     </div>
   );
 }
 
-export const Route = createFileRoute("/super-admin/users")({
-  head: () => ({
-    meta: [
-      { title: "Guest Directory Control Console — Hour Stay" },
-      { name: "description", content: "Manage guest databases and registration accounts across properties." }
-    ]
-  }),
-  component: SuperAdminGuests
-});
+export default SuperAdminGuests;

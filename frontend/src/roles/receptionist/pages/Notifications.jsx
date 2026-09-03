@@ -17,6 +17,7 @@ import {
 import { authService } from "@/services/auth";
 import { notificationsService } from "@/services/notifications";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/reception/notifications")({
   head: () => ({
@@ -51,8 +52,8 @@ function ReceptionNotificationsPage() {
   const [filterType, setFilterType] = useState("All"); // 'All' | 'Unread' | 'Operations' | 'Alerts'
   const [userProperty, setUserProperty] = useState(null);
 
-  const loadNotificationsData = () => {
-    setLoading(true);
+  const loadNotificationsData = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getProperty()
       .then(propRes => {
         const propName = propRes.success && propRes.data ? propRes.data.name : "Assigned Hotel";
@@ -74,7 +75,9 @@ function ReceptionNotificationsPage() {
             }
           })
           .catch(err => console.error("Failed to load notifications:", err))
-          .finally(() => setLoading(false));
+          .finally(() => {
+            if (!isSilent) setLoading(false);
+          });
       })
       .catch(() => {
         notificationsService.getNotifications()
@@ -95,12 +98,26 @@ function ReceptionNotificationsPage() {
             }
           })
           .catch(err => console.error(err))
-          .finally(() => setLoading(false));
+          .finally(() => {
+            if (!isSilent) setLoading(false);
+          });
       });
   };
 
   useEffect(() => {
-    loadNotificationsData();
+    loadNotificationsData(false);
+
+    const handleFocus = () => loadNotificationsData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadNotificationsData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleMarkAllAsRead = async () => {

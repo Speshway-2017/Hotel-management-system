@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 async function request(path, options = {}) {
   const token = localStorage.getItem('hms_token');
@@ -38,7 +38,7 @@ export const adminService = {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const response = await fetch('http://localhost:5000/api/admin/upload', {
+    const response = await fetch(`${API_URL}/admin/upload`, {
       method: 'POST',
       body: formData,
       headers
@@ -67,6 +67,12 @@ export const adminService = {
   deleteRoom: async (id) => {
     return await request(`/manager/rooms/${id}`, {
       method: 'DELETE'
+    });
+  },
+  updateRoomStatus: async (roomNumber, status) => {
+    return await request(`/manager/rooms/${roomNumber}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
     });
   },
   getPayments: async () => {

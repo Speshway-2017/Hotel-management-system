@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,13 +27,13 @@ function SuperAdminReservations() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const [bookingsRes, propertiesRes] = await Promise.all([
-        superAdminService.getReservations(),
-        superAdminService.getProperties()
+        superAdminService.getReservations().catch(() => ({})),
+        superAdminService.getProperties().catch(() => ({}))
       ]);
 
       if (bookingsRes.success && propertiesRes.success) {
@@ -40,14 +41,26 @@ function SuperAdminReservations() {
         setProperties(propertiesRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load bookings database");
+      if (!isSilent) setError(err.message || "Failed to load bookings database");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const getPropertyName = (pId) => {
@@ -60,11 +73,14 @@ function SuperAdminReservations() {
     return prop ? prop.city : "—";
   };
 
-  const handleCancelReservation = (booking) => {
+  const handleCancelReservation = async (booking) => {
     const bId = booking.id || booking._id;
-    setReservations(prev =>
-      prev.map(r => (r.id === bId || r._id === bId) ? { ...r, status: "Cancelled" } : r)
-    );
+    try {
+      await superAdminService.updateReservation(bId, { status: "Cancelled" });
+      loadData(true);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const matchesDate = (checkInStr) => {
@@ -72,7 +88,7 @@ function SuperAdminReservations() {
     const bookingDate = new Date(checkInStr);
     if (isNaN(bookingDate.getTime())) return true;
 
-    const today = new Date("2026-08-14"); // Baseline mock current date
+    const today = new Date();
     const diffTime = today.getTime() - bookingDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 

@@ -45,69 +45,7 @@ const SHIFT_TIMINGS = {
   "General Shift": { start: "09:00 AM", end: "05:00 PM" }
 };
 
-// Generates persistent daily attendance sheets for a selected date
-const generateAttendanceForDate = (staffList, propertyId, selectedDate) => {
-  const cacheKey = `hms_attendance_${propertyId}_${selectedDate}`;
-  const stored = localStorage.getItem(cacheKey);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  // Compile realistic daily entries
-  const list = staffList.map((st, idx) => {
-    let checkIn = "—";
-    let checkOut = "—";
-    let workingHours = "—";
-    let attendanceStatus = "Present";
-
-    // Alternate statuses for realism
-    if (st.status === "On Leave" || st.status === "Inactive") {
-      attendanceStatus = "On Leave";
-    } else if (idx === 0) {
-      attendanceStatus = "Present";
-      checkIn = "06:02 AM";
-      checkOut = "02:00 PM";
-      workingHours = "7h 58m";
-    } else if (idx === 1) {
-      attendanceStatus = "Present";
-      checkIn = "02:01 PM";
-      checkOut = "10:00 PM";
-      workingHours = "7h 59m";
-    } else if (idx === 2) {
-      attendanceStatus = "Late";
-      checkIn = "02:18 PM"; // Late check-in
-      checkOut = "10:00 PM";
-      workingHours = "7h 42m";
-    } else if (idx === 3) {
-      attendanceStatus = "Half Day";
-      checkIn = "06:05 AM";
-      checkOut = "10:30 AM";
-      workingHours = "4h 25m";
-    } else {
-      attendanceStatus = "Absent";
-    }
-
-    return {
-      id: st._id || st.id,
-      name: st.name,
-      email: st.email,
-      employeeId: st.employeeId,
-      department: st.department,
-      assignedShift: st.assignedShift,
-      checkIn,
-      checkOut,
-      workingHours,
-      attendanceStatus
-    };
-  });
-
-  localStorage.setItem(cacheKey, JSON.stringify(list));
-  return list;
-};
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ManagerAttendancePage() {
   const navigate = useNavigate();
@@ -127,24 +65,24 @@ function ManagerAttendancePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  async function loadRoster() {
+  async function loadRoster(isSilent = false) {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const user = authService.getCurrentUser();
       setCurrentUser(user);
 
       if (!user || user.role !== "manager") {
         setIsAuthorized(false);
-        setLoading(false);
+        if (!isSilent) setLoading(false);
         return;
       }
 
       const [propRes, staffRes, attendanceRes, shiftsRes] = await Promise.all([
-        managerService.getProperty(),
-        managerService.getStaff(),
-        managerService.getAttendance(),
-        managerService.getShifts()
+        managerService.getProperty().catch(() => ({})),
+        managerService.getStaff().catch(() => ({})),
+        managerService.getAttendance().catch(() => ({})),
+        managerService.getShifts().catch(() => ({}))
       ]);
 
       if (propRes.success && propRes.data) {
@@ -186,14 +124,26 @@ function ManagerAttendancePage() {
       setAttendanceSheet(sheet);
 
     } catch (err) {
-      setError(err.message || "Failed to load attendance logs");
+      if (!isSilent) setError(err.message || "Failed to load attendance logs");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadRoster();
+    loadRoster(false);
+
+    const handleFocus = () => loadRoster(true);
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadRoster(true);
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, [selectedDate]);
 
   // Stats computations

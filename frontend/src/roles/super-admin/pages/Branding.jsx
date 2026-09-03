@@ -342,7 +342,8 @@ function SuperAdminBranding() {
       toast.loading(`Uploading ${assetName} to server...`);
       try {
         const token = localStorage.getItem("hms_token");
-        const res = await fetch("http://localhost:5000/api/super-admin/upload", {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+        const res = await fetch(`${apiBase}/super-admin/upload`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`

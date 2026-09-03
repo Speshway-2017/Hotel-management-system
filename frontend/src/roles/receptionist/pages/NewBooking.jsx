@@ -7,6 +7,8 @@ import { receptionistService } from "@/services/receptionist";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 function ReceptionistNewBooking() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -49,88 +51,84 @@ function ReceptionistNewBooking() {
     return now.getFullYear() === y && (now.getMonth() + 1) === m && now.getDate() === d;
   };
 
-  // 1. Fetch rooms and live reservations to accurately filter available rooms
-  useEffect(() => {
-    const fetchRoomsAndAvailability = async () => {
-      try {
-        setLoading(true);
-        const [roomsRes, resRes] = await Promise.all([
-          receptionistService.getRooms().catch(() => ({})),
-          receptionistService.getReservations().catch(() => ({}))
-        ]);
+  const fetchRoomsAndAvailability = async () => {
+    try {
+      setLoading(true);
+      const [roomsRes, resRes] = await Promise.all([
+        receptionistService.getRooms().catch(() => ({})),
+        receptionistService.getReservations().catch(() => ({}))
+      ]);
 
-        let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
-        if (dbRooms.length === 0) {
-          dbRooms = [
-            { roomNumber: "101", category: "Standard Room", status: "Available", rate: 3000 },
-            { roomNumber: "102", category: "Standard Room", status: "Available", rate: 3000 },
-            { roomNumber: "103", category: "Standard Room", status: "Occupied", rate: 3000 },
-            { roomNumber: "201", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "202", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "203", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "204", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "301", category: "Executive Suite", status: "Available", rate: 6500 },
-            { roomNumber: "302", category: "Executive Suite", status: "Available", rate: 6500 },
-            { roomNumber: "303", category: "Executive Suite", status: "Available", rate: 6500 },
-            { roomNumber: "401", category: "Deluxe Room", status: "Available", rate: 4500 },
-            { roomNumber: "402", category: "Deluxe Room", status: "Available", rate: 4500 }
-          ];
-        }
-        setRooms(dbRooms);
+      const dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
+      setRooms(dbRooms);
 
-        // Helper to extract all 3-4 digit room numbers from any reservation object
-        const extractNums = (resObj) => {
-          const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
-          const matches = combined.match(/\b\d{3,4}\b/g);
-          return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
-        };
+      // Helper to extract all 3-4 digit room numbers from any reservation object
+      const extractNums = (resObj) => {
+        const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
+        const matches = combined.match(/\b\d{3,4}\b/g);
+        return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
+      };
 
-        // Determine occupied / reserved rooms from live reservations
-        const occupied = new Set();
-        if (resRes && resRes.success && Array.isArray(resRes.data)) {
-          resRes.data.forEach(r => {
-            const s = String(r.status || '').toLowerCase().trim();
-            const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
-            if (!isInactive) {
-              const nums = extractNums(r);
-              nums.forEach(n => occupied.add(n));
-            }
-          });
-        }
-
-        // Filter ONLY available/vacant rooms (not occupied or reserved)
-        const availableRooms = dbRooms
-          .map(r => ({
-            num: String(r.roomNumber || r.num || ''),
-            type: r.category || r.roomType || 'Standard Room',
-            status: r.status || 'Available',
-            rate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
-          }))
-          .filter(r => {
-            if (!r.num) return false;
-            if (occupied.has(r.num)) return false; // Exclude occupied / reserved rooms
-            const roomStat = String(r.status || 'Available').toLowerCase().trim();
-            return roomStat === 'available' || roomStat === 'vacant';
-          });
-
-        // Deduplicate & sort
-        const uniqueAvailable = [];
-        const seen = new Set();
-        availableRooms.forEach(r => {
-          if (!seen.has(r.num)) {
-            seen.add(r.num);
-            uniqueAvailable.push(r);
+      // Determine occupied / reserved rooms from live reservations
+      const occupied = new Set();
+      if (resRes && resRes.success && Array.isArray(resRes.data)) {
+        resRes.data.forEach(r => {
+          const s = String(r.status || '').toLowerCase().trim();
+          const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
+          if (!isInactive) {
+            const nums = extractNums(r);
+            nums.forEach(n => occupied.add(n));
           }
         });
-        uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
-        setAvailableRoomsList(uniqueAvailable);
-      } catch (e) {
-        console.error("Failed to load available rooms:", e);
-      } finally {
-        setLoading(false);
       }
-    };
+
+      // Filter ONLY available/vacant rooms (not occupied or reserved)
+      const availableRooms = dbRooms
+        .map(r => ({
+          num: String(r.roomNumber || r.num || ''),
+          type: r.category || r.roomType || 'Standard Room',
+          status: r.status || 'Available',
+          rate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
+        }))
+        .filter(r => {
+          if (!r.num) return false;
+          if (occupied.has(r.num)) return false; // Exclude occupied / reserved rooms
+          const roomStat = String(r.status || 'Available').toLowerCase().trim();
+          return roomStat === 'available' || roomStat === 'vacant';
+        });
+
+      // Deduplicate & sort
+      const uniqueAvailable = [];
+      const seen = new Set();
+      availableRooms.forEach(r => {
+        if (!seen.has(r.num)) {
+          seen.add(r.num);
+          uniqueAvailable.push(r);
+        }
+      });
+      uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
+      setAvailableRoomsList(uniqueAvailable);
+    } catch (e) {
+      console.error("Failed to load available rooms:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchRoomsAndAvailability();
+
+    const handleFocus = () => fetchRoomsAndAvailability();
+    window.addEventListener('focus', handleFocus);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchRoomsAndAvailability();
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Automatic calculation of duration (nights) and amount based on stay dates and room type

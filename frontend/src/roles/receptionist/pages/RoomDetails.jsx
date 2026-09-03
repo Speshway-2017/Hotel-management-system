@@ -21,6 +21,7 @@ export const Route = createFileRoute("/reception/room-assignment/$id")({
 
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ReceptionRoomDetailsPage() {
   const { id } = useParams();
@@ -29,8 +30,8 @@ function ReceptionRoomDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [roomObj, setRoomObj] = useState(null);
 
-  const loadRoomDetails = () => {
-    setLoading(true);
+  const loadRoomDetails = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     receptionistService.getRooms()
       .then(res => {
         if (res.success && res.data) {
@@ -42,17 +43,25 @@ function ReceptionRoomDetailsPage() {
           );
           if (found) {
             setRoomObj(found);
-          } else {
+          } else if (!isSilent) {
             toast.error("Room details not found in property inventory.");
           }
         }
       })
       .catch(err => console.error("Failed to query room status:", err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+      });
   };
 
   useEffect(() => {
     loadRoomDetails();
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadRoomDetails(true);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [id]);
 
   const handleUpdateHousekeeping = (status) => {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { toast } from "sonner";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Receipt, Search, Eye, ChevronLeft, ChevronRight, TrendingUp,
   CreditCard, AlertCircle, FileText, Ban, Percent, CheckCircle2,
@@ -125,21 +126,13 @@ function AdminBillingPage() {
     const handleFocus = () => loadData();
     window.addEventListener('focus', handleFocus);
 
-    let socketInst = null;
-    import('@/services/socket').then(({ socket }) => {
-      socketInst = socket;
-      socket.on('booking_updated', loadData);
-      socket.on('payment_added', loadData);
-      socket.on('availability_changed', loadData);
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData();
     });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      if (socketInst) {
-        socketInst.off('booking_updated', loadData);
-        socketInst.off('payment_added', loadData);
-        socketInst.off('availability_changed', loadData);
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 

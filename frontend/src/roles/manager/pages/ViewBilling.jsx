@@ -48,7 +48,12 @@ function ManagerViewBilling() {
       setLoading(true);
       setError(null);
       try {
-        const decodedId = atob(id);
+        let decodedId = id;
+        try {
+          decodedId = atob(id);
+        } catch (e) {
+          decodedId = id;
+        }
         const billingRes = await managerService.getBilling();
         
         let foundInvoice = null;
@@ -80,7 +85,7 @@ function ManagerViewBilling() {
               issuedDate: r.checkIn
             };
           });
-          foundInvoice = list.find(inv => inv.bookingId === decodedId || inv.id === decodedId);
+          foundInvoice = list.find(inv => inv.bookingId === decodedId || inv.id === decodedId || inv.bookingId === id || inv.id === id);
         }
 
         if (foundInvoice) {

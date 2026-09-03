@@ -2,7 +2,9 @@ import express from 'express';
 import { protect } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
+import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
+import { emitRealtimeSync } from '../utils/socketEmitter.js';
 
 const router = express.Router();
 
@@ -168,6 +170,12 @@ router.put('/settings', async (req, res) => {
 
     const updatedProperty = await Property.findByIdAndUpdate(propertyId, updateFields, { new: true });
     
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'property_updated', { property: updatedProperty, propertyId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'settings_updated' });
+    }
+
     return sendSuccess(res, 200, {
       ...updatedProperty.settings,
       name: updatedProperty.name,

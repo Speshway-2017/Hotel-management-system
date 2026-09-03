@@ -5,6 +5,7 @@ import {
   ArrowRight, ShieldCheck, RefreshCw, AlertCircle, Clock, CheckCircle2 
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/guest/")({
   head: () => ({
@@ -48,105 +49,56 @@ function GuestDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError("");
     try {
       const token = localStorage.getItem('hms_token');
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/v1/guest/dashboard', { headers });
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${apiBase}/v1/guest/dashboard`, { headers });
       const result = await res.json();
-      
-      const stored = localStorage.getItem('latest_booking');
-      let localBooking = null;
-      if (stored) {
-        try { localBooking = JSON.parse(stored); } catch(e) {}
-      }
 
       if (result && result.success && result.data) {
-        let serverData = result.data;
-        let recent = serverData.recentBookings || [];
-
-        // If local latest booking exists, prepend if not already in list
-        if (localBooking) {
-          const exists = recent.some(b => b.id === localBooking.id || b.bookingId === localBooking.id || b.bookingId === localBooking.bookingId);
-          if (!exists) {
-            recent = [localBooking, ...recent];
-          }
-        }
-
-        const upcomingBooking = recent.find(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending') || recent[0] || null;
-        const currentStay = recent.find(b => b.status === 'Checked-in') || null;
-        const totalStays = recent.length;
-        const totalSpent = recent.reduce((acc, b) => acc + Number(b.amount || 0), 0);
-
-        setData({
-          stats: {
-            upcomingBooking,
-            currentStay,
-            totalStays,
-            loyaltyPoints: totalStays > 0 ? (totalStays * 2000 + Math.round(totalSpent * 0.1)) : 0,
-            loyaltyTier: totalStays >= 10 ? 'Platinum' : (totalStays >= 5 ? 'Gold' : 'Silver'),
-            totalSpent
-          },
-          recentBookings: recent
-        });
+        setData(result.data);
       } else {
-        const parsed = localBooking ? [localBooking] : [];
         setData({
           stats: {
-            upcomingBooking: parsed[0] || null,
+            upcomingBooking: null,
             currentStay: null,
-            totalStays: parsed.length,
-            loyaltyPoints: parsed.length > 0 ? 2000 : 0,
+            totalStays: 0,
+            loyaltyPoints: 0,
             loyaltyTier: 'Silver',
-            totalSpent: parsed[0]?.amount || 0
+            totalSpent: 0
           },
-          recentBookings: parsed
+          recentBookings: []
         });
       }
     } catch (err) {
       console.error("Failed to load guest dashboard:", err);
-      const stored = localStorage.getItem('latest_booking');
-      const parsed = stored ? [JSON.parse(stored)] : [];
-      setData({
-        stats: {
-          upcomingBooking: parsed[0] || null,
-          currentStay: null,
-          totalStays: parsed.length,
-          loyaltyPoints: parsed.length > 0 ? 2000 : 0,
-          loyaltyTier: 'Silver',
-          totalSpent: parsed[0]?.amount || 0
-        },
-        recentBookings: parsed
-      });
+      setError("Failed to load guest dashboard metrics from server.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboardData(false);
 
-    // Realtime Socket.io updates for Guest Dashboard
-    import('@/services/socket').then(({ socket }) => {
-      const handleRealtimeUpdate = () => {
-        console.log('⚡ Realtime Socket event received on Guest Dashboard. Updating metrics...');
-        fetchDashboardData();
-      };
+    const handleFocus = () => fetchDashboardData(true);
+    window.addEventListener('focus', handleFocus);
 
-      socket.on('booking_updated', handleRealtimeUpdate);
-      socket.on('room_status_changed', handleRealtimeUpdate);
-      socket.on('availability_changed', handleRealtimeUpdate);
-
-      return () => {
-        socket.off('booking_updated', handleRealtimeUpdate);
-        socket.off('room_status_changed', handleRealtimeUpdate);
-        socket.off('availability_changed', handleRealtimeUpdate);
-      };
+    const unsubscribe = subscribeRealtimeSync(() => {
+      console.log('⚡ Realtime Socket event received on Guest Dashboard. Updating metrics...');
+      fetchDashboardData(true);
     });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   if (loading) {

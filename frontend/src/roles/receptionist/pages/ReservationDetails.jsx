@@ -21,6 +21,7 @@ export const Route = createFileRoute("/reception/reservations/$id")({
 
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 function ReceptionReservationDetailsPage() {
   const { id } = useParams();
@@ -30,7 +31,6 @@ function ReceptionReservationDetailsPage() {
   const [booking, setBooking] = useState(null);
 
   const loadReservationDetails = () => {
-    setLoading(true);
     receptionistService.getReservations()
       .then(res => {
         if (res.success && res.data) {
@@ -55,6 +55,12 @@ function ReceptionReservationDetailsPage() {
 
   useEffect(() => {
     loadReservationDetails();
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadReservationDetails();
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [id]);
 
   const statusMeta = {
