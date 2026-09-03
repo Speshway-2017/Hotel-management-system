@@ -567,7 +567,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       else if (booking.status === 'Cancelled' || booking.status === 'No-show') rmStatus = 'Available';
 
       await Room.findOneAndUpdate(
-        { roomNumber: roomNum, propertyId: targetPropId },
+        { roomNumber: roomNum, $or: [{ propertyId: targetPropId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] },
         { status: rmStatus }
       );
     }

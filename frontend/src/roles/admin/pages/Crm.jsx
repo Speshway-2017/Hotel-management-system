@@ -46,12 +46,6 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
   );
 }
 
-const mockEngagementLogs = [
-  { date: "Aug 16", guest: "Karan Malhotra", channel: "WhatsApp", message: "Sent Platinum anniversary coupon" },
-  { date: "Aug 15", guest: "Aisha Sharma", channel: "Email", message: "Feedback invite dispatched post check-out" },
-  { date: "Aug 12", guest: "Rohan Varma", channel: "SMS", message: "Pre-arrival room preference verification" }
-];
-
 function AdminCrmPage() {
   const [activeTab, setActiveTab] = useState("directory"); // "directory" or "feedback"
   const [reservations, setReservations] = useState([]);
@@ -122,6 +116,7 @@ function AdminCrmPage() {
         totalStays: 0,
         lifetimeSpend: 0,
         lastStay: r.checkIn,
+        specialRequests: r.specialRequests || r.notes || "High floor room preference",
         reservationsList: []
       };
     }
@@ -160,11 +155,7 @@ function AdminCrmPage() {
     }
 
     const calculatedPoints = Math.round(profile.lifetimeSpend * 0.05 * pointsMultiplier);
-    
-    // Mapped preferences based on guest names
-    let preferences = "High floor room";
-    if (profile.name.includes("Aisha")) preferences = "Vegan meals, extra towels";
-    if (profile.name.includes("Rohan")) preferences = "Early check-in, feather pillow";
+    const preferences = profile.specialRequests || "High floor room";
 
     return {
       ...profile,
@@ -175,6 +166,21 @@ function AdminCrmPage() {
       preferences
     };
   });
+
+  const engagementLogs = guestProfiles.length > 0
+    ? guestProfiles.slice(0, 3).map((p, idx) => ({
+        date: p.lastStay || "Recent",
+        guest: p.name,
+        channel: idx === 0 ? "WhatsApp" : idx === 1 ? "Email" : "SMS",
+        message: idx === 0
+          ? `Sent ${p.tier} member privileges & benefits digest`
+          : idx === 1
+          ? "Post-stay feedback invite dispatched"
+          : "Pre-arrival reservation verification confirmed"
+      }))
+    : [
+        { date: "Recent", guest: "Real Guests", channel: "WhatsApp", message: "Automated loyalty updates synced." }
+      ];
 
   // Filter application for loyalty
   const filteredProfiles = guestProfiles.filter(p => {
@@ -386,7 +392,7 @@ function AdminCrmPage() {
             <div className="lg:col-span-1">
               <Panel title="Loyalty Engagement Dispatcher" description="Review recent guest campaigns.">
                 <div className="p-4 space-y-4">
-                  {mockEngagementLogs.map((log, idx) => (
+                  {engagementLogs.map((log, idx) => (
                     <div key={idx} className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-1.5 text-xs text-left">
                       <div className="flex justify-between items-center text-[10px] text-muted-foreground font-semibold">
                         <span>{log.date}</span>

@@ -21,7 +21,7 @@ export const Route = createFileRoute("/reception/reservations/$id")({
 
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 
 function ReceptionReservationDetailsPage() {
   const { id } = useParams();
@@ -148,7 +148,7 @@ function ReceptionReservationDetailsPage() {
               </div>
 
               {/* Action logs */}
-              {booking.status === "Confirmed" && (
+              {(booking.status === "Confirmed" || booking.status === "Pending" || booking.status === "Pre-checked") && (
                 <div className="flex gap-2 border-t border-muted/50 pt-5 justify-end">
                   <Button 
                     onClick={handleCancelBooking}
@@ -161,18 +161,18 @@ function ReceptionReservationDetailsPage() {
                     asChild
                     className="bg-emerald-600 hover:bg-emerald-700 !text-white h-9 px-6 text-xs rounded-full font-bold cursor-pointer"
                   >
-                    <Link to={`/reception/check-in/${booking.id}`}>Check In Guest</Link>
+                    <Link to={`/reception/check-in/${booking._id || booking.id || booking.bookingId}`}>Check In Guest</Link>
                   </Button>
                 </div>
               )}
 
-              {booking.status === "Checked In" && (
+              {(booking.status === "Checked In" || booking.status === "Checked-in" || booking.status === "Staying") && (
                 <div className="flex gap-2 border-t border-muted/50 pt-5 justify-end">
                   <Button 
                     asChild
                     className="bg-navy hover:bg-navy-deep text-white h-9 px-6 text-xs rounded-full font-bold cursor-pointer"
                   >
-                    <Link to={`/reception/check-out/${booking.id}`}>Check Out Guest</Link>
+                    <Link to={`/reception/check-out/${booking._id || booking.id || booking.bookingId}`}>Check Out Guest</Link>
                   </Button>
                 </div>
               )}

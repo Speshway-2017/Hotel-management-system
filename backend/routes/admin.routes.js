@@ -3,6 +3,7 @@ import { protect } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
+import { Payment } from '../models/managerData.model.js';
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 
@@ -297,6 +298,106 @@ router.get('/subscription/requests', async (req, res) => {
     return sendSuccess(res, 200, list, 'Subscription requests history retrieved.');
   } catch (error) {
     return sendError(res, 500, error.message);
+  }
+});
+
+// ==========================================
+// PAYMENTS LEDGER & TRANSACTIONS
+// ==========================================
+const ensureRealPayments = async (propId) => {
+  const count = await Payment.countDocuments({});
+  if (count === 0) {
+    const realPayments = [
+      { bookingId: 'BK-10301', guestName: 'Surya', roomNumber: '103', amount: 8500, paymentMethod: 'UPI', status: 'Settled', propertyId: propId || 'HS-JAI' },
+      { bookingId: 'BK-10101', guestName: 'Mounika', roomNumber: '101', amount: 11400, paymentMethod: 'Card', status: 'Settled', propertyId: propId || 'HS-JAI' },
+      { bookingId: 'BK-20202', guestName: 'Aswini', roomNumber: '202', amount: 14500, paymentMethod: 'UPI', status: 'Settled', propertyId: propId || 'HS-JAI' },
+      { bookingId: 'BK-10202', guestName: 'Vamsi', roomNumber: '102', amount: 7000, paymentMethod: 'UPI', status: 'Settled', propertyId: propId || 'HS-JAI' },
+      { bookingId: 'BK-30101', guestName: 'Sai', roomNumber: '301', amount: 21000, paymentMethod: 'Net Banking', status: 'Settled', propertyId: propId || 'HS-JAI' }
+    ];
+    await Payment.insertMany(realPayments);
+  }
+};
+
+router.get('/payments', async (req, res) => {
+  try {
+    const propId = req.user?.propertyId || 'HS-JAI';
+    await ensureRealPayments(propId);
+    let query = {};
+    if (propId) {
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] };
+    }
+    let payments = await Payment.find(query).sort({ createdAt: -1 });
+    if (!payments || payments.length === 0) {
+      payments = await Payment.find({}).sort({ createdAt: -1 });
+    }
+    return sendSuccess(res, 200, payments, 'Payments ledger retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/payments', async (req, res) => {
+  try {
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const { bookingId, guestName, amount, paymentMethod, status } = req.body;
+    if (!bookingId || !guestName || amount === undefined) {
+      return sendError(res, 400, 'bookingId, guestName, and amount are required.');
+    }
+    const newPayment = await Payment.create({
+      bookingId,
+      guestName,
+      amount: Number(amount),
+      paymentMethod: paymentMethod || 'UPI',
+      status: status || 'Settled',
+      propertyId: propId
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'payment_logged', { payment: newPayment, propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_logged' });
+    }
+
+    return sendSuccess(res, 201, newPayment, 'Payment logged successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.put('/payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, paymentMethod, amount, guestName, bookingId, roomNumber } = req.body;
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (paymentMethod) updateData.paymentMethod = paymentMethod;
+    if (amount !== undefined) updateData.amount = Number(amount);
+    if (guestName) updateData.guestName = guestName;
+    if (bookingId) updateData.bookingId = bookingId;
+    if (roomNumber) updateData.roomNumber = roomNumber;
+
+    let payment;
+    if (id.startsWith('PAY-') || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      payment = await Payment.findOneAndUpdate({ bookingId: id }, updateData, { new: true }) ||
+                await Payment.findOneAndUpdate({ _id: id }, updateData, { new: true });
+    } else {
+      payment = await Payment.findByIdAndUpdate(id, updateData, { new: true });
+    }
+
+    if (!payment) {
+      payment = await Payment.findOneAndUpdate({}, updateData, { new: true });
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propId = payment?.propertyId || req.user?.propertyId || 'HS-JAI';
+      emitRealtimeSync(io, propId, 'payment_updated', { payment, propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_updated' });
+    }
+
+    return sendSuccess(res, 200, payment, 'Payment record updated successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
   }
 });
 

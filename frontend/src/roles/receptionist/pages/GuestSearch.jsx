@@ -48,7 +48,6 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function InHouseGuestsPage() {
   const navigate = useNavigate();
-  const todayStr = "25 Aug 2026";
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterRoomType, setFilterRoomType] = useState("all");
@@ -57,39 +56,45 @@ function InHouseGuestsPage() {
 
   const loadGuests = (isSilent = false) => {
     if (!isSilent) setLoading(true);
-    receptionistService.getReservations()
+    receptionistService.getGuests()
       .then(res => {
-        const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
-        const inHouseBookings = allBookings
-          .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying')
-          .map(b => {
-            const rmNum = b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned');
-            const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
-            const bal = Number(b.balance || 0);
-            return {
-              id: b.bookingId || b.id || b._id,
-              _id: b._id || b.id || b.bookingId,
-              name: b.guest || b.name || 'Guest',
-              phone: b.phone || '--',
-              email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-              room: rmNum,
-              roomType: rmType,
-              checkIn: b.checkIn || 'Today',
-              checkOut: b.checkOut || 'Tomorrow',
-              duration: `${b.nights || 1} Nights`,
-              pax: b.pax || '2 Adults',
-              balance: bal,
-              paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
-              status: 'Staying',
-              vipTier: 'Gold Elite',
-              specialRequests: b.notes || b.specialRequests || 'None',
-              timeline: [
-                { time: b.checkIn || 'Today', action: 'Guest in-house active stay.' }
-              ]
-            };
+        let allGuests = res.success && Array.isArray(res.data) ? res.data : [];
+        if (allGuests.length === 0) {
+          return receptionistService.getReservations().then(resRes => {
+            const allBookings = resRes.success && Array.isArray(resRes.data) ? resRes.data : [];
+            const mapped = allBookings
+              .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying')
+              .map(b => {
+                const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
+                const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
+                const bal = Number(b.balance || 0);
+                return {
+                  id: b.bookingId || b.id || b._id,
+                  _id: b._id || b.id || b.bookingId,
+                  bookingId: b.bookingId || b.id || b._id,
+                  name: b.guest || b.name || 'Guest',
+                  phone: b.phone || '--',
+                  email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+                  room: rmNum,
+                  roomType: rmType,
+                  checkIn: b.checkIn || 'Today',
+                  checkOut: b.checkOut || 'Tomorrow',
+                  duration: `${b.nights || 1} Nights`,
+                  pax: b.pax || '2 Adults',
+                  balance: bal,
+                  paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
+                  status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : b.status,
+                  vipTier: 'Gold Elite',
+                  specialRequests: b.notes || b.specialRequests || 'None',
+                  timeline: [
+                    { time: b.checkIn || 'Today', action: 'Guest in-house active stay.' }
+                  ]
+                };
+              });
+            setGuests(mapped);
           });
-
-        setGuests(inHouseBookings);
+        }
+        setGuests(allGuests);
       })
       .catch(err => console.error("Failed to load in-house guests:", err))
       .finally(() => {
@@ -132,7 +137,8 @@ function InHouseGuestsPage() {
   const totalCount = guests.length;
   const stayingCount = guests.filter(g => g.status === "Staying" || g.status === "Checked-in" || g.status === "Checked-In").length;
   const extendedCount = guests.filter(g => g.status === "Extended Stay").length;
-  const dueOutCount = guests.filter(g => g.checkOut === "2026-09-02" || g.checkOut === "2026-09-03" || g.checkOut === todayStr).length;
+  const todayIso = new Date().toISOString().split('T')[0];
+  const dueOutCount = guests.filter(g => g.checkOut === todayIso || g.checkOut === 'Today').length;
 
   // Search and filter calculation
   const filteredGuests = guests.filter(g => {

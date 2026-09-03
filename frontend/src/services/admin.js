@@ -76,13 +76,46 @@ export const adminService = {
     });
   },
   getPayments: async () => {
-    return await request('/manager/payments');
+    try {
+      return await request('/admin/payments');
+    } catch (err) {
+      if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
+        return await request('/manager/payments');
+      }
+      throw err;
+    }
   },
   createPayment: async (data) => {
-    return await request('/manager/payments', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    try {
+      return await request('/admin/payments', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    } catch (err) {
+      if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
+        return await request('/manager/payments', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      }
+      throw err;
+    }
+  },
+  updatePayment: async (id, data) => {
+    try {
+      return await request(`/admin/payments/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    } catch (err) {
+      if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
+        return await request(`/manager/payments/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+      }
+      throw err;
+    }
   },
   getProperty: async () => {
     return await request('/admin/property');

@@ -93,6 +93,18 @@ export const receptionistService = {
       body: JSON.stringify(data)
     });
   },
+  createPayment: async (data) => {
+    return await request('/receptionist/payments', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  updatePayment: async (id, data) => {
+    return await request(`/receptionist/payments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
   getNotifications: async () => {
     return await request(`/receptionist/notifications?t=${Date.now()}`);
   },

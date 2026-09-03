@@ -18,7 +18,11 @@ const SEED_USERS = [
   { name: 'Hotel Admin', email: 'admin@hourstay.com', password: 'password123', role: 'admin', mobile: '9888888888' },
   { name: 'Hotel Manager', email: 'manager@hourstay.com', password: 'password123', role: 'manager', mobile: '9777777777' },
   { name: 'Front Desk Receptionist', email: 'receptionist@hourstay.com', password: 'password123', role: 'receptionist', mobile: '9666666666' },
-  { name: 'Regular Guest', email: 'guest@hourstay.com', password: 'password123', role: 'guest', mobile: '9555555555' },
+  { name: 'Surya', email: 'surya@gmail.com', password: 'password123', role: 'guest', mobile: '+91 47362 54654' },
+  { name: 'Mounika', email: 'mounika@gmail.com', password: 'password123', role: 'guest', mobile: '+91 99443 88120' },
+  { name: 'Aswini', email: 'aswini@gmail.com', password: 'password123', role: 'guest', mobile: '+91 98840 20203' },
+  { name: 'Vamsi', email: 'vamsi@gmail.com', password: 'password123', role: 'guest', mobile: '+91 98765 10202' },
+  { name: 'Sai', email: 'sai@gmail.com', password: 'password123', role: 'guest', mobile: '+91 98765 10404' },
   { name: 'Vikram Rathore', email: 'vikram.rathore@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98290 11223', propertyId: 'HS-JAI', status: 'Active' },
   { name: 'Meera Nair', email: 'meera.nair@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 97444 88321', propertyId: 'HS-UDA', status: 'Active' },
   { name: 'Joaquim Fernandes', email: 'joaquim@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98221 44556', propertyId: 'HS-GOA', status: 'Active' },
@@ -35,10 +39,11 @@ const SEED_PROPERTIES = [
 ];
 
 const SEED_BOOKINGS = [
-  { guest: 'Karan Malhotra', phone: '+91 98765 43210', room: 'Suite Room 302', checkIn: '2026-08-13', checkOut: '2026-08-15', nights: 2, pax: '2 Adults', source: 'MakeMyTrip', status: 'Checked-in', amount: 15400, balance: 0 },
-  { guest: 'Aisha Sharma', phone: '+91 99112 23344', room: 'Deluxe Room 104', checkIn: '2026-08-13', checkOut: '2026-08-14', nights: 1, pax: '1 Adult', source: 'Direct', status: 'Checked-in', amount: 8900, balance: 0 },
-  { guest: 'Rohan Varma', phone: '+91 98300 12345', room: 'Executive Room 205', checkIn: '2026-08-12', checkOut: '2026-08-14', nights: 2, pax: '2 Adults', source: 'Booking.com', status: 'Confirmed', amount: 12500, balance: 0 },
-  { guest: 'Meera Nair', phone: '+91 97777 88888', room: 'Villa Suite 101', checkIn: '2026-08-14', checkOut: '2026-08-17', nights: 3, pax: '3 Adults', source: 'Agoda', status: 'Pending', amount: 4500, balance: 4500 }
+  { bookingId: 'BK-10301', guest: 'Surya', phone: '+91 47362 54654', email: 'surya@gmail.com', room: '103 · Standard Room', roomNumber: '103', roomType: 'Standard Room', checkIn: '2026-09-01', checkOut: '2026-09-02', nights: 1, pax: '2 Adults', source: 'Direct Web', status: 'Checked-out', amount: 8500, totalAmount: 8500, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-10101', guest: 'Mounika', phone: '+91 99443 88120', email: 'mounika@gmail.com', room: '101 · Standard Room', roomNumber: '101', roomType: 'Standard Room', checkIn: '2026-09-02', checkOut: '2026-09-04', nights: 2, pax: '2 Adults', source: 'MakeMyTrip', status: 'Checked-in', amount: 11400, totalAmount: 11400, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-20202', guest: 'Aswini', phone: '+91 98840 20203', email: 'aswini@gmail.com', room: '202 · Deluxe Room', roomNumber: '202', roomType: 'Deluxe Room', checkIn: '2026-09-02', checkOut: '2026-09-05', nights: 3, pax: '2 Adults', source: 'Direct Web', status: 'Checked-in', amount: 14500, totalAmount: 14500, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-10202', guest: 'Vamsi', phone: '+91 98765 10202', email: 'vamsi@gmail.com', room: '102 · Standard Room', roomNumber: '102', roomType: 'Standard Room', checkIn: '2026-09-03', checkOut: '2026-09-05', nights: 2, pax: '2 Adults', source: 'Direct Web', status: 'Confirmed', amount: 7000, totalAmount: 7000, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-30101', guest: 'Sai', phone: '+91 98765 10404', email: 'sai@gmail.com', room: '301 · Executive Suite', roomNumber: '301', roomType: 'Executive Suite', checkIn: '2026-09-03', checkOut: '2026-09-06', nights: 3, pax: '2 Adults', source: 'Booking.com', status: 'Confirmed', amount: 21000, totalAmount: 21000, balance: 0, paymentStatus: 'Paid' }
 ];
 
 const SEED_AUDITS = [

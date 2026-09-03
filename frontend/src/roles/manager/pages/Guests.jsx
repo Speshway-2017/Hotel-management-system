@@ -264,28 +264,25 @@ function ManagerGuestsPage() {
   
   // Arrivals today: matching checkIn or In status
   const todayArrivals = activeBookings.filter(b => isTodayDate(b.checkIn) || (b.status || "").toLowerCase().includes("in")).length;
-  // Departures today: matching checkOut or Out status or Surya
-  const todayDepartures = activeBookings.filter(b => isTodayDate(b.checkOut) || (b.status || "").toLowerCase().includes("out") || (b.guest || "").toLowerCase().includes("surya")).length;
+  // Departures today: matching checkOut or Out status
+  const todayDepartures = activeBookings.filter(b => isTodayDate(b.checkOut) || (b.status || "").toLowerCase().includes("out")).length;
 
   const returningGuests = compiledGuests.filter(g => g.stays.length > 1).length;
   const loyaltyMembers = compiledGuests.filter(g => g.loyaltyTier !== "Regular").length;
 
   const getRoomDisplay = (b) => {
-    const guestLower = String(b?.guest || "").toLowerCase();
-    if (guestLower.includes("surya")) return "Room 103";
-    if (guestLower.includes("aswini") || guestLower.includes("ashwini")) return "Room 202";
     if (b?.roomNumber) return `Room ${b.roomNumber}`;
-    if (!b?.room) return "Room 101";
+    if (!b?.room) return "Unassigned";
     const str = String(b.room).split("·")[0].split("-")[0].replace(/room/i, "").trim();
     return str ? `Room ${str}` : "Room 101";
   };
 
   const getRoomCategoryDisplay = (b) => {
-    const guestLower = String(b?.guest || "").toLowerCase();
-    if (guestLower.includes("surya")) return "Standard Room";
-    if (guestLower.includes("aswini") || guestLower.includes("ashwini")) return "Deluxe Room";
     if (b?.roomType) return b.roomType;
     if (b?.category) return b.category;
+    if (b?.room && String(b.room).includes("·")) {
+      return String(b.room).split("·")[1]?.trim() || "Standard Room";
+    }
     return "Standard Room";
   };
 

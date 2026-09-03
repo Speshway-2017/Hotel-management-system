@@ -48,7 +48,7 @@ function Confirmation() {
           </span>
           <h1 className="mt-5 font-display text-3xl font-semibold text-navy">Your stay is confirmed</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            A confirmation has been sent to {booking?.email || 'aarav.mehta@example.in'} and {booking?.phone || '+91 98204 33121'}.
+            A confirmation has been sent to {booking?.email || 'your registered email'} and {booking?.phone || 'registered phone number'}.
           </p>
           <dl className="mt-8 grid gap-3 rounded-lg bg-cream p-5 text-left text-sm">
             <Row k="Booking reference" v={booking?.id || booking?._id || "HS24-10241"} />

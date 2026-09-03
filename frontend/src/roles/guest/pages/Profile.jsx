@@ -44,12 +44,14 @@ function GuestProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  const currentUser = authService.getUser();
+
   const [profileData, setProfileData] = useState({
-    name: "Aarav Mehta",
-    email: "aarav.mehta@example.com",
-    phone: "+91 98204 33121",
-    city: "Hyderabad",
-    address: "Hitech City, Hyderabad, Telangana",
+    name: currentUser?.name || "Guest",
+    email: currentUser?.email || "",
+    phone: currentUser?.mobile || currentUser?.phone || "",
+    city: currentUser?.city || "Hyderabad",
+    address: currentUser?.address || "Hitech City, Hyderabad, Telangana",
     country: "India",
     role: "Guest Member",
     status: "Active",
@@ -84,10 +86,11 @@ function GuestProfilePage() {
 
       if (result && result.success && result.data) {
         const fresh = result.data;
+        const u = authService.getUser();
         setProfileData({
-          name: fresh.name || "Aarav Mehta",
-          email: fresh.email || "aarav.mehta@example.com",
-          phone: fresh.mobile || fresh.phone || "+91 98204 33121",
+          name: fresh.name || u?.name || "Guest",
+          email: fresh.email || u?.email || "",
+          phone: fresh.mobile || fresh.phone || u?.mobile || "",
           city: fresh.city || "Hyderabad",
           address: fresh.address || "Hitech City, Hyderabad",
           country: fresh.country || "India",

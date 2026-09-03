@@ -103,7 +103,7 @@ function AddGuestPage() {
                   id="name"
                   type="text"
                   required
-                  placeholder="e.g. Karan Malhotra"
+                  placeholder="e.g. Surya"
                   value={formData.name}
                   onChange={handleChange}
                 />

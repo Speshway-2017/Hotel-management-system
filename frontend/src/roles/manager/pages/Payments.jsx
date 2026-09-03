@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { UnifiedPaymentsView } from "@/components/common/UnifiedPaymentsView";
 
-export const Route = createFileRoute("/manager/billing")({
+export const Route = createFileRoute("/manager/payments")({
   head: () => ({
     meta: [
       { title: "Payments Ledger — Manager Console" },

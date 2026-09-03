@@ -35,8 +35,7 @@ import {
 const operationsTabs = [
   { label: "Reservations", to: "/admin/reservations", icon: CalendarCheck },
   { label: "Rooms & Rates", to: "/admin/rooms", icon: Bed },
-  { label: "Guests", to: "/admin/guests", icon: Users },
-  { label: "Front Desk", to: "/admin/front-desk", icon: ConciergeBell }
+  { label: "Guests", to: "/admin/guests", icon: Users }
 ];
 
 export const Route = createFileRoute("/admin/reservations")({
@@ -205,6 +204,31 @@ function ReservationsPage() {
     emitRealtimeEvent('dashboard_sync', { action, roomNum });
   };
 
+  const handleStatusChange = async (bookingId, newStatus, notes = "") => {
+    try {
+      const payload = { status: newStatus };
+      if (notes) payload.notes = notes;
+      const res = await superAdminService.updateReservation(bookingId, payload);
+      if (res.success) {
+        setReservations(prev => prev.map(r => 
+          (r._id === bookingId || r.id === bookingId || r.bookingId === bookingId)
+            ? { ...r, status: newStatus }
+            : r
+        ));
+        if (selectedRes && (selectedRes._id === bookingId || selectedRes.id === bookingId || selectedRes.bookingId === bookingId)) {
+          setSelectedRes(prev => ({ ...prev, status: newStatus }));
+        }
+        toast.success(newStatus === "Checked-in" ? "Guest checked in successfully!" : newStatus === "Checked-out" ? "Guest checked out successfully!" : `Reservation status updated to ${newStatus}`);
+        notifySocketEvents(newStatus === 'Checked-in' ? 'checkin' : newStatus === 'Checked-out' ? 'checkout' : 'update');
+        loadReservations(false);
+      } else {
+        toast.error(res.message || "Failed to update status");
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to update status");
+    }
+  };
+
   useEffect(() => {
     loadReservations(false);
 
@@ -222,26 +246,6 @@ function ReservationsPage() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
-
-  async function handleStatusChange(bookingId, newStatus, notes = "") {
-    try {
-      const payload = { status: newStatus };
-      if (notes) payload.notes = notes;
-      const res = await superAdminService.updateReservation(bookingId, payload);
-      if (res.success) {
-        toast.success(`Reservation status updated to ${newStatus}`);
-        notifySocketEvents('status_change');
-        loadReservations(false);
-        if (selectedRes && selectedRes._id === bookingId) {
-          setSelectedRes(prev => ({ ...prev, status: newStatus }));
-        }
-      } else {
-        toast.error(res.message || "Failed to update reservation");
-      }
-    } catch (err) {
-      toast.error(err.message || "Failed to update status");
-    }
-  }
 
   async function handleDelete(id) {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
@@ -348,20 +352,28 @@ function ReservationsPage() {
     return new Date(dStr);
   };
 
+  const isInactiveBooking = (status) => {
+    if (!status) return false;
+    const s = String(status).toLowerCase().trim();
+    return s === "checked-out" || s === "checked out" || s === "cancelled" || s === "no-show" || s === "no show";
+  };
+
   const detectOverbookings = () => {
-    const active = reservations.filter(r => r.status !== "Cancelled" && r.room);
+    const active = reservations.filter(r => !isInactiveBooking(r.status) && r.room);
     const conflicts = [];
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
         const b1 = active[i];
         const b2 = active[j];
-        if (b1.room === b2.room) {
+        const r1 = (b1.roomNumber || b1.room || "").match(/\b\d{3,4}\b/)?.[0] || b1.room;
+        const r2 = (b2.roomNumber || b2.room || "").match(/\b\d{3,4}\b/)?.[0] || b2.room;
+        if (r1 && r2 && r1 === r2) {
           const s1 = parseDate(b1.checkIn);
           const e1 = parseDate(b1.checkOut);
           const s2 = parseDate(b2.checkIn);
           const e2 = parseDate(b2.checkOut);
           if (s1 < e2 && s2 < e1) {
-            conflicts.push({ b1, b2, room: b1.room });
+            conflicts.push({ b1, b2, room: r1 });
           }
         }
       }
@@ -624,9 +636,9 @@ function ReservationsPage() {
                           </td>
                           <td className="py-3.5 pl-3 pr-4 text-left align-middle">
                             <div className="flex items-center justify-start gap-1 whitespace-nowrap">
-                              {res.status === "Pending" && (
+                              {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
                                 <Button
-                                  onClick={() => handleStatusChange(res._id, "Checked-in")}
+                                  onClick={() => handleStatusChange(res._id || res.id, "Checked-in")}
                                   size="xs"
                                   variant="outline"
                                   className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
@@ -634,9 +646,9 @@ function ReservationsPage() {
                                   Check-In
                                 </Button>
                               )}
-                              {res.status === "Checked-in" && (
+                              {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying") && (
                                 <Button
-                                  onClick={() => handleStatusChange(res._id, "Checked-out")}
+                                  onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
                                   size="xs"
                                   variant="outline"
                                   className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
@@ -983,7 +995,7 @@ function ReservationsPage() {
                 <div className="bg-[#fdfbfc]/40 border border-muted p-3.5 rounded-xl space-y-2 text-muted-foreground">
                   <div className="flex items-start gap-2.5 text-[11px]">
                     <span className="size-1.5 rounded-full bg-success mt-1.5 shrink-0" />
-                    <p>Booking generated by **receptionist_aarav** via direct walk-in desk.</p>
+                    <p>Booking processed via front desk reservation system.</p>
                   </div>
                   <div className="flex items-start gap-2.5 text-[11px]">
                     <span className="size-1.5 rounded-full bg-purple mt-1.5 shrink-0" />
@@ -1002,27 +1014,27 @@ function ReservationsPage() {
 
             {/* Quick Status actions controls at the footer */}
             <div className="p-4 bg-muted/15 border-t border-muted flex flex-wrap gap-2.5">
-              {selectedRes.status === "Pending" && (
+              {(selectedRes.status === "Pending" || selectedRes.status === "Confirmed" || selectedRes.status === "Pre-checked") && (
                 <Button
-                  onClick={() => handleStatusChange(selectedRes._id, "Checked-in")}
-                  className="bg-success hover:bg-success-deep text-white text-xs font-bold px-4 h-9 rounded-full flex-1"
+                  onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Checked-in")}
+                  className="bg-success hover:bg-success-deep text-white text-xs font-bold px-4 h-9 rounded-full flex-1 cursor-pointer"
                 >
                   Confirm Check-In
                 </Button>
               )}
-              {selectedRes.status === "Checked-in" && (
+              {(selectedRes.status === "Checked-in" || selectedRes.status === "Checked In" || selectedRes.status === "Staying") && (
                 <Button
-                  onClick={() => handleStatusChange(selectedRes._id, "Checked-out")}
-                  className="bg-navy hover:bg-navy-deep text-white text-xs font-bold px-4 h-9 rounded-full flex-1"
+                  onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Checked-out")}
+                  className="bg-navy hover:bg-navy-deep text-white text-xs font-bold px-4 h-9 rounded-full flex-1 cursor-pointer"
                 >
                   Confirm Check-Out
                 </Button>
               )}
-              {selectedRes.status !== "Cancelled" && selectedRes.status !== "Checked-out" && (
+              {selectedRes.status !== "Cancelled" && selectedRes.status !== "Checked-out" && selectedRes.status !== "Checked Out" && (
                 <Button
-                  onClick={() => handleStatusChange(selectedRes._id, "Cancelled", "Marked as Cancelled by Administrator")}
+                  onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Cancelled", "Marked as Cancelled by Administrator")}
                   variant="outline"
-                  className="text-destructive border-destructive/40 hover:bg-destructive/5 text-xs font-bold px-4 h-9 rounded-full"
+                  className="text-destructive border-destructive/40 hover:bg-destructive/5 text-xs font-bold px-4 h-9 rounded-full cursor-pointer"
                 >
                   Cancel Booking
                 </Button>

@@ -110,6 +110,7 @@ export const ReceptionistNotification = mongoose.models.ReceptionistNotification
 const paymentSchema = new mongoose.Schema({
   bookingId: { type: String, required: true },
   guestName: { type: String, required: true },
+  roomNumber: { type: String, default: '101' },
   amount: { type: Number, required: true },
   paymentMethod: { type: String, default: 'UPI' },
   status: { type: String, default: 'Settled' }, // Settled, Refunded, Pending

@@ -32,8 +32,13 @@ router.get('/bookings', async (req, res) => {
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    // Show ONLY bookings linked to the logged-in guest's guestId/accountId
-    const bookings = await Booking.find({ guestId: userId }).sort({ createdAt: -1 });
+    const query = [{ guestId: userId }];
+    if (req.user?.email) query.push({ email: req.user.email });
+    if (req.user?.mobile) query.push({ phone: req.user.mobile });
+    if (req.user?.name) query.push({ guest: req.user.name });
+
+    // Show bookings linked to the logged-in guest
+    const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
 
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
@@ -72,8 +77,13 @@ router.get('/dashboard', async (req, res) => {
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    // Show ONLY bookings linked to the logged-in guest's guestId/accountId
-    const bookings = await Booking.find({ guestId: userId }).sort({ createdAt: -1 });
+    const query = [{ guestId: userId }];
+    if (req.user?.email) query.push({ email: req.user.email });
+    if (req.user?.mobile) query.push({ phone: req.user.mobile });
+    if (req.user?.name) query.push({ guest: req.user.name });
+
+    // Show bookings linked to the logged-in guest
+    const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
 
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
@@ -129,8 +139,13 @@ router.get('/folio', async (req, res) => {
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    // Show ONLY folios linked to the logged-in guest's guestId/accountId
-    const bookings = await Booking.find({ guestId: userId }).sort({ createdAt: -1 });
+    const query = [{ guestId: userId }];
+    if (req.user?.email) query.push({ email: req.user.email });
+    if (req.user?.mobile) query.push({ phone: req.user.mobile });
+    if (req.user?.name) query.push({ guest: req.user.name });
+
+    // Show folios linked to the logged-in guest
+    const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
 
     const folios = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
@@ -228,11 +243,11 @@ router.post('/feedback', async (req, res) => {
     }
 
     const newReview = await Review.create({
-      bookingId: bookingId || 'HS-1001',
-      hotelName: hotelName || 'Speshway Hotel & Suites',
-      guestName: req.user?.name || 'Aarav Mehta',
-      guestPhone: req.user?.mobile || '+91 98204 33121',
-      guestEmail: req.user?.email || 'aarav.mehta@example.com',
+      bookingId: bookingId || 'BK-1001',
+      hotelName: hotelName || 'Hour Stay Luxury Hotel',
+      guestName: req.user?.name || 'Guest',
+      guestPhone: req.user?.mobile || '',
+      guestEmail: req.user?.email || '',
       userId: req.user?.id || req.user?._id,
       rating: Number(rating),
       categories: categories || { cleanliness: 5, service: 5, room: 5, food: 5, overall: 5 },

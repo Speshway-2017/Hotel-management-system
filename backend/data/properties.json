@@ -310,9 +310,9 @@
   {
     "id": "HS-9HQ8P",
     "_id": "HS-9HQ8P",
-    "name": "Speshway Luxary Hotel",
-    "city": "Madhapur , Hyderabad",
-    "rooms": 50,
+    "name": "Speshway Luxury Hotel",
+    "city": "Madhapur, Hyderabad",
+    "rooms": 14,
     "occupancy": 0,
     "adr": 0,
     "revpar": 0,
@@ -363,8 +363,8 @@
       "channelSms": false,
       "channelWhatsApp": true,
       "channelPush": false,
-      "name": "Speshway Luxary Hotel",
-      "city": "Madhapur , Hyderabad",
+      "name": "Speshway Luxury Hotel",
+      "city": "Madhapur, Hyderabad",
       "photos": [
         "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152549/hourstay_hms_assets/t1wutasu8gu727qtekyj.jpg",
         "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152563/hourstay_hms_assets/g42hkvukxkpcx4yzrmlh.jpg",
@@ -396,7 +396,7 @@
       "emailAlerts": true,
       "smsAlerts": false,
       "parityAlerts": true,
-      "hotelName": "Speshway Luxary Hotel",
+      "hotelName": "Speshway Luxury Hotel",
       "gallery": [
         "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152549/hourstay_hms_assets/t1wutasu8gu727qtekyj.jpg",
         "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152563/hourstay_hms_assets/g42hkvukxkpcx4yzrmlh.jpg",

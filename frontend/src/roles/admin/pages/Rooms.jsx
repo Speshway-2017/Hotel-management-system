@@ -39,8 +39,7 @@ import {
 const operationsTabs = [
   { label: "Reservations", to: "/admin/reservations", icon: CalendarCheck },
   { label: "Rooms & Rates", to: "/admin/rooms", icon: Bed },
-  { label: "Guests", to: "/admin/guests", icon: Users },
-  { label: "Front Desk", to: "/admin/front-desk", icon: ConciergeBell }
+  { label: "Guests", to: "/admin/guests", icon: Users }
 ];
 
 import { CalendarCheck, ConciergeBell } from "lucide-react";

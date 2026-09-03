@@ -81,35 +81,27 @@ router.get('/properties/:id/rooms', async (req, res) => {
       dbRooms = await Room.find().sort({ roomNumber: 1 });
     }
 
-    // Seed 12 default room configurations if zero rooms exist in MongoDB
+    // Seed 14 default room configurations if zero rooms exist in MongoDB
     if (!dbRooms || dbRooms.length === 0) {
-      const defaultRoomsToSeed = [];
-      const roomTypeSpecs = [
-        { category: "Standard Room", rate: 3000, plan: "Standard Plan" },
-        { category: "Deluxe Room", rate: 4500, plan: "Deluxe Plan" },
-        { category: "Executive Suite", rate: 6500, plan: "Deluxe Plan" },
-        { category: "Villa Suite", rate: 12500, plan: "Weekend Plan" }
-      ];
-
       const allProps = await Property.find();
       const defaultPropId = allProps[0]?._id?.toString() || 'HS-9HQ8P';
 
-      for (let floor = 1; floor <= 4; floor++) {
-        const spec = roomTypeSpecs[floor - 1];
-        for (let r = 1; r <= 3; r++) {
-          defaultRoomsToSeed.push({
-            roomNumber: `${floor}0${r}`,
-            category: spec.category,
-            status: 'Available',
-            ratePlan: spec.plan,
-            baseRate: spec.rate,
-            currentRate: spec.rate,
-            dailyRate: spec.rate,
-            floor: `Floor ${floor}`,
-            propertyId: defaultPropId
-          });
-        }
-      }
+      const defaultRoomsToSeed = [
+        { roomNumber: '101', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '102', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '103', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '201', category: 'Deluxe Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '202', category: 'Deluxe Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '203', category: 'Deluxe Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '301', category: 'Executive Suite', status: 'Available', ratePlan: 'Standard Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '302', category: 'Executive Suite', status: 'Available', ratePlan: 'Standard Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '303', category: 'Executive Suite', status: 'Available', ratePlan: 'Standard Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '401', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '402', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '403', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '501', category: 'Penthouse Suite', status: 'Available', ratePlan: 'Penthouse Plan', baseRate: 5500, currentRate: 5500, dailyRate: 5500, floor: 'Floor 5', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '502', category: 'Penthouse Suite', status: 'Available', ratePlan: 'Penthouse Plan', baseRate: 5500, currentRate: 5500, dailyRate: 5500, floor: 'Floor 5', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId }
+      ];
       await Room.insertMany(defaultRoomsToSeed);
       dbRooms = await Room.find().sort({ roomNumber: 1 });
     }
