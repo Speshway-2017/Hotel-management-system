@@ -120,19 +120,13 @@ function AdminReportsDashboard() {
         setLoading(false);
       }
     }
-    loadReportsData();
-
-    const handleFocus = () => {
-      loadReportsData();
-    };
-    window.addEventListener('focus', handleFocus);
+    loadReportsData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadReportsData();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

@@ -6,6 +6,8 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ExtendStayModal } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import {
   Users,
   CheckCircle,
@@ -90,52 +92,9 @@ function ManagerGuestsPage() {
 
   // Extend Stay modal state
   const [extendingBooking, setExtendingBooking] = useState(null);
-  const [newCheckOutDate, setNewCheckOutDate] = useState("");
-  const [dailyRate, setDailyRate] = useState(0);
-  const [extendingSubmit, setExtendingSubmit] = useState(false);
 
   const handleOpenExtendModal = (b) => {
     setExtendingBooking(b);
-    const currentOut = new Date(b.checkOut);
-    const nextDay = new Date(currentOut.getTime() + 24 * 60 * 60 * 1000);
-    setNewCheckOutDate(formatDateToYYYYMMDD(nextDay));
-    const avgNightWithTax = b.amount / (b.nights || 1);
-    setDailyRate(Math.round(avgNightWithTax / 1.18));
-  };
-
-  const handleConfirmExtend = async () => {
-    if (!extendingBooking || !newCheckOutDate) return;
-    const additionalNights = getAdditionalNights(extendingBooking.checkOut, newCheckOutDate);
-    if (additionalNights <= 0) {
-      toast.error("New check-out date must be after current check-out date.");
-      return;
-    }
-    
-    setExtendingSubmit(true);
-    try {
-      const roomCharges = dailyRate * additionalNights;
-      const gst = Math.round(roomCharges * 0.18);
-      const totalAdditionalAmount = roomCharges + gst;
-      
-      const payload = {
-        newCheckOut: formatDateToString(new Date(newCheckOutDate)),
-        additionalNights,
-        additionalAmount: totalAdditionalAmount
-      };
-      
-      const res = await managerService.extendReservation(extendingBooking._id || extendingBooking.id, payload);
-      if (res.success) {
-        toast.success(`Stay extended successfully until ${payload.newCheckOut}!`);
-        setExtendingBooking(null);
-        loadData();
-      } else {
-        toast.error(res.message || "Failed to extend stay.");
-      }
-    } catch (err) {
-      toast.error(err.message || "An error occurred while extending stay.");
-    } finally {
-      setExtendingSubmit(false);
-    }
   };
 
   async function loadData() {
@@ -171,19 +130,13 @@ function ManagerGuestsPage() {
   }
 
   useEffect(() => {
-    loadData();
-
-    const handleFocus = () => {
-      loadData();
-    };
-    window.addEventListener('focus', handleFocus);
+    loadData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -198,10 +151,6 @@ function ManagerGuestsPage() {
       if (!guestMap[key]) {
         const nameParts = b.guest.toLowerCase().split(" ");
         const email = nameParts.length > 1 ? `${nameParts[0]}.${nameParts[1]}@gmail.com` : `${nameParts[0]}@gmail.com`;
-        
-        const loyaltyTiers = ["Platinum", "Gold", "Silver", "Regular"];
-        const tierIndex = (b.guest.length) % loyaltyTiers.length;
-        const loyaltyTier = loyaltyTiers[tierIndex];
         
         const roomPrefs = ["High floor, non-smoking", "Near elevator, twin bed", "King bed, pool view", "Quiet room, extra blankets"];
         const roomPref = roomPrefs[b.guest.length % roomPrefs.length];
@@ -219,7 +168,6 @@ function ManagerGuestsPage() {
           name: b.guest,
           phone: b.phone || "+91 99999 88888",
           email: email,
-          loyaltyTier,
           roomPreference: roomPref,
           guestPreference: guestPref,
           feedback,
@@ -233,42 +181,20 @@ function ManagerGuestsPage() {
     return Object.values(guestMap);
   })();
 
-  const getTodayISO = () => new Date().toISOString().split('T')[0];
-  const getTodayFormatted = () => {
-    const d = new Date();
-    const day = String(d.getDate()).padStart(2, '0');
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  };
-
-  const isTodayDate = (dateStr) => {
-    if (!dateStr) return false;
-    const str = String(dateStr).trim();
-    const todayISO = getTodayISO();
-    const todayFormatted = getTodayFormatted();
-    const todaySimple = new Date().toDateString();
-    if (str.includes(todayISO) || str.includes(todayFormatted)) return true;
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toDateString() === todaySimple;
-    }
-    return false;
-  };
-
   // Active bookings filter
   const activeBookings = bookings.filter(b => (b.status || "").toLowerCase() !== "cancelled");
 
   // Statistics Computations
   const totalGuests = compiledGuests.length;
-  const currentGuests = activeBookings.filter(b => (b.status || "").toLowerCase() === "checked-in" || (b.status || "").toLowerCase() === "checked in").length;
+  const currentGuests = activeBookings.filter(b => (b.status || "").toLowerCase() === "checked-in" || (b.status || "").toLowerCase() === "checked in" || (b.status || "").toLowerCase() === "staying").length;
   
-  // Arrivals today: matching checkIn or In status
-  const todayArrivals = activeBookings.filter(b => isTodayDate(b.checkIn) || (b.status || "").toLowerCase().includes("in")).length;
-  // Departures today: matching checkOut or Out status
-  const todayDepartures = activeBookings.filter(b => isTodayDate(b.checkOut) || (b.status || "").toLowerCase().includes("out")).length;
+  // Arrivals today: matching checkIn is today
+  const todayArrivals = activeBookings.filter(b => isToday(b.checkIn) && ['confirmed', 'pending', 'pre-checked', 'paid', 'checked-in', 'checked in'].includes((b.status || '').toLowerCase())).length;
+  // Departures today: matching checkOut is today
+  const todayDepartures = activeBookings.filter(b => isToday(b.checkOut) && ['checked-in', 'checked in', 'staying', 'checked-out', 'checked out'].includes((b.status || '').toLowerCase())).length;
 
   const returningGuests = compiledGuests.filter(g => g.stays.length > 1).length;
-  const loyaltyMembers = compiledGuests.filter(g => g.loyaltyTier !== "Regular").length;
+  const corporateGuests = compiledGuests.filter(g => g.stays.length > 2).length;
 
   const getRoomDisplay = (b) => {
     if (b?.roomNumber) return `Room ${b.roomNumber}`;
@@ -349,7 +275,7 @@ function ManagerGuestsPage() {
         <PremiumStatCard label="Today's Arrivals" value={todayArrivals.toString()} hint="Incoming reservation entries" accentColor="#3b82f6" />
         <PremiumStatCard label="Today's Departures" value={todayDepartures.toString()} hint="Checked-out logs today" accentColor="#ef4444" />
         <PremiumStatCard label="Returning Guests" value={returningGuests.toString()} hint="Repeat bookings count" accentColor="#8b5cf6" />
-        <PremiumStatCard label="Loyalty Members" value={loyaltyMembers.toString()} hint="Elite Tier subscribers" accentColor="#f59e0b" />
+        <PremiumStatCard label="Total Guests" value={totalGuests.toString()} hint="All profiled guests" accentColor="#f59e0b" />
       </div>
 
       {/* Filters & Search Toolbar */}
@@ -433,11 +359,6 @@ function ManagerGuestsPage() {
                       <td className="py-3.5 px-4 text-left align-middle font-bold text-navy-deep truncate">
                         <div className="flex items-center gap-1.5 truncate">
                           <span className="truncate">{g.name}</span>
-                          {g.loyaltyTier !== "Regular" && (
-                            <Tag tone="brand" className="text-[8px] px-1.5 py-0 scale-90 shrink-0">
-                              {g.loyaltyTier}
-                            </Tag>
-                          )}
                         </div>
                         <div className="text-[9px] font-normal text-muted-foreground/80 mt-0.5">Stays: {g.stays.length}</div>
                       </td>
@@ -536,106 +457,14 @@ function ManagerGuestsPage() {
         )}
       </div>
 
-      {/* Extend Stay Modal */}
-      {extendingBooking && (
-        <div className="fixed inset-0 bg-[#071420]/75 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-muted shadow-lift w-full max-w-md overflow-hidden animate-scale-up text-left font-sans">
-            
-            {/* Modal Header */}
-            <div className="bg-navy p-5 text-white flex items-start justify-between">
-              <div>
-                <h3 className="text-sm font-bold">Extend Stay Duration</h3>
-                <p className="text-[10px] text-[#A5F3FC] font-semibold mt-1">Guest: {extendingBooking.guest} · Room: {extendingBooking.room}</p>
-              </div>
-              <button
-                onClick={() => setExtendingBooking(null)}
-                className="text-white/60 hover:text-white cursor-pointer text-xs"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-4 text-xs text-navy">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Current Checkout</label>
-                  <p className="font-semibold text-navy-deep bg-muted/20 border border-muted/50 p-2.5 rounded-lg text-[11px]">{extendingBooking.checkOut}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">New Checkout Date</label>
-                  <input
-                    type="date"
-                    min={formatDateToYYYYMMDD(new Date(new Date(extendingBooking.checkOut).getTime() + 24 * 60 * 60 * 1000))}
-                    value={newCheckOutDate}
-                    onChange={(e) => setNewCheckOutDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy text-navy font-semibold h-9"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Additional Nights</label>
-                  <p className="font-bold text-navy bg-muted/20 border border-muted/50 p-2.5 rounded-lg text-xs">
-                    {getAdditionalNights(extendingBooking.checkOut, newCheckOutDate)} Nights
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Daily Charge (Excl. GST)</label>
-                  <input
-                    type="number"
-                    value={dailyRate}
-                    onChange={(e) => setDailyRate(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-muted rounded-lg text-xs bg-[#fafafa]/50 focus:outline-none focus:border-navy text-navy font-bold h-9"
-                  />
-                </div>
-              </div>
-
-              {/* Price Breakdown Ledger */}
-              <div className="border-t border-muted pt-4 space-y-2 select-none">
-                <div className="flex justify-between font-semibold text-muted-foreground">
-                  <span>Room Charges (Excl. GST):</span>
-                  <span>₹{(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate)).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between font-semibold text-muted-foreground">
-                  <span>GST (18%):</span>
-                  <span>₹{Math.round(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) * 0.18).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between font-black text-navy text-sm pt-2 border-t border-muted/50">
-                  <span>Total Additional Amount:</span>
-                  <span className="text-brand">
-                    ₹{(
-                      dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) +
-                      Math.round(dailyRate * getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) * 0.18)
-                    ).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-4 flex justify-end gap-2 border-t border-muted/30">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setExtendingBooking(null)}
-                  className="h-9 px-4 text-xs font-bold rounded-md"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleConfirmExtend}
-                  disabled={extendingSubmit || getAdditionalNights(extendingBooking.checkOut, newCheckOutDate) <= 0}
-                  className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-5 rounded-md cursor-pointer"
-                >
-                  {extendingSubmit ? "Processing..." : "Confirm Extension"}
-                </Button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadData()}
+        userRole="manager"
+      />
     </div>
   );
 }

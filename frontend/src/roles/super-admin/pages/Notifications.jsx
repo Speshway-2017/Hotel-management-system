@@ -83,15 +83,13 @@ function SuperAdminNotifications() {
   useEffect(() => {
     fetchAlerts(false);
 
-    const handleFocus = () => fetchAlerts(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => fetchAlerts(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchAlerts(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

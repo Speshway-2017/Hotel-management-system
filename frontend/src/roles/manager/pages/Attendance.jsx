@@ -133,15 +133,13 @@ function ManagerAttendancePage() {
   useEffect(() => {
     loadRoster(false);
 
-    const handleFocus = () => loadRoster(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadRoster(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadRoster(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, [selectedDate]);

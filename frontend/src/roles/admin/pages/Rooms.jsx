@@ -271,19 +271,13 @@ function RoomsRatesPage() {
   const itemsPerPage = 8;
 
   useEffect(() => {
-    loadData(false);
-
-    const handleFocus = () => {
-      loadData(true);
-    };
-    window.addEventListener('focus', handleFocus);
+    loadData(false);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

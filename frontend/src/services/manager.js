@@ -1,151 +1,93 @@
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-async function request(path, options = {}) {
-  const token = localStorage.getItem('hms_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-  return data;
-}
+import { apiClient } from './apiClient';
 
 export const managerService = {
   getProperty: async () => {
-    return await request('/manager/property');
+    return await apiClient.get('/manager/property');
   },
   getReservations: async () => {
-    return await request(`/manager/reservations?t=${Date.now()}`);
+    return await apiClient.get('/manager/reservations');
   },
   getReservationById: async (id) => {
-    return await request(`/manager/reservations/${id}`);
+    return await apiClient.get(`/manager/reservations/${id}`);
   },
   createReservation: async (data) => {
-    return await request('/manager/reservations', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/manager/reservations', data);
   },
   updateReservation: async (id, data) => {
-    return await request(`/manager/reservations/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/manager/reservations/${id}`, data);
   },
   assignRoom: async (id, roomNumber, roomType) => {
-    return await request(`/manager/reservations/${id}/assign-room`, {
-      method: 'POST',
-      body: JSON.stringify({ roomNumber, roomType })
-    });
+    return await apiClient.post(`/manager/reservations/${id}/assign-room`, { roomNumber, roomType });
   },
   deleteReservation: async (id) => {
-    return await request(`/manager/reservations/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/manager/reservations/${id}`);
   },
   getRooms: async () => {
-    return await request(`/manager/rooms?t=${Date.now()}`);
+    return await apiClient.get('/manager/rooms');
   },
   updateRoomStatus: async (roomNumber, status) => {
-    return await request(`/manager/rooms/${roomNumber}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
-    });
+    return await apiClient.put(`/manager/rooms/${roomNumber}/status`, { status });
   },
   getGuests: async () => {
-    return await request(`/manager/guests?t=${Date.now()}`);
+    return await apiClient.get('/manager/guests');
   },
   getApprovals: async () => {
-    return await request(`/manager/approvals?t=${Date.now()}`);
+    return await apiClient.get('/manager/approvals');
   },
   updateApproval: async (id, action, decisionReason) => {
-    return await request(`/manager/approvals/${id}`, {
-      method: 'POST',
-      body: JSON.stringify({ action, decisionReason })
-    });
+    return await apiClient.post(`/manager/approvals/${id}`, { action, decisionReason });
   },
   getStaff: async () => {
-    return await request(`/manager/staff?t=${Date.now()}`);
+    return await apiClient.get('/manager/staff');
   },
   addStaff: async (data) => {
-    return await request('/manager/staff', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/manager/staff', data);
   },
   updateStaff: async (id, data) => {
-    return await request(`/manager/staff/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/manager/staff/${id}`, data);
   },
   getShifts: async () => {
-    return await request(`/manager/shifts?t=${Date.now()}`);
+    return await apiClient.get('/manager/shifts');
   },
   assignShift: async (userId, username, shiftType) => {
-    return await request('/manager/shifts/assign', {
-      method: 'POST',
-      body: JSON.stringify({ userId, username, shiftType })
-    });
+    return await apiClient.post('/manager/shifts/assign', { userId, username, shiftType });
   },
   getAttendance: async () => {
-    return await request(`/manager/attendance?t=${Date.now()}`);
+    return await apiClient.get('/manager/attendance');
   },
   getFeedback: async () => {
-    return await request(`/manager/feedback?t=${Date.now()}`);
+    return await apiClient.get('/manager/feedback');
   },
-  respondFeedback: async (id, response) => {
-    return await request(`/manager/feedback/${id}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ response })
-    });
+  createFeedback: async (data) => {
+    return await apiClient.post('/manager/feedback', data);
+  },
+  respondFeedback: async (id, response, status) => {
+    return await apiClient.post(`/manager/feedback/${id}/respond`, { response, status });
   },
   getBilling: async () => {
-    return await request(`/manager/billing?t=${Date.now()}`);
+    return await apiClient.get('/manager/billing');
   },
   getPayments: async () => {
-    return await request(`/manager/payments?t=${Date.now()}`);
+    return await apiClient.get('/manager/payments');
   },
   createPayment: async (data) => {
-    return await request('/manager/payments', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/manager/payments', data);
   },
   updatePayment: async (id, data) => {
-    return await request(`/manager/payments/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/manager/payments/${id}`, data);
   },
   recordPayment: async (id, amountPaid) => {
-    return await request(`/manager/billing/${id}/payment`, {
-      method: 'POST',
-      body: JSON.stringify({ amountPaid })
-    });
+    return await apiClient.post(`/manager/billing/${id}/payment`, { amountPaid });
   },
   getNotifications: async () => {
-    return await request(`/manager/notifications?t=${Date.now()}`);
+    return await apiClient.get('/manager/notifications');
   },
   markNotificationRead: async (id) => {
-    return await request(`/manager/notifications/${id}/read`, {
-      method: 'POST'
-    });
+    return await apiClient.post(`/manager/notifications/${id}/read`);
   },
   extendReservation: async (id, data) => {
-    return await request(`/manager/reservations/${id}/extend`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/manager/reservations/${id}/extend`, data);
   }
 };
+
+export default managerService;

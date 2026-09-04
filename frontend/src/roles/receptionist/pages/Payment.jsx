@@ -53,15 +53,13 @@ function PaymentsPage() {
   useEffect(() => {
     loadTransactions(false);
 
-    const handleFocus = () => loadTransactions(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadTransactions(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadTransactions(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

@@ -109,15 +109,13 @@ export function UnifiedPaymentsView({ role = "admin" }) {
   useEffect(() => {
     loadPayments(false);
 
-    const handleFocus = () => loadPayments(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadPayments(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadPayments(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, [role]);

@@ -52,16 +52,14 @@ function RoomStatusPage() {
     const interval = setInterval(() => {
       loadRooms(true);
     }, 10000);
-    const handleFocus = () => loadRooms(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadRooms(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadRooms(true);
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);

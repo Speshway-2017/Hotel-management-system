@@ -6,7 +6,9 @@ import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
-import { Calendar, User, Home, CreditCard, ChevronLeft, ShieldAlert } from "lucide-react";
+import { Calendar, User, Home, CreditCard, ChevronLeft, ShieldAlert, CheckCircle, Edit2, LogOut } from "lucide-react";
+import { toast } from "sonner";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 
 function ManagerViewReservation() {
   const { id } = useParams();
@@ -16,6 +18,7 @@ function ManagerViewReservation() {
   const [booking, setBooking] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
 
   const loadBookingDetail = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -71,10 +74,33 @@ function ManagerViewReservation() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <PageHeader
-        title={booking ? `Reservation Details: ${booking._id || booking.id}` : "Reservation Details"}
-        subtitle="Guest stay overview, room parameters, and tariff details."
-      />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <PageHeader
+          title={booking ? `Reservation Details: ${booking._id || booking.id}` : "Reservation Details"}
+          subtitle="Guest stay overview, room parameters, and tariff details."
+        />
+
+        {booking && booking.status !== "Checked-out" && booking.status !== "Checked Out" && (
+          <div className="flex items-center gap-2 select-none">
+            {(booking.status === "Checked-in" || booking.status === "Checked In" || booking.status === "Staying" || booking.status === "Staying-In") && (
+              <ExtendStayButton
+                variant="header"
+                label="Extend Stay"
+                booking={booking}
+                onClick={() => navigate({ to: `/manager/reservations/extend/${booking._id || booking.id}` })}
+              />
+            )}
+            <Button
+              onClick={() => navigate({ to: `/manager/reservations/edit/${booking._id || booking.id}` })}
+              variant="outline"
+              size="sm"
+              className="text-navy border-navy/30 hover:bg-navy/5 font-bold text-xs h-9 px-4 rounded-full cursor-pointer"
+            >
+              <Edit2 className="size-3.5 mr-1.5" /> Modify Stay
+            </Button>
+          </div>
+        )}
+      </div>
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
@@ -173,6 +199,15 @@ function ManagerViewReservation() {
           </div>
         </div>
       ) : null}
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        booking={booking}
+        isOpen={isExtendModalOpen}
+        onClose={() => setIsExtendModalOpen(false)}
+        onSuccess={() => loadBookingDetail()}
+        userRole="manager"
+      />
     </div>
   );
 }

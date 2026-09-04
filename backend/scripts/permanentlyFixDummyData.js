@@ -20,17 +20,16 @@ const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hourstay
 
 const REAL_GUESTS = [
   {
-    name: 'Surya',
-    email: 'surya@gmail.com',
+    name: 'Sravan',
+    email: 'sravan@gmail.com',
     role: 'guest',
-    mobile: '+91 47362 54654',
+    mobile: '+91 99887 76655',
     city: 'Hyderabad',
     state: 'Telangana',
     country: 'India',
     address: 'Madhapur, Hyderabad',
     status: 'Active',
-    type: 'Regular',
-    loyaltyPoints: 1200
+    type: 'Regular'
   },
   {
     name: 'Mounika',
@@ -42,8 +41,7 @@ const REAL_GUESTS = [
     country: 'India',
     address: 'Gachibowli, Hyderabad',
     status: 'Active',
-    type: 'VIP',
-    loyaltyPoints: 2450
+    type: 'VIP'
   },
   {
     name: 'Aswini',
@@ -55,8 +53,7 @@ const REAL_GUESTS = [
     country: 'India',
     address: 'Kondapur, Hyderabad',
     status: 'Active',
-    type: 'VIP',
-    loyaltyPoints: 3100
+    type: 'VIP'
   },
   {
     name: 'Vamsi',
@@ -68,8 +65,7 @@ const REAL_GUESTS = [
     country: 'India',
     address: 'Jubilee Hills, Hyderabad',
     status: 'Active',
-    type: 'Regular',
-    loyaltyPoints: 950
+    type: 'Regular'
   },
   {
     name: 'Sai',
@@ -81,8 +77,7 @@ const REAL_GUESTS = [
     country: 'India',
     address: 'Banjara Hills, Hyderabad',
     status: 'Active',
-    type: 'VIP',
-    loyaltyPoints: 4500
+    type: 'VIP'
   }
 ];
 
@@ -228,7 +223,6 @@ async function permanentlyFix() {
       preferences: 'High floor preference',
       idDocType: 'Aadhaar Card',
       idDocNumber: 'XXXX-XXXX-1234',
-      loyaltyPoints: g.loyaltyPoints,
       notes: 'Verified real guest account.',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

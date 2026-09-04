@@ -77,15 +77,13 @@ function GuestNotificationsPage() {
   useEffect(() => {
     fetchNotifications(false);
 
-    const handleFocus = () => fetchNotifications(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => fetchNotifications(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchNotifications(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

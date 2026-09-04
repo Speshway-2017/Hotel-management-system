@@ -113,15 +113,13 @@ function SuperAdminReports() {
   useEffect(() => {
     loadCommissionData(false);
 
-    const handleFocus = () => loadCommissionData(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadCommissionData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadCommissionData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

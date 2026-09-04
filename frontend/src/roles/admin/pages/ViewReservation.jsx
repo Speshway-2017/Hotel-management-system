@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 
 function ViewReservation() {
   const { id } = Route.useParams();
@@ -27,6 +28,7 @@ function ViewReservation() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [booking, setBooking] = useState(null);
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
 
   const loadBookingDetail = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -150,14 +152,22 @@ function ViewReservation() {
                 <CheckCircle className="size-3.5 mr-1.5" /> Check-In
               </Button>
             )}
-            {booking.status === "Checked-in" && (
-              <Button
-                onClick={() => handleStatusChange("Checked-out")}
-                size="sm"
-                className="bg-navy hover:bg-navy-deep text-white font-bold text-xs h-9 px-4 rounded-full shadow-soft cursor-pointer"
-              >
-                <CheckCircle className="size-3.5 mr-1.5" /> Check-Out
-              </Button>
+            {(booking.status === "Checked-in" || booking.status === "Checked In" || booking.status === "Staying" || booking.status === "Staying-In") && (
+              <>
+                <ExtendStayButton
+                  variant="header"
+                  label="Extend Stay"
+                  booking={booking}
+                  onClick={() => navigate({ to: `/admin/reservations/extend/${booking._id || booking.id || booking.bookingId || id}` })}
+                />
+                <Button
+                  onClick={() => handleStatusChange("Checked-out")}
+                  size="sm"
+                  className="bg-navy hover:bg-navy-deep text-white font-bold text-xs h-9 px-4 rounded-xl shadow-soft cursor-pointer"
+                >
+                  <CheckCircle className="size-3.5 mr-1.5" /> Check-Out
+                </Button>
+              </>
             )}
             <Button
               onClick={() => navigate({ to: `/admin/reservations/edit/${booking._id || booking.id}` })}
@@ -352,6 +362,15 @@ function ViewReservation() {
           </div>
         </div>
       ) : null}
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        booking={booking}
+        isOpen={isExtendModalOpen}
+        onClose={() => setIsExtendModalOpen(false)}
+        onSuccess={() => loadBookingDetail()}
+        userRole="admin"
+      />
     </div>
   );
 }

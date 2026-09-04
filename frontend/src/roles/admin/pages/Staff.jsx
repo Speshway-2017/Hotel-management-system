@@ -87,19 +87,13 @@ function AdminStaffPage() {
   }
 
   useEffect(() => {
-    loadStaff(false);
-
-    const handleFocus = () => {
-      loadStaff(true);
-    };
-    window.addEventListener('focus', handleFocus);
+    loadStaff(false);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadStaff(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

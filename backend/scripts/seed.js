@@ -5,6 +5,7 @@ import Booking from '../models/booking.model.js';
 import AuditLog from '../models/auditLog.model.js';
 import Announcement from '../models/announcement.model.js';
 import Cms from '../models/cms.model.js';
+import Coupon from '../models/coupon.model.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,9 +16,9 @@ const __dirname = path.dirname(__filename);
 
 const SEED_USERS = [
   { name: 'Super Admin', email: 'superadmin@hourstay.com', password: 'password123', role: 'super-admin', mobile: '9999999999' },
-  { name: 'Hotel Admin', email: 'admin@hourstay.com', password: 'password123', role: 'admin', mobile: '9888888888' },
-  { name: 'Hotel Manager', email: 'manager@hourstay.com', password: 'password123', role: 'manager', mobile: '9777777777' },
-  { name: 'Front Desk Receptionist', email: 'receptionist@hourstay.com', password: 'password123', role: 'receptionist', mobile: '9666666666' },
+  { name: 'Hotel Admin', email: 'admin@hourstay.com', password: 'password123', role: 'admin', mobile: '9888888888', propertyId: 'HS-JAI' },
+  { name: 'Hotel Manager', email: 'manager@hourstay.com', password: 'password123', role: 'manager', mobile: '9777777777', propertyId: 'HS-JAI' },
+  { name: 'Front Desk Receptionist', email: 'receptionist@hourstay.com', password: 'password123', role: 'receptionist', mobile: '9666666666', propertyId: 'HS-JAI' },
   { name: 'Surya', email: 'surya@gmail.com', password: 'password123', role: 'guest', mobile: '+91 47362 54654' },
   { name: 'Mounika', email: 'mounika@gmail.com', password: 'password123', role: 'guest', mobile: '+91 99443 88120' },
   { name: 'Aswini', email: 'aswini@gmail.com', password: 'password123', role: 'guest', mobile: '+91 98840 20203' },
@@ -38,12 +39,18 @@ const SEED_PROPERTIES = [
   { _id: 'HS-KER', name: 'Backwater Retreat', city: 'Alleppey', rooms: 15, occupancy: 30, adr: 12000, revpar: 3600, status: 'Onboarding', gm: 'Unassigned', subscriptionTier: 'None', subscriptionStatus: 'None' }
 ];
 
+const todayISO = new Date().toISOString().split('T')[0];
+const yesterdayISO = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+const tomorrowISO = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+const inTwoDaysISO = new Date(Date.now() + 172800000).toISOString().split('T')[0];
+const inThreeDaysISO = new Date(Date.now() + 259200000).toISOString().split('T')[0];
+
 const SEED_BOOKINGS = [
   { bookingId: 'BK-10301', guest: 'Surya', phone: '+91 47362 54654', email: 'surya@gmail.com', room: '103 · Standard Room', roomNumber: '103', roomType: 'Standard Room', checkIn: '2026-09-01', checkOut: '2026-09-02', nights: 1, pax: '2 Adults', source: 'Direct Web', status: 'Checked-out', amount: 8500, totalAmount: 8500, balance: 0, paymentStatus: 'Paid' },
-  { bookingId: 'BK-10101', guest: 'Mounika', phone: '+91 99443 88120', email: 'mounika@gmail.com', room: '101 · Standard Room', roomNumber: '101', roomType: 'Standard Room', checkIn: '2026-09-02', checkOut: '2026-09-04', nights: 2, pax: '2 Adults', source: 'MakeMyTrip', status: 'Checked-in', amount: 11400, totalAmount: 11400, balance: 0, paymentStatus: 'Paid' },
-  { bookingId: 'BK-20202', guest: 'Aswini', phone: '+91 98840 20203', email: 'aswini@gmail.com', room: '202 · Deluxe Room', roomNumber: '202', roomType: 'Deluxe Room', checkIn: '2026-09-02', checkOut: '2026-09-05', nights: 3, pax: '2 Adults', source: 'Direct Web', status: 'Checked-in', amount: 14500, totalAmount: 14500, balance: 0, paymentStatus: 'Paid' },
-  { bookingId: 'BK-10202', guest: 'Vamsi', phone: '+91 98765 10202', email: 'vamsi@gmail.com', room: '102 · Standard Room', roomNumber: '102', roomType: 'Standard Room', checkIn: '2026-09-03', checkOut: '2026-09-05', nights: 2, pax: '2 Adults', source: 'Direct Web', status: 'Confirmed', amount: 7000, totalAmount: 7000, balance: 0, paymentStatus: 'Paid' },
-  { bookingId: 'BK-30101', guest: 'Sai', phone: '+91 98765 10404', email: 'sai@gmail.com', room: '301 · Executive Suite', roomNumber: '301', roomType: 'Executive Suite', checkIn: '2026-09-03', checkOut: '2026-09-06', nights: 3, pax: '2 Adults', source: 'Booking.com', status: 'Confirmed', amount: 21000, totalAmount: 21000, balance: 0, paymentStatus: 'Paid' }
+  { bookingId: 'BK-10102', guest: 'Mani', phone: '+91 98765 43210', email: 'mani@gmail.com', room: '101 · Standard Room', roomNumber: '101', roomType: 'Standard Room', checkIn: yesterdayISO, checkOut: todayISO, nights: 1, pax: '2 Adults', source: 'Direct Web', status: 'Checked-in', amount: 8500, totalAmount: 8500, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-10401', guest: 'Kavya', phone: '+91 98765 10401', email: 'kavya@gmail.com', room: '104 · Standard Room', roomNumber: '104', roomType: 'Standard Room', checkIn: todayISO, checkOut: inTwoDaysISO, nights: 2, pax: '2 Adults', source: 'Direct Web', status: 'Confirmed', amount: 8500, totalAmount: 8500, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-10202', guest: 'Vamsi', phone: '+91 98765 10202', email: 'vamsi@gmail.com', room: '102 · Standard Room', roomNumber: '102', roomType: 'Standard Room', checkIn: tomorrowISO, checkOut: inThreeDaysISO, nights: 2, pax: '2 Adults', source: 'Direct Web', status: 'Confirmed', amount: 7000, totalAmount: 7000, balance: 0, paymentStatus: 'Paid' },
+  { bookingId: 'BK-30101', guest: 'Sai', phone: '+91 98765 10404', email: 'sai@gmail.com', room: '301 · Executive Suite', roomNumber: '301', roomType: 'Executive Suite', checkIn: yesterdayISO, checkOut: inTwoDaysISO, nights: 3, pax: '2 Adults', source: 'Booking.com', status: 'Confirmed', amount: 21000, totalAmount: 21000, balance: 0, paymentStatus: 'Paid' }
 ];
 
 const SEED_AUDITS = [
@@ -95,7 +102,7 @@ const SEED_CMS = [
   { type: "feature", title: "Invoicing & Billing", excerpt: "GST split billing (CGST, SGST, IGST), SAC code compliance, master folios, corporate tag splits, and refund credits.", icon: "Receipt", tag: "Automatic tax-slab mapping, Invoice WhatsApp dispatch, Outstanding ledger" },
   { type: "feature", title: "Unified Payments", excerpt: "UPI dynamic QR codes, integrated card payments, net banking, automated Settlements, and original payment refunds.", icon: "CreditCard", tag: "Instant UPI verification, Partial checks tracking, Commission-free payments" },
   { type: "feature", title: "POS Integrations", excerpt: "In-house restaurant dining bills, bar/spa outlet charges, laundry postings, and room service order folio links.", icon: "Receipt", tag: "Unified POS reports, Direct checkout mapping, Outlet commission audits" },
-  { type: "feature", title: "Guest CRM & Loyalty", excerpt: "Central guest profiles, stay logs, preferences notes, loyalty tier points, and repeat guest marketing offers.", icon: "Users", tag: "Personalized check-in, Blacklist tags, Occasion notifications" },
+  { type: "feature", title: "Guest CRM & Profiles", excerpt: "Central guest profiles, stay histories, dining & room preferences notes, and repeat guest communication logs.", icon: "Users", tag: "Personalized check-in, Blacklist tags, Occasion notifications" },
   { type: "feature", title: "Maintenance Tickets", excerpt: "Guest-initiated service requests via mobile app (housekeeping, room service, maintenance), ticketing assignments, and SLAs.", icon: "Wrench", tag: "Out-of-order inventory hold, Staff assignment notifications, Problem details photo logs" },
   { type: "feature", title: "Staff Roster & Shifts", excerpt: "Granular role-based accounts, geo-tagged mobile attendance sheets, shift rosters, and performance indexes.", icon: "Users", tag: "Biometric optional link, Salary/wage calculations, Shift handover logs" },
   { type: "feature", title: "Reports & Analytics", excerpt: "Consolidated occupancy charts, RevPAR, ADR logs, statutory tax summaries, and multi-branch benchmarks.", icon: "BarChart3", tag: "Custom PDF/CSV export, Payment gateway audits, YoY comparative graphs" },
@@ -312,10 +319,13 @@ export const seedUsers = async () => {
             password: u.password,
             role: u.role,
             mobile: u.mobile,
-            propertyId: u.propertyId || null,
+            propertyId: u.propertyId || 'HS-JAI',
             status: u.status || 'Active'
           });
           console.log(`🔄 Re-seeded user with correct string ID: ${u.email}`);
+        } else if (u.propertyId && exists.propertyId !== u.propertyId) {
+          exists.propertyId = u.propertyId;
+          await exists.save();
         }
       } else {
         await User.create({
@@ -325,7 +335,7 @@ export const seedUsers = async () => {
           password: u.password,
           role: u.role,
           mobile: u.mobile,
-          propertyId: u.propertyId || null,
+          propertyId: u.propertyId || 'HS-JAI',
           status: u.status || 'Active'
         });
         console.log(`🌱 Seeded user: ${u.email}`);
@@ -402,6 +412,90 @@ export const seedUsers = async () => {
         );
       }
     } catch (e) {}
+
+    // 8. Seed Default Website Coupons into MongoDB
+    try {
+      const SEED_COUPONS = [
+        {
+          _id: 'CPN-WELCOME20',
+          code: 'WELCOME20',
+          title: 'Welcome Special 20% Off',
+          description: 'Get 20% instant discount on direct website bookings above ₹1,500.',
+          discountType: 'percentage',
+          discountValue: 20,
+          maxDiscount: 2500,
+          minBookingAmount: 1500,
+          validFrom: '2026-01-01',
+          validUntil: '2027-12-31',
+          usageLimit: 500,
+          usedCount: 0,
+          status: 'Active',
+          propertyId: 'all',
+          applicableSource: 'website'
+        },
+        {
+          _id: 'CPN-WELCOME',
+          code: 'WELCOME10',
+          title: 'Welcome Special',
+          description: 'Get 10% instant discount on your first direct website booking.',
+          discountType: 'percentage',
+          discountValue: 10,
+          maxDiscount: 2000,
+          minBookingAmount: 1500,
+          validFrom: '2026-01-01',
+          validUntil: '2027-12-31',
+          usageLimit: 500,
+          usedCount: 24,
+          status: 'Active',
+          propertyId: 'all',
+          applicableSource: 'website'
+        },
+        {
+          _id: 'CPN-FESTIVE',
+          code: 'STAY500',
+          title: 'Flat ₹500 Off',
+          description: 'Enjoy flat ₹500 off on reservations above ₹3,000 booked on the official website.',
+          discountType: 'fixed',
+          discountValue: 500,
+          maxDiscount: 500,
+          minBookingAmount: 3000,
+          validFrom: '2026-01-01',
+          validUntil: '2027-12-31',
+          usageLimit: 200,
+          usedCount: 15,
+          status: 'Active',
+          propertyId: 'all',
+          applicableSource: 'website'
+        },
+        {
+          _id: 'CPN-LUXURY20',
+          code: 'LUXURY20',
+          title: 'Heritage & Suite Offer',
+          description: 'Save 20% up to ₹4,000 on luxury villas and executive suites.',
+          discountType: 'percentage',
+          discountValue: 20,
+          maxDiscount: 4000,
+          minBookingAmount: 8000,
+          validFrom: '2026-01-01',
+          validUntil: '2027-12-31',
+          usageLimit: 100,
+          usedCount: 8,
+          status: 'Active',
+          propertyId: 'all',
+          applicableSource: 'website'
+        }
+      ];
+
+      for (const c of SEED_COUPONS) {
+        const exists = await Coupon.findOne({ code: c.code });
+        if (!exists) {
+          await Coupon.create(c);
+        }
+      }
+      console.log('🎟️ Seeded website promotional coupons (WELCOME20, WELCOME10, STAY500, LUXURY20).');
+    } catch (e) {
+      console.error('Failed to seed coupons:', e.message);
+    }
 
     console.log('✅ Seeding checks completed successfully!');
   } catch (error) {

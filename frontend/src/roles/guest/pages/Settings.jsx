@@ -506,8 +506,8 @@ function GuestSettingsPage() {
 
               <div className="flex items-center justify-between py-3">
                 <div>
-                  <p className="text-xs font-bold text-navy">Promotional Offers & Member Perks</p>
-                  <p className="text-[11px] text-navy/60">Receive custom room discounts, seasonal offers and loyalty bonus points</p>
+                  <p className="text-xs font-bold text-navy">Promotional Offers & Updates</p>
+                  <p className="text-[11px] text-navy/60">Receive custom room discounts and seasonal stay offers</p>
                 </div>
                 <input
                   type="checkbox"

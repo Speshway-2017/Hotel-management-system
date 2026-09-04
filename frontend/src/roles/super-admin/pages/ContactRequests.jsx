@@ -74,15 +74,13 @@ export function ContactRequestsPage() {
   useEffect(() => {
     loadContacts(false);
 
-    const handleFocus = () => loadContacts(true);
-    window.addEventListener("focus", handleFocus);
+    const handleFocus = () => loadContacts(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadContacts(true);
     });
 
-    return () => {
-      window.removeEventListener("focus", handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

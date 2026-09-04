@@ -1,199 +1,129 @@
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-async function request(path, options = {}) {
-  const token = localStorage.getItem('hms_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-  return data;
-}
+import { apiClient } from './apiClient';
 
 export const superAdminService = {
   getDashboardStats: async () => {
-    return await request('/super-admin/dashboard-stats');
+    return await apiClient.get('/super-admin/dashboard-stats');
   },
   getProperties: async () => {
-    return await request(`/super-admin/properties?t=${Date.now()}`);
+    return await apiClient.get('/super-admin/properties');
   },
   getProperty: async (id) => {
-    return await request(`/super-admin/properties/${id}`);
+    return await apiClient.get(`/super-admin/properties/${id}`);
   },
   createProperty: async (data) => {
-    return await request('/super-admin/properties', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/properties', data);
   },
   updateProperty: async (id, data) => {
-    return await request(`/super-admin/properties/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/super-admin/properties/${id}`, data);
   },
   deleteProperty: async (id) => {
-    return await request(`/super-admin/properties/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/properties/${id}`);
   },
   
   getUsers: async () => {
-    return await request(`/super-admin/users?t=${Date.now()}`);
+    return await apiClient.get('/super-admin/users');
   },
   createUser: async (data) => {
-    return await request('/super-admin/users', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/users', data);
   },
   updateUser: async (id, data) => {
-    return await request(`/super-admin/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/super-admin/users/${id}`, data);
   },
   deleteUser: async (id) => {
-    return await request(`/super-admin/users/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/users/${id}`);
   },
 
   getReservations: async () => {
-    return await request(`/super-admin/reservations?t=${Date.now()}`);
+    return await apiClient.get('/super-admin/reservations');
   },
   createReservation: async (data) => {
-    return await request('/super-admin/reservations', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/reservations', data);
   },
   updateReservation: async (id, data) => {
-    return await request(`/super-admin/reservations/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/super-admin/reservations/${id}`, data);
+  },
+  extendReservation: async (id, data) => {
+    try {
+      return await apiClient.post(`/super-admin/reservations/${id}/extend`, data);
+    } catch (err) {
+      return await apiClient.post(`/manager/reservations/${id}/extend`, data);
+    }
   },
   deleteReservation: async (id) => {
-    return await request(`/super-admin/reservations/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/reservations/${id}`);
   },
 
   getAuditLogs: async () => {
-    return await request('/super-admin/audit-logs');
+    return await apiClient.get('/super-admin/audit-logs');
   },
   getCommissionReports: async () => {
-    return await request('/super-admin/commission-reports');
+    return await apiClient.get('/super-admin/commission-reports');
   },
 
   getCmsItems: async () => {
-    return await request('/super-admin/cms');
+    return await apiClient.get('/super-admin/cms');
   },
   createCmsItem: async (data) => {
-    return await request('/super-admin/cms', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/cms', data);
   },
   updateCmsItem: async (id, data) => {
-    return await request(`/super-admin/cms/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/super-admin/cms/${id}`, data);
   },
   deleteCmsItem: async (id) => {
-    return await request(`/super-admin/cms/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/cms/${id}`);
   },
 
   getAnnouncements: async () => {
-    return await request('/super-admin/notifications');
+    return await apiClient.get('/super-admin/notifications');
   },
   publishAnnouncement: async (data) => {
-    return await request('/super-admin/notifications', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/notifications', data);
   },
 
   getSubscriptionPlans: async () => {
-    return await request('/super-admin/plans');
+    return await apiClient.get('/super-admin/plans');
   },
   createSubscriptionPlan: async (data) => {
-    return await request('/super-admin/plans', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/plans', data);
   },
   updateSubscriptionPlan: async (id, data) => {
-    return await request(`/super-admin/plans/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/super-admin/plans/${id}`, data);
   },
   deleteSubscriptionPlan: async (id) => {
-    return await request(`/super-admin/plans/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/plans/${id}`);
   },
 
   getPromoCoupons: async () => {
-    return await request('/super-admin/coupons');
+    return await apiClient.get('/super-admin/coupons');
   },
   createPromoCoupon: async (data) => {
-    return await request('/super-admin/coupons', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/super-admin/coupons', data);
   },
   updatePromoCoupon: async (id, data) => {
-    return await request(`/super-admin/coupons/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/super-admin/coupons/${id}`, data);
   },
   deletePromoCoupon: async (id) => {
-    return await request(`/super-admin/coupons/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/coupons/${id}`);
   },
   getSubscriptionRequests: async () => {
-    return await request('/super-admin/subscription/requests');
+    return await apiClient.get('/super-admin/subscription/requests');
   },
   decideSubscriptionRequest: async (id, action, rejectionReason = '') => {
-    return await request(`/super-admin/subscription/requests/${id}/decide`, {
-      method: 'POST',
-      body: JSON.stringify({ action, rejectionReason })
-    });
+    return await apiClient.post(`/super-admin/subscription/requests/${id}/decide`, { action, rejectionReason });
   },
 
   getContactRequests: async () => {
-    return await request('/super-admin/contacts');
+    return await apiClient.get('/super-admin/contacts');
   },
   getContactRequest: async (id) => {
-    return await request(`/super-admin/contacts/${id}`);
+    return await apiClient.get(`/super-admin/contacts/${id}`);
   },
   updateContactRequestStatus: async (id, status) => {
-    return await request(`/super-admin/contacts/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status })
-    });
+    return await apiClient.patch(`/super-admin/contacts/${id}/status`, { status });
   },
   deleteContactRequest: async (id) => {
-    return await request(`/super-admin/contacts/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/super-admin/contacts/${id}`);
   }
 };
+
+export default superAdminService;

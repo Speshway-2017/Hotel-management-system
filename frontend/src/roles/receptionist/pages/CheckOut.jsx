@@ -13,6 +13,8 @@ import {
 
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 export const Route = createFileRoute("/reception/check-out")({
   head: () => ({
@@ -49,19 +51,20 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 }
 
 function DeparturesPage() {
-  const todayStr = "25 Aug 2026";
+  const todayStr = formatDisplayDate(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
 
   const [loading, setLoading] = useState(true);
   const [departures, setDepartures] = useState([]);
+  const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadDepartures = () => {
     receptionistService.getReservations()
       .then(res => {
         const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
         const list = allBookings
-          .filter(b => b.status === 'Checked-in' || b.status === 'Checked-out')
+          .filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'))
           .map(b => ({
             id: b.bookingId || b.id || b._id,
             _id: b._id || b.id || b.bookingId,
@@ -74,14 +77,14 @@ function DeparturesPage() {
             roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
             nights: Number(b.nights || 1),
             duration: `${b.nights || 1} Nights`,
-            time: b.checkOut || 'Today',
+            time: formatDisplayDate(b.checkOut) || 'Today',
             checkOut: b.checkOut || 'Today',
             isLate: false,
             isCorporate: false,
             corporateAccount: '',
             balance: Number(b.balance || 0),
             paymentStatus: Number(b.balance || 0) === 0 ? 'Paid' : 'Pending',
-            status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+            status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
           }));
         setDepartures(list);
       })
@@ -92,16 +95,14 @@ function DeparturesPage() {
   useEffect(() => {
     loadDepartures();
     const interval = setInterval(loadDepartures, 10000);
-    const handleFocus = () => loadDepartures();
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadDepartures();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDepartures();
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -270,27 +271,35 @@ function DeparturesPage() {
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
                         {guest.status !== "Checked Out" && guest.status !== "Checked-out" && (
-                          guest.balance > 0 ? (
-                            <Button
-                              asChild
+                          <>
+                            <ExtendStayButton
                               size="xs"
-                              variant="outline"
-                              className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              <Link to={`/reception/check-out/${guest.id || guest._id}`}>
-                                Collect & Check-Out
-                              </Link>
-                            </Button>
-                          ) : (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              onClick={() => handleCheckOut(guest.id || guest._id)}
-                              className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-Out
-                            </Button>
-                          )
+                              label="Extend"
+                              booking={guest}
+                              onClick={() => navigate(`/reception/reservations/extend/${guest.id || guest._id || guest.bookingId}`)}
+                            />
+                            {guest.balance > 0 ? (
+                              <Button
+                                asChild
+                                size="xs"
+                                variant="outline"
+                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                              >
+                                <Link to={`/reception/check-out/${guest.id || guest._id}`}>
+                                  Collect & Check-Out
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleCheckOut(guest.id || guest._id)}
+                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                              >
+                                Check-Out
+                              </Button>
+                            )}
+                          </>
                         )}
                         
                         {/* View Folio / Details Ghost Icon Button */}
@@ -314,6 +323,15 @@ function DeparturesPage() {
           </table>
         </div>
       </Panel>
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadDepartures()}
+        userRole="receptionist"
+      />
     </div>
   );
 }

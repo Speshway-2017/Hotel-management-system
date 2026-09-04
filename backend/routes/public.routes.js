@@ -8,6 +8,7 @@ import Booking from '../models/booking.model.js';
 import User from '../models/user.model.js';
 import { Room, ContactMessage } from '../models/managerData.model.js';
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
+import Coupon from '../models/coupon.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { triggerNotification } from '../utils/notification.helper.js';
 
@@ -90,12 +91,12 @@ router.get('/properties/:id/rooms', async (req, res) => {
         { roomNumber: '101', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
         { roomNumber: '102', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
         { roomNumber: '103', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '201', category: 'Deluxe Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '202', category: 'Deluxe Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '203', category: 'Deluxe Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '301', category: 'Executive Suite', status: 'Available', ratePlan: 'Standard Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '302', category: 'Executive Suite', status: 'Available', ratePlan: 'Standard Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '303', category: 'Executive Suite', status: 'Available', ratePlan: 'Standard Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '201', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '202', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '203', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '301', category: 'Executive Suite', status: 'Available', ratePlan: 'Executive Suite Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '302', category: 'Executive Suite', status: 'Available', ratePlan: 'Executive Suite Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
+        { roomNumber: '303', category: 'Executive Suite', status: 'Available', ratePlan: 'Executive Suite Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
         { roomNumber: '401', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
         { roomNumber: '402', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
         { roomNumber: '403', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
@@ -113,7 +114,12 @@ router.get('/properties/:id/rooms', async (req, res) => {
 
     const mapped = dbRooms.map((rm) => {
       const rate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3000);
-      const ratePlan = rm.ratePlan || 'Standard Plan';
+      let ratePlan = rm.ratePlan;
+      if (!ratePlan || ((ratePlan === 'Standard Plan' || ratePlan === 'Standard Rate Plan') && rm.category && !rm.category.toLowerCase().includes('standard'))) {
+        ratePlan = rm.category.toLowerCase().includes('deluxe') ? 'Deluxe Plan' :
+                   rm.category.toLowerCase().includes('suite') ? 'Executive Suite Plan' :
+                   `${rm.category} Plan`;
+      }
       const amenitiesArr = rm.amenities
         ? (Array.isArray(rm.amenities)
             ? rm.amenities
@@ -141,7 +147,7 @@ router.get('/properties/:id/rooms', async (req, res) => {
         });
       }
 
-      const isAvailable = (rm.status === "Available" || rm.status === "Vacant Clean") && !reservedForDates;
+      const isAvailable = (rm.status === "Available" || rm.status === "Vacant Clean" || !rm.status) && !reservedForDates;
 
       return {
         id: rm._id ? String(rm._id) : (rm.id || `RM-${rm.roomNumber}`),
@@ -156,7 +162,7 @@ router.get('/properties/:id/rooms', async (req, res) => {
         baseRate: rate,
         currentRate: rate,
         dailyRate: rate,
-        ratePlan: ratePlan,
+        ratePlan: ratePlan || 'Standard Plan',
         status: reservedForDates ? "Reserved" : rm.status || "Available",
         isAvailable: isAvailable,
         amenities: amenitiesArr,
@@ -201,7 +207,7 @@ router.post('/bookings', async (req, res) => {
     const gName = guestName || guest;
     const cIn = checkInDate || checkIn;
     const cOut = checkOutDate || checkOut;
-    const rType = roomType || room;
+    const rType = roomType || room || 'Standard Room';
     let amt = Number(totalAmount || amount || 0);
     if (!amt || isNaN(amt) || amt <= 0) {
       amt = 7080;
@@ -222,21 +228,28 @@ router.post('/bookings', async (req, res) => {
     }
 
     // Fetch physical rooms and existing active bookings for property
-    const allPropRooms = await Room.find({ propertyId: targetPropId });
+    let allPropRooms = await Room.find({ propertyId: targetPropId });
+    if (!allPropRooms || allPropRooms.length === 0) {
+      allPropRooms = await Room.find();
+    }
+
     const existingBookings = await Booking.find({
       propertyId: targetPropId,
       status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
     });
 
-    // If a specific roomId / room was selected, verify room availability for date range
     let assignedRoomId = roomId || null;
     let assignedRoomNumber = null;
 
     if (roomId) {
-      const targetRoom = await Room.findById(roomId).catch(() => null);
-      if (targetRoom) {
-        assignedRoomNumber = targetRoom.roomNumber;
-      }
+      try {
+        if (mongoose.Types.ObjectId.isValid(roomId)) {
+          const targetRoom = await Room.findById(roomId);
+          if (targetRoom) {
+            assignedRoomNumber = targetRoom.roomNumber;
+          }
+        }
+      } catch (e) {}
     }
 
     if (!assignedRoomNumber && room) {
@@ -254,37 +267,70 @@ router.post('/bookings', async (req, res) => {
       return (newCheckIn < bOut && newCheckOut > bIn);
     });
 
+    // Find all rooms matching target category
+    const categoryRooms = allPropRooms.filter(r => {
+      const rCat = String(r.category || '').toLowerCase().trim();
+      const tCat = String(targetCategory).toLowerCase().trim();
+      return rCat === tCat || tCat.includes(rCat) || rCat.includes(tCat) ||
+        (tCat.includes('deluxe') && rCat.includes('deluxe')) ||
+        (tCat.includes('suite') && rCat.includes('suite')) ||
+        (tCat.includes('standard') && rCat.includes('standard')) ||
+        (tCat.includes('penthouse') && rCat.includes('penthouse'));
+    });
+
+    // Identify which category rooms are vacant for requested date range
+    const availableCategoryRooms = categoryRooms.filter(r => {
+      const isTaken = overlappingActiveBookings.some(b => {
+        const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
+        return (bRoomNum && String(bRoomNum).trim() === String(r.roomNumber).trim()) ||
+               (b.roomId && String(b.roomId) === String(r._id));
+      });
+      const statusStr = String(r.status || 'Available').toLowerCase();
+      const isStatusAvailable = statusStr === 'available' || statusStr === 'vacant clean' || statusStr === 'vacant';
+      return !isTaken && isStatusAvailable;
+    });
+
+    let finalAssignedRoom = null;
     let isUnavailable = false;
 
-    if (assignedRoomNumber) {
-      // Case A: A specific room number (e.g. Room 103) was selected
-      const isSpecificRoomTaken = overlappingActiveBookings.some(b => {
-        const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
-        return (bRoomNum && String(bRoomNum).trim() === String(assignedRoomNumber).trim()) ||
-               (b.roomId && String(b.roomId) === String(assignedRoomId));
-      });
-      if (isSpecificRoomTaken) {
-        isUnavailable = true;
+    // If a specific room was requested, check if it's free
+    if (assignedRoomNumber || assignedRoomId) {
+      const requestedRoom = allPropRooms.find(r => 
+        (assignedRoomId && String(r._id) === String(assignedRoomId)) ||
+        (assignedRoomNumber && String(r.roomNumber).trim() === String(assignedRoomNumber).trim())
+      );
+
+      if (requestedRoom) {
+        const isSpecificRoomTaken = overlappingActiveBookings.some(b => {
+          const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
+          return (bRoomNum && String(bRoomNum).trim() === String(requestedRoom.roomNumber).trim()) ||
+                 (b.roomId && String(b.roomId) === String(requestedRoom._id));
+        });
+        const statusStr = String(requestedRoom.status || 'Available').toLowerCase();
+        const isStatusAvailable = statusStr === 'available' || statusStr === 'vacant clean' || statusStr === 'vacant';
+
+        if (!isSpecificRoomTaken && isStatusAvailable) {
+          finalAssignedRoom = requestedRoom;
+        }
       }
-    } else {
-      // Case B: A room category (e.g. "Standard Room") was selected without a specific room number
-      const categoryRooms = allPropRooms.filter(r => {
-        const rCat = String(r.category || '').toLowerCase();
-        const tCat = String(targetCategory).toLowerCase();
-        return rCat === tCat || tCat.includes(rCat) || rCat.includes(tCat);
-      });
+    }
 
-      const totalCategoryRoomCount = categoryRooms.length || 3; // Default 3 physical rooms per category if not seeded
+    // If specific room wasn't available or none requested, assign from available rooms in category
+    if (!finalAssignedRoom && availableCategoryRooms.length > 0) {
+      finalAssignedRoom = availableCategoryRooms[0];
+    }
 
-      // Count overlapping bookings for this category
-      const categoryBookingsCount = overlappingActiveBookings.filter(b => {
-        const bCat = String(b.roomType || b.category || b.room || '').toLowerCase();
-        const tCat = String(targetCategory).toLowerCase();
-        return bCat === tCat || tCat.includes(bCat) || bCat.includes(tCat);
-      }).length;
-
-      if (categoryBookingsCount >= totalCategoryRoomCount) {
+    // If no room is available in category, check availability state
+    if (!finalAssignedRoom) {
+      if (categoryRooms.length > 0) {
+        // All rooms in this category are truly occupied
         isUnavailable = true;
+      } else {
+        // Fallback: check overall property occupancy
+        const totalCount = allPropRooms.length || 10;
+        if (overlappingActiveBookings.length >= totalCount) {
+          isUnavailable = true;
+        }
       }
     }
 
@@ -292,10 +338,24 @@ router.post('/bookings', async (req, res) => {
       return sendError(res, 400, 'Selected room or category is unavailable for the chosen date range.');
     }
 
+    if (finalAssignedRoom) {
+      assignedRoomId = finalAssignedRoom._id ? String(finalAssignedRoom._id) : assignedRoomId;
+      assignedRoomNumber = finalAssignedRoom.roomNumber;
+    }
+
     let bookingCity = req.body.city || req.body.guestCity || req.body.hotelCity;
-    if (!bookingCity) {
-      const targetProp = await Property.findOne({ _id: targetPropId }).catch(() => null);
-      bookingCity = targetProp?.settings?.city || targetProp?.city || 'Hyderabad';
+    let targetPropObj = null;
+    try {
+      if (mongoose.Types.ObjectId.isValid(targetPropId)) {
+        targetPropObj = await Property.findById(targetPropId);
+      } else {
+        targetPropObj = await Property.findOne({ $or: [{ propertyId: targetPropId }, { name: targetPropId }] });
+      }
+      if (!bookingCity && targetPropObj) {
+        bookingCity = targetPropObj.settings?.city || targetPropObj.city || 'Hyderabad';
+      }
+    } catch (e) {
+      if (!bookingCity) bookingCity = 'Hyderabad';
     }
 
     // 2. Identify or Create Guest Account (Website -> First Booking creates account and links booking)
@@ -306,14 +366,18 @@ router.post('/bookings', async (req, res) => {
       try {
         const tokenVal = req.headers.authorization.split(' ')[1];
         const decoded = jwt.verify(tokenVal, process.env.JWT_SECRET || 'secret123');
-        if (decoded?.id) {
+        if (decoded?.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
           guestUser = await User.findById(decoded.id);
         }
       } catch (e) {}
     }
 
     if (!guestUser && req.body.guestId) {
-      guestUser = await User.findById(req.body.guestId).catch(() => null);
+      try {
+        if (mongoose.Types.ObjectId.isValid(req.body.guestId)) {
+          guestUser = await User.findById(req.body.guestId);
+        }
+      } catch (e) {}
     }
 
     const cleanEmail = String(email || '').trim().toLowerCase();
@@ -338,6 +402,46 @@ router.post('/bookings', async (req, res) => {
 
     const guestId = guestUser ? (guestUser._id || guestUser.id) : null;
 
+    // 2. Validate and Apply Promo / Coupon if provided
+    let appliedCoupon = null;
+    let discountAmount = 0;
+    let finalAmount = amt;
+    const requestedCouponCode = req.body.couponCode || req.body.coupon;
+
+    if (requestedCouponCode) {
+      const cleanCode = String(requestedCouponCode).trim().toUpperCase();
+      const coupon = await Coupon.findOne({ code: cleanCode, status: 'Active' });
+      if (coupon) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isDateValid = (!coupon.validFrom || todayStr >= coupon.validFrom) && (!coupon.validUntil || todayStr <= coupon.validUntil);
+        const isUsageValid = !coupon.usageLimit || coupon.usageLimit === 0 || (coupon.usedCount || 0) < coupon.usageLimit;
+        const isMinAmountValid = !coupon.minBookingAmount || amt >= coupon.minBookingAmount;
+
+        if (isDateValid && isUsageValid && isMinAmountValid) {
+          if (coupon.discountType === 'percentage') {
+            discountAmount = Math.round((amt * coupon.discountValue) / 100);
+            if (coupon.maxDiscount && coupon.maxDiscount > 0 && discountAmount > coupon.maxDiscount) {
+              discountAmount = coupon.maxDiscount;
+            }
+          } else {
+            discountAmount = Math.min(coupon.discountValue, amt);
+          }
+          finalAmount = Math.max(0, amt - discountAmount);
+          appliedCoupon = coupon;
+
+          // Increment usage count
+          try {
+            await Coupon.findByIdAndUpdate(coupon._id || coupon.id, { $inc: { usedCount: 1 } });
+          } catch (e) {
+            if (coupon.usedCount !== undefined) {
+              coupon.usedCount += 1;
+              await coupon.save?.();
+            }
+          }
+        }
+      }
+    }
+
     const bookingId = `BK${Date.now().toString().slice(-6)}`;
 
     const newBooking = await Booking.create({
@@ -345,7 +449,7 @@ router.post('/bookings', async (req, res) => {
       guestId,
       propertyId: targetPropId,
       roomId: assignedRoomId,
-      city: bookingCity,
+      city: bookingCity || 'Hyderabad',
       guest: gName,
       email: cleanEmail,
       phone: cleanPhone,
@@ -353,11 +457,15 @@ router.post('/bookings', async (req, res) => {
       checkOut: cOut,
       room: assignedRoomNumber ? `${rType || 'Room'} (Room ${assignedRoomNumber})` : (rType || 'Standard Room'),
       roomType: rType || 'Standard Room',
+      ratePlan: req.body.ratePlan || (rType?.toLowerCase().includes('deluxe') ? 'Deluxe Plan' : rType?.toLowerCase().includes('suite') ? 'Executive Suite Plan' : `${rType || 'Standard'} Plan`),
       rooms: Number(roomsCount) || 1,
       adults: Number(adults) || 2,
       children: Number(children) || 0,
-      amount: amt,
-      totalAmount: amt,
+      originalAmount: amt,
+      couponCode: appliedCoupon ? appliedCoupon.code : null,
+      discountAmount: discountAmount,
+      amount: finalAmount,
+      totalAmount: finalAmount,
       specialRequests: specialRequests || '',
       source: 'Website Direct',
       status: 'Confirmed'
@@ -389,7 +497,7 @@ router.post('/bookings', async (req, res) => {
         userId: guestUser._id || guestUser.id,
         role: 'guest',
         title: 'Booking Confirmed!',
-        message: `Your reservation at ${prop?.name || 'Hotel'} is confirmed for ${checkIn} - ${checkOut}. Ref: #${newBooking.bookingId || newBooking._id}`,
+        message: `Your reservation at ${targetPropObj?.settings?.hotelName || targetPropObj?.name || 'Speshway Luxury Hotel'} is confirmed for ${checkIn} - ${checkOut}. Ref: #${newBooking.bookingId || newBooking._id}`,
         category: 'Booking Confirmation'
       });
     }
@@ -533,6 +641,120 @@ router.get('/plans', async (req, res) => {
     return sendSuccess(res, 200, plans, 'Active subscription plans retrieved');
   } catch (err) {
     return sendError(res, 500, err.message || 'Failed to retrieve subscription plans');
+  }
+});
+
+// ==========================================
+// PUBLIC COUPONS & OFFERS (WEBSITE ONLY)
+// ==========================================
+// GET /api/v1/public/coupons
+router.get('/coupons', async (req, res) => {
+  try {
+    const propId = req.query.propertyId;
+    const query = { status: 'Active' };
+    if (propId && propId !== 'all') {
+      query.$or = [{ propertyId: 'all' }, { propertyId: propId }, { propertyId: null }, { propertyId: { $exists: false } }];
+    }
+
+    const coupons = await Coupon.find(query);
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Filter only active, not expired, and not usage-exhausted coupons
+    const validCoupons = coupons.filter(c => {
+      if (c.status !== 'Active') return false;
+      if (c.validFrom && todayStr < c.validFrom) return false;
+      if (c.validUntil && todayStr > c.validUntil) return false;
+      if (c.usageLimit && c.usageLimit > 0 && (c.usedCount || 0) >= c.usageLimit) return false;
+      return true;
+    }).map(c => ({
+      id: c._id || c.id,
+      _id: c._id || c.id,
+      code: c.code,
+      title: c.title || c.code,
+      description: c.description || '',
+      discountType: (c.discountType === 'flat' ? 'fixed' : (c.discountType || 'percentage')),
+      discountValue: c.discountValue,
+      maxDiscount: c.maxDiscount || 0,
+      minBookingAmount: c.minBookingAmount || 0,
+      validFrom: c.validFrom,
+      validUntil: c.validUntil
+    }));
+
+    return sendSuccess(res, 200, validCoupons, 'Available public promo coupons retrieved');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to fetch public coupons');
+  }
+});
+
+// POST /api/v1/public/coupons/validate
+router.post('/coupons/validate', async (req, res) => {
+  try {
+    const { code, bookingAmount, propertyId } = req.body;
+    if (!code || !code.trim()) {
+      return sendError(res, 400, 'Please enter a valid coupon code.');
+    }
+
+    const cleanCode = String(code).trim().toUpperCase();
+    const coupon = await Coupon.findOne({ code: cleanCode });
+
+    if (!coupon) {
+      return sendError(res, 404, `Invalid coupon code '${cleanCode}'. Please check and try again.`);
+    }
+
+    if (coupon.status !== 'Active') {
+      return sendError(res, 400, `Coupon '${cleanCode}' is currently inactive.`);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (coupon.validFrom && todayStr < coupon.validFrom) {
+      return sendError(res, 400, `Coupon '${cleanCode}' is not yet active. Valid from ${coupon.validFrom}.`);
+    }
+
+    if (coupon.validUntil && todayStr > coupon.validUntil) {
+      return sendError(res, 400, `Coupon '${cleanCode}' has expired on ${coupon.validUntil}.`);
+    }
+
+    if (coupon.usageLimit && coupon.usageLimit > 0 && (coupon.usedCount || 0) >= coupon.usageLimit) {
+      return sendError(res, 400, `Coupon '${cleanCode}' has reached its maximum usage limit.`);
+    }
+
+    const amountNum = Number(bookingAmount) || 0;
+    if (coupon.minBookingAmount && coupon.minBookingAmount > 0 && amountNum < coupon.minBookingAmount) {
+      return sendError(res, 400, `Coupon '${cleanCode}' requires a minimum booking amount of ₹${coupon.minBookingAmount.toLocaleString('en-IN')}. (Current: ₹${amountNum.toLocaleString('en-IN')})`);
+    }
+
+    // Calculate discount amount
+    let discountAmount = 0;
+    const normType = coupon.discountType === 'flat' ? 'fixed' : (coupon.discountType || 'percentage');
+    if (normType === 'percentage') {
+      discountAmount = Math.round((amountNum * coupon.discountValue) / 100);
+      if (coupon.maxDiscount && coupon.maxDiscount > 0 && discountAmount > coupon.maxDiscount) {
+        discountAmount = coupon.maxDiscount;
+      }
+    } else {
+      discountAmount = Math.min(coupon.discountValue, amountNum);
+    }
+
+    const payableAmount = Math.max(0, amountNum - discountAmount);
+
+    return sendSuccess(res, 200, {
+      valid: true,
+      coupon: {
+        id: coupon._id || coupon.id,
+        code: coupon.code,
+        title: coupon.title || coupon.code,
+        description: coupon.description,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        maxDiscount: coupon.maxDiscount || 0,
+        minBookingAmount: coupon.minBookingAmount || 0
+      },
+      originalAmount: amountNum,
+      discountAmount,
+      payableAmount
+    }, `Coupon '${cleanCode}' applied successfully! You saved ₹${discountAmount.toLocaleString('en-IN')}.`);
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to validate coupon');
   }
 });
 

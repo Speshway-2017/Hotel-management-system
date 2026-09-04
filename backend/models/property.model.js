@@ -79,6 +79,10 @@ const propertySchema = new mongoose.Schema({
   timestamps: true
 });
 
+propertySchema.index({ propertyId: 1 });
+propertySchema.index({ assignedAdmin: 1 });
+propertySchema.index({ status: 1 });
+
 let MongooseProperty;
 try {
   MongooseProperty = mongoose.model('Property');

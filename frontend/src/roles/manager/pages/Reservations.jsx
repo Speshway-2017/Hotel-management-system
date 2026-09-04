@@ -7,6 +7,7 @@ import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import {
   Search,
   Eye,
@@ -48,6 +49,7 @@ function ManagerReservationsPage() {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [extendingBooking, setExtendingBooking] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
 
   // Search & Filter state
@@ -101,19 +103,13 @@ function ManagerReservationsPage() {
   };
 
   useEffect(() => {
-    loadData();
-
-    const handleFocus = () => {
-      loadData();
-    };
-    window.addEventListener('focus', handleFocus);
+    loadData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -214,11 +210,11 @@ function ManagerReservationsPage() {
 
   // Statistics Computations
   const totalCount = reservations.length;
-  const confirmedCount = reservations.filter(r => r.status === "Confirmed").length;
-  const checkedInCount = reservations.filter(r => r.status === "Checked-in" || r.status === "Checked In").length;
+  const confirmedCount = reservations.filter(r => r.status === "Confirmed" || r.status === "Pre-checked" || r.status === "Paid").length;
+  const checkedInCount = reservations.filter(r => r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying").length;
   const checkedOutCount = reservations.filter(r => r.status === "Checked-out" || r.status === "Checked Out").length;
   const cancelledCount = reservations.filter(r => r.status === "Cancelled").length;
-  const noShowCount = reservations.filter(r => r.status === "No-show").length;
+  const noShowCount = reservations.filter(r => r.status === "No-show" || r.status === "No Show").length;
 
   // Pagination computations
   const totalPages = Math.ceil(filteredReservations.length / itemsPerPage) || 1;
@@ -457,15 +453,23 @@ function ManagerReservationsPage() {
                             </Button>
                           )}
 
-                          {(res.status === "Checked-in" || res.status === "Checked In") && (
-                            <Button
-                              onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
-                              size="xs"
-                              variant="outline"
-                              className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-Out
-                            </Button>
+                          {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
+                            <>
+                              <ExtendStayButton
+                                size="xs"
+                                label="Extend"
+                                booking={res}
+                                onClick={() => navigate({ to: `/manager/reservations/extend/${res._id || res.id || res.bookingId}` })}
+                              />
+                              <Button
+                                onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
+                                size="xs"
+                                variant="outline"
+                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                              >
+                                Check-Out
+                              </Button>
+                            </>
                           )}
 
                           {/* View in Dedicated Page */}
@@ -537,6 +541,15 @@ function ManagerReservationsPage() {
           </div>
         )}
       </div>
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadData()}
+        userRole="manager"
+      />
     </div>
   );
 }

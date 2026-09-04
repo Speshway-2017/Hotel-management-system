@@ -31,8 +31,8 @@ import { authService } from "@/services/auth";
 export const Route = createFileRoute("/guest/profile")({
   head: () => ({
     meta: [
-      { title: "Profile — Hour Stay" },
-      { name: "description", content: "Personal guest details, contact info, loyalty balance, and account settings." }
+      { title: "Guest Profile — Hour Stay" },
+      { name: "description", content: "Personal guest details, contact info, preferences, and account settings." }
     ]
   }),
   component: GuestProfilePage
@@ -44,7 +44,7 @@ function GuestProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  const currentUser = authService.getUser();
+  const currentUser = authService.getCurrentUser() || {};
 
   const [profileData, setProfileData] = useState({
     name: currentUser?.name || "Guest",
@@ -55,8 +55,6 @@ function GuestProfilePage() {
     country: "India",
     role: "Guest Member",
     status: "Active",
-    loyaltyPoints: 2450,
-    loyaltyTier: "Silver",
     avatar: null,
     createdAt: "2026-08-01"
   });
@@ -86,7 +84,7 @@ function GuestProfilePage() {
 
       if (result && result.success && result.data) {
         const fresh = result.data;
-        const u = authService.getUser();
+        const u = authService.getCurrentUser() || {};
         setProfileData({
           name: fresh.name || u?.name || "Guest",
           email: fresh.email || u?.email || "",
@@ -96,8 +94,6 @@ function GuestProfilePage() {
           country: fresh.country || "India",
           role: "Guest Member",
           status: "Active",
-          loyaltyPoints: fresh.loyaltyPoints || 2450,
-          loyaltyTier: fresh.loyaltyTier || "Silver",
           avatar: fresh.avatar || null,
           createdAt: fresh.createdAt ? new Date(fresh.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : "August 2026"
         });
@@ -311,14 +307,10 @@ function GuestProfilePage() {
             
             <div className="mt-4 flex flex-wrap gap-1.5 justify-center">
               <Tag tone="brand">{profileData.role}</Tag>
-              <Tag tone="success">{profileData.loyaltyTier} Tier</Tag>
+              <Tag tone="success">{profileData.status}</Tag>
             </div>
             
             <div className="w-full border-t border-navy/5 my-5 pt-5 text-left text-xs space-y-3.5 font-medium">
-              <div className="flex items-center gap-2.5 text-navy font-semibold">
-                <Star className="size-4 text-amber-500 fill-amber-500 shrink-0" />
-                <span>Loyalty Points: <strong className="text-purple font-bold">{profileData.loyaltyPoints.toLocaleString()} pts</strong></span>
-              </div>
               <div className="flex items-center gap-2.5 text-navy/70">
                 <Mail className="size-4 text-purple shrink-0" />
                 <span className="truncate">{profileData.email}</span>
@@ -388,8 +380,8 @@ function GuestProfilePage() {
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-navy/50 font-bold uppercase tracking-wider text-[9px]">Account Status / Tier</p>
-                    <p className="font-bold text-purple text-sm">{profileData.status} ({profileData.loyaltyTier} Member)</p>
+                    <p className="text-navy/50 font-bold uppercase tracking-wider text-[9px]">Account Status</p>
+                    <p className="font-bold text-emerald-600 text-sm">{profileData.status}</p>
                   </div>
 
                 </div>

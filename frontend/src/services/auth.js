@@ -1,43 +1,9 @@
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-// Helper to make API requests
-async function request(path, options = {}) {
-  const token = localStorage.getItem('hms_token');
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  if (options.body instanceof FormData) {
-    delete headers['Content-Type'];
-  }
-
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-
-  return data;
-}
+import { apiClient } from './apiClient';
 
 export const authService = {
   // Login
   login: async (email, password) => {
-    const res = await request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
+    const res = await apiClient.post('/auth/login', { email, password });
     if (res.success && res.data.token) {
       localStorage.setItem('hms_token', res.data.token);
       localStorage.setItem('hms_user', JSON.stringify(res.data.user));
@@ -47,10 +13,7 @@ export const authService = {
 
   // Register
   register: async (name, email, password, mobile, role) => {
-    const res = await request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password, mobile, role })
-    });
+    const res = await apiClient.post('/auth/register', { name, email, password, mobile, role });
     if (res.success && res.data.token) {
       localStorage.setItem('hms_token', res.data.token);
       localStorage.setItem('hms_user', JSON.stringify(res.data.user));
@@ -60,31 +23,22 @@ export const authService = {
 
   // Forgot password OTP request
   forgotPassword: async (email) => {
-    return await request('/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email })
-    });
+    return await apiClient.post('/auth/forgot-password', { email });
   },
 
   // Verify OTP code
   verifyOtp: async (email, otp) => {
-    return await request('/auth/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, otp })
-    });
+    return await apiClient.post('/auth/verify-otp', { email, otp });
   },
 
   // Reset password
   resetPassword: async (email, otp, password) => {
-    return await request('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ email, otp, password })
-    });
+    return await apiClient.post('/auth/reset-password', { email, otp, password });
   },
 
   // Get profile details
   getProfile: async () => {
-    const res = await request('/auth/profile');
+    const res = await apiClient.get('/auth/profile');
     if (res.success && res.data) {
       localStorage.setItem('hms_user', JSON.stringify(res.data));
       window.dispatchEvent(new Event('user-profile-updated'));
@@ -94,10 +48,7 @@ export const authService = {
 
   // Update profile details and upload avatar
   updateProfile: async (formData) => {
-    const res = await request('/auth/profile', {
-      method: 'PUT',
-      body: formData
-    });
+    const res = await apiClient.put('/auth/profile', formData);
     if (res.success && res.data) {
       localStorage.setItem('hms_user', JSON.stringify(res.data));
       window.dispatchEvent(new Event('user-profile-updated'));
@@ -109,6 +60,7 @@ export const authService = {
   logout: () => {
     localStorage.removeItem('hms_token');
     localStorage.removeItem('hms_user');
+    apiClient.invalidateCache();
   },
 
   // Get stored user info
@@ -121,6 +73,31 @@ export const authService = {
     }
   },
 
+  // Alias for getCurrentUser
+  getUser: () => {
+    try {
+      const user = localStorage.getItem('hms_user');
+      return user ? JSON.parse(user) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // Set stored user info
+  setUser: (user) => {
+    try {
+      localStorage.setItem('hms_user', JSON.stringify(user));
+      window.dispatchEvent(new Event('user-profile-updated'));
+    } catch (e) {
+      console.error("Failed to store user info:", e);
+    }
+  },
+
+  // Get auth token
+  getToken: () => {
+    return localStorage.getItem('hms_token');
+  },
+
   // Check if authenticated
   isAuthenticated: () => {
     return !!localStorage.getItem('hms_token');
@@ -128,9 +105,6 @@ export const authService = {
 
   // Change password
   changePassword: async (currentPassword, newPassword) => {
-    return await request('/receptionist/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword })
-    });
+    return await apiClient.post('/receptionist/change-password', { currentPassword, newPassword });
   }
 };

@@ -1,45 +1,21 @@
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-async function request(path, options = {}) {
-  const token = localStorage.getItem('hms_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-  return data;
-}
+import { apiClient } from './apiClient';
 
 export const notificationsService = {
   getNotifications: async () => {
-    return await request('/notifications');
+    return await apiClient.get('/notifications');
   },
   getUnreadCount: async () => {
-    return await request('/notifications/unread-count');
+    return await apiClient.get('/notifications/unread-count');
   },
   markNotificationRead: async (id) => {
-    return await request(`/notifications/${id}/read`, {
-      method: 'POST'
-    });
+    return await apiClient.post(`/notifications/${id}/read`);
   },
   markAllNotificationsRead: async () => {
-    return await request('/notifications/read-all', {
-      method: 'POST'
-    });
+    return await apiClient.post('/notifications/read-all');
   },
   deleteNotification: async (id) => {
-    return await request(`/notifications/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/notifications/${id}`);
   }
 };
+
+export default notificationsService;

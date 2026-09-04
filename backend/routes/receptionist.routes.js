@@ -8,10 +8,14 @@ import bcrypt from 'bcryptjs';
 import {
   Room,
   Payment,
-  ReceptionistNotification
+  ReceptionistNotification,
+  Feedback
 } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
+import { findPropertySafely } from '../utils/propertyCache.js';
+import { isToday } from '../utils/dateUtils.js';
+import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 
 import mongoose from 'mongoose';
 
@@ -43,11 +47,7 @@ router.use(authorize('receptionist', 'manager', 'admin', 'super-admin'));
 // Fetch receptionist's assigned property profile
 router.get('/property', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId;
-    if (!propertyId) {
-      return sendError(res, 400, 'User has no assigned property');
-    }
-    const property = await Property.findById(propertyId);
+    const property = await findPropertySafely(req.user?.propertyId, req.user);
     if (!property) {
       return sendError(res, 404, 'Property profile not found');
     }
@@ -106,8 +106,8 @@ router.get('/dashboard', async (req, res) => {
       .filter(b => b.status !== 'Cancelled')
       .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
 
-    // Arrivals: Incoming stays for today / pending check-in (Confirmed / Pending / Paid)
-    const arrivals = bookings.filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked');
+    // Arrivals: Incoming stays for today / pending check-in (check-in date is today)
+    const arrivals = bookings.filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked'));
     const arrivalsList = arrivals.map(b => {
       const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
       const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
@@ -133,8 +133,8 @@ router.get('/dashboard', async (req, res) => {
       };
     });
 
-    // Departures: Stays currently checked in or completed
-    const departures = bookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked-out' || b.status === 'Checked In');
+    // Departures: Stays scheduled for departure today (check-out date is today)
+    const departures = bookings.filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'));
     const departuresList = departures.map(b => {
       const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
       const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
@@ -268,37 +268,64 @@ router.post('/guests/:id/charge', async (req, res) => {
 });
 
 // Extend guest stay
-router.post('/guests/:id/extend', async (req, res) => {
+const handleReceptionistExtendStay = async (req, res) => {
   try {
-    const { days } = req.body;
-    if (!days || isNaN(days)) {
-      return sendError(res, 400, 'Valid stay extension days required.');
-    }
-
+    const { days, newCheckOut, additionalNights, additionalAmount } = req.body;
+    
     const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-JAI');
     if (!booking) {
       return sendError(res, 404, 'Guest stay record not found.');
     }
 
+    let calculatedNights = additionalNights !== undefined ? Number(additionalNights) : Number(days);
+    if (!calculatedNights || isNaN(calculatedNights) || calculatedNights <= 0) {
+      return sendError(res, 400, 'Valid stay extension nights/days required.');
+    }
+
+    let calculatedCheckOut = newCheckOut;
+    if (!calculatedCheckOut) {
+      const currentOut = new Date(booking.checkOut);
+      const nextDate = new Date(currentOut.getTime() + (calculatedNights * 24 * 60 * 60 * 1000));
+      calculatedCheckOut = nextDate.toDateString();
+    }
+
+    const addAmount = additionalAmount !== undefined ? Number(additionalAmount) : 0;
+
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, {
-      nights: Number(booking.nights) + Number(days),
-      checkOut: new Date(new Date(booking.checkOut).getTime() + (days * 24 * 60 * 60 * 1000)).toDateString()
+      nights: Number(booking.nights || 1) + calculatedNights,
+      checkOut: calculatedCheckOut,
+      amount: Number(booking.amount || 0) + addAmount,
+      balance: Number(booking.balance || 0) + addAmount
     }, { new: true });
 
     // Trigger notification
     await triggerNotification({
       role: 'manager',
-      propertyId: req.user.propertyId || 'HS-JAI',
+      propertyId: booking.propertyId || req.user.propertyId || 'HS-JAI',
       title: 'Stay Extended',
-      message: `Stay extended by ${days} days for guest ${booking.guest}. New checkout: ${updated.checkOut}.`,
+      message: `Stay extended by ${calculatedNights} night(s) for guest ${booking.guest}. New checkout: ${updated.checkOut}.`,
       category: 'Operations'
     });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-JAI', 'booking_updated', {
+        action: 'extend',
+        booking: updated,
+        bookingId: updated._id,
+        checkOut: updated.checkOut
+      });
+    }
 
     return sendSuccess(res, 200, updated, 'Stay duration extended successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
-});
+};
+
+router.post('/guests/:id/extend', handleReceptionistExtendStay);
+router.put('/reservations/:id/extend', handleReceptionistExtendStay);
+router.post('/reservations/:id/extend', handleReceptionistExtendStay);
 
 // ==========================================
 // 3. ROOM STATUS
@@ -994,6 +1021,112 @@ router.post('/change-password', async (req, res) => {
     await user.save();
 
     return sendSuccess(res, 200, {}, 'Password changed successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// ==========================================
+// 9. GUEST FEEDBACK / REVIEWS (FRONT DESK)
+// ==========================================
+router.get('/feedback', async (req, res) => {
+  try {
+    const propId = req.query.propertyId || req.user?.propertyId;
+    const query = (propId && propId !== 'all')
+      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
+      : {};
+    const list = await getUnifiedFeedbacksAndReviews(query);
+    return sendSuccess(res, 200, list, 'Guest feedback & reviews retrieved successfully from MongoDB (Feedbacks & Reviews collections).');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/feedback', async (req, res) => {
+  try {
+    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-JAI';
+    const {
+      bookingId = `BK-${Date.now().toString().slice(-5)}`,
+      guestName,
+      guestEmail = '',
+      guestPhone = '',
+      room = '101 · Standard Room',
+      roomType = 'Standard Room',
+      rating = 5,
+      ratings = { cleanliness: 5, service: 5, room: 5, food: 5, overall: 5 },
+      category = 'Front Desk Service',
+      sentiment = 'Positive',
+      status = 'Published',
+      comment = '',
+      response = ''
+    } = req.body;
+
+    if (!guestName || !comment) {
+      return sendError(res, 400, 'Guest name and review comment are required.');
+    }
+
+    const created = await Feedback.create({
+      bookingId,
+      guestName,
+      guestEmail,
+      guestPhone,
+      room,
+      roomType,
+      rating: Number(rating) || 5,
+      ratings,
+      category,
+      sentiment,
+      status,
+      comment,
+      comments: comment,
+      response,
+      respondedAt: response ? new Date() : null,
+      propertyId: propId
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'feedback_received', created);
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_received' });
+    }
+
+    return sendSuccess(res, 201, created, 'Guest feedback recorded at reception successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/feedback/:id/respond', async (req, res) => {
+  try {
+    const { response, status } = req.body;
+    if (!response) {
+      return sendError(res, 400, 'Response message is required.');
+    }
+
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const updateData = {
+      response,
+      respondedAt: new Date(),
+      status: status || 'Resolved'
+    };
+
+    let updated = await Feedback.findOneAndUpdate(
+      { _id: req.params.id },
+      updateData,
+      { new: true }
+    );
+
+    if (!updated) {
+      return sendError(res, 404, 'Feedback record not found.');
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'feedback_updated', updated);
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_updated' });
+    }
+
+    return sendSuccess(res, 200, updated, 'Reception response published successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }

@@ -102,15 +102,13 @@ function ManagerNotificationsPage() {
   useEffect(() => {
     loadNotifications(false);
 
-    const handleFocus = () => loadNotifications(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadNotifications(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadNotifications(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

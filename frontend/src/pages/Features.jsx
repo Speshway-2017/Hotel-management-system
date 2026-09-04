@@ -60,15 +60,13 @@ function Features() {
 
     loadPlans(false);
 
-    const handleFocus = () => loadPlans(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadPlans(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadPlans(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -110,8 +108,8 @@ function Features() {
       points: ["Unified POS reports", "Direct checkout mapping", "Outlet commission audits"]
     },
     {
-      title: "08. Guest CRM & Loyalty",
-      desc: "Central guest profiles, stay logs, preferences notes, loyalty tier points, and repeat guest marketing offers.",
+      title: "08. Guest CRM & Profiles",
+      desc: "Central guest profiles, stay histories, dining & room preferences notes, and repeat guest communication logs.",
       points: ["Personalized check-in", "Blacklist tags", "Occasion notifications"]
     },
     {

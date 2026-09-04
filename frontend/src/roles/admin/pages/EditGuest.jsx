@@ -35,7 +35,6 @@ function EditGuestPage() {
     preferences: "",
     idDocType: "Aadhaar Card",
     idDocNumber: "",
-    loyaltyPoints: "0",
     notes: ""
   });
 
@@ -58,7 +57,6 @@ function EditGuestPage() {
               preferences: matched.preferences || "",
               idDocType: matched.idDocType || "Aadhaar Card",
               idDocNumber: matched.idDocNumber || "",
-              loyaltyPoints: (matched.loyaltyPoints || 0).toString(),
               notes: matched.notes || ""
             });
           }
@@ -98,7 +96,6 @@ function EditGuestPage() {
         preferences: formData.preferences,
         idDocType: formData.idDocType,
         idDocNumber: formData.idDocNumber,
-        loyaltyPoints: parseInt(formData.loyaltyPoints) || 0,
         notes: formData.notes
       });
       toast.success(`Guest profile for ${formData.name} updated!`);
@@ -239,14 +236,6 @@ function EditGuestPage() {
                   id="preferences"
                   type="text"
                   value={formData.preferences}
-                  onChange={handleChange}
-                />
-              </FormField>
-              <FormField label="Loyalty Points" id="loyaltyPoints">
-                <Input
-                  id="loyaltyPoints"
-                  type="number"
-                  value={formData.loyaltyPoints}
                   onChange={handleChange}
                 />
               </FormField>

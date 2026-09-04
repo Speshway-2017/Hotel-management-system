@@ -1384,9 +1384,9 @@ function SuperAdminBranding() {
 export const Route = createFileRoute("/super-admin/branding")({
   head: () => ({
     meta: [
-      { title: "Loyalty & Branding — Hour Stay" },
+      { title: "CMS & Branding — Hour Stay" },
       { name: "description", content: "Manage dynamic landing page sections and FAQ contents." },
-      { property: "og:title", content: "Loyalty & Branding — Hour Stay" },
+      { property: "og:title", content: "CMS & Branding — Hour Stay" },
       { property: "og:description", content: "Manage dynamic landing page sections and FAQ contents." }
     ]
   }),

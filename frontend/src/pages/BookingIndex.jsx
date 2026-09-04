@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, ChevronRight, CheckCircle2, AlertCircle, Ticket, Tag, Sparkles, X, Check } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { inr } from "@/data/hs-data";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
+import { toast } from "sonner";
 
 export const Route = {
   head: () => ({
@@ -30,6 +31,14 @@ function Booking() {
   const [gstin, setGstin] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState("");
+
+  // Coupon / Promo Code state
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [couponFeedback, setCouponFeedback] = useState(null); // { type: 'success' | 'error', text: '' }
 
   useEffect(() => {
     // Check if user is authenticated before proceeding with booking
@@ -79,6 +88,58 @@ function Booking() {
         }
       })
       .catch(() => {});
+
+    // Fetch active available promo coupons for website and merge with admin-created coupons
+    const loadCoupons = async () => {
+      let serverCoupons = [];
+      try {
+        const res = await publicService.getCoupons(activeId);
+        if (res && res.success && Array.isArray(res.data)) {
+          serverCoupons = res.data;
+        }
+      } catch (e) {}
+
+      // Merge with locally created admin coupons if any
+      let localCoupons = [];
+      try {
+        const raw = localStorage.getItem('hms_admin_coupons_cache');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            localCoupons = parsed.filter(c => {
+              if (c.status && c.status !== 'Active') return false;
+              if (c.validFrom && todayStr < c.validFrom) return false;
+              if (c.validUntil && todayStr > c.validUntil) return false;
+              return true;
+            }).map(c => ({
+              id: c._id || c.id,
+              _id: c._id || c.id,
+              code: String(c.code).toUpperCase(),
+              title: c.title || c.code,
+              description: c.description || '',
+              discountType: c.discountType === 'flat' ? 'fixed' : (c.discountType || 'percentage'),
+              discountValue: Number(c.discountValue) || 0,
+              maxDiscount: Number(c.maxDiscount) || 0,
+              minBookingAmount: Number(c.minBookingAmount) || 0,
+              validFrom: c.validFrom,
+              validUntil: c.validUntil
+            }));
+          }
+        }
+      } catch (e) {}
+
+      const merged = [...serverCoupons];
+      for (const lc of localCoupons) {
+        if (!merged.some(m => m.code?.toUpperCase() === lc.code?.toUpperCase())) {
+          merged.unshift(lc);
+        }
+      }
+
+      setAvailableCoupons(merged);
+    };
+
+    loadCoupons();
   }, []);
 
   const checkInDate = localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0];
@@ -88,7 +149,101 @@ function Booking() {
   const roomRate = Number(selectedRoom?.currentRate || selectedRoom?.baseRate || selectedRoom?.dailyRate || 3000);
   const roomBaseTotal = roomRate * 2; // Default 2 nights
   const roomGst = Math.round(roomBaseTotal * 0.18);
-  const grandTotal = Number(roomBaseTotal + roomGst);
+  const grossTotal = Number(roomBaseTotal + roomGst);
+  const payableTotal = Math.max(0, grossTotal - discountAmount);
+
+  const hotelName = property?.settings?.hotelName || property?.name || "Speshway Luxury Hotel";
+  const propId = property?._id || property?.id || 'HS-9HQ8P';
+  const roomCategory = selectedRoom?.category || 'Standard Room';
+  const ratePlanDisplay = (selectedRoom?.ratePlan && selectedRoom.ratePlan !== 'Standard Plan' && selectedRoom.ratePlan !== 'Standard Rate Plan')
+    ? selectedRoom.ratePlan
+    : (roomCategory.toLowerCase().includes('deluxe') ? 'Deluxe Rate Plan' : roomCategory.toLowerCase().includes('suite') ? 'Executive Suite Plan' : roomCategory.toLowerCase().includes('villa') ? 'Villa Suite Plan' : `${roomCategory} Rate Plan`);
+
+  // Handle applying a coupon
+  const handleApplyCoupon = async (codeToApply) => {
+    const targetCode = String(codeToApply || couponCodeInput).trim().toUpperCase();
+    if (!targetCode) {
+      setCouponFeedback({ type: 'error', text: 'Please enter a coupon code.' });
+      return;
+    }
+
+    setValidatingCoupon(true);
+    setCouponFeedback(null);
+
+    try {
+      const res = await publicService.validateCoupon({
+        code: targetCode,
+        bookingAmount: grossTotal,
+        propertyId: propId
+      });
+
+      if (res && res.success && res.data && res.data.valid) {
+        setAppliedCoupon(res.data.coupon);
+        setDiscountAmount(res.data.discountAmount);
+        setCouponCodeInput(res.data.coupon.code);
+        setCouponFeedback({
+          type: 'success',
+          text: `Coupon "${res.data.coupon.code}" applied! You saved ${inr(res.data.discountAmount)}.`
+        });
+        toast.success(`Coupon ${res.data.coupon.code} applied successfully!`);
+        return;
+      } else {
+        throw new Error(res?.message || 'Coupon could not be validated on server');
+      }
+    } catch (err) {
+      // Fallback: check availableCoupons / local cache for valid coupon
+      const localMatch = availableCoupons.find(c => c.code?.toUpperCase() === targetCode);
+      if (localMatch) {
+        const amountNum = grossTotal;
+        if (localMatch.minBookingAmount > 0 && amountNum < localMatch.minBookingAmount) {
+          setAppliedCoupon(null);
+          setDiscountAmount(0);
+          setCouponFeedback({
+            type: 'error',
+            text: `Coupon "${localMatch.code}" requires a minimum booking amount of ₹${localMatch.minBookingAmount.toLocaleString('en-IN')}. (Current: ₹${amountNum.toLocaleString('en-IN')})`
+          });
+          return;
+        }
+
+        let calcDisc = 0;
+        if (localMatch.discountType === 'percentage') {
+          calcDisc = Math.round((amountNum * localMatch.discountValue) / 100);
+          if (localMatch.maxDiscount > 0 && calcDisc > localMatch.maxDiscount) {
+            calcDisc = localMatch.maxDiscount;
+          }
+        } else {
+          calcDisc = Math.min(localMatch.discountValue, amountNum);
+        }
+
+        setAppliedCoupon(localMatch);
+        setDiscountAmount(calcDisc);
+        setCouponCodeInput(localMatch.code);
+        setCouponFeedback({
+          type: 'success',
+          text: `Coupon "${localMatch.code}" applied! You saved ${inr(calcDisc)}.`
+        });
+        toast.success(`Coupon ${localMatch.code} applied successfully!`);
+        return;
+      }
+
+      setAppliedCoupon(null);
+      setDiscountAmount(0);
+      setCouponFeedback({
+        type: 'error',
+        text: err.response?.data?.message || err.message || `Invalid coupon code '${targetCode}'.`
+      });
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);
+    setCouponCodeInput("");
+    setCouponFeedback(null);
+    toast.info("Coupon removed.");
+  };
 
   const handleConfirm = async (e) => {
     e.preventDefault();
@@ -100,7 +255,7 @@ function Booking() {
       return;
     }
 
-    if (!grandTotal || isNaN(grandTotal) || grandTotal <= 0) {
+    if (!payableTotal || isNaN(payableTotal) || payableTotal <= 0) {
       setBookingError("Booking amount validation failed: amount must be a positive number.");
       return;
     }
@@ -120,12 +275,17 @@ function Booking() {
         checkIn: checkInDate,
         checkOutDate: checkOutDate,
         checkOut: checkOutDate,
-        roomType: selectedRoom?.category || selectedRoom?.name || 'Standard Room',
-        room: selectedRoom?.roomNumber ? `${selectedRoom.category || 'Room'} (Room ${selectedRoom.roomNumber})` : (selectedRoom?.name || 'Standard Room'),
+        roomType: roomCategory,
+        room: selectedRoom?.roomNumber ? `${roomCategory} (Room ${selectedRoom.roomNumber})` : roomCategory,
+        ratePlan: ratePlanDisplay,
         city: property?.settings?.city || property?.city || city || 'Hyderabad',
         hotelCity: property?.settings?.city || property?.city || city || 'Hyderabad',
-        totalAmount: grandTotal,
-        amount: grandTotal,
+        originalAmount: grossTotal,
+        couponCode: appliedCoupon ? appliedCoupon.code : null,
+        coupon: appliedCoupon ? appliedCoupon.code : null,
+        discountAmount: discountAmount,
+        totalAmount: payableTotal,
+        amount: payableTotal,
         specialRequests: gstin ? `GSTIN: ${gstin}` : ''
       };
 
@@ -163,10 +323,6 @@ function Booking() {
     }
   };
 
-  const hotelName = property?.settings?.hotelName || property?.name || "Speshway Luxury Hotel";
-  const propId = property?._id || property?.id || 'HS-9HQ8P';
-  const roomCategory = selectedRoom?.category || 'Standard Room';
-
   return (
     <SiteLayout>
       <div className="bg-cream min-h-screen py-8 font-ui text-left">
@@ -199,7 +355,7 @@ function Booking() {
             </Button>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
             {/* Form Column */}
             <form onSubmit={handleConfirm} className="bg-white rounded-2xl border border-navy/10 p-6 sm:p-8 shadow-soft text-left space-y-6">
               
@@ -240,6 +396,71 @@ function Booking() {
                 </div>
               </div>
 
+              {/* Promo Offers Banner (if available) */}
+              {availableCoupons.length > 0 && (
+                <div className="bg-purple/5 rounded-2xl border border-purple/15 p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="size-4 text-purple" />
+                    <h3 className="font-display text-sm font-bold text-navy">Available Website Offers & Coupons</h3>
+                  </div>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {availableCoupons.map((ac) => {
+                      const isApplied = appliedCoupon?.code === ac.code;
+                      const discountTag = ac.discountType === 'percentage'
+                        ? `${ac.discountValue}% OFF`
+                        : `₹${ac.discountValue} OFF`;
+
+                      return (
+                        <div
+                          key={ac.id || ac.code}
+                          className={`p-3 rounded-xl border transition-all text-left flex flex-col justify-between ${
+                            isApplied
+                              ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/20'
+                              : 'bg-white border-navy/10 hover:border-purple/40 hover:shadow-xs'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="font-mono font-bold text-xs bg-purple/10 text-purple px-2 py-0.5 rounded border border-purple/20">
+                                {ac.code}
+                              </span>
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">
+                                {discountTag}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-navy/70 mt-1 font-medium line-clamp-2">
+                              {ac.description || ac.title}
+                            </p>
+                            {ac.minBookingAmount > 0 && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                Min spend: ₹{ac.minBookingAmount.toLocaleString('en-IN')}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="mt-2.5 pt-2 border-t border-navy/5 flex justify-end">
+                            {isApplied ? (
+                              <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                <Check className="size-3" /> Applied
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleApplyCoupon(ac.code)}
+                                disabled={validatingCoupon}
+                                className="text-[11px] font-bold text-purple hover:text-purple/80 cursor-pointer disabled:opacity-50"
+                              >
+                                Apply Code →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 border-t border-navy/5">
                 <Button 
                   type="submit" 
@@ -248,47 +469,131 @@ function Booking() {
                   size="touch" 
                   className="w-full sm:w-auto h-11 px-8 text-xs font-bold cursor-pointer disabled:opacity-50"
                 >
-                  {submitting ? "Processing Reservation..." : "Confirm Booking"}
+                  {submitting ? "Processing Reservation..." : `Confirm Booking (${inr(payableTotal)})`}
                 </Button>
               </div>
 
             </form>
 
             {/* Sidebar Column */}
-            <aside className="bg-white rounded-2xl border border-navy/10 p-6 shadow-soft text-left h-fit space-y-4">
-              <h3 className="font-display text-lg font-bold text-navy border-b border-navy/5 pb-2">Stay Summary</h3>
+            <aside className="space-y-4">
+              <div className="bg-white rounded-2xl border border-navy/10 p-6 shadow-soft text-left space-y-4">
+                <h3 className="font-display text-lg font-bold text-navy border-b border-navy/5 pb-2">Stay Summary</h3>
 
-              <div>
-                <p className="font-display text-base font-bold text-navy">{selectedRoom?.category || selectedRoom?.name || "Standard Room"}</p>
-                {selectedRoom?.roomNumber && (
-                  <span className="text-[10px] bg-purple/10 text-purple font-mono font-bold px-2 py-0.5 rounded mt-1 inline-block">
-                    Room {selectedRoom.roomNumber} ({selectedRoom.floor || 'Floor 1'})
-                  </span>
-                )}
-                <p className="mt-1 text-xs text-navy/60 font-medium">
-                  {hotelName}, {property?.city || "Hyderabad"}
-                </p>
+                <div>
+                  <p className="font-display text-base font-bold text-navy">{roomCategory}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {selectedRoom?.roomNumber && (
+                      <span className="text-[10px] bg-purple/10 text-purple font-mono font-bold px-2 py-0.5 rounded inline-block">
+                        Room {selectedRoom.roomNumber} ({selectedRoom.floor || 'Floor 1'})
+                      </span>
+                    )}
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-2 py-0.5 rounded inline-block">
+                      {ratePlanDisplay}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-navy/60 font-medium">
+                    {hotelName}, {property?.city || "Hyderabad"}
+                  </p>
+                </div>
+
+                <div className="text-xs text-navy/70 space-y-1 bg-cream/40 p-3 rounded-xl border border-navy/5 font-medium">
+                  <div className="flex justify-between"><span>Check-In:</span><strong className="text-navy font-bold">{checkInDate}</strong></div>
+                  <div className="flex justify-between"><span>Check-Out:</span><strong className="text-navy font-bold">{checkOutDate}</strong></div>
+                </div>
+
+                {/* Promo Code Input Box */}
+                <div className="pt-3 border-t border-navy/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="couponIn" className="text-xs font-bold text-navy flex items-center gap-1.5">
+                      <Ticket className="size-3.5 text-purple" /> Promo / Coupon Code
+                    </Label>
+                    {appliedCoupon && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-bold cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      id="couponIn"
+                      placeholder="ENTER COUPON"
+                      value={couponCodeInput}
+                      onChange={e => setCouponCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
+                      disabled={!!appliedCoupon || validatingCoupon}
+                      className="h-10 text-xs font-mono font-bold uppercase"
+                    />
+                    {appliedCoupon ? (
+                      <Button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-3 text-xs font-bold text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer"
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={() => handleApplyCoupon(couponCodeInput)}
+                        disabled={!couponCodeInput.trim() || validatingCoupon}
+                        variant="hero"
+                        size="sm"
+                        className="h-10 px-4 text-xs font-bold cursor-pointer disabled:opacity-50"
+                      >
+                        {validatingCoupon ? "..." : "Apply"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {couponFeedback && (
+                    <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
+                      couponFeedback.type === 'success'
+                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                        : 'bg-rose-50 border border-rose-200 text-rose-700'
+                    }`}>
+                      {couponFeedback.type === 'success' ? (
+                        <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                      ) : (
+                        <AlertCircle className="size-3.5 shrink-0 text-rose-600" />
+                      )}
+                      <span>{couponFeedback.text}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tariff Breakdown */}
+                <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
+                  <div className="flex justify-between">
+                    <dt className="text-navy/60">Room Tariff (2 nights)</dt>
+                    <dd className="tabular-nums font-bold text-navy">{inr(roomBaseTotal)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-navy/60">GST (18%)</dt>
+                    <dd className="tabular-nums font-bold text-navy">{inr(roomGst)}</dd>
+                  </div>
+
+                  {appliedCoupon && discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-bold bg-emerald-50/80 p-2 rounded-lg border border-emerald-200/60">
+                      <dt className="flex items-center gap-1">
+                        <Tag className="size-3" /> Coupon ({appliedCoupon.code})
+                      </dt>
+                      <dd className="tabular-nums">- {inr(discountAmount)}</dd>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy">
+                    <dt>Total Payable</dt>
+                    <dd className="tabular-nums font-bold text-purple">{inr(payableTotal)}</dd>
+                  </div>
+                </dl>
               </div>
-
-              <div className="text-xs text-navy/70 space-y-1 bg-cream/40 p-3 rounded-xl border border-navy/5 font-medium">
-                <div className="flex justify-between"><span>Check-In:</span><strong className="text-navy font-bold">{checkInDate}</strong></div>
-                <div className="flex justify-between"><span>Check-Out:</span><strong className="text-navy font-bold">{checkOutDate}</strong></div>
-              </div>
-
-              <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
-                <div className="flex justify-between">
-                  <dt className="text-navy/60">Room Tariff</dt>
-                  <dd className="tabular-nums font-bold text-navy">{inr(roomBaseTotal)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-navy/60">GST (18%)</dt>
-                  <dd className="tabular-nums font-bold text-navy">{inr(roomGst)}</dd>
-                </div>
-                <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy">
-                  <dt>Total Amount</dt>
-                  <dd className="tabular-nums font-bold text-purple">{inr(grandTotal)}</dd>
-                </div>
-              </dl>
             </aside>
           </div>
 

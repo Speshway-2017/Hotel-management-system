@@ -37,6 +37,10 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+userSchema.index({ role: 1, propertyId: 1 });
+userSchema.index({ propertyId: 1 });
+userSchema.index({ mobile: 1 });
+
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return next();
@@ -270,7 +274,7 @@ const User = {
   findById: (id) => {
     return new QueryWrapper((isMongoose) => {
       if (isMongoose) {
-        return MongooseUser.findById(id);
+        return MongooseUser.findOne({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] });
       }
       return MockUser.findById(id);
     });
@@ -315,7 +319,7 @@ const User = {
   },
   findByIdAndUpdate: async (id, update, options) => {
     if (mongoose.connection.readyState === 1) {
-      const updated = await MongooseUser.findByIdAndUpdate(id, update, { new: true, ...options });
+      const updated = await MongooseUser.findOneAndUpdate({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] }, update, { new: true, ...options });
       if (updated) {
         try {
           const instance = new UserInstance({
@@ -355,7 +359,7 @@ const User = {
   },
   findByIdAndDelete: async (id) => {
     if (mongoose.connection.readyState === 1) {
-      const deleted = await MongooseUser.findByIdAndDelete(id);
+      const deleted = await MongooseUser.findOneAndDelete({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] });
       try {
         await MockUser.findByIdAndDelete(id);
       } catch (err) {

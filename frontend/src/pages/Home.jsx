@@ -515,12 +515,12 @@ function Home() {
                       <div className="rounded-lg bg-navy/10 p-2.5 text-navy">
                         <Users className="size-6" />
                       </div>
-                      <span className="text-xs font-bold text-navy uppercase tracking-wider">Guest Loyalty</span>
+                      <span className="text-xs font-bold text-navy uppercase tracking-wider">Guest Profiles</span>
                     </div>
-                    <p className="mt-4 text-xs text-muted-foreground">Build profiles with local tastes: filter coffee preferences, festival cards, and VIP greetings.</p>
+                    <p className="mt-4 text-xs text-muted-foreground">Build profiles with preferences, special requests, occasion notes, and personalized greetings.</p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">CRM Retention</span>
-                      <span className="inline-flex items-center gap-1 rounded bg-navy/10 px-1.5 py-0.5 text-[9px] font-bold text-navy">Platinum Tier</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">CRM Database</span>
+                      <span className="inline-flex items-center gap-1 rounded bg-navy/10 px-1.5 py-0.5 text-[9px] font-bold text-navy">VIP Segment</span>
                     </div>
                   </div>
                 </div>

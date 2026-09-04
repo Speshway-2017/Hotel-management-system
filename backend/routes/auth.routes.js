@@ -8,11 +8,13 @@ import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 const router = express.Router();
 
 // Helper to generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (id, email = '') => {
+  const payload = typeof id === 'object' ? id : { id, email };
+  return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: '30d'
   });
 };
+
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -77,7 +79,7 @@ router.post('/login', async (req, res) => {
     }
 
     return sendSuccess(res, 200, {
-      token: generateToken(user._id),
+      token: generateToken(user._id, user.email),
       user: {
         id: user._id,
         name: user.name,

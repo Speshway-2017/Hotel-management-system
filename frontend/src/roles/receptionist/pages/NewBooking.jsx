@@ -118,15 +118,13 @@ function ReceptionistNewBooking() {
   useEffect(() => {
     fetchRoomsAndAvailability();
 
-    const handleFocus = () => fetchRoomsAndAvailability();
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => fetchRoomsAndAvailability();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchRoomsAndAvailability();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

@@ -35,6 +35,7 @@ const shiftSchema = new mongoose.Schema({
   propertyId: { type: String, required: true }
 }, { timestamps: true });
 
+shiftSchema.index({ propertyId: 1 });
 export const Shift = mongoose.models.Shift || mongoose.model('Shift', shiftSchema);
 
 // ==========================================
@@ -51,6 +52,7 @@ const attendanceSchema = new mongoose.Schema({
   propertyId: { type: String, required: true }
 }, { timestamps: true });
 
+attendanceSchema.index({ propertyId: 1, date: -1 });
 export const Attendance = mongoose.models.Attendance || mongoose.model('Attendance', attendanceSchema);
 
 // ==========================================
@@ -68,6 +70,7 @@ const approvalSchema = new mongoose.Schema({
   decidedAt: { type: Date, default: null }
 }, { timestamps: true });
 
+approvalSchema.index({ propertyId: 1, status: 1 });
 export const Approval = mongoose.models.Approval || mongoose.model('Approval', approvalSchema);
 
 // ==========================================
@@ -76,18 +79,29 @@ export const Approval = mongoose.models.Approval || mongoose.model('Approval', a
 const feedbackSchema = new mongoose.Schema({
   bookingId: { type: String, required: true },
   guestName: { type: String, required: true },
+  guestEmail: { type: String, default: '' },
+  guestPhone: { type: String, default: '' },
   room: { type: String, default: '' },
+  roomType: { type: String, default: '' },
+  rating: { type: Number, default: 5 },
   ratings: {
     cleanliness: { type: Number, default: 5 },
     service: { type: Number, default: 5 },
-    room: { type: Number, default: 5 }
+    room: { type: Number, default: 5 },
+    food: { type: Number, default: 5 },
+    overall: { type: Number, default: 5 }
   },
+  category: { type: String, default: 'General' },
+  sentiment: { type: String, default: 'Positive' },
+  status: { type: String, default: 'Published' }, // Published, Pending, Resolved, Archived
   comment: { type: String, default: '' },
+  comments: { type: String, default: '' },
   response: { type: String, default: '' },
   respondedAt: { type: Date, default: null },
-  propertyId: { type: String, required: true }
+  propertyId: { type: String, required: true, default: 'HS-JAI' }
 }, { timestamps: true });
 
+feedbackSchema.index({ propertyId: 1, createdAt: -1 });
 export const Feedback = mongoose.models.Feedback || mongoose.model('Feedback', feedbackSchema);
 
 // ==========================================
@@ -101,6 +115,7 @@ const managerNotificationSchema = new mongoose.Schema({
   propertyId: { type: String, required: true }
 }, { timestamps: true });
 
+managerNotificationSchema.index({ propertyId: 1, isRead: 1 });
 export const ManagerNotification = mongoose.models.ManagerNotification || mongoose.model('ManagerNotification', managerNotificationSchema);
 export const ReceptionistNotification = mongoose.models.ReceptionistNotification || mongoose.model('ReceptionistNotification', managerNotificationSchema);
 
@@ -117,6 +132,7 @@ const paymentSchema = new mongoose.Schema({
   propertyId: { type: String, required: true }
 }, { timestamps: true });
 
+paymentSchema.index({ propertyId: 1, createdAt: -1 });
 export const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
 
 // ==========================================

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/hs/FormFields";
+import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
@@ -25,7 +26,7 @@ import {
 export const Route = createFileRoute("/admin/feedback")({
   head: () => ({
     meta: [
-      { title: "Guest Feedback & Reviews — Admin Console" },
+      { title: "Guest Feedback — Admin Console" },
       { name: "description", content: "Review guest stay feedback, ratings, and reply with administrative responses." }
     ]
   }),
@@ -92,7 +93,7 @@ function AdminFeedbackPage() {
       const user = authService.getCurrentUser();
       setCurrentUser(user);
 
-      const feedbackRes = await managerService.getFeedback().catch(() => ({}));
+      const feedbackRes = await adminService.getFeedback().catch(() => ({}));
 
       if (feedbackRes.success && feedbackRes.data) {
         const compiled = feedbackRes.data.map((f) => {
@@ -100,18 +101,29 @@ function AdminFeedbackPage() {
           const cleanliness = f.ratings?.cleanliness || 5;
           const service = f.ratings?.service || 5;
           const room = f.ratings?.room || 5;
-          const overall = Math.round((cleanliness + service + room) / 3);
+          const food = f.ratings?.food || 5;
+          const overall = f.rating || Math.round((cleanliness + service + room + food) / 4);
+          let sentiment = f.sentiment;
+          if (!sentiment) {
+            sentiment = overall >= 4 ? "Positive" : overall === 3 ? "Neutral" : "Negative";
+          }
           return {
             id: fid,
             bookingId: f.bookingId || "BK-10101",
             guest: f.guestName || "Guest",
-            room: f.room || "101",
+            guestEmail: f.guestEmail || "",
+            guestPhone: f.guestPhone || "",
+            room: f.room || "101 · Standard Room",
+            roomType: f.roomType || "Standard Room",
+            category: f.category || "General",
+            sentiment,
             stayDates: f.stayDates || "Recent Stay",
             overall,
             cleanliness,
             service,
             roomRating: room,
-            comments: f.comment || "Great experience.",
+            foodRating: food,
+            comments: f.comment || f.comments || "Great experience.",
             submittedDate: f.createdAt ? new Date(f.createdAt).toISOString().split('T')[0] : "2026-09-02",
             status: f.response ? "Responded" : "Pending Response",
             response: f.response || null,
@@ -149,7 +161,7 @@ function AdminFeedbackPage() {
 
     setIsSubmitting(true);
     try {
-      await managerService.respondFeedback(selectedFeedback.id, responseText);
+      await adminService.respondFeedback(selectedFeedback.id, responseText, "Resolved");
       toast.success("Response sent to guest successfully!");
       setFeedbackList(prev => prev.map(f => {
         if (f.id === selectedFeedback.id) {
@@ -213,7 +225,7 @@ function AdminFeedbackPage() {
   if (loading && feedbackList.length === 0) {
     return (
       <div className="space-y-6 text-left">
-        <PageHeader title="Guest Feedback & Reviews" subtitle="Loading guest reviews ledger..." />
+        <PageHeader title="Guest Feedback" subtitle="Loading guest feedback ledger..." />
         <LoadingRows rows={5} />
       </div>
     );
@@ -223,11 +235,11 @@ function AdminFeedbackPage() {
     <div className="space-y-6 text-left animate-fade-in font-ui">
       {/* Summary Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <PremiumStatCard label="Total Reviews" value={totalCount.toString()} hint="Guest review submissions" accentColor="#0d1b2a" />
+        <PremiumStatCard label="Total Feedback" value={totalCount.toString()} hint="Guest feedback submissions" accentColor="#0d1b2a" />
         <PremiumStatCard label="Average Rating" value={`${averageRating} / 5.0`} hint="Cleanliness & service index" accentColor="#10b981" />
-        <PremiumStatCard label="5-Star Reviews" value={fiveStarCount.toString()} hint="Top rated stays" accentColor="#3b82f6" />
+        <PremiumStatCard label="5-Star Feedback" value={fiveStarCount.toString()} hint="Top rated stays" accentColor="#3b82f6" />
         <PremiumStatCard label="Critical (1-2★)" value={lowStarCount.toString()} hint="Negative feedback tickets" accentColor="#ef4444" />
-        <PremiumStatCard label="Pending Action" value={pendingCount.toString()} hint="Awaiting review response" accentColor="#f59e0b" />
+        <PremiumStatCard label="Pending Action" value={pendingCount.toString()} hint="Awaiting feedback response" accentColor="#f59e0b" />
       </div>
 
       {/* Filters Toolbar */}

@@ -11,10 +11,12 @@ import Announcement from '../models/announcement.model.js';
 import { upload, uploadImageToCloudinary, deleteImageFromCloudinary } from '../utils/uploader.js';
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import PromoCoupon from '../models/promoCoupon.model.js';
+import Coupon from '../models/coupon.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
 import { Room, ContactMessage } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
+import { invalidatePropertyCache } from '../utils/propertyCache.js';
 
 const router = express.Router();
 
@@ -249,6 +251,7 @@ router.post('/properties', authorize('super-admin'), async (req, res) => {
       category: 'Property Audit'
     });
 
+    invalidatePropertyCache(property.id || property._id);
     return sendSuccess(res, 201, property, 'Property created successfully');
   } catch (error) {
     console.error('[API] POST /properties error:', error);
@@ -268,6 +271,7 @@ router.put('/properties/:id', authorize('super-admin'), async (req, res) => {
       await User.findByIdAndUpdate(updateData.assignedAdmin, { propertyId: updated.id || updated._id });
     }
 
+    invalidatePropertyCache(id);
     await logAction(req.user, 'Updated Property', `${updated.name}`, req);
     return sendSuccess(res, 200, updated, 'Property updated successfully');
   } catch (error) {
@@ -289,6 +293,7 @@ router.put('/properties/:propertyId/assign-admin', authorize('super-admin'), asy
 
     await User.findByIdAndUpdate(adminId, { propertyId });
 
+    invalidatePropertyCache(propertyId);
     await logAction(req.user, 'Assigned Admin to Property', `${updated.name}`, req);
     return sendSuccess(res, 200, updated, 'Admin assigned to property successfully');
   } catch (error) {
@@ -302,6 +307,7 @@ router.delete('/properties/:id', authorize('super-admin'), async (req, res) => {
     const deleted = await Property.findByIdAndDelete(id);
     if (!deleted) return sendError(res, 404, 'Property not found');
 
+    invalidatePropertyCache(id);
     await logAction(req.user, 'Deleted Property', `${deleted.name}`, req);
     return sendSuccess(res, 200, deleted, 'Property deleted successfully');
   } catch (error) {
@@ -590,6 +596,98 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
   }
 });
 
+router.put('/reservations/:id/extend', checkPropertyStatus, async (req, res) => {
+  try {
+    const { newCheckOut, additionalNights, additionalAmount } = req.body;
+    if (!newCheckOut || additionalNights === undefined || additionalAmount === undefined) {
+      return sendError(res, 400, 'newCheckOut, additionalNights, and additionalAmount are required.');
+    }
+
+    const { id } = req.params;
+    const bookingQuery = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      bookingQuery.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: bookingQuery });
+    if (!booking) {
+      return sendError(res, 404, 'Booking reservation record not found.');
+    }
+
+    const updated = await Booking.findOneAndUpdate(
+      { $or: bookingQuery },
+      {
+        checkOut: newCheckOut,
+        nights: Number(booking.nights || 1) + Number(additionalNights),
+        amount: Number(booking.amount || 0) + Number(additionalAmount),
+        balance: Number(booking.balance || 0) + Number(additionalAmount)
+      },
+      { new: true }
+    );
+
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, targetPropId, 'booking_updated', {
+        action: 'extend',
+        booking: updated,
+        bookingId: updated._id,
+        checkOut: newCheckOut
+      });
+    }
+
+    return sendSuccess(res, 200, updated, 'Stay reservation extended successfully.');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to extend booking');
+  }
+});
+
+router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) => {
+  try {
+    const { newCheckOut, additionalNights, additionalAmount } = req.body;
+    if (!newCheckOut || additionalNights === undefined || additionalAmount === undefined) {
+      return sendError(res, 400, 'newCheckOut, additionalNights, and additionalAmount are required.');
+    }
+
+    const { id } = req.params;
+    const bookingQuery = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      bookingQuery.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: bookingQuery });
+    if (!booking) {
+      return sendError(res, 404, 'Booking reservation record not found.');
+    }
+
+    const updated = await Booking.findOneAndUpdate(
+      { $or: bookingQuery },
+      {
+        checkOut: newCheckOut,
+        nights: Number(booking.nights || 1) + Number(additionalNights),
+        amount: Number(booking.amount || 0) + Number(additionalAmount),
+        balance: Number(booking.balance || 0) + Number(additionalAmount)
+      },
+      { new: true }
+    );
+
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, targetPropId, 'booking_updated', {
+        action: 'extend',
+        booking: updated,
+        bookingId: updated._id,
+        checkOut: newCheckOut
+      });
+    }
+
+    return sendSuccess(res, 200, updated, 'Stay reservation extended successfully.');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to extend booking');
+  }
+});
+
 router.delete('/reservations/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
@@ -874,7 +972,7 @@ router.get('/plans', authorize('super-admin', 'admin'), async (req, res) => {
     if (list.length === 0) {
       const seeded = await SubscriptionPlan.create([
         { name: "Starter Tier", description: "Perfect for single hotel operators.", monthlyPrice: 2499, yearlyPrice: 24990, propertyLimit: 1, roomLimit: 30, includedFeatures: ["Direct Website Builder", "Manual Bookings Management", "GST Invoice Invoicing"], status: "Active", activeSubscribers: 2 },
-        { name: "Professional Suite", description: "Advanced tools for growing hotel chains.", monthlyPrice: 5999, yearlyPrice: 59990, propertyLimit: 3, roomLimit: 150, includedFeatures: ["Direct Website Builder", "2-Way OTA XML Channel Manager", "Automated CRM Loyalty Module", "Advanced Revenue Analytics"], status: "Active", activeSubscribers: 3 },
+        { name: "Professional Suite", description: "Advanced tools for growing hotel chains.", monthlyPrice: 5999, yearlyPrice: 59990, propertyLimit: 3, roomLimit: 150, includedFeatures: ["Direct Website Builder", "2-Way OTA XML Channel Manager", "Automated CRM & Profiles Module", "Advanced Revenue Analytics"], status: "Active", activeSubscribers: 3 },
         { name: "Enterprise Pro", description: "Complete platform control for major hospitality brands.", monthlyPrice: 12999, yearlyPrice: 129990, propertyLimit: 10, roomLimit: 800, includedFeatures: ["Unlimited Property Profiles", "All Standard Suite Integrations", "Custom Payment Gateway Routing", "24/7 Dedicated Support Hotline"], status: "Active", activeSubscribers: 1 }
       ]);
       return sendSuccess(res, 200, seeded, 'Plans retrieved');
@@ -1163,32 +1261,58 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
 // ==========================================
 // 9. PROMO COUPONS
 // ==========================================
-router.get('/coupons', authorize('super-admin'), async (req, res) => {
+router.get('/coupons', authorize('super-admin', 'admin'), async (req, res) => {
   try {
-    const list = await PromoCoupon.find({});
-    // If empty, let's seed standard ones
-    if (list.length === 0) {
-      const seeded = await PromoCoupon.create([
-        { code: "WELCOME20", description: "New client sign up package.", discountType: "percentage", discountValue: 20, validFrom: "2026-01-01", validUntil: "2026-12-31", usageLimit: 500, usedCount: 24, minimumSubscriptionAmount: 2000, applicableSubscriptionPlans: ["Starter Tier", "Professional Suite"], status: "Active" },
-        { code: "FLAT1000", description: "Corporate platform discount coupon.", discountType: "flat", discountValue: 1000, validFrom: "2026-03-01", validUntil: "2026-10-15", usageLimit: 100, usedCount: 15, minimumSubscriptionAmount: 5000, applicableSubscriptionPlans: ["Professional Suite", "Enterprise Pro"], status: "Active" }
-      ]);
-      return sendSuccess(res, 200, seeded, 'Coupons retrieved');
+    const list = await Coupon.find({});
+    if (list && list.length > 0) {
+      return sendSuccess(res, 200, list, 'Coupons retrieved');
     }
-    return sendSuccess(res, 200, list, 'Coupons retrieved');
+    const promoList = await PromoCoupon.find({});
+    return sendSuccess(res, 200, promoList, 'Coupons retrieved');
   } catch (error) {
     return sendError(res, 500, 'Failed to retrieve promo coupons');
   }
 });
 
-router.post('/coupons', authorize('super-admin'), async (req, res) => {
+router.post('/coupons', authorize('super-admin', 'admin'), async (req, res) => {
   try {
     const codeVal = req.body.code ? req.body.code.toUpperCase().trim() : '';
-    const existing = await PromoCoupon.findOne({ code: codeVal });
+    if (!codeVal) {
+      return sendError(res, 400, 'Coupon code is required.');
+    }
+    const existing = await Coupon.findOne({ code: codeVal });
     if (existing) {
       return sendError(res, 400, `Coupon code "${codeVal}" already exists. Please choose a unique code.`);
     }
-    const newCoupon = new PromoCoupon(req.body);
-    await newCoupon.save();
+
+    const payload = {
+      code: codeVal,
+      title: req.body.title || codeVal,
+      description: req.body.description || '',
+      discountType: req.body.discountType === 'flat' ? 'fixed' : (req.body.discountType || 'percentage'),
+      discountValue: Number(req.body.discountValue) || 0,
+      maxDiscount: Number(req.body.maxDiscount) || 0,
+      minBookingAmount: Number(req.body.minBookingAmount || req.body.minimumSubscriptionAmount) || 0,
+      validFrom: req.body.validFrom || new Date().toISOString().split('T')[0],
+      validUntil: req.body.validUntil || new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0],
+      usageLimit: Number(req.body.usageLimit) || 0,
+      status: req.body.status || 'Active',
+      propertyId: req.body.propertyId || 'all',
+      applicableSource: 'website'
+    };
+
+    const newCoupon = await Coupon.create(payload);
+    try {
+      const newPromo = new PromoCoupon(req.body);
+      await newPromo.save();
+    } catch (e) {}
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'coupon_created', newCoupon);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_created' });
+    }
+
     await logAction(req.user, 'Created Promo Coupon', newCoupon.code, req);
     return sendSuccess(res, 201, newCoupon, 'Coupon created successfully');
   } catch (error) {
@@ -1199,16 +1323,34 @@ router.post('/coupons', authorize('super-admin'), async (req, res) => {
   }
 });
 
-router.put('/coupons/:id', authorize('super-admin'), async (req, res) => {
+router.put('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) => {
   try {
+    const couponId = req.params.id;
     if (req.body.code) {
       const codeVal = req.body.code.toUpperCase().trim();
-      const existing = await PromoCoupon.findOne({ code: codeVal, _id: { $ne: req.params.id } });
-      if (existing) {
+      const existing = await Coupon.findOne({ code: codeVal });
+      if (existing && existing._id !== couponId && existing.id !== couponId) {
         return sendError(res, 400, `Coupon code "${codeVal}" already exists on another coupon.`);
       }
     }
-    const updated = await PromoCoupon.findByIdAndUpdate(req.params.id, req.body, { new: true });
+
+    const updatePayload = {
+      ...req.body,
+      discountType: req.body.discountType === 'flat' ? 'fixed' : req.body.discountType,
+      minBookingAmount: req.body.minBookingAmount !== undefined ? req.body.minBookingAmount : req.body.minimumSubscriptionAmount
+    };
+
+    const updated = await Coupon.findByIdAndUpdate(couponId, updatePayload, { new: true });
+    try {
+      await PromoCoupon.findByIdAndUpdate(couponId, req.body, { new: true });
+    } catch (e) {}
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'coupon_updated', updated);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_updated' });
+    }
+
     if (!updated) return sendError(res, 404, 'Coupon not found');
     await logAction(req.user, 'Updated Promo Coupon', updated.code, req);
     return sendSuccess(res, 200, updated, 'Coupon updated successfully');
@@ -1220,9 +1362,19 @@ router.put('/coupons/:id', authorize('super-admin'), async (req, res) => {
   }
 });
 
-router.delete('/coupons/:id', authorize('super-admin'), async (req, res) => {
+router.delete('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) => {
   try {
-    const deleted = await PromoCoupon.findByIdAndDelete(req.params.id);
+    const deleted = await Coupon.findByIdAndDelete(req.params.id);
+    try {
+      await PromoCoupon.findByIdAndDelete(req.params.id);
+    } catch (e) {}
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'coupon_deleted', { id: req.params.id });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_deleted' });
+    }
+
     if (!deleted) return sendError(res, 404, 'Coupon not found');
     await logAction(req.user, 'Deleted Promo Coupon', deleted.code, req);
     return sendSuccess(res, 200, deleted, 'Coupon deleted successfully');

@@ -90,15 +90,9 @@ function AdminApprovalsPage() {
   };
 
   useEffect(() => {
-    loadApprovals();
+    loadApprovals();
 
-    const handleFocus = () => {
-      loadApprovals();
-    };
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
     };
   }, []);
 

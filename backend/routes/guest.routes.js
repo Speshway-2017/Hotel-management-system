@@ -6,6 +6,8 @@ import Booking from '../models/booking.model.js';
 import Property from '../models/property.model.js';
 import Review from '../models/review.model.js';
 import Notification from '../models/notification.model.js';
+import { Feedback } from '../models/managerData.model.js';
+import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 const router = express.Router();
@@ -115,16 +117,12 @@ router.get('/dashboard', async (req, res) => {
     const currentStay = mapped.find(b => b.status === 'Checked-in') || null;
     const totalStays = mapped.length;
     const totalSpent = mapped.reduce((acc, b) => acc + Number(b.amount || 0), 0);
-    const points = totalStays > 0 ? (totalStays * 2000 + Math.round(totalSpent * 0.1)) : 0;
-    const tier = totalStays >= 10 ? 'Platinum' : (totalStays >= 5 ? 'Gold' : 'Silver');
 
     return sendSuccess(res, 200, {
       stats: {
         upcomingBooking,
         currentStay,
         totalStays,
-        loyaltyPoints: points,
-        loyaltyTier: tier,
         totalSpent
       },
       recentBookings: mapped
@@ -221,13 +219,13 @@ router.get('/feedback', async (req, res) => {
     if (userMobile) query.push({ guestPhone: userMobile });
     if (userEmail) query.push({ guestEmail: userEmail });
 
-    let reviews = await Review.find(query.length > 0 ? { $or: query } : {}).sort({ createdAt: -1 });
+    let feedbacks = await Feedback.find(query.length > 0 ? { $or: query } : {}).sort({ createdAt: -1 });
 
-    if (reviews.length === 0) {
-      reviews = await Review.find({}).sort({ createdAt: -1 });
+    if (feedbacks.length === 0) {
+      feedbacks = await Feedback.find({}).sort({ createdAt: -1 });
     }
 
-    return sendSuccess(res, 200, reviews, 'Guest feedback retrieved successfully from MongoDB');
+    return sendSuccess(res, 200, feedbacks, 'Guest feedback retrieved successfully from MongoDB');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to load guest feedback');
   }
@@ -236,26 +234,84 @@ router.get('/feedback', async (req, res) => {
 // POST /api/v1/guest/feedback
 router.post('/feedback', async (req, res) => {
   try {
-    const { bookingId, hotelName, rating, categories, comments } = req.body;
+    const {
+      bookingId,
+      hotelName,
+      rating,
+      categories,
+      comments,
+      comment,
+      reviewText,
+      guestName: customGuestName,
+      guestEmail: customGuestEmail
+    } = req.body;
 
-    if (!comments || !rating) {
-      return sendError(res, 400, 'Rating and comments are required');
+    const feedbackText = comments || comment || reviewText;
+    const feedbackRating = Number(rating) || 5;
+
+    if (!feedbackText) {
+      return sendError(res, 400, 'Review comment text is required');
     }
 
-    const newReview = await Review.create({
-      bookingId: bookingId || 'BK-1001',
-      hotelName: hotelName || 'Hour Stay Luxury Hotel',
-      guestName: req.user?.name || 'Guest',
+    // Try to find matching booking for room details & propertyId
+    let propertyId = req.body.propertyId || 'HS-JAI';
+    let room = '101';
+    let roomType = 'Standard Room';
+    let guestName = customGuestName || req.user?.name || 'Valued Guest';
+    let guestEmail = customGuestEmail || req.user?.email || '';
+
+    if (bookingId) {
+      const b = await Booking.findOne({
+        $or: [{ bookingId: bookingId }, { _id: bookingId.length === 24 ? bookingId : null }, { id: bookingId }]
+      });
+      if (b) {
+        propertyId = b.propertyId || 'HS-JAI';
+        room = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
+        roomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
+      }
+    }
+
+    const ratingNum = Number(rating) || 5;
+    const sentiment = ratingNum >= 4 ? 'Positive' : ratingNum === 3 ? 'Neutral' : 'Negative';
+
+    // Single source of truth: Create Feedback document in MongoDB 'feedbacks' collection
+    const newFeedback = await Feedback.create({
+      bookingId: bookingId || `BK-${Date.now().toString().slice(-5)}`,
+      guestName: guestName || req.user?.name || 'Guest',
+      guestEmail: guestEmail || req.user?.email || '',
       guestPhone: req.user?.mobile || '',
-      guestEmail: req.user?.email || '',
-      userId: req.user?.id || req.user?._id,
-      rating: Number(rating),
-      categories: categories || { cleanliness: 5, service: 5, room: 5, food: 5, overall: 5 },
-      comments,
-      status: 'Published'
+      room,
+      roomType,
+      rating: feedbackRating,
+      ratings: {
+        cleanliness: categories?.cleanliness || 5,
+        service: categories?.service || 5,
+        room: categories?.room || 5,
+        food: categories?.food || 5,
+        overall: feedbackRating
+      },
+      category: 'Guest Stay Review',
+      sentiment,
+      status: 'Published',
+      comment: feedbackText,
+      comments: feedbackText,
+      propertyId
     });
 
-    return sendSuccess(res, 201, newReview, 'Thank you! Your feedback has been submitted successfully.');
+    // Emit Realtime Sync via Socket.IO
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'feedback_received', {
+        id: newFeedback._id,
+        guestName: newFeedback.guestName,
+        rating: ratingNum,
+        comment: feedbackText,
+        room
+      });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { action: 'new_feedback' });
+    }
+
+    return sendSuccess(res, 201, { feedback: newFeedback, review: newFeedback }, 'Thank you! Your feedback has been submitted successfully.');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to submit feedback');
   }

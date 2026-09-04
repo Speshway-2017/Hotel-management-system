@@ -13,6 +13,8 @@ import {
 
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 export const Route = createFileRoute("/reception/check-in")({
   head: () => ({
@@ -54,6 +56,7 @@ function ArrivalsPage() {
   const [filterSource, setFilterSource] = useState("All");
   const [loading, setLoading] = useState(true);
   const [arrivals, setArrivals] = useState([]);
+  const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadArrivals = (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -61,7 +64,7 @@ function ArrivalsPage() {
       .then(res => {
         const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
         const list = allBookings
-          .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked' || b.status === 'Checked-in' || b.status === 'Checked-In')
+          .filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked' || b.status === 'Checked-in' || b.status === 'Checked-In'))
           .map(b => {
             const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
             const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
@@ -83,7 +86,7 @@ function ArrivalsPage() {
               paymentStatus: Number(b.balance || 0) === 0 || b.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
               source: b.source || 'Direct Web',
               status: b.status === 'Confirmed' ? 'Pre-checked' : (b.status === 'Checked-in' || b.status === 'Checked-In' ? 'Checked-In' : b.status),
-              time: b.checkIn || 'Today',
+              time: formatDisplayDate(b.checkIn) || 'Today',
               checkIn: b.checkIn || 'Today',
               checkOut: b.checkOut || 'Tomorrow',
               nights: b.nights || 1,
@@ -103,16 +106,14 @@ function ArrivalsPage() {
   useEffect(() => {
     loadArrivals(false);
     const interval = setInterval(() => loadArrivals(true), 10000);
-    const handleFocus = () => loadArrivals(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadArrivals(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadArrivals(true);
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -357,15 +358,23 @@ function ArrivalsPage() {
                           </Button>
                         )}
 
-                        {(guest.status === "Checked-In" || guest.status === "Checked-in") && (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => handleCheckOut(guest.id || guest._id)}
-                            className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                          >
-                            Check-Out
-                          </Button>
+                        {(guest.status === "Checked-In" || guest.status === "Checked-in" || guest.status === "Staying" || guest.status === "Staying-In") && (
+                          <>
+                            <ExtendStayButton
+                              size="xs"
+                              label="Extend"
+                              booking={guest}
+                              onClick={() => navigate(`/reception/reservations/extend/${guest.id || guest._id || guest.bookingId}`)}
+                            />
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              onClick={() => handleCheckOut(guest.id || guest._id)}
+                              className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                            >
+                              Check-Out
+                            </Button>
+                          </>
                         )}
                         
                         {/* View Details Ghost Icon Button */}
@@ -402,6 +411,15 @@ function ArrivalsPage() {
           </table>
         </div>
       </Panel>
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadArrivals(false)}
+        userRole="receptionist"
+      />
     </div>
   );
 }

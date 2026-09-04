@@ -32,6 +32,12 @@ const bookingSchema = new mongoose.Schema({
   strict: false
 });
 
+bookingSchema.index({ propertyId: 1, createdAt: -1 });
+bookingSchema.index({ propertyId: 1, status: 1 });
+bookingSchema.index({ bookingId: 1 });
+bookingSchema.index({ email: 1 });
+bookingSchema.index({ checkIn: 1, checkOut: 1 });
+
 bookingSchema.pre('validate', function(next) {
   if (!this.amount || isNaN(this.amount) || Number(this.amount) <= 0) {
     this.amount = Number(this.totalAmount) || 7080;

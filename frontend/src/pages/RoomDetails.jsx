@@ -132,7 +132,9 @@ export function RoomDetailsPage() {
   const bedType = selectedRoom?.beds || selectedRoom?.bedType || "King Bed";
   const capacity = selectedRoom?.capacity || `Max ${selectedRoom?.occupancy || 2} Guests`;
   const roomFloor = selectedRoom?.floor || "Floor 1";
-  const ratePlan = selectedRoom?.ratePlan || "Standard Rate Plan";
+  const ratePlan = (selectedRoom?.ratePlan && selectedRoom.ratePlan !== "Standard Rate Plan" && selectedRoom.ratePlan !== "Standard Plan")
+    ? selectedRoom.ratePlan
+    : (roomType.toLowerCase().includes('deluxe') ? 'Deluxe Rate Plan' : roomType.toLowerCase().includes('suite') ? 'Executive Suite Plan' : roomType.toLowerCase().includes('villa') ? 'Villa Suite Plan' : `${roomType} Rate Plan`);
   const roomDescription = selectedRoom?.description || `Experience superior comfort in our ${roomType}, featuring premium furnishings and state-of-the-art amenities.`;
 
   // Calculate pricing & taxes
