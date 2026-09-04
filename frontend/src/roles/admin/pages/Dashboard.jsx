@@ -522,7 +522,7 @@ function AdminDashboard() {
                 <CalendarCheck className="size-5 text-warning group-hover:scale-115 transition-transform" />
                 <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Booking</span>
               </Link>
-              <Link to="/admin/approvals" className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[76px]">
+              <Link to="/admin/coupons/add" className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-muted bg-[#fcfcfc] hover:bg-muted/15 transition-all text-center group cursor-pointer hover:no-underline min-h-[76px]">
                 <Percent className="size-5 text-success group-hover:scale-115 transition-transform" />
                 <span className="text-[10px] font-bold text-navy mt-1.5 leading-none">Add Coupons</span>
               </Link>
