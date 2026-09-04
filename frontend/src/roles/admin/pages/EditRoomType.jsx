@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { PageHeader, Crumbs, Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/admin/rooms/edit-type/$id")({
 });
 
 function EditRoomTypePage() {
-  const params = Route.useParams();
+  const params = useParams() || {};
   const rawTargetId = params?.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const targetId = decodeURIComponent(rawTargetId);
 

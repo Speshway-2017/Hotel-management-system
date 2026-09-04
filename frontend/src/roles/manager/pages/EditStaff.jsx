@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
+import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 
 function ManagerEditStaff() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,24 +25,44 @@ function ManagerEditStaff() {
 
   useEffect(() => {
     const loadStaffMember = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
-        const decodedId = atob(id);
-        const res = await managerService.getStaff();
-        if (res.success) {
-          const match = res.data.find(u => u._id === decodedId || u.id === decodedId);
-          if (match) {
-            setName(match.name || "");
-            setEmail(match.email || "");
-            setPhone(match.mobile === "—" ? "" : (match.mobile || ""));
-            setDept(match.dept || "Front Office");
-            setShift(match.shift || "Morning Shift");
-          } else {
-            setError("Employee not found.");
+        let decodedId = id;
+        try {
+          if (id && id.length % 4 === 0 && !id.includes('-')) {
+            decodedId = atob(id);
           }
+        } catch (e) {
+          decodedId = id;
+        }
+
+        const [mgrRes, superRes] = await Promise.all([
+          managerService.getStaff().catch(() => ({ success: false })),
+          superAdminService.getUsers().catch(() => ({ success: false }))
+        ]);
+
+        let allStaff = [];
+        if (mgrRes.success && Array.isArray(mgrRes.data)) allStaff.push(...mgrRes.data);
+        if (superRes.success && Array.isArray(superRes.data)) allStaff.push(...superRes.data);
+
+        const match = allStaff.find(u => 
+          String(u._id) === String(decodedId) || 
+          String(u.id) === String(decodedId) || 
+          String(u._id) === String(id) || 
+          String(u.id) === String(id) ||
+          String(u.email).toLowerCase() === String(decodedId).toLowerCase()
+        );
+
+        if (match) {
+          setName(match.name || "");
+          setEmail(match.email || "");
+          setPhone(match.mobile === "—" ? "" : (match.mobile || match.phone || ""));
+          setDept(match.dept || match.department || "Front Office");
+          setShift(match.shift || "Morning Shift");
         } else {
-          setError(res.message || "Failed to load staff roster.");
+          setError("Employee not found.");
         }
       } catch (err) {
         setError(err.message || "Failed to load employee profile.");
@@ -48,14 +70,22 @@ function ManagerEditStaff() {
         setLoading(false);
       }
     };
-    if (id) loadStaffMember();
+    loadStaffMember();
   }, [id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const decodedId = atob(id);
+      let decodedId = id;
+      try {
+        if (id && id.length % 4 === 0 && !id.includes('-')) {
+          decodedId = atob(id);
+        }
+      } catch (e) {
+        decodedId = id;
+      }
+
       const payload = {
         name,
         mobile: phone,

@@ -49,6 +49,9 @@ export const superAdminService = {
       return await apiClient.post(`/manager/reservations/${id}/extend`, data);
     }
   },
+  verifyIdProof: async (id, data) => {
+    return await apiClient.post(`/super-admin/reservations/${id}/verify-id`, data);
+  },
   deleteReservation: async (id) => {
     return await apiClient.delete(`/super-admin/reservations/${id}`);
   },

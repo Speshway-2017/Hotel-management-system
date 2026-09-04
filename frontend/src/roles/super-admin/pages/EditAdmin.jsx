@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 function EditAdmin() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,26 +27,32 @@ function EditAdmin() {
 
   useEffect(() => {
     const loadAdminAndProperties = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
         const [usersRes, propertiesRes] = await Promise.all([
-          superAdminService.getUsers(),
-          superAdminService.getProperties()
+          superAdminService.getUsers().catch(() => ({ success: false })),
+          superAdminService.getProperties().catch(() => ({ success: false }))
         ]);
 
-        if (propertiesRes.success) {
+        if (propertiesRes.success && Array.isArray(propertiesRes.data)) {
           setProperties(propertiesRes.data);
         }
 
-        if (usersRes.success) {
-          const admin = usersRes.data.find(u => u.id === id || u._id === id);
+        if (usersRes.success && Array.isArray(usersRes.data)) {
+          const admin = usersRes.data.find(u => 
+            String(u.id) === String(id) || 
+            String(u._id) === String(id) || 
+            String(u.email).toLowerCase() === String(id).toLowerCase()
+          );
+
           if (admin) {
             setFormData({
-              name: admin.name,
-              email: admin.email,
-              mobile: admin.mobile || "",
-              propertyId: admin.propertyId || "",
+              name: admin.name || "",
+              email: admin.email || "",
+              mobile: admin.mobile || admin.phone || "",
+              propertyId: admin.propertyId ? (admin.propertyId._id || admin.propertyId.id || admin.propertyId) : "",
               status: admin.status || "Active"
             });
           } else {
@@ -58,7 +65,7 @@ function EditAdmin() {
         setLoading(false);
       }
     };
-    if (id) loadAdminAndProperties();
+    loadAdminAndProperties();
   }, [id]);
 
   const handleSubmit = async (e) => {

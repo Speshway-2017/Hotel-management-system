@@ -17,9 +17,11 @@ export const Route = createFileRoute("/admin/guests/edit/$id")({
 });
 
 import { superAdminService } from "@/services/superAdmin";
+import { managerService } from "@/services/manager";
 
 function EditGuestPage() {
-  const { id } = Route.useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -40,32 +42,61 @@ function EditGuestPage() {
 
   useEffect(() => {
     const loadGuestDetail = async () => {
+      if (!id) return;
       try {
-        const res = await superAdminService.getUsers();
-        if (res.success && res.data) {
-          const matched = res.data.find(g => g._id === id || g.id === id);
-          if (matched) {
-            setFormData({
-              name: matched.name || "",
-              email: matched.email || "",
-              phone: matched.mobile || "",
-              city: matched.city || "",
-              state: matched.state || "",
-              country: matched.country || "India",
-              address: matched.address || "",
-              type: matched.type || "Regular",
-              preferences: matched.preferences || "",
-              idDocType: matched.idDocType || "Aadhaar Card",
-              idDocNumber: matched.idDocNumber || "",
-              notes: matched.notes || ""
-            });
-          }
+        setLoading(true);
+        const [usersRes, guestsRes] = await Promise.all([
+          superAdminService.getUsers().catch(() => ({ success: false })),
+          managerService.getGuests().catch(() => ({ success: false }))
+        ]);
+
+        const cleanId = decodeURIComponent(String(id)).trim().toLowerCase();
+        let matched = null;
+        if (usersRes.success && Array.isArray(usersRes.data)) {
+          matched = usersRes.data.find(g => 
+            String(g._id).toLowerCase() === cleanId || 
+            String(g.id).toLowerCase() === cleanId || 
+            (g.guestId && String(g.guestId).toLowerCase() === cleanId) ||
+            (g.email && String(g.email).toLowerCase() === cleanId) ||
+            (g.mobile && String(g.mobile).toLowerCase() === cleanId) ||
+            (g.phone && String(g.phone).toLowerCase() === cleanId)
+          );
+        }
+
+        if (!matched && guestsRes.success && Array.isArray(guestsRes.data)) {
+          matched = guestsRes.data.find(g => 
+            String(g._id).toLowerCase() === cleanId || 
+            String(g.id).toLowerCase() === cleanId || 
+            (g.guestId && String(g.guestId).toLowerCase() === cleanId) ||
+            (g.email && String(g.email).toLowerCase() === cleanId) ||
+            (g.mobile && String(g.mobile).toLowerCase() === cleanId) ||
+            (g.phone && String(g.phone).toLowerCase() === cleanId)
+          );
+        }
+
+        if (matched) {
+          setFormData({
+            name: matched.name || matched.guestName || "",
+            email: matched.email || "",
+            phone: matched.phone || matched.mobile || matched.phoneNumber || "",
+            city: matched.city || "",
+            state: matched.state || "",
+            country: matched.country || "India",
+            address: matched.address || "",
+            type: matched.type || matched.tier || matched.guestType || "Regular",
+            preferences: matched.preferences || "",
+            idDocType: matched.idDocType || matched.idType || "Aadhaar Card",
+            idDocNumber: matched.idDocNumber || matched.idNumber || matched.idProofNumber || "",
+            notes: matched.notes || ""
+          });
         }
       } catch (err) {
         toast.error("Failed to load guest profile.");
+      } finally {
+        setLoading(false);
       }
     };
-    if (id) loadGuestDetail();
+    loadGuestDetail();
   }, [id]);
 
   const handleChange = (e) => {

@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 
 function EditProperty() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,26 +27,39 @@ function EditProperty() {
 
   useEffect(() => {
     const loadData = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
-        const [propRes, usersRes] = await Promise.all([
-          superAdminService.getProperty(id),
-          superAdminService.getUsers()
+        const [propRes, propsListRes, usersRes] = await Promise.all([
+          superAdminService.getProperty(id).catch(() => ({ success: false })),
+          superAdminService.getProperties().catch(() => ({ success: false })),
+          superAdminService.getUsers().catch(() => ({ success: false }))
         ]);
-        if (propRes.success) {
-          const item = propRes.data;
-          setPropertyForm({
-            name: item.name,
-            city: item.city,
-            propertyType: item.propertyType || "Boutique Resort",
-            rooms: item.rooms,
-            gm: item.gm || "",
-            assignedAdmin: item.assignedAdmin ? (item.assignedAdmin._id || item.assignedAdmin) : "",
-            status: item.status
-          });
+
+        let item = null;
+        if (propRes.success && propRes.data) {
+          item = propRes.data.property || propRes.data;
         }
-        if (usersRes.success) {
+        if (!item && propsListRes.success && Array.isArray(propsListRes.data)) {
+          item = propsListRes.data.find(p => String(p._id) === String(id) || String(p.id) === String(id) || String(p.propertyId) === String(id));
+        }
+
+        if (item) {
+          setPropertyForm({
+            name: item.name || "",
+            city: item.city || item.settings?.city || "",
+            propertyType: item.propertyType || item.type || "Boutique Resort",
+            rooms: item.rooms || item.totalRooms || 50,
+            gm: item.gm || item.generalManager || "",
+            assignedAdmin: item.assignedAdmin ? (item.assignedAdmin._id || item.assignedAdmin.id || item.assignedAdmin) : "",
+            status: item.status || "Active"
+          });
+        } else {
+          setError("Property details not found.");
+        }
+
+        if (usersRes.success && Array.isArray(usersRes.data)) {
           setUsers(usersRes.data);
         }
       } catch (err) {
@@ -54,7 +68,7 @@ function EditProperty() {
         setLoading(false);
       }
     };
-    if (id) loadData();
+    loadData();
   }, [id]);
 
   const handlePropertySubmit = async (e) => {

@@ -67,12 +67,14 @@ import { Route as AdminViewReservation } from "./roles/admin/pages/ViewReservati
 import { Route as AdminExtendReservation } from "./roles/admin/pages/ExtendReservation";
 import { Route as AdminAssignRoomDesk } from "./roles/admin/pages/AssignRoomDesk";
 import { Route as AdminCollectPaymentDesk } from "./roles/admin/pages/CollectPaymentDesk";
+import { Route as AdminCheckInDetails } from "./roles/admin/pages/CheckInDetails";
 
 // Import Manager Workspace Pages
 import { Route as ManagerLayout } from "./roles/manager/pages/ManagerLayout";
 import { Route as ManagerDashboard } from "./roles/manager/pages/Dashboard";
 import { Route as ManagerApprovals } from "./roles/manager/pages/Approvals";
 import { Route as ManagerArrivals } from "./roles/manager/pages/Arrivals";
+import { Route as ManagerCheckInDetails } from "./roles/manager/pages/CheckInDetails";
 import { Route as ManagerFeedback } from "./roles/manager/pages/Feedback";
 import { Route as ManagerViewFeedback } from "./roles/manager/pages/ViewFeedback";
 import { Route as ManagerBilling } from "./roles/manager/pages/Billing";
@@ -139,6 +141,7 @@ import { Route as GuestPayment } from "./roles/guest/pages/Payment";
 import { Route as GuestPreCheckIn } from "./roles/guest/pages/PreCheckIn";
 import { Route as GuestProfile } from "./roles/guest/pages/Profile";
 import { Route as GuestReviews } from "./roles/guest/pages/Reviews";
+import { Route as GuestAddFeedback } from "./roles/guest/pages/AddFeedback";
 import { Route as GuestSearch } from "./roles/guest/pages/Search";
 import { Route as GuestServices } from "./roles/guest/pages/Services";
 import { Route as GuestCurrentStay } from "./roles/guest/pages/CurrentStay";
@@ -314,6 +317,7 @@ export default function App() {
             <Route path="/admin/coupons/add" element={<RouteWrapper routeObj={AdminAddCoupon} />} />
             <Route path="/admin/coupons/edit/:id" element={<RouteWrapper routeObj={AdminEditCoupon} />} />
             <Route path="/admin/coupons/view/:id" element={<RouteWrapper routeObj={AdminViewCoupon} />} />
+            <Route path="/admin/check-in/:id" element={<RouteWrapper routeObj={AdminCheckInDetails} />} />
             <Route path="/admin/profile" element={<RouteWrapper routeObj={AdminProfile} />} />
           </Route>
 
@@ -344,6 +348,7 @@ export default function App() {
             <Route path="/manager/reservations/edit/:id" element={<RouteWrapper routeObj={ManagerEditReservation} />} />
             <Route path="/manager/reservations/extend/:id" element={<RouteWrapper routeObj={ManagerExtendReservation} />} />
             <Route path="/manager/reservations/extend" element={<RouteWrapper routeObj={ManagerExtendReservation} />} />
+            <Route path="/manager/check-in/:id" element={<RouteWrapper routeObj={ManagerCheckInDetails} />} />
             <Route path="/manager/rooms" element={<RouteWrapper routeObj={ManagerRooms} />} />
             <Route path="/manager/shifts" element={<RouteWrapper routeObj={ManagerShifts} />} />
             <Route path="/manager/attendance" element={<RouteWrapper routeObj={ManagerAttendance} />} />
@@ -399,7 +404,10 @@ export default function App() {
             <Route path="/guest/pre-check-in" element={<RouteWrapper routeObj={GuestPreCheckIn} />} />
             <Route path="/guest/profile" element={<RouteWrapper routeObj={GuestProfile} />} />
             <Route path="/guest/feedback" element={<RouteWrapper routeObj={GuestReviews} />} />
+            <Route path="/guest/feedback/add" element={<RouteWrapper routeObj={GuestAddFeedback} />} />
+            <Route path="/guest/feedback/new" element={<RouteWrapper routeObj={GuestAddFeedback} />} />
             <Route path="/guest/reviews" element={<RouteWrapper routeObj={GuestReviews} />} />
+            <Route path="/guest/reviews/add" element={<RouteWrapper routeObj={GuestAddFeedback} />} />
             <Route path="/guest/search" element={<RouteWrapper routeObj={GuestSearch} />} />
             <Route path="/guest/services" element={<RouteWrapper routeObj={GuestServices} />} />
             <Route path="/guest/current-stay" element={<RouteWrapper routeObj={GuestCurrentStay} />} />

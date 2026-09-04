@@ -548,6 +548,56 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
   }
 });
 
+// Verify ID proof details for a reservation (Super Admin / Admin)
+router.post('/reservations/:id/verify-id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { idDocType, idDocNumber, idDocImage, idVerification, notes } = req.body;
+
+    if (!idDocNumber || !idDocNumber.trim()) {
+      return sendError(res, 400, 'ID Document Number is required for verification.');
+    }
+
+    const bookingQuery = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      bookingQuery.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: bookingQuery });
+    if (!booking) return sendError(res, 404, 'Reservation not found');
+
+    const verificationData = {
+      idDocType: idDocType || booking.idDocType || 'Aadhaar Card',
+      idDocNumber: idDocNumber.trim(),
+      idDocImage: idDocImage || booking.idDocImage || '',
+      idVerification: idVerification || 'Verified',
+      idVerifiedAt: new Date(),
+      idVerifiedBy: req.user?.name || req.user?.username || 'Administrator'
+    };
+
+    const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, verificationData, { new: true });
+
+    // Sync guest user profile
+    try {
+      if (booking.guestId) {
+        await User.findByIdAndUpdate(booking.guestId, {
+          idDocType: verificationData.idDocType,
+          idDocNumber: verificationData.idDocNumber
+        });
+      } else if (booking.email) {
+        await User.findOneAndUpdate({ email: booking.email.toLowerCase() }, {
+          idDocType: verificationData.idDocType,
+          idDocNumber: verificationData.idDocNumber
+        });
+      }
+    } catch (e) {}
+
+    return sendSuccess(res, 200, updated, 'ID proof successfully verified.');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to verify ID proof');
+  }
+});
+
 router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
@@ -555,7 +605,31 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(id)) {
       bookingQuery.unshift({ _id: id });
     }
-    const booking = await Booking.findOneAndUpdate({ $or: bookingQuery }, req.body, { new: true });
+
+    const existingBooking = await Booking.findOne({ $or: bookingQuery });
+    if (!existingBooking) return sendError(res, 404, 'Booking not found');
+
+    const isWebsiteBooking = existingBooking.source && existingBooking.source !== 'Walk-in' && !existingBooking.source.toLowerCase().includes('walk-in');
+
+    if (req.body.status === 'Checked-in' && isWebsiteBooking) {
+      const isAlreadyVerified = existingBooking.idVerification === 'Verified';
+      const isProvidedNow = (req.body.idVerification === 'Verified' || req.body.idDocNumber);
+      if (!isAlreadyVerified && !isProvidedNow && !req.body.bypassVerification) {
+        return sendError(res, 400, 'ID Proof Verification is required before checking in a website booking.');
+      }
+    }
+
+    const updatePayload = { ...req.body };
+    if (req.body.idDocNumber) {
+      updatePayload.idDocNumber = req.body.idDocNumber.trim();
+      updatePayload.idDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      updatePayload.idDocImage = req.body.idDocImage || existingBooking.idDocImage || '';
+      updatePayload.idVerification = 'Verified';
+      updatePayload.idVerifiedAt = new Date();
+      updatePayload.idVerifiedBy = req.user?.name || req.user?.username || 'Administrator';
+    }
+
+    const booking = await Booking.findOneAndUpdate({ $or: bookingQuery }, updatePayload, { new: true });
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Updated Booking', `${booking.guest}`, req);
 

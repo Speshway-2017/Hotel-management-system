@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { 
   Calendar, Bed, Hotel, MapPin, ArrowRight, ShieldCheck, 
   RefreshCw, AlertCircle, Clock, CheckCircle2, ChevronRight, 
-  ArrowLeft, CreditCard, User, FileText, Download, Phone, Eye, Sparkles
+  ArrowLeft, CreditCard, User, FileText, Download, Phone, Eye, Sparkles,
+  Star, MessageSquare
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
 import { calculateStayNights } from "@/utils/dateUtils";
@@ -33,6 +34,7 @@ function GuestBookingsPage() {
 
   const [activeTab, setActiveTab] = useState(initialTab); // 'all', 'upcoming', 'check-ins', 'check-outs'
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [feedbackBookingIds, setFeedbackBookingIds] = useState(new Set());
 
   const fetchBookings = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -43,12 +45,29 @@ function GuestBookingsPage() {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${apiBase}/v1/guest/bookings`, { headers });
-      const result = await res.json();
-      
+      const [res, fbRes] = await Promise.all([
+        fetch(`${apiBase}/v1/guest/bookings`, { headers }).then(r => r.json()).catch(() => ({})),
+        fetch(`${apiBase}/v1/guest/feedback`, { headers }).then(r => r.json()).catch(() => ({}))
+      ]);
+
+      const fbSet = new Set();
+      if (fbRes && fbRes.success && Array.isArray(fbRes.data)) {
+        fbRes.data.forEach(f => {
+          if (f.bookingId) fbSet.add(String(f.bookingId));
+        });
+      }
+      setFeedbackBookingIds(fbSet);
+
       let list = [];
-      if (result && result.success && Array.isArray(result.data)) {
-        list = result.data;
+      if (res && res.success && Array.isArray(res.data)) {
+        list = res.data.map(b => {
+          const bId = b.bookingId || b.id || b._id;
+          const hasFb = b.hasFeedback || fbSet.has(String(bId)) || fbSet.has(String(b.id)) || fbSet.has(String(b._id)) || fbSet.has(String(b.bookingId));
+          return {
+            ...b,
+            hasFeedback: Boolean(hasFb)
+          };
+        });
       }
       setBookings(list);
 
@@ -151,8 +170,19 @@ function GuestBookingsPage() {
   // Dedicated Detailed Page View when a booking is clicked
   if (selectedBooking) {
     const b = selectedBooking;
+    const isCheckedOut = (b.status || '').toLowerCase() === 'checked-out' || 
+                         (b.status || '').toLowerCase() === 'checked out' || 
+                         (b.status || '').toLowerCase() === 'completed';
+
     return (
-      <div className="space-y-6 text-left font-ui">
+      <div className="space-y-4 text-left font-ui">
+        {/* Back navigation button */}
+        <button
+          onClick={() => handleSelectBooking(null)}
+          className="inline-flex items-center gap-2 text-xs font-bold text-navy/70 hover:text-purple transition-colors cursor-pointer border-none bg-transparent"
+        >
+          <ArrowLeft className="size-4" /> Back to My Bookings
+        </button>
         
         {/* Detailed Booking Page Card (Admin/Manager Panel Style) */}
         <div className="bg-white rounded-2xl border border-navy/10 p-6 sm:p-8 shadow-soft space-y-6">
@@ -163,7 +193,9 @@ function GuestBookingsPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-display text-2xl font-bold text-navy">{b.hotel || "Speshway Hotel & Suites"}</span>
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                  (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'paid'
+                  isCheckedOut
+                    ? 'bg-purple/10 text-purple border border-purple/20'
+                    : (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'paid'
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : (b.status || '').toLowerCase() === 'checked-in'
                     ? 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -231,7 +263,25 @@ function GuestBookingsPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="pt-4 border-t border-navy/5 flex flex-wrap gap-3 justify-end">
+          <div className="pt-4 border-t border-navy/5 flex flex-wrap gap-3 justify-end items-center">
+            {/* Feedback button when guest status is Checked Out */}
+            {isCheckedOut && (
+              (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
+                <span className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" /> Feedback Submitted
+                </span>
+              ) : (
+                <Button
+                  onClick={() => {
+                    window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
+                  }}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-soft border-none"
+                >
+                  <Star className="size-3.5 fill-current text-white" /> Add Feedback
+                </Button>
+              )
+            )}
+
             <button
               onClick={() => window.print()}
               className="px-4 py-2 bg-cream text-navy border border-navy/10 rounded-xl text-xs font-bold hover:bg-cream/80 transition-colors inline-flex items-center gap-2 cursor-pointer"
@@ -363,27 +413,63 @@ function GuestBookingsPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'paid'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : (b.status || '').toLowerCase() === 'checked-in'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {b.status || 'Confirmed'}
-                      </span>
+                      {(() => {
+                        const isRowCheckedOut = (b.status || '').toLowerCase() === 'checked-out' || 
+                                                (b.status || '').toLowerCase() === 'checked out' || 
+                                                (b.status || '').toLowerCase() === 'completed';
+                        return (
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            isRowCheckedOut
+                              ? 'bg-purple/10 text-purple border border-purple/20'
+                              : (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'paid'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : (b.status || '').toLowerCase() === 'checked-in'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {b.status || 'Confirmed'}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectBooking(b);
-                        }}
-                        className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-cream text-navy inline-flex items-center justify-center transition-colors cursor-pointer border-none"
-                        title="View Booking Details"
-                      >
-                        <Eye className="size-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {(((b.status || '').toLowerCase() === 'checked-out' || 
+                          (b.status || '').toLowerCase() === 'checked out' || 
+                          (b.status || '').toLowerCase() === 'completed')) && (
+                          (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
+                            <span
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1 text-[11px] font-bold"
+                              title="Feedback already submitted"
+                            >
+                              <CheckCircle2 className="size-3 text-emerald-600" />
+                              <span>Reviewed</span>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 inline-flex items-center gap-1 text-[11px] font-bold transition-colors cursor-pointer"
+                              title="Add Feedback"
+                            >
+                              <Star className="size-3 fill-amber-500 text-amber-500" />
+                              <span>Add Feedback</span>
+                            </button>
+                          )
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectBooking(b);
+                          }}
+                          className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-cream text-navy inline-flex items-center justify-center transition-colors cursor-pointer border-none"
+                          title="View Booking Details"
+                        >
+                          <Eye className="size-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

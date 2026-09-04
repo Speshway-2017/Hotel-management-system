@@ -8,7 +8,8 @@ import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 
 function EditCoupon() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,32 +31,38 @@ function EditCoupon() {
 
   useEffect(() => {
     const loadCouponData = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
         const [couponsRes, plansRes] = await Promise.all([
-          superAdminService.getPromoCoupons(),
-          superAdminService.getSubscriptionPlans()
+          superAdminService.getPromoCoupons().catch(() => ({ success: false })),
+          superAdminService.getSubscriptionPlans().catch(() => ({ success: false }))
         ]);
 
-        if (plansRes.success) {
+        if (plansRes.success && Array.isArray(plansRes.data)) {
           setPlans(plansRes.data);
         }
 
-        if (couponsRes.success) {
-          const coupon = couponsRes.data.find(c => c._id === id || c.id === id);
+        if (couponsRes.success && Array.isArray(couponsRes.data)) {
+          const coupon = couponsRes.data.find(c => 
+            String(c._id) === String(id) || 
+            String(c.id) === String(id) || 
+            String(c.code).toUpperCase() === String(decodeURIComponent(id)).toUpperCase()
+          );
+
           if (coupon) {
             setFormData({
-              code: coupon.code,
+              code: coupon.code || "",
               description: coupon.description || "",
-              discountType: coupon.discountType,
-              discountValue: coupon.discountValue,
-              validFrom: coupon.validFrom,
-              validUntil: coupon.validUntil,
-              usageLimit: coupon.usageLimit,
+              discountType: coupon.discountType || "percentage",
+              discountValue: coupon.discountValue !== undefined ? coupon.discountValue : "",
+              validFrom: coupon.validFrom ? String(coupon.validFrom).split("T")[0] : "",
+              validUntil: coupon.validUntil ? String(coupon.validUntil).split("T")[0] : "",
+              usageLimit: coupon.usageLimit !== undefined ? coupon.usageLimit : "",
               minimumSubscriptionAmount: coupon.minimumSubscriptionAmount || 0,
-              applicableSubscriptionPlans: coupon.applicableSubscriptionPlans || [],
-              status: coupon.status
+              applicableSubscriptionPlans: Array.isArray(coupon.applicableSubscriptionPlans) ? coupon.applicableSubscriptionPlans : [],
+              status: coupon.status || "Active"
             });
           } else {
             setError("Promo Coupon not found.");

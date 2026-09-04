@@ -112,6 +112,17 @@ export const adminService = {
       return await apiClient.post(`/super-admin/reservations/${id}/extend`, data);
     }
   },
+  verifyIdProof: async (id, data) => {
+    try {
+      return await apiClient.post(`/super-admin/reservations/${id}/verify-id`, data);
+    } catch (err) {
+      try {
+        return await apiClient.post(`/manager/reservations/${id}/verify-id`, data);
+      } catch {
+        return await apiClient.post(`/receptionist/reservations/${id}/verify-id`, data);
+      }
+    }
+  },
   getFeedback: async (params = {}) => {
     try {
       return await apiClient.get('/admin/feedback', { params });
@@ -176,18 +187,43 @@ export const adminService = {
   },
   getCoupon: async (id) => {
     try {
-      return await apiClient.get(`/admin/coupons/${id}`);
-    } catch {
-      try {
-        const list = await apiClient.get('/super-admin/coupons');
-        const found = (list?.data || list || []).find(c => (c._id === id || c.id === id));
-        if (found) return { success: true, data: found };
-      } catch {}
+      const res = await apiClient.get(`/admin/coupons/${id}`);
+      if (res && (res.data || res.code)) return res;
+    } catch {}
 
-      const local = getLocalCoupons().find(c => c._id === id || c.id === id);
-      if (local) return { success: true, data: local };
-      throw new Error('Coupon not found');
-    }
+    const cleanId = decodeURIComponent(String(id || '')).trim().toLowerCase();
+
+    try {
+      const allCoupons = await adminService.getCoupons();
+      const list = allCoupons?.data || allCoupons || [];
+      const found = list.find(c => 
+        String(c._id).toLowerCase() === cleanId || 
+        String(c.id).toLowerCase() === cleanId || 
+        String(c.code).toLowerCase() === cleanId
+      );
+      if (found) return { success: true, data: found };
+    } catch {}
+
+    try {
+      const list = await apiClient.get('/super-admin/coupons');
+      const found = (list?.data || list || []).find(c => 
+        String(c._id).toLowerCase() === cleanId || 
+        String(c.id).toLowerCase() === cleanId || 
+        String(c.code).toLowerCase() === cleanId
+      );
+      if (found) return { success: true, data: found };
+    } catch {}
+
+    const local = getLocalCoupons().find(c => 
+      String(c._id).toLowerCase() === cleanId || 
+      String(c.id).toLowerCase() === cleanId || 
+      String(c.code).toLowerCase() === cleanId
+    );
+    if (local) return { success: true, data: local };
+    throw new Error('Coupon not found');
+  },
+  getCouponById: async (id) => {
+    return await adminService.getCoupon(id);
   },
   createCoupon: async (data) => {
     try {

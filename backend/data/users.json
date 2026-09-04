@@ -830,5 +830,31 @@
     "status": "Active",
     "type": "Regular",
     "updatedAt": "2026-09-01T04:34:46.054Z"
+  },
+  {
+    "id": "nhb9td45vas",
+    "_id": "nhb9td45vas",
+    "name": "Sunny",
+    "email": "sunny@gmail.com",
+    "password": "$2a$10$x6QnjZatpJVcvi0unnReV.FHEjQRJy15nTjgO5SQp6wJKsTtA/n9q",
+    "role": "guest",
+    "mobile": "4563536436",
+    "propertyId": null,
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Driving License",
+    "idDocNumber": "DL-0420110012345",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "createdAt": "2026-09-04T04:49:58.712Z",
+    "updatedAt": "2026-09-04T11:39:50.213Z"
   }
 ]

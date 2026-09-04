@@ -11,6 +11,7 @@ import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -140,8 +141,98 @@ export function DashShell({ role, children }) {
     const handleForceRefresh = () => fetchUnreadCount();
     window.addEventListener('refresh-unread-notifications-count', handleForceRefresh);
 
-    const unsubscribe = subscribeRealtimeSync(() => {
+    let lastEventSignature = '';
+    let lastEventTimestamp = 0;
+
+    const unsubscribe = subscribeRealtimeSync((data = {}, eventName = '') => {
       fetchUnreadCount();
+
+      // Deduplicate rapid socket duplicate events (1.5s window)
+      const signature = `${eventName}_${JSON.stringify(data || {})}`;
+      const now = Date.now();
+      if (signature === lastEventSignature && (now - lastEventTimestamp) < 1500) {
+        return;
+      }
+      lastEventSignature = signature;
+      lastEventTimestamp = now;
+
+      // Realtime notification raise based on event
+      if (eventName === 'notification_created' && data?.notification) {
+        const notif = data.notification;
+        const currentRole = role;
+        const currentUserId = currentUser?._id || currentUser?.id;
+        const isTargeted = !notif.role || notif.role === currentRole || 
+                           (notif.userId && String(notif.userId) === String(currentUserId)) ||
+                           currentRole === 'super-admin' || currentRole === 'admin';
+
+        if (isTargeted) {
+          toast(notif.title || 'System Alert', {
+            description: notif.message,
+            icon: '🔔',
+            duration: 5000,
+            action: {
+              label: 'View Alerts',
+              onClick: () => navigate({ to: `/${role}/notifications` })
+            }
+          });
+        }
+      } else if (eventName === 'booking_created') {
+        const bId = data?.bookingId || data?.id;
+        toast.success('New Booking Placed', {
+          description: bId ? `Booking #${bId} created for ${data?.guestName || data?.guest || 'Guest'}.` : 'A new reservation has been placed.',
+          icon: '📅',
+          duration: 5000
+        });
+      } else if (eventName === 'checkin_completed' || eventName === 'booking_checked_in') {
+        toast.info('Guest Checked In', {
+          description: `${data?.guestName || data?.guest || 'Guest'} checked into ${data?.roomNumber || data?.room || 'Room'}.`,
+          icon: '🏨',
+          duration: 5000
+        });
+      } else if (eventName === 'checkout_completed' || eventName === 'booking_checked_out') {
+        toast.info('Guest Checked Out', {
+          description: `${data?.guestName || data?.guest || 'Guest'} checked out of ${data?.roomNumber || data?.room || 'Room'}.`,
+          icon: '💳',
+          duration: 5000
+        });
+      } else if (eventName === 'payment_logged' || eventName === 'payment_added') {
+        const pay = data?.payment || data;
+        toast.success('Payment Recorded', {
+          description: `Payment of ${pay.amount ? '₹' + pay.amount : 'amount'} received via ${pay.paymentMethod || pay.method || 'Direct'}.`,
+          icon: '💰',
+          duration: 5000
+        });
+      } else if (eventName === 'feedback_received' || eventName === 'feedback_created') {
+        toast.info('New Stay Feedback', {
+          description: `${data?.rating || 5}★ Review submitted: "${(data?.title || data?.comment || data?.comments || '').slice(0, 45)}..."`,
+          icon: '⭐',
+          duration: 5000
+        });
+      } else if (eventName === 'feedback_updated') {
+        toast.info('Feedback Updated', {
+          description: `Feedback record #${data?.bookingId || data?.id || ''} has been updated.`,
+          icon: '💬',
+          duration: 4500
+        });
+      } else if (eventName === 'room_status_changed') {
+        toast.info('Room Status Changed', {
+          description: `Room ${data?.room || data?.roomNumber || ''} is now ${data?.status || 'Active'}.`,
+          icon: '🛏️',
+          duration: 4500
+        });
+      } else if (eventName === 'coupon_created') {
+        toast.success('New Coupon Created', {
+          description: `Coupon code '${data?.code || ''}' is now active.`,
+          icon: '🎟️',
+          duration: 4500
+        });
+      } else if (eventName === 'coupon_updated') {
+        toast.info('Coupon Updated', {
+          description: `Coupon code '${data?.code || ''}' details updated.`,
+          icon: '🎟️',
+          duration: 4500
+        });
+      }
     });
 
     return () => {

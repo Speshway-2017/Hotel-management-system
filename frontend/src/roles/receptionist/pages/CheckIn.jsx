@@ -151,6 +151,14 @@ function ArrivalsPage() {
 
   // Action methods
   const handleCheckIn = async (id, roomNum) => {
+    const target = arrivals.find(a => a.id === id || a._id === id || a.bookingId === id);
+    const isWebsiteBooking = !target || (target.source !== "Walk-in" && !String(target.source || "").toLowerCase().includes("walk-in"));
+
+    if (isWebsiteBooking) {
+      navigate(`/reception/check-in/${id}`);
+      return;
+    }
+
     try {
       await receptionistService.updateReservationStatus(id, "Checked-in", roomNum);
       setArrivals(prev => prev.map(a => 
@@ -158,7 +166,7 @@ function ArrivalsPage() {
           ? { ...a, status: "Checked-In", room: roomNum || a.room }
           : a
       ));
-      toast.success("Guest checked in successfully!");
+      toast.success("Walk-in guest checked in successfully!");
       emitRealtimeEvent('checkin_completed', { id, status: 'Checked-in', roomNumber: roomNum });
       loadArrivals(true);
     } catch (err) {

@@ -8,7 +8,8 @@ import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 
 function EditPlan() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -27,22 +28,23 @@ function EditPlan() {
 
   useEffect(() => {
     const loadPlan = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
         const res = await superAdminService.getSubscriptionPlans();
-        if (res.success) {
-          const plan = res.data.find(p => p._id === id || p.id === id);
+        if (res.success && Array.isArray(res.data)) {
+          const plan = res.data.find(p => String(p._id) === String(id) || String(p.id) === String(id) || String(p.name).toLowerCase() === decodeURIComponent(id).toLowerCase());
           if (plan) {
             setFormData({
-              name: plan.name,
+              name: plan.name || "",
               description: plan.description || "",
-              monthlyPrice: plan.monthlyPrice,
-              yearlyPrice: plan.yearlyPrice,
-              propertyLimit: plan.propertyLimit,
-              roomLimit: plan.roomLimit,
-              status: plan.status,
-              includedFeaturesText: (plan.includedFeatures || []).join(", ")
+              monthlyPrice: plan.monthlyPrice !== undefined ? plan.monthlyPrice : "",
+              yearlyPrice: plan.yearlyPrice !== undefined ? plan.yearlyPrice : "",
+              propertyLimit: plan.propertyLimit !== undefined ? plan.propertyLimit : "",
+              roomLimit: plan.roomLimit !== undefined ? plan.roomLimit : "",
+              status: plan.status || "Active",
+              includedFeaturesText: Array.isArray(plan.includedFeatures) ? plan.includedFeatures.join(", ") : (plan.includedFeatures || "")
             });
           } else {
             setError("Subscription Plan not found.");
@@ -54,7 +56,7 @@ function EditPlan() {
         setLoading(false);
       }
     };
-    if (id) loadPlan();
+    loadPlan();
   }, [id]);
 
   const handleSubmit = async (e) => {

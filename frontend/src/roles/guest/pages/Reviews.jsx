@@ -35,17 +35,21 @@ function StarRating({ rating = 5, size = "size-3.5" }) {
 }
 
 function GuestReviewsPage() {
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const paramBookingId = urlParams.get('bookingId') || urlParams.get('id') || "";
+  const paramNew = urlParams.get('new') === 'true' || urlParams.get('add') === 'true' || !!paramBookingId;
+
   const [reviews, setReviews] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(paramNew);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
 
   // Feedback Form State
-  const [selectedBooking, setSelectedBooking] = useState("");
+  const [selectedBooking, setSelectedBooking] = useState(paramBookingId);
   const [overallRating, setOverallRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [categories, setCategories] = useState({
@@ -88,8 +92,12 @@ function GuestReviewsPage() {
 
       if (bookData && bookData.success && Array.isArray(bookData.data)) {
         setBookings(bookData.data);
-        if (bookData.data.length > 0 && !selectedBooking) {
-          setSelectedBooking(bookData.data[0].bookingId || bookData.data[0].id);
+        const searchParams = new URLSearchParams(window.location.search);
+        const qBookingId = searchParams.get('bookingId') || searchParams.get('id');
+        if (qBookingId) {
+          setSelectedBooking(qBookingId);
+        } else if (bookData.data.length > 0 && !selectedBooking) {
+          setSelectedBooking(bookData.data[0].bookingId || bookData.data[0].id || bookData.data[0]._id);
         }
       }
     } catch (err) {
@@ -102,6 +110,12 @@ function GuestReviewsPage() {
 
   useEffect(() => {
     fetchData();
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const qBookingId = searchParams.get('bookingId') || searchParams.get('id');
+    const qNew = searchParams.get('new') === 'true' || searchParams.get('add') === 'true' || !!qBookingId;
+    if (qNew) setShowForm(true);
+    if (qBookingId) setSelectedBooking(qBookingId);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchData(true);
@@ -191,7 +205,7 @@ function GuestReviewsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => setShowForm(true)}
+            onClick={() => window.location.href = '/guest/feedback/add'}
             variant="hero"
             size="touch"
             className="px-5 text-xs font-bold gap-2 shadow-soft cursor-pointer"
@@ -301,9 +315,14 @@ function GuestReviewsPage() {
                     onChange={(e) => setSelectedBooking(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer"
                   >
+                    {selectedBooking && !bookings.some(b => (b.bookingId === selectedBooking || b.id === selectedBooking || b._id === selectedBooking)) && (
+                      <option value={selectedBooking}>
+                        Stay Reservation (Ref: #{selectedBooking})
+                      </option>
+                    )}
                     {bookings.map((b) => (
-                      <option key={b.bookingId || b.id} value={b.bookingId || b.id}>
-                        {b.hotel || "Hour Stay Resort"} · {b.room || "Room"} (Ref: #{b.bookingId || b.id})
+                      <option key={b.bookingId || b.id || b._id} value={b.bookingId || b.id || b._id}>
+                        {b.hotel || "Hour Stay Resort"} · {b.room || "Room"} (Ref: #{b.bookingId || b.id || b._id})
                       </option>
                     ))}
                   </select>
@@ -446,7 +465,7 @@ function GuestReviewsPage() {
               </p>
             </div>
             <Button
-              onClick={() => setShowForm(true)}
+              onClick={() => window.location.href = '/guest/feedback/add'}
               variant="hero"
               size="touch"
               className="px-6 py-2.5 text-xs font-bold cursor-pointer shadow-soft"
