@@ -17,24 +17,32 @@ export const parseDateSafe = (val) => {
     return d;
   }
 
-  // Handle ISO string or YYYY-MM-DD
+  // Match DD-MM-YYYY or DD/MM/YYYY (e.g. 04-09-2026)
+  const dmyMatch = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    const parsed = new Date(year, month, day);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  // Match YYYY-MM-DD (e.g. 2026-09-04)
+  const ymdMatch = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    const parsed = new Date(year, month, day);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  // Handle ISO string or standard Date parsing
   const d = new Date(s);
   if (!isNaN(d.getTime())) {
     return d;
   }
 
-  // Try custom regex matching "DD Mon YYYY" / "DD-MM-YYYY" / "YYYY-MM-DD"
-  const parts = s.split(/[-/ ]+/);
-  if (parts.length === 3) {
-    if (parts[0].length === 4) {
-      const parsed = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      if (!isNaN(parsed.getTime())) return parsed;
-    }
-    if (parts[2].length === 4) {
-      const parsed = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-      if (!isNaN(parsed.getTime())) return parsed;
-    }
-  }
   return null;
 };
 
@@ -84,4 +92,66 @@ export const formatDisplayDate = (dateVal) => {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const day = String(d.getDate()).padStart(2, '0');
   return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+/**
+ * Calculates stay nights strictly as the calendar day difference (checkOut - checkIn).
+ * Avoids timezone drift and supports DD-MM-YYYY, YYYY-MM-DD, ISO, same-day, and fallback dates.
+ * E.g., check-in 04-09-2026 and check-out 05-09-2026 => 1 night.
+ */
+export const calculateStayNights = (checkIn, checkOut) => {
+  if (!checkIn || !checkOut) return 1;
+
+  const parseToUtcDate = (dateVal) => {
+    if (!dateVal) return null;
+    if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+      return Date.UTC(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
+    }
+    const str = String(dateVal).trim();
+    if (!str) return null;
+    if (str.toLowerCase() === 'today') {
+      const now = new Date();
+      return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    if (str.toLowerCase() === 'tomorrow') {
+      const now = new Date();
+      now.setDate(now.getDate() + 1);
+      return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+
+    // Match DD-MM-YYYY or DD/MM/YYYY (e.g. 04-09-2026)
+    const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+      return Date.UTC(year, month, day);
+    }
+
+    // Match YYYY-MM-DD (e.g. 2026-09-04)
+    const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10) - 1;
+      const day = parseInt(ymdMatch[3], 10);
+      return Date.UTC(year, month, day);
+    }
+
+    // Fallback: standard Date parsing
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    return null;
+  };
+
+  const startUtc = parseToUtcDate(checkIn);
+  const endUtc = parseToUtcDate(checkOut);
+
+  if (startUtc === null || endUtc === null) return 1;
+
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const diffDays = Math.round((endUtc - startUtc) / MS_PER_DAY);
+
+  return Math.max(1, diffDays);
 };

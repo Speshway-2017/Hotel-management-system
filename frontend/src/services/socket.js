@@ -71,6 +71,12 @@ export const ALL_REALTIME_EVENTS = [
   'payment_added',
   'payment_updated',
   'guest_updated',
+  'feedback_received',
+  'feedback_created',
+  'feedback_updated',
+  'feedback_deleted',
+  'notification_created',
+  'unread_notifications_count_updated',
   'dashboard_sync'
 ];
 

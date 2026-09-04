@@ -69,19 +69,22 @@ function ManagerViewFeedback() {
           const list = feedbackRes.data;
           const matched = list.find(f => f._id === decodedId || f.id === decodedId || f._id === id || f.id === id);
           if (matched) {
-            const overall = Math.round((matched.ratings.cleanliness + matched.ratings.service + matched.ratings.room) / 3);
+            const cleanliness = matched.ratings?.cleanliness || 5;
+            const service = matched.ratings?.service || 5;
+            const room = matched.ratings?.room || 5;
+            const overall = matched.rating || Math.round((cleanliness + service + room) / 3);
             const compiled = {
               id: matched._id || matched.id,
               bookingId: matched.bookingId,
-              guest: matched.guestName,
+              guest: matched.guestName || matched.guest || "Guest",
               room: matched.room || "101",
-              stayDates: "stay dates",
+              stayDates: matched.stayDates || "Recent Stay",
               overall,
-              cleanliness: matched.ratings.cleanliness,
-              service: matched.ratings.service,
-              roomRating: matched.ratings.room,
-              comments: matched.comment,
-              submittedDate: new Date(matched.createdAt).toISOString().split('T')[0],
+              cleanliness,
+              service,
+              roomRating: room,
+              comments: matched.comment || matched.comments || "",
+              submittedDate: matched.createdAt ? new Date(matched.createdAt).toISOString().split('T')[0] : "Recent",
               status: matched.response ? "Responded" : "Pending Response",
               response: matched.response || null
             };
@@ -113,19 +116,22 @@ function ManagerViewFeedback() {
         if (feedbackRes.success && feedbackRes.data) {
           const matched = feedbackRes.data.find(f => f._id === feedback.id || f.id === feedback.id);
           if (matched) {
-            const overall = Math.round((matched.ratings.cleanliness + matched.ratings.service + matched.ratings.room) / 3);
+            const cleanliness = matched.ratings?.cleanliness || 5;
+            const service = matched.ratings?.service || 5;
+            const room = matched.ratings?.room || 5;
+            const overall = matched.rating || Math.round((cleanliness + service + room) / 3);
             setFeedback({
               id: matched._id || matched.id,
               bookingId: matched.bookingId,
-              guest: matched.guestName,
+              guest: matched.guestName || matched.guest || "Guest",
               room: matched.room || "101",
-              stayDates: "stay dates",
+              stayDates: matched.stayDates || "Recent Stay",
               overall,
-              cleanliness: matched.ratings.cleanliness,
-              service: matched.ratings.service,
-              roomRating: matched.ratings.room,
-              comments: matched.comment,
-              submittedDate: new Date(matched.createdAt).toISOString().split('T')[0],
+              cleanliness,
+              service,
+              roomRating: room,
+              comments: matched.comment || matched.comments || "",
+              submittedDate: matched.createdAt ? new Date(matched.createdAt).toISOString().split('T')[0] : "Recent",
               status: matched.response ? "Responded" : "Pending Response",
               response: matched.response || null
             });

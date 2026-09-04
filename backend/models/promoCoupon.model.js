@@ -1,5 +1,5 @@
 import Coupon from './coupon.model.js';
 
-// Unified Single Store: PromoCoupon is an alias to the canonical Coupon model & 'coupons' collection
+// Canonical unified Coupon model - single source of truth
 export const PromoCoupon = Coupon;
 export default Coupon;

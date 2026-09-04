@@ -94,6 +94,13 @@ export const receptionistService = {
     } catch (err) {
       return await apiClient.post(`/manager/feedback/${id}/respond`, { response, status });
     }
+  },
+  updateFeedbackStatus: async (id, status) => {
+    try {
+      return await apiClient.put(`/receptionist/feedback/${id}/status`, { status });
+    } catch (err) {
+      return await apiClient.put(`/manager/feedback/${id}/status`, { status });
+    }
   }
 };
 

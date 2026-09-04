@@ -423,11 +423,11 @@ function AdminCrmPage() {
                   </thead>
                   <tbody className="divide-y divide-muted/30">
                     {filteredFeedbacks.map((f, i) => {
-                      const overall = Math.round((f.ratings.cleanliness + f.ratings.service + f.ratings.room) / 3);
+                      const overall = Number(f.rating) || (f.ratings ? Math.round(((f.ratings.cleanliness || 5) + (f.ratings.service || 5) + (f.ratings.room || 5)) / 3) : 5);
                       return (
                         <tr key={f._id || i} className="hover:bg-muted/5">
-                          <td className="py-3.5 px-4 font-bold text-navy">{f.guestName}</td>
-                          <td className="py-3.5 px-4 text-muted-foreground font-semibold">{f.date}</td>
+                          <td className="py-3.5 px-4 font-bold text-navy">{f.guestName || f.guest || "Guest"}</td>
+                          <td className="py-3.5 px-4 text-muted-foreground font-semibold">{f.date || "Recent"}</td>
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1">
                               {[...Array(5)].map((_, idx) => (

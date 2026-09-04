@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { inr } from "@/data/hs-data";
+import { calculateStayNights } from "@/utils/dateUtils";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
@@ -143,11 +144,13 @@ function Booking() {
   }, []);
 
   const checkInDate = localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0];
-  const checkOutDate = localStorage.getItem('booking_check_out') || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const checkOutDate = localStorage.getItem('booking_check_out') || new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const nights = calculateStayNights(checkInDate, checkOutDate);
 
   // Calculate pricing & tariff
   const roomRate = Number(selectedRoom?.currentRate || selectedRoom?.baseRate || selectedRoom?.dailyRate || 3000);
-  const roomBaseTotal = roomRate * 2; // Default 2 nights
+  const roomBaseTotal = roomRate * nights;
   const roomGst = Math.round(roomBaseTotal * 0.18);
   const grossTotal = Number(roomBaseTotal + roomGst);
   const payableTotal = Math.max(0, grossTotal - discountAmount);
@@ -275,11 +278,14 @@ function Booking() {
         checkIn: checkInDate,
         checkOutDate: checkOutDate,
         checkOut: checkOutDate,
+        nights: nights,
         roomType: roomCategory,
         room: selectedRoom?.roomNumber ? `${roomCategory} (Room ${selectedRoom.roomNumber})` : roomCategory,
         ratePlan: ratePlanDisplay,
         city: property?.settings?.city || property?.city || city || 'Hyderabad',
         hotelCity: property?.settings?.city || property?.city || city || 'Hyderabad',
+        roomBaseTotal: roomBaseTotal,
+        gstAmount: roomGst,
         originalAmount: grossTotal,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         coupon: appliedCoupon ? appliedCoupon.code : null,
@@ -571,7 +577,7 @@ function Booking() {
                 {/* Tariff Breakdown */}
                 <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
                   <div className="flex justify-between">
-                    <dt className="text-navy/60">Room Tariff (2 nights)</dt>
+                    <dt className="text-navy/60">Room Tariff ({nights} {nights === 1 ? 'night' : 'nights'})</dt>
                     <dd className="tabular-nums font-bold text-navy">{inr(roomBaseTotal)}</dd>
                   </div>
                   <div className="flex justify-between">

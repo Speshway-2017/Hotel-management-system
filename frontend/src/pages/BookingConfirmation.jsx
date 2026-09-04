@@ -4,6 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { inr } from "@/data/hs-data";
+import { calculateStayNights } from "@/utils/dateUtils";
 import { publicService } from "@/services/public";
 
 export const Route = createFileRoute("/booking/confirmation")({
@@ -54,7 +55,13 @@ function Confirmation() {
             <Row k="Booking reference" v={booking?.id || booking?._id || "HS24-10241"} />
             <Row k="Property" v={property ? `${property.name}, ${property.city}` : "Speshway Luxury Hotel, Hyderabad"} />
             <Row k="Room" v={booking?.room || "Premier Room"} />
-            <Row k="Stay" v={booking ? `${booking.checkIn} → ${booking.checkOut} · ${booking.nights || 3} nights` : "12 Aug → 15 Aug 2026 · 3 nights"} />
+            <Row 
+              k="Stay" 
+              v={booking ? (() => {
+                const stayNights = Number(booking.nights) || calculateStayNights(booking.checkIn, booking.checkOut);
+                return `${booking.checkIn} → ${booking.checkOut} · ${stayNights} ${stayNights === 1 ? 'night' : 'nights'}`;
+              })() : "04-09-2026 → 05-09-2026 · 1 night"} 
+            />
             <Row k="Guests" v={booking?.pax || "2 adults"} />
             <Row k="Total paid" v={inr(booking?.amount || 43896)} />
           </dl>

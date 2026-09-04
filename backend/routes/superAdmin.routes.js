@@ -1259,18 +1259,14 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
 });
 
 // ==========================================
-// 9. PROMO COUPONS
+// 9. PROMO COUPONS (UNIFIED COUPON STORE)
 // ==========================================
 router.get('/coupons', authorize('super-admin', 'admin'), async (req, res) => {
   try {
     const list = await Coupon.find({});
-    if (list && list.length > 0) {
-      return sendSuccess(res, 200, list, 'Coupons retrieved');
-    }
-    const promoList = await PromoCoupon.find({});
-    return sendSuccess(res, 200, promoList, 'Coupons retrieved');
+    return sendSuccess(res, 200, list || [], 'Coupons retrieved');
   } catch (error) {
-    return sendError(res, 500, 'Failed to retrieve promo coupons');
+    return sendError(res, 500, 'Failed to retrieve coupons');
   }
 });
 
@@ -1293,19 +1289,17 @@ router.post('/coupons', authorize('super-admin', 'admin'), async (req, res) => {
       discountValue: Number(req.body.discountValue) || 0,
       maxDiscount: Number(req.body.maxDiscount) || 0,
       minBookingAmount: Number(req.body.minBookingAmount || req.body.minimumSubscriptionAmount) || 0,
+      minimumSubscriptionAmount: Number(req.body.minimumSubscriptionAmount || req.body.minBookingAmount) || 0,
+      applicableSubscriptionPlans: req.body.applicableSubscriptionPlans || [],
       validFrom: req.body.validFrom || new Date().toISOString().split('T')[0],
       validUntil: req.body.validUntil || new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0],
       usageLimit: Number(req.body.usageLimit) || 0,
       status: req.body.status || 'Active',
       propertyId: req.body.propertyId || 'all',
-      applicableSource: 'website'
+      applicableSource: req.body.applicableSource || 'website'
     };
 
     const newCoupon = await Coupon.create(payload);
-    try {
-      const newPromo = new PromoCoupon(req.body);
-      await newPromo.save();
-    } catch (e) {}
 
     const io = req.app.get('socketio');
     if (io) {
@@ -1313,7 +1307,7 @@ router.post('/coupons', authorize('super-admin', 'admin'), async (req, res) => {
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_created' });
     }
 
-    await logAction(req.user, 'Created Promo Coupon', newCoupon.code, req);
+    await logAction(req.user, 'Created Coupon', newCoupon.code, req);
     return sendSuccess(res, 201, newCoupon, 'Coupon created successfully');
   } catch (error) {
     if (error.code === 11000) {
@@ -1329,7 +1323,7 @@ router.put('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) =
     if (req.body.code) {
       const codeVal = req.body.code.toUpperCase().trim();
       const existing = await Coupon.findOne({ code: codeVal });
-      if (existing && existing._id !== couponId && existing.id !== couponId) {
+      if (existing && String(existing._id || existing.id) !== String(couponId)) {
         return sendError(res, 400, `Coupon code "${codeVal}" already exists on another coupon.`);
       }
     }
@@ -1337,13 +1331,11 @@ router.put('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) =
     const updatePayload = {
       ...req.body,
       discountType: req.body.discountType === 'flat' ? 'fixed' : req.body.discountType,
-      minBookingAmount: req.body.minBookingAmount !== undefined ? req.body.minBookingAmount : req.body.minimumSubscriptionAmount
+      minBookingAmount: req.body.minBookingAmount !== undefined ? req.body.minBookingAmount : req.body.minimumSubscriptionAmount,
+      minimumSubscriptionAmount: req.body.minimumSubscriptionAmount !== undefined ? req.body.minimumSubscriptionAmount : req.body.minBookingAmount
     };
 
     const updated = await Coupon.findByIdAndUpdate(couponId, updatePayload, { new: true });
-    try {
-      await PromoCoupon.findByIdAndUpdate(couponId, req.body, { new: true });
-    } catch (e) {}
 
     const io = req.app.get('socketio');
     if (io) {
@@ -1352,7 +1344,7 @@ router.put('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) =
     }
 
     if (!updated) return sendError(res, 404, 'Coupon not found');
-    await logAction(req.user, 'Updated Promo Coupon', updated.code, req);
+    await logAction(req.user, 'Updated Coupon', updated.code, req);
     return sendSuccess(res, 200, updated, 'Coupon updated successfully');
   } catch (error) {
     if (error.code === 11000) {
@@ -1365,9 +1357,6 @@ router.put('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) =
 router.delete('/coupons/:id', authorize('super-admin', 'admin'), async (req, res) => {
   try {
     const deleted = await Coupon.findByIdAndDelete(req.params.id);
-    try {
-      await PromoCoupon.findByIdAndDelete(req.params.id);
-    } catch (e) {}
 
     const io = req.app.get('socketio');
     if (io) {
@@ -1376,7 +1365,7 @@ router.delete('/coupons/:id', authorize('super-admin', 'admin'), async (req, res
     }
 
     if (!deleted) return sendError(res, 404, 'Coupon not found');
-    await logAction(req.user, 'Deleted Promo Coupon', deleted.code, req);
+    await logAction(req.user, 'Deleted Coupon', deleted.code, req);
     return sendSuccess(res, 200, deleted, 'Coupon deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete coupon');

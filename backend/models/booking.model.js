@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { calculateStayNights } from '../utils/dateUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -517,7 +518,8 @@ const Booking = {
     cleanData.totalAmount = cleanData.amount;
     cleanData.guest = cleanData.guest || cleanData.guestName || 'Guest';
     cleanData.checkIn = cleanData.checkIn || cleanData.checkInDate || '2026-09-01';
-    cleanData.checkOut = cleanData.checkOut || cleanData.checkOutDate || '2026-09-03';
+    cleanData.checkOut = cleanData.checkOut || cleanData.checkOutDate || '2026-09-02';
+    cleanData.nights = Number(cleanData.nights) || calculateStayNights(cleanData.checkIn, cleanData.checkOut);
     cleanData.propertyId = cleanData.propertyId || 'HS-9HQ8P';
     cleanData.city = cleanData.city || cleanData.hotelCity || 'Hyderabad';
 

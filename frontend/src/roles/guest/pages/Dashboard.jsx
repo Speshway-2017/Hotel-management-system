@@ -8,6 +8,8 @@ import {
 import { inr } from "@/data/hs-data";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { apiClient } from "@/services/apiClient";
+import { authService } from "@/services/auth";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/guest/")({
   head: () => ({
@@ -51,6 +53,15 @@ function GuestDashboardPage() {
   const [feedbackCount, setFeedbackCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const handleBookNow = () => {
+    const user = authService.getCurrentUser();
+    const storedPropId = localStorage.getItem('selected_property_id');
+    const userPropId = user?.propertyId;
+    const bookingPropId = data?.recentBookings?.find(b => b.propertyId)?.propertyId;
+    const targetPropertyId = storedPropId || userPropId || bookingPropId || 'HS-JAI';
+    window.location.href = `/hotels/${targetPropertyId}`;
+  };
 
   const fetchDashboardData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -178,8 +189,8 @@ function GuestDashboardPage() {
         />
       </div>
 
-      {/* Featured Upcoming Reservation Highlight (If Available) */}
-      {upcoming && (
+      {/* Featured Upcoming Reservation or No Active Booking Callout */}
+      {upcoming ? (
         <div className="bg-[#FFF7E6] border border-[#F5C06A]/40 rounded-2xl p-6 sm:p-8 text-[#0D1B2A] shadow-soft relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
             <Sparkles className="size-48 text-[#5B21B6]" />
@@ -214,6 +225,28 @@ function GuestDashboardPage() {
             </div>
           </div>
         </div>
+      ) : (
+        <div className="bg-gradient-to-r from-navy/5 via-purple/5 to-navy/5 border border-navy/10 rounded-2xl p-6 sm:p-7 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-left">
+            <div className="size-12 rounded-xl bg-purple/10 text-purple flex items-center justify-center shrink-0">
+              <Calendar className="size-6" />
+            </div>
+            <div>
+              <h3 className="font-display text-base font-bold text-navy">No Active Booking</h3>
+              <p className="text-xs text-navy/60 mt-0.5">
+                You don't have an active or upcoming stay reservation right now.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleBookNow}
+            variant="hero"
+            size="touch"
+            className="px-6 py-2.5 text-xs font-bold gap-2 cursor-pointer shadow-soft shrink-0"
+          >
+            <Calendar className="size-4" /> Book Now
+          </Button>
+        </div>
       )}
 
       {/* Recent Bookings Summary Section */}
@@ -240,12 +273,14 @@ function GuestDashboardPage() {
                 You don't have any reservations recorded yet. Explore our luxury hotels and book your next stay!
               </p>
             </div>
-            <a
-              href="/search"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple text-cream rounded-xl text-xs font-bold hover:bg-purple/90 transition-colors shadow-soft"
+            <Button
+              onClick={handleBookNow}
+              variant="hero"
+              size="touch"
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold cursor-pointer shadow-soft"
             >
-              Explore Hotels & Rooms
-            </a>
+              <Calendar className="size-4" /> Book Now
+            </Button>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-muted bg-white">

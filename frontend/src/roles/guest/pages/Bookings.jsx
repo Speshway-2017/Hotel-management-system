@@ -3,11 +3,13 @@ import { useState, useEffect } from "react";
 import { 
   Calendar, Bed, Hotel, MapPin, ArrowRight, ShieldCheck, 
   RefreshCw, AlertCircle, Clock, CheckCircle2, ChevronRight, 
-  ArrowLeft, CreditCard, User, FileText, Download, Phone, Eye
+  ArrowLeft, CreditCard, User, FileText, Download, Phone, Eye, Sparkles
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
+import { calculateStayNights } from "@/utils/dateUtils";
 import { Button } from "@/components/ui/button";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { authService } from "@/services/auth";
 
 export const Route = createFileRoute("/guest/bookings")({
   head: () => ({
@@ -62,6 +64,15 @@ function GuestBookingsPage() {
     }
   };
 
+  const handleBookNow = () => {
+    const user = authService.getCurrentUser();
+    const storedPropId = localStorage.getItem('selected_property_id');
+    const userPropId = user?.propertyId;
+    const bookingPropId = bookings.find(b => b.propertyId)?.propertyId;
+    const targetPropertyId = storedPropId || userPropId || bookingPropId || 'HS-JAI';
+    window.location.href = `/hotels/${targetPropertyId}`;
+  };
+
   const handleSelectBooking = (b) => {
     if (b) {
       const newUrl = window.location.pathname + '?id=' + (b.bookingId || b.id);
@@ -75,7 +86,7 @@ function GuestBookingsPage() {
   useEffect(() => {
     fetchBookings(false);
 
-    const handleFocus = () => fetchBookings(true);
+    const handleFocus = () => fetchBookings(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       console.log('⚡ Socket event received. Refreshing bookings ledger...');
@@ -91,7 +102,7 @@ function GuestBookingsPage() {
     };
 
     window.addEventListener('popstate', handlePopState);
-    return () => {
+    return () => {
       window.removeEventListener('popstate', handlePopState);
       if (unsubscribe) unsubscribe();
     };
@@ -184,7 +195,12 @@ function GuestBookingsPage() {
               <div className="text-xs font-semibold text-navy space-y-1">
                 <p>Check-in: <strong className="text-purple">{b.checkIn || b.dates?.split('→')[0]}</strong> (12:00 PM)</p>
                 <p>Check-out: <strong className="text-purple">{b.checkOut || b.dates?.split('→')[1]}</strong> (11:00 AM)</p>
-                <p className="text-navy/60 font-medium">Duration: 2 Nights</p>
+                <p className="text-navy/60 font-medium">
+                  {(() => {
+                    const stayN = Number(b.nights) || calculateStayNights(b.checkIn, b.checkOut);
+                    return `Duration: ${stayN} ${stayN === 1 ? 'Night' : 'Nights'}`;
+                  })()}
+                </p>
               </div>
             </div>
 
@@ -222,6 +238,14 @@ function GuestBookingsPage() {
             >
               <Download className="size-3.5" /> Download Digital Folio
             </button>
+            <Button
+              onClick={handleBookNow}
+              variant="hero"
+              size="sm"
+              className="px-4 py-2 text-xs font-bold gap-1.5 cursor-pointer shadow-soft"
+            >
+              <Calendar className="size-3.5" /> Book Another Stay
+            </Button>
           </div>
 
         </div>
@@ -236,9 +260,9 @@ function GuestBookingsPage() {
       {/* Main Panel matching Admin/Manager style */}
       <div className="bg-white rounded-2xl border border-navy/10 p-6 shadow-soft space-y-6">
         
-        {/* Top Header Controls with Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-start border-b border-navy/5 pb-4">
-          {/* Category Tabs (Admin/Manager style) */}
+        {/* Top Header Controls with Tabs and Book Now Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-navy/5 pb-4 gap-3">
+          {/* Category Tabs */}
           <div className="flex rounded-xl border border-navy/10 bg-cream/30 p-1 gap-1 flex-wrap">
             {[
               { id: "all", label: "All Stays" },
@@ -259,6 +283,15 @@ function GuestBookingsPage() {
               </button>
             ))}
           </div>
+
+          <Button
+            onClick={handleBookNow}
+            variant="hero"
+            size="sm"
+            className="h-9 px-4 text-xs font-bold gap-1.5 cursor-pointer shadow-soft shrink-0"
+          >
+            <Calendar className="size-3.5" /> Book Now
+          </Button>
         </div>
 
         {/* Bookings Table / Cards Grid */}
@@ -266,17 +299,21 @@ function GuestBookingsPage() {
           <div className="py-16 text-center space-y-4 border border-dashed border-navy/10 rounded-2xl bg-cream/10">
             <Hotel className="size-12 text-navy/20 mx-auto" />
             <div>
-              <h3 className="font-display text-base font-bold text-navy">No Bookings Found in "{activeTab}"</h3>
+              <h3 className="font-display text-base font-bold text-navy">
+                {activeTab === 'all' ? 'No Active Bookings' : `No Bookings in "${activeTab}"`}
+              </h3>
               <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">
-                You don't have any reservations under this status. Explore our properties and book a room!
+                You don't have any active reservations. Book your room stay now at direct hotel rates!
               </p>
             </div>
-            <a
-              href="/search"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple text-cream rounded-xl text-xs font-bold hover:bg-purple/90 transition-colors shadow-soft"
+            <Button
+              onClick={handleBookNow}
+              variant="hero"
+              size="touch"
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-bold cursor-pointer shadow-soft"
             >
-              Explore Hotels & Rooms
-            </a>
+              <Calendar className="size-4" /> Book Now
+            </Button>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-muted bg-white">

@@ -8,6 +8,8 @@ import Review from '../models/review.model.js';
 import Notification from '../models/notification.model.js';
 import { Feedback } from '../models/managerData.model.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
+import { notifyFeedbackEvent } from '../utils/notification.helper.js';
+import { calculateStayNights } from '../utils/dateUtils.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 const router = express.Router();
@@ -59,6 +61,7 @@ router.get('/bookings', async (req, res) => {
         room: b.room || b.roomType || 'Standard Room',
         checkIn: checkIn,
         checkOut: checkOut,
+        nights: Number(b.nights) || calculateStayNights(checkIn, checkOut),
         dates: `${checkIn} → ${checkOut}`,
         amount: Number(b.amount || b.totalAmount || 0),
         status: b.status || 'Confirmed',
@@ -104,6 +107,7 @@ router.get('/dashboard', async (req, res) => {
         room: b.room || b.roomType || 'Standard Room',
         checkIn: checkIn,
         checkOut: checkOut,
+        nights: Number(b.nights) || calculateStayNights(checkIn, checkOut),
         dates: `${checkIn} → ${checkOut}`,
         amount: Number(b.amount || b.totalAmount || 0),
         status: b.status || 'Confirmed',
@@ -280,6 +284,7 @@ router.post('/feedback', async (req, res) => {
       guestName: guestName || req.user?.name || 'Guest',
       guestEmail: guestEmail || req.user?.email || '',
       guestPhone: req.user?.mobile || '',
+      userId: req.user?._id || req.user?.id || null,
       room,
       roomType,
       rating: feedbackRating,
@@ -298,18 +303,13 @@ router.post('/feedback', async (req, res) => {
       propertyId
     });
 
-    // Emit Realtime Sync via Socket.IO
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, propertyId, 'feedback_received', {
-        id: newFeedback._id,
-        guestName: newFeedback.guestName,
-        rating: ratingNum,
-        comment: feedbackText,
-        room
-      });
-      emitRealtimeSync(io, propertyId, 'dashboard_sync', { action: 'new_feedback' });
-    }
+    // Centralized Notification Dispatcher & Socket.IO emitter
+    await notifyFeedbackEvent({
+      req,
+      action: 'created',
+      feedback: newFeedback,
+      actor: guestName || req.user?.name || 'Guest'
+    });
 
     return sendSuccess(res, 201, { feedback: newFeedback, review: newFeedback }, 'Thank you! Your feedback has been submitted successfully.');
   } catch (error) {
