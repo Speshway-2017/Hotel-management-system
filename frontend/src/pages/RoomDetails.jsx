@@ -4,6 +4,7 @@ import { Check, Star, MapPin, Bed, Users, Sparkles, Clock, FileText, ChevronRigh
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { inr } from "@/data/hs-data";
+import { calculateStayNights } from "@/utils/dateUtils";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
 
@@ -40,7 +41,7 @@ export function RoomDetailsPage() {
 
   // Reservation Date Selectors
   const [checkInDate, setCheckInDate] = useState(() => localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0]);
-  const [checkOutDate, setCheckOutDate] = useState(() => localStorage.getItem('booking_check_out') || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [checkOutDate, setCheckOutDate] = useState(() => localStorage.getItem('booking_check_out') || new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
   useEffect(() => {
     let isMounted = true;
@@ -139,7 +140,7 @@ export function RoomDetailsPage() {
 
   // Calculate pricing & taxes
   const nightlyTariff = Number(selectedRoom?.currentRate || selectedRoom?.baseRate || selectedRoom?.dailyRate || 3000);
-  const nightsCount = 2; // Default stay calculation (Check-in Sept 1 -> Sept 3)
+  const nightsCount = calculateStayNights(checkInDate, checkOutDate);
   const baseTariffTotal = nightlyTariff * nightsCount;
   const gstTax = Math.round(baseTariffTotal * 0.18);
   const totalPayable = baseTariffTotal + gstTax;
@@ -434,7 +435,7 @@ export function RoomDetailsPage() {
                 {/* Price Breakdown */}
                 <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
                   <div className="flex justify-between">
-                    <dt className="text-navy/60">Room Tariff (2 nights)</dt>
+                    <dt className="text-navy/60">Room Tariff ({nightsCount} {nightsCount === 1 ? 'night' : 'nights'})</dt>
                     <dd className="tabular-nums font-bold text-navy">{inr(baseTariffTotal)}</dd>
                   </div>
                   <div className="flex justify-between">

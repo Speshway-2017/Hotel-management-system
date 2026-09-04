@@ -6,14 +6,21 @@ import { Feedback } from '../models/managerData.model.js';
  */
 export async function getUnifiedFeedbacksAndReviews(query = {}) {
   try {
-    const filter = {};
-    if (query.propertyId && query.propertyId !== 'all') {
-      filter.$or = [
-        { propertyId: query.propertyId },
-        { propertyId: { $exists: false } },
-        { propertyId: '' },
-        { propertyId: 'HS-JAI' }
-      ];
+    let filter = {};
+    if (query.$or) {
+      filter = query;
+    } else if (query.propertyId && query.propertyId !== 'all') {
+      filter = {
+        $or: [
+          { propertyId: query.propertyId },
+          { propertyId: { $exists: false } },
+          { propertyId: '' },
+          { propertyId: 'all' },
+          { propertyId: 'HS-JAI' }
+        ]
+      };
+    } else {
+      filter = query || {};
     }
 
     const feedbacks = await Feedback.find(filter).sort({ createdAt: -1 });

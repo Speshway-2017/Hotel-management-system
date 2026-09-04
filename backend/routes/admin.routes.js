@@ -9,6 +9,7 @@ import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.j
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
+import { notifyFeedbackEvent } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -392,7 +393,7 @@ router.get('/feedback', async (req, res) => {
       ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
       : {};
     const list = await getUnifiedFeedbacksAndReviews(query);
-    return sendSuccess(res, 200, list, 'Feedback & guest reviews retrieved successfully from MongoDB (Feedbacks & Reviews collections).');
+    return sendSuccess(res, 200, list, 'Feedback & guest reviews retrieved successfully from MongoDB.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -414,10 +415,12 @@ router.post('/feedback', async (req, res) => {
       sentiment = 'Positive',
       status = 'Published',
       comment = '',
+      comments = '',
       response = ''
     } = req.body;
 
-    if (!guestName || !comment) {
+    const feedbackText = comment || comments;
+    if (!guestName || !feedbackText) {
       return sendError(res, 400, 'Guest name and review comment are required.');
     }
 
@@ -433,18 +436,20 @@ router.post('/feedback', async (req, res) => {
       category,
       sentiment,
       status,
-      comment,
-      comments: comment,
+      comment: feedbackText,
+      comments: feedbackText,
       response,
+      respondedBy: response ? (req.user?.name || 'Administrator') : '',
       respondedAt: response ? new Date() : null,
       propertyId: propId
     });
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, propId, 'feedback_received', created);
-      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_received' });
-    }
+    await notifyFeedbackEvent({
+      req,
+      action: 'created',
+      feedback: created,
+      actor: req.user?.name || 'Admin'
+    });
 
     return sendSuccess(res, 201, created, 'Guest feedback recorded successfully.');
   } catch (err) {
@@ -459,15 +464,15 @@ router.post('/feedback/:id/respond', async (req, res) => {
       return sendError(res, 400, 'Response comment content is required.');
     }
 
-    const propId = req.user?.propertyId || 'HS-JAI';
     const updateData = {
       response,
+      respondedBy: req.user?.name || 'Administrator',
       respondedAt: new Date(),
       status: status || 'Resolved'
     };
 
-    let updated = await Feedback.findOneAndUpdate(
-      { _id: req.params.id },
+    const updated = await Feedback.findByIdAndUpdate(
+      req.params.id,
       updateData,
       { new: true }
     );
@@ -476,13 +481,64 @@ router.post('/feedback/:id/respond', async (req, res) => {
       return sendError(res, 404, 'Feedback record not found.');
     }
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, propId, 'feedback_updated', updated);
-      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_updated' });
-    }
+    await notifyFeedbackEvent({
+      req,
+      action: 'responded',
+      feedback: updated,
+      actor: req.user?.name || 'Administrator'
+    });
 
     return sendSuccess(res, 200, updated, 'Admin response published successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.put('/feedback/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return sendError(res, 400, 'Status is required.');
+    }
+
+    const updated = await Feedback.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+
+    if (!updated) {
+      return sendError(res, 404, 'Feedback record not found.');
+    }
+
+    await notifyFeedbackEvent({
+      req,
+      action: 'status_updated',
+      feedback: updated,
+      actor: req.user?.name || 'Admin'
+    });
+
+    return sendSuccess(res, 200, updated, `Feedback status updated to ${status}.`);
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.delete('/feedback/:id', async (req, res) => {
+  try {
+    const deleted = await Feedback.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return sendError(res, 404, 'Feedback record not found.');
+    }
+
+    await notifyFeedbackEvent({
+      req,
+      action: 'deleted',
+      feedback: deleted,
+      actor: req.user?.name || 'Admin'
+    });
+
+    return sendSuccess(res, 200, deleted, 'Feedback deleted successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }

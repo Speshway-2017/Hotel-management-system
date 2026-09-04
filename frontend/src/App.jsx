@@ -230,39 +230,9 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children;
 }
 
-// Auth metadata for shared layouts
-const authMeta = {
-  "/login": {},
-  "/register": {},
-  "/forgot-password": {},
-  "/reset-password": {
-    badge: "Account Security",
-    title: "Set New",
-    titleHighlight: "Password",
-    subtitle: '"Choose a strong new password to protect your account."',
-    description: "Enter your new password below. Make sure it is at least 6 characters long."
-  },
-  "/verify-otp": {
-    badge: "Two-Factor Security",
-    title: "Verify Your",
-    titleHighlight: "Identity",
-    subtitle: '"We have sent a 6-digit security code to your device."',
-    description: "Please enter the 6-digit code below to complete verification and proceed safely to your workspace."
-  },
-  "/otp": {
-    badge: "Two-Factor Security",
-    title: "Verify Your",
-    titleHighlight: "Identity",
-    subtitle: '"We have sent a 6-digit security code to your device."',
-    description: "Please enter the 6-digit code below to complete verification and proceed safely to your workspace."
-  }
-};
-
 function AuthRoutesLayout() {
-  const location = useLocation();
-  const meta = authMeta[location.pathname] || {};
   return (
-    <AuthLayout {...meta}>
+    <AuthLayout>
       <Outlet />
     </AuthLayout>
   );

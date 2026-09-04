@@ -6,11 +6,13 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import Booking from '../models/booking.model.js';
 import User from '../models/user.model.js';
-import { Room, ContactMessage } from '../models/managerData.model.js';
+import { Room, ContactMessage, Feedback } from '../models/managerData.model.js';
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import Coupon from '../models/coupon.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
-import { triggerNotification } from '../utils/notification.helper.js';
+import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
+import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
+import { calculateStayNights, parseDateSafe } from '../utils/dateUtils.js';
 
 const router = express.Router();
 
@@ -218,12 +220,18 @@ router.post('/bookings', async (req, res) => {
     }
 
     const targetPropId = propertyId || 'HS-9HQ8P';
+    const nights = calculateStayNights(cIn, cOut);
 
     // 1. Overlapping Date Availability Check
-    const newCheckIn = new Date(cIn).getTime();
-    const newCheckOut = new Date(cOut).getTime();
+    const parseDateToMs = (val) => {
+      const parsed = parseDateSafe(val);
+      return parsed ? parsed.getTime() : new Date(val).getTime();
+    };
 
-    if (isNaN(newCheckIn) || isNaN(newCheckOut) || newCheckIn >= newCheckOut) {
+    const newCheckIn = parseDateToMs(cIn);
+    const newCheckOut = parseDateToMs(cOut);
+
+    if (isNaN(newCheckIn) || isNaN(newCheckOut) || newCheckIn > newCheckOut) {
       return sendError(res, 400, 'Invalid check-in or check-out date range');
     }
 
@@ -455,6 +463,7 @@ router.post('/bookings', async (req, res) => {
       phone: cleanPhone,
       checkIn: cIn,
       checkOut: cOut,
+      nights: nights,
       room: assignedRoomNumber ? `${rType || 'Room'} (Room ${assignedRoomNumber})` : (rType || 'Standard Room'),
       roomType: rType || 'Standard Room',
       ratePlan: req.body.ratePlan || (rType?.toLowerCase().includes('deluxe') ? 'Deluxe Plan' : rType?.toLowerCase().includes('suite') ? 'Executive Suite Plan' : `${rType || 'Standard'} Plan`),
@@ -755,6 +764,101 @@ router.post('/coupons/validate', async (req, res) => {
     }, `Coupon '${cleanCode}' applied successfully! You saved ₹${discountAmount.toLocaleString('en-IN')}.`);
   } catch (err) {
     return sendError(res, 500, err.message || 'Failed to validate coupon');
+  }
+});
+
+// ==========================================
+// PUBLIC GUEST FEEDBACK & REVIEWS
+// ==========================================
+router.get('/feedback', async (req, res) => {
+  try {
+    const { propertyId } = req.query;
+    const query = { status: 'Published' };
+    if (propertyId && propertyId !== 'all') {
+      query.$or = [
+        { propertyId: propertyId },
+        { propertyId: { $exists: false } },
+        { propertyId: '' },
+        { propertyId: 'HS-JAI' }
+      ];
+    }
+    const list = await getUnifiedFeedbacksAndReviews(query);
+    return sendSuccess(res, 200, list, 'Public published feedback retrieved successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to fetch feedback');
+  }
+});
+
+router.post('/feedback', async (req, res) => {
+  try {
+    const {
+      bookingId,
+      guestName,
+      guestEmail = '',
+      guestPhone = '',
+      rating = 5,
+      ratings,
+      comment = '',
+      comments = '',
+      propertyId = 'HS-JAI'
+    } = req.body;
+
+    const feedbackText = comment || comments;
+    if (!guestName || !feedbackText) {
+      return sendError(res, 400, 'Guest name and review comment are required.');
+    }
+
+    let room = '101';
+    let roomType = 'Standard Room';
+    let propId = propertyId;
+
+    if (bookingId) {
+      const b = await Booking.findOne({
+        $or: [{ bookingId: bookingId }, { _id: bookingId.length === 24 ? bookingId : null }, { id: bookingId }]
+      });
+      if (b) {
+        propId = b.propertyId || propId;
+        room = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
+        roomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
+      }
+    }
+
+    const ratingNum = Number(rating) || 5;
+    const sentiment = ratingNum >= 4 ? 'Positive' : ratingNum === 3 ? 'Neutral' : 'Negative';
+
+    const created = await Feedback.create({
+      bookingId: bookingId || `BK-${Date.now().toString().slice(-5)}`,
+      guestName,
+      guestEmail,
+      guestPhone,
+      room,
+      roomType,
+      rating: ratingNum,
+      ratings: {
+        cleanliness: ratings?.cleanliness || 5,
+        service: ratings?.service || 5,
+        room: ratings?.room || 5,
+        food: ratings?.food || 5,
+        overall: ratingNum
+      },
+      category: 'Public Guest Review',
+      sentiment,
+      status: 'Published',
+      comment: feedbackText,
+      comments: feedbackText,
+      propertyId: propId
+    });
+
+    await notifyFeedbackEvent({
+      req,
+      action: 'created',
+      feedback: created,
+      actor: guestName
+    });
+
+    return sendSuccess(res, 201, created, 'Thank you! Your feedback has been published.');
+  } catch (err) {
+    return sendError(res, 500, err.message || 'Failed to submit feedback');
   }
 });
 

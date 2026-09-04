@@ -112,11 +112,11 @@ export const adminService = {
       return await apiClient.post(`/super-admin/reservations/${id}/extend`, data);
     }
   },
-  getFeedback: async () => {
+  getFeedback: async (params = {}) => {
     try {
-      return await apiClient.get('/admin/feedback');
+      return await apiClient.get('/admin/feedback', { params });
     } catch (err) {
-      return await apiClient.get('/manager/feedback');
+      return await apiClient.get('/manager/feedback', { params });
     }
   },
   createFeedback: async (data) => {
@@ -131,6 +131,20 @@ export const adminService = {
       return await apiClient.post(`/admin/feedback/${id}/respond`, { response, status });
     } catch (err) {
       return await apiClient.post(`/manager/feedback/${id}/respond`, { response, status });
+    }
+  },
+  updateFeedbackStatus: async (id, status) => {
+    try {
+      return await apiClient.put(`/admin/feedback/${id}/status`, { status });
+    } catch (err) {
+      return await apiClient.put(`/manager/feedback/${id}/status`, { status });
+    }
+  },
+  deleteFeedback: async (id) => {
+    try {
+      return await apiClient.delete(`/admin/feedback/${id}`);
+    } catch (err) {
+      return await apiClient.delete(`/manager/feedback/${id}`);
     }
   },
   getCoupons: async (params = {}) => {

@@ -81,6 +81,7 @@ const feedbackSchema = new mongoose.Schema({
   guestName: { type: String, required: true },
   guestEmail: { type: String, default: '' },
   guestPhone: { type: String, default: '' },
+  userId: { type: String, default: null },
   room: { type: String, default: '' },
   roomType: { type: String, default: '' },
   rating: { type: Number, default: 5 },
@@ -97,11 +98,14 @@ const feedbackSchema = new mongoose.Schema({
   comment: { type: String, default: '' },
   comments: { type: String, default: '' },
   response: { type: String, default: '' },
+  respondedBy: { type: String, default: '' },
   respondedAt: { type: Date, default: null },
-  propertyId: { type: String, required: true, default: 'HS-JAI' }
+  propertyId: { type: String, required: true, default: 'HS-JAI' },
+  propertyName: { type: String, default: 'Hour Stay Resort' }
 }, { timestamps: true });
 
 feedbackSchema.index({ propertyId: 1, createdAt: -1 });
+feedbackSchema.index({ status: 1, createdAt: -1 });
 export const Feedback = mongoose.models.Feedback || mongoose.model('Feedback', feedbackSchema);
 
 // ==========================================

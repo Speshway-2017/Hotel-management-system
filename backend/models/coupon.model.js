@@ -27,6 +27,8 @@ const couponSchema = new mongoose.Schema({
   discountValue: { type: Number, required: true },
   maxDiscount: { type: Number, default: 0 }, // 0 = unlimited cap
   minBookingAmount: { type: Number, default: 0 },
+  minimumSubscriptionAmount: { type: Number, default: 0 },
+  applicableSubscriptionPlans: { type: [String], default: [] },
   validFrom: { type: String, required: true }, // ISO Date YYYY-MM-DD
   validUntil: { type: String, required: true }, // ISO Date YYYY-MM-DD
   usageLimit: { type: Number, default: 0 }, // 0 = unlimited usage
@@ -37,9 +39,7 @@ const couponSchema = new mongoose.Schema({
     default: 'Active'
   },
   propertyId: { type: String, default: 'all' }, // 'all' or specific hotel ID
-  applicableSource: { type: String, default: 'website' }, // 'website' or 'platform'
-  minimumSubscriptionAmount: { type: Number, default: 0 },
-  applicableSubscriptionPlans: { type: [String], default: [] }
+  applicableSource: { type: String, default: 'website' } // 'website' or 'all'
 }, {
   timestamps: true
 });

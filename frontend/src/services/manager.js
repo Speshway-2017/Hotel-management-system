@@ -55,14 +55,20 @@ export const managerService = {
   getAttendance: async () => {
     return await apiClient.get('/manager/attendance');
   },
-  getFeedback: async () => {
-    return await apiClient.get('/manager/feedback');
+  getFeedback: async (params = {}) => {
+    return await apiClient.get('/manager/feedback', { params });
   },
   createFeedback: async (data) => {
     return await apiClient.post('/manager/feedback', data);
   },
   respondFeedback: async (id, response, status) => {
     return await apiClient.post(`/manager/feedback/${id}/respond`, { response, status });
+  },
+  updateFeedbackStatus: async (id, status) => {
+    return await apiClient.put(`/manager/feedback/${id}/status`, { status });
+  },
+  deleteFeedback: async (id) => {
+    return await apiClient.delete(`/manager/feedback/${id}`);
   },
   getBilling: async () => {
     return await apiClient.get('/manager/billing');

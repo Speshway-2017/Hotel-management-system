@@ -14,7 +14,7 @@ import {
   ManagerNotification,
   Payment
 } from '../models/managerData.model.js';
-import { triggerNotification } from '../utils/notification.helper.js';
+import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
@@ -122,83 +122,6 @@ const seedDefaultApprovals = async (propertyId) => {
       }
     ];
     await Approval.insertMany(defaults);
-  }
-};
-
-// Helper to seed default reviews/feedback if empty
-const seedDefaultFeedback = async (propertyId) => {
-  const propId = propertyId || 'HS-JAI';
-  const count = await Feedback.countDocuments({ propertyId: propId });
-  if (count === 0) {
-    const defaults = [
-      {
-        bookingId: "BK-10301",
-        guestName: "Surya",
-        guestEmail: "surya@example.com",
-        guestPhone: "+91 98765 43210",
-        room: "103 · Standard Room",
-        roomType: "Standard Room",
-        rating: 5,
-        ratings: { cleanliness: 5, service: 5, room: 4, food: 5, overall: 5 },
-        category: "Room Stay",
-        sentiment: "Positive",
-        status: "Published",
-        comment: "Excellent stay structure! Friendly reception personnel and prompt room service.",
-        response: "",
-        propertyId: propId
-      },
-      {
-        bookingId: "BK-10101",
-        guestName: "Mounika",
-        guestEmail: "mounika@example.com",
-        guestPhone: "+91 98765 43211",
-        room: "101 · Standard Room",
-        roomType: "Standard Room",
-        rating: 4,
-        ratings: { cleanliness: 4, service: 4, room: 4, food: 4, overall: 4 },
-        category: "Front Desk Service",
-        sentiment: "Positive",
-        status: "Resolved",
-        comment: "Linens and room were spotless on arrival. Very smooth check-in process.",
-        response: "Thank you for staying with us! We look forward to hosting you again.",
-        respondedAt: new Date(),
-        propertyId: propId
-      },
-      {
-        bookingId: "BK-10402",
-        guestName: "Rohit Verma",
-        guestEmail: "rohit.verma@example.com",
-        guestPhone: "+91 98765 43212",
-        room: "104 · Deluxe Suite",
-        roomType: "Deluxe Suite",
-        rating: 5,
-        ratings: { cleanliness: 5, service: 5, room: 5, food: 5, overall: 5 },
-        category: "Amenities",
-        sentiment: "Positive",
-        status: "Published",
-        comment: "The complimentary breakfast and high-speed Wi-Fi exceeded expectations.",
-        response: "Glad you enjoyed the amenities, Rohit! Have a wonderful journey.",
-        respondedAt: new Date(),
-        propertyId: propId
-      },
-      {
-        bookingId: "BK-10205",
-        guestName: "Ananya Sharma",
-        guestEmail: "ananya.s@example.com",
-        guestPhone: "+91 98765 43213",
-        room: "102 · Executive Suite",
-        roomType: "Executive Suite",
-        rating: 3,
-        ratings: { cleanliness: 3, service: 4, room: 3, food: 3, overall: 3 },
-        category: "Room Maintenance",
-        sentiment: "Neutral",
-        status: "Pending",
-        comment: "AC took some time to cool the room, but the front desk team sent a technician promptly.",
-        response: "",
-        propertyId: propId
-      }
-    ];
-    await Feedback.insertMany(defaults);
   }
 };
 
@@ -947,12 +870,11 @@ router.get('/attendance', async (req, res) => {
 router.get('/feedback', async (req, res) => {
   try {
     const propId = req.query.propertyId || req.user?.propertyId || 'HS-JAI';
-    await seedDefaultFeedback(propId);
     const query = (propId && propId !== 'all')
       ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
       : {};
     const list = await getUnifiedFeedbacksAndReviews(query);
-    return sendSuccess(res, 200, list, 'Reviews and guest feedback list retrieved from MongoDB (Feedbacks & Reviews collections).');
+    return sendSuccess(res, 200, list, 'Reviews and guest feedback list retrieved from MongoDB.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -974,10 +896,12 @@ router.post('/feedback', async (req, res) => {
       sentiment = 'Positive',
       status = 'Published',
       comment = '',
+      comments = '',
       response = ''
     } = req.body;
 
-    if (!guestName || !comment) {
+    const feedbackText = comment || comments;
+    if (!guestName || !feedbackText) {
       return sendError(res, 400, 'Guest name and review comment are required.');
     }
 
@@ -993,18 +917,20 @@ router.post('/feedback', async (req, res) => {
       category,
       sentiment,
       status,
-      comment,
-      comments: comment,
+      comment: feedbackText,
+      comments: feedbackText,
       response,
+      respondedBy: response ? (req.user?.name || 'Hotel Manager') : '',
       respondedAt: response ? new Date() : null,
       propertyId: propId
     });
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, propId, 'feedback_received', created);
-      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_received' });
-    }
+    await notifyFeedbackEvent({
+      req,
+      action: 'created',
+      feedback: created,
+      actor: req.user?.name || 'Manager'
+    });
 
     return sendSuccess(res, 201, created, 'Guest feedback recorded successfully.');
   } catch (err) {
@@ -1019,15 +945,15 @@ router.post('/feedback/:id/respond', async (req, res) => {
       return sendError(res, 400, 'Response comment content is required.');
     }
 
-    const propId = req.user?.propertyId || 'HS-JAI';
     const updateData = {
       response,
+      respondedBy: req.user?.name || 'Hotel Manager',
       respondedAt: new Date(),
       status: status || 'Resolved'
     };
 
-    let updated = await Feedback.findOneAndUpdate(
-      { _id: req.params.id },
+    const updated = await Feedback.findByIdAndUpdate(
+      req.params.id,
       updateData,
       { new: true }
     );
@@ -1036,13 +962,64 @@ router.post('/feedback/:id/respond', async (req, res) => {
       return sendError(res, 404, 'Review feedback record not found.');
     }
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, propId, 'feedback_updated', updated);
-      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_updated' });
-    }
+    await notifyFeedbackEvent({
+      req,
+      action: 'responded',
+      feedback: updated,
+      actor: req.user?.name || 'Hotel Manager'
+    });
 
     return sendSuccess(res, 200, updated, 'Response published successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.put('/feedback/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return sendError(res, 400, 'Status is required.');
+    }
+
+    const updated = await Feedback.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+
+    if (!updated) {
+      return sendError(res, 404, 'Feedback record not found.');
+    }
+
+    await notifyFeedbackEvent({
+      req,
+      action: 'status_updated',
+      feedback: updated,
+      actor: req.user?.name || 'Manager'
+    });
+
+    return sendSuccess(res, 200, updated, `Feedback status updated to ${status}.`);
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.delete('/feedback/:id', async (req, res) => {
+  try {
+    const deleted = await Feedback.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return sendError(res, 404, 'Feedback record not found.');
+    }
+
+    await notifyFeedbackEvent({
+      req,
+      action: 'deleted',
+      feedback: deleted,
+      actor: req.user?.name || 'Manager'
+    });
+
+    return sendSuccess(res, 200, deleted, 'Feedback record deleted successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
