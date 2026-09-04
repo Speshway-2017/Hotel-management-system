@@ -207,7 +207,16 @@ function ReservationsPage() {
     emitRealtimeEvent('dashboard_sync', { action, roomNum });
   };
 
-  const handleStatusChange = async (bookingId, newStatus, notes = "") => {
+  const handleStatusChange = async (bookingId, newStatus, notes = "", booking = null) => {
+    const targetBooking = booking || reservations.find(r => r._id === bookingId || r.id === bookingId || r.bookingId === bookingId);
+    const source = targetBooking?.source || "";
+    const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
+
+    if (newStatus === "Checked-in" && targetBooking && !isWalkIn) {
+      navigate({ to: `/admin/check-in/${bookingId}` });
+      return;
+    }
+
     try {
       const payload = { status: newStatus };
       if (notes) payload.notes = notes;
@@ -635,7 +644,7 @@ function ReservationsPage() {
                             <div className="flex items-center justify-start gap-1 whitespace-nowrap">
                               {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
                                 <Button
-                                  onClick={() => handleStatusChange(res._id || res.id, "Checked-in")}
+                                  onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
                                   size="xs"
                                   variant="outline"
                                   className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
@@ -1021,7 +1030,7 @@ function ReservationsPage() {
             <div className="p-4 bg-muted/15 border-t border-muted flex flex-wrap gap-2.5">
               {(selectedRes.status === "Pending" || selectedRes.status === "Confirmed" || selectedRes.status === "Pre-checked") && (
                 <Button
-                  onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Checked-in")}
+                  onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Checked-in", "", selectedRes)}
                   className="bg-success hover:bg-success-deep text-white text-xs font-bold px-4 h-9 rounded-full flex-1 cursor-pointer"
                 >
                   Confirm Check-In

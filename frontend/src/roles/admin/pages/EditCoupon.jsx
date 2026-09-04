@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useParams } from "react-router-dom";
 import { PageHeader, Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea, FormField } from "@/components/hs/FormFields";
 import { adminService } from "@/services/admin";
+import { superAdminService } from "@/services/superAdmin";
 import { toast } from "sonner";
 import {
   Ticket,
@@ -24,7 +26,8 @@ import {
 
 function EditCoupon() {
   const navigate = useNavigate();
-  const { id } = useParams({ strict: false });
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -49,8 +52,19 @@ function EditCoupon() {
       if (!id) return;
       try {
         setLoading(true);
-        const res = await adminService.getCouponById(id);
-        const data = res?.data || res;
+        let data = null;
+        try {
+          const res = await adminService.getCouponById(id);
+          data = res?.data || res;
+        } catch {}
+
+        if (!data) {
+          try {
+            const superRes = await superAdminService.getPromoCoupons();
+            const list = superRes?.data || superRes || [];
+            data = list.find(c => String(c._id) === String(id) || String(c.id) === String(id) || String(c.code).toUpperCase() === String(id).toUpperCase());
+          } catch {}
+        }
         if (data) {
           setFormData({
             code: data.code || "",

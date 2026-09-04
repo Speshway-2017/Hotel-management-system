@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
+import { superAdminService } from "@/services/superAdmin";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
@@ -10,7 +11,8 @@ import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 
 function ManagerEditReservation() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,80 +44,98 @@ function ManagerEditReservation() {
     const user = authService.getCurrentUser();
     setCurrentUser(user);
 
-    if (!user || user.role !== "manager") {
+    if (!user || (user.role !== "manager" && user.role !== "admin" && user.role !== "super-admin")) {
       setIsAuthorized(false);
       setLoading(false);
       return;
     }
 
     const loadBookingDetail = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
-        const [res, roomsRes] = await Promise.all([
-          managerService.getReservations(),
+        const [mgrRes, superRes, roomsRes] = await Promise.all([
+          managerService.getReservations().catch(() => ({ success: false })),
+          superAdminService.getReservations().catch(() => ({ success: false })),
           managerService.getRooms().catch(() => ({}))
         ]);
 
-        if (res.success && Array.isArray(res.data)) {
-          const match = res.data.find(r => String(r._id) === String(id) || String(r.id) === String(id));
-          if (match) {
-            setGuest(match.guest || "");
-            setPhone(match.phone || "");
-            
-            let currentRoomNum = match.roomNumber || match.room || "";
-            let category = match.roomType || match.category || "Standard Room";
-            if (currentRoomNum.includes("·")) {
-              currentRoomNum = currentRoomNum.split("·")[0].trim();
-            }
-            if (currentRoomNum.toLowerCase().includes("room")) {
-              currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
-            }
-            
-            setRoom(currentRoomNum);
-            setRoomType(category);
-            if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
-            if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
-            setNights(match.nights || 1);
-            setPax(match.pax || "2 Adults");
-            setSource(match.source || "Direct");
-            setStatus(match.status || "Pending");
-            setAmount(match.amount || "");
-            setBalance(match.balance !== undefined ? match.balance : "");
-            setNotes(match.notes || "");
-            setIsGroupBooking(!!match.isGroupBooking);
-            setIsCorporate(!!match.isCorporate);
-            setCorporateName(match.corporateName || "");
-          } else {
-            setError("Reservation details not found.");
+        let allReservations = [];
+        if (mgrRes.success && Array.isArray(mgrRes.data)) allReservations.push(...mgrRes.data);
+        if (superRes.success && Array.isArray(superRes.data)) allReservations.push(...superRes.data);
+
+        const match = allReservations.find(r => 
+          String(r._id) === String(id) || 
+          String(r.id) === String(id) || 
+          String(r.bookingId) === String(id)
+        );
+
+        let currentRoomNum = "";
+        let category = "Standard Room";
+
+        if (match) {
+          setGuest(match.guest || match.guestName || "");
+          setPhone(match.phone || match.mobile || match.phoneNumber || "");
+          
+          currentRoomNum = match.roomNumber || match.room || "";
+          category = match.roomType || match.category || "Standard Room";
+          if (currentRoomNum.includes("·")) {
+            currentRoomNum = currentRoomNum.split("·")[0].trim();
           }
+          if (currentRoomNum.toLowerCase().includes("room")) {
+            currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
+          }
+          
+          setRoom(currentRoomNum);
+          setRoomType(category);
+          if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
+          if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
+          setNights(match.nights || 1);
+          setPax(match.pax || "2 Adults");
+          setSource(match.source || "Direct");
+          setStatus(match.status || "Pending");
+          setAmount(match.totalAmount || match.amount || "");
+          setBalance(match.balance !== undefined ? match.balance : "");
+          setNotes(match.notes || "");
+          setIsGroupBooking(!!match.isGroupBooking);
+          setIsCorporate(!!match.isCorporate);
+          setCorporateName(match.corporateName || "");
+        } else {
+          setError("Reservation details not found.");
         }
 
-        if (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) {
-          setAvailableRoomsList(roomsRes.data);
-        } else {
-          setAvailableRoomsList([
-            { roomNumber: "101", category: "Standard Room", status: "Available" },
-            { roomNumber: "102", category: "Standard Room", status: "Available" },
-            { roomNumber: "103", category: "Standard Room", status: "Available" },
-            { roomNumber: "201", category: "Deluxe Room", status: "Available" },
-            { roomNumber: "202", category: "Deluxe Room", status: "Reserved" },
-            { roomNumber: "203", category: "Deluxe Room", status: "Available" },
-            { roomNumber: "301", category: "Executive Suite", status: "Available" },
-            { roomNumber: "302", category: "Executive Suite", status: "Available" },
-            { roomNumber: "303", category: "Executive Suite", status: "Available" },
-            { roomNumber: "401", category: "Standard Room", status: "Available" },
-            { roomNumber: "402", category: "Standard Room", status: "Available" },
-            { roomNumber: "403", category: "Standard Room", status: "Available" }
-          ]);
+        let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [
+          { roomNumber: "101", category: "Standard Room", status: "Available" },
+          { roomNumber: "102", category: "Standard Room", status: "Available" },
+          { roomNumber: "103", category: "Standard Room", status: "Available" },
+          { roomNumber: "201", category: "Deluxe Room", status: "Available" },
+          { roomNumber: "202", category: "Deluxe Room", status: "Available" },
+          { roomNumber: "203", category: "Deluxe Room", status: "Available" },
+          { roomNumber: "301", category: "Executive Suite", status: "Available" },
+          { roomNumber: "302", category: "Executive Suite", status: "Available" },
+          { roomNumber: "303", category: "Executive Suite", status: "Available" },
+          { roomNumber: "401", category: "Standard Room", status: "Available" },
+          { roomNumber: "402", category: "Standard Room", status: "Available" },
+          { roomNumber: "403", category: "Standard Room", status: "Available" }
+        ];
+
+        if (currentRoomNum && !dbRooms.some(r => String(r.roomNumber) === String(currentRoomNum))) {
+          dbRooms.unshift({
+            roomNumber: currentRoomNum,
+            category: category,
+            status: "Assigned"
+          });
         }
+
+        setAvailableRoomsList(dbRooms);
       } catch (err) {
         setError(err.message || "Failed to load reservation details.");
       } finally {
         setLoading(false);
       }
     };
-    if (id) loadBookingDetail();
+    loadBookingDetail();
   }, [id]);
 
   const handleSubmit = async (e) => {

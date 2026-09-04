@@ -308,21 +308,29 @@ function FrontDeskPage() {
     }
   };
 
-  const handleCheckinAction = async (bookingId) => {
-    const booking = reservations.find(r => (r._id || r.id) === bookingId);
-    if (!booking) return;
+  const handleCheckinAction = async (bookingId, booking = null) => {
+    const targetBooking = booking || reservations.find(r => (r._id || r.id) === bookingId || r.bookingId === bookingId);
+    if (!targetBooking) return;
 
-    if (!booking.room) {
+    const source = targetBooking.source || "";
+    const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
+    const targetId = targetBooking._id || targetBooking.id || targetBooking.bookingId;
+
+    if (!isWalkIn) {
+      navigate({ to: `/admin/check-in/${targetId}` });
+      return;
+    }
+
+    if (!targetBooking.room) {
       toast.error("Please assign a room number first before checking in.");
       return;
     }
 
     try {
-      const targetId = booking._id || booking.id;
       await superAdminService.updateReservation(targetId, { status: "Checked-in" });
-      await adminService.updateRoomStatus(booking.room, "Occupied").catch(() => ({}));
-      toast.success(`Guest ${booking.guest} successfully checked-in.`);
-      notifySocketEvents('checkin', booking.room);
+      await adminService.updateRoomStatus(targetBooking.room, "Occupied").catch(() => ({}));
+      toast.success(`Guest ${targetBooking.guest} successfully checked-in.`);
+      notifySocketEvents('checkin', targetBooking.room);
       loadData(true);
       setActiveModal(null);
     } catch (err) {
@@ -757,7 +765,7 @@ function FrontDeskPage() {
                               </Button>
                             ) : (
                               <Button
-                                onClick={() => handleCheckinAction(arr._id)}
+                                onClick={() => handleCheckinAction(arr._id, arr)}
                                 className="h-7 w-7 p-0 bg-navy hover:bg-navy-deep text-white flex items-center justify-center rounded-full"
                                 title="Check-In"
                               >
@@ -1232,7 +1240,7 @@ function FrontDeskPage() {
                   .map(r => (
                     <button
                       key={r._id}
-                      onClick={() => handleCheckinAction(r._id)}
+                      onClick={() => handleCheckinAction(r._id, r)}
                       className="w-full text-left p-3 border border-muted rounded-xl hover:bg-muted/15 transition-all text-xs font-bold text-navy flex justify-between items-center"
                     >
                       <div>

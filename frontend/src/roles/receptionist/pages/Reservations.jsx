@@ -120,7 +120,15 @@ function ReservationsPage() {
   });
 
   // Action methods
-  const handleCheckIn = async (id, roomNum) => {
+  const handleCheckIn = async (id, roomNum, booking = null) => {
+    // If it's a website / OTA booking, route to dedicated ID Verification & Check-in page
+    const source = booking?.source || "";
+    const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
+    if (booking && !isWalkIn) {
+      navigate(`/reception/check-in/${id}`);
+      return;
+    }
+
     try {
       await receptionistService.updateReservationStatus(id, "Checked-in", roomNum);
       setReservations(prev => prev.map(r => 
@@ -341,7 +349,7 @@ function ReservationsPage() {
                             <Button
                               size="xs"
                               variant="outline"
-                              onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber)}
+                              onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber, res)}
                               className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                             >
                               Check-In

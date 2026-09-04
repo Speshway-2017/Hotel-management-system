@@ -615,10 +615,59 @@ router.post('/reservations', async (req, res) => {
   }
 });
 
+// Verify ID proof details for a reservation
+router.post('/reservations/:id/verify-id', async (req, res) => {
+  try {
+    const { idDocType, idDocNumber, idDocImage, idVerification, notes } = req.body;
+    const propertyId = req.user.propertyId || 'HS-JAI';
+
+    if (!idDocNumber || !idDocNumber.trim()) {
+      return sendError(res, 400, 'ID Document Number is required for verification.');
+    }
+
+    const booking = await findBookingById(req.params.id, propertyId);
+    if (!booking) {
+      return sendError(res, 404, 'Booking not found.');
+    }
+
+    const verificationData = {
+      idDocType: idDocType || booking.idDocType || 'Aadhaar Card',
+      idDocNumber: idDocNumber.trim(),
+      idDocImage: idDocImage || booking.idDocImage || '',
+      idVerification: idVerification || 'Verified',
+      idVerifiedAt: new Date(),
+      idVerifiedBy: req.user?.name || req.user?.username || 'Staff'
+    };
+
+    const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, verificationData, { new: true });
+
+    // Sync guest profile in User collection if guestId or email matches
+    try {
+      if (booking.guestId) {
+        await User.findByIdAndUpdate(booking.guestId, {
+          idDocType: verificationData.idDocType,
+          idDocNumber: verificationData.idDocNumber
+        });
+      } else if (booking.email) {
+        await User.findOneAndUpdate({ email: booking.email.toLowerCase() }, {
+          idDocType: verificationData.idDocType,
+          idDocNumber: verificationData.idDocNumber
+        });
+      }
+    } catch (e) {
+      console.warn('Could not sync guest user document:', e.message);
+    }
+
+    return sendSuccess(res, 200, updated, 'ID proof successfully verified.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 // Update status (e.g. check-in, check-out, cancel, no-show)
 router.put('/reservations/:id/status', async (req, res) => {
   try {
-    const { status, room } = req.body;
+    const { status, room, idDocType, idDocNumber, idDocImage, idVerification } = req.body;
     const propertyId = req.user.propertyId || 'HS-JAI';
 
     const booking = await findBookingById(req.params.id, propertyId);
@@ -626,7 +675,29 @@ router.put('/reservations/:id/status', async (req, res) => {
       return sendError(res, 404, 'Booking not found.');
     }
 
+    const isWebsiteBooking = booking.source && booking.source !== 'Walk-in' && !booking.source.toLowerCase().includes('walk-in');
+
+    // Enforce ID proof for website bookings on check-in
+    if (status === 'Checked-in' && isWebsiteBooking) {
+      const isAlreadyVerified = booking.idVerification === 'Verified';
+      const isProvidedNow = (idVerification === 'Verified' || idDocNumber);
+      if (!isAlreadyVerified && !isProvidedNow && !req.body.bypassVerification) {
+        return sendError(res, 400, 'ID Proof Verification is required before checking in a website booking.');
+      }
+    }
+
     const updateData = { status };
+    if (idDocNumber) {
+      updateData.idDocNumber = idDocNumber.trim();
+      updateData.idDocType = idDocType || booking.idDocType || 'Aadhaar Card';
+      updateData.idDocImage = idDocImage || booking.idDocImage || '';
+      updateData.idVerification = 'Verified';
+      updateData.idVerifiedAt = new Date();
+      updateData.idVerifiedBy = req.user?.name || req.user?.username || 'Staff';
+    } else if (idVerification) {
+      updateData.idVerification = idVerification;
+    }
+
     const roomNum = (room || booking.roomNumber || booking.room)?.match(/\b\d{3,4}\b/)?.[0] || (room ? String(room).split(' ')[0] : null);
     if (roomNum) {
       updateData.roomNumber = roomNum;

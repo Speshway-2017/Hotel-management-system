@@ -16,6 +16,9 @@ export const managerService = {
   updateReservation: async (id, data) => {
     return await apiClient.put(`/manager/reservations/${id}`, data);
   },
+  verifyIdProof: async (id, idData) => {
+    return await apiClient.post(`/manager/reservations/${id}/verify-id`, idData);
+  },
   assignRoom: async (id, roomNumber, roomType) => {
     return await apiClient.post(`/manager/reservations/${id}/assign-room`, { roomNumber, roomType });
   },

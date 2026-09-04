@@ -9,7 +9,7 @@ import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.j
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
-import { notifyFeedbackEvent } from '../utils/notification.helper.js';
+import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -340,6 +340,15 @@ router.post('/payments', async (req, res) => {
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_logged' });
     }
 
+    await triggerNotification({
+      req,
+      role: 'admin',
+      propertyId: propId,
+      title: 'Payment Logged',
+      message: `Payment of ₹${amount} received from ${guestName} via ${paymentMethod || 'UPI'}.`,
+      category: 'Finance'
+    });
+
     return sendSuccess(res, 201, newPayment, 'Payment logged successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -633,6 +642,14 @@ router.post('/coupons', async (req, res) => {
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_created' });
     }
 
+    await triggerNotification({
+      req,
+      role: 'admin',
+      title: 'New Discount Coupon Created',
+      message: `Coupon code '${cleanCode}' with ${discountValue}% discount created by ${req.user?.name || 'Admin'}.`,
+      category: 'General'
+    });
+
     return sendSuccess(res, 201, created, `Coupon '${cleanCode}' created successfully`);
   } catch (err) {
     return sendError(res, 500, err.message || 'Failed to create coupon');
@@ -703,6 +720,14 @@ router.put('/coupons/:id', async (req, res) => {
       emitRealtimeSync(io, 'all', 'coupon_updated', updated);
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_updated' });
     }
+
+    await triggerNotification({
+      req,
+      role: 'admin',
+      title: 'Discount Coupon Updated',
+      message: `Coupon '${updated.code}' settings updated by ${req.user?.name || 'Admin'}.`,
+      category: 'General'
+    });
 
     return sendSuccess(res, 200, updated, 'Coupon updated successfully');
   } catch (err) {

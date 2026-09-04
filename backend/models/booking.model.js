@@ -27,7 +27,13 @@ const bookingSchema = new mongoose.Schema({
   totalAmount: { type: Number, default: 0 },
   city: { type: String, default: 'Hyderabad' },
   balance: { type: Number, default: 0 },
-  propertyId: { type: String, required: true }
+  propertyId: { type: String, required: true },
+  idVerification: { type: String, default: 'Pending' }, // 'Pending' | 'Verified' | 'Mismatch'
+  idDocType: { type: String, default: 'Aadhaar Card' },
+  idDocNumber: { type: String, default: '' },
+  idDocImage: { type: String, default: '' },
+  idVerifiedAt: { type: Date, default: null },
+  idVerifiedBy: { type: String, default: '' }
 }, {
   timestamps: true,
   strict: false

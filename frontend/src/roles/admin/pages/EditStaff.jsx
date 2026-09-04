@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 
+import { managerService } from "@/services/manager";
+
 function EditStaff() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,23 +28,35 @@ function EditStaff() {
 
   useEffect(() => {
     const loadStaffMember = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
-        const res = await superAdminService.getUsers();
-        if (res.success) {
-          const match = res.data.find(u => u._id === id || u.id === id);
-          if (match) {
-            setName(match.name || "");
-            setEmail(match.email || "");
-            setPhone(match.mobile === "—" ? "" : (match.mobile || ""));
-            setRole(match.role || "receptionist");
-            setStatus(match.status || "Active");
-            setDept(match.dept || "Front Desk");
-            setShift(match.shift || "Morning (06:00 - 14:00)");
-          } else {
-            setError("Employee not found.");
-          }
+        const [superRes, mgrRes] = await Promise.all([
+          superAdminService.getUsers().catch(() => ({ success: false })),
+          managerService.getStaff().catch(() => ({ success: false }))
+        ]);
+
+        let allStaff = [];
+        if (superRes.success && Array.isArray(superRes.data)) allStaff.push(...superRes.data);
+        if (mgrRes.success && Array.isArray(mgrRes.data)) allStaff.push(...mgrRes.data);
+
+        const match = allStaff.find(u => 
+          String(u._id) === String(id) || 
+          String(u.id) === String(id) || 
+          String(u.email).toLowerCase() === String(id).toLowerCase()
+        );
+
+        if (match) {
+          setName(match.name || "");
+          setEmail(match.email || "");
+          setPhone(match.mobile === "—" ? "" : (match.mobile || match.phone || ""));
+          setRole(match.role || "receptionist");
+          setStatus(match.status || "Active");
+          setDept(match.dept || match.department || "Front Desk");
+          setShift(match.shift || "Morning (06:00 - 14:00)");
+        } else {
+          setError("Employee not found.");
         }
       } catch (err) {
         setError(err.message || "Failed to load employee profile.");
@@ -49,7 +64,7 @@ function EditStaff() {
         setLoading(false);
       }
     };
-    if (id) loadStaffMember();
+    loadStaffMember();
   }, [id]);
 
   const handleSubmit = async (e) => {

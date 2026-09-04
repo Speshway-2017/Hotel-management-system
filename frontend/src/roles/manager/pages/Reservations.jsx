@@ -132,7 +132,16 @@ function ManagerReservationsPage() {
   };
 
   // Status Handlers
-  async function handleStatusChange(bookingId, newStatus, notes = "") {
+  async function handleStatusChange(bookingId, newStatus, notes = "", booking = null) {
+    const targetBooking = booking || reservations.find(r => r._id === bookingId || r.id === bookingId || r.bookingId === bookingId);
+    const source = targetBooking?.source || "";
+    const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
+
+    if (newStatus === "Checked-in" && targetBooking && !isWalkIn) {
+      navigate({ to: `/manager/check-in/${bookingId}` });
+      return;
+    }
+
     try {
       const payload = { status: newStatus };
       if (notes) payload.notes = notes;
@@ -444,7 +453,7 @@ function ManagerReservationsPage() {
                           {/* Admin-styled Check-In / Check-Out buttons */}
                           {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
                             <Button
-                              onClick={() => handleStatusChange(res._id || res.id, "Checked-in")}
+                              onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
                               size="xs"
                               variant="outline"
                               className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"

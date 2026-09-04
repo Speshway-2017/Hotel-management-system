@@ -150,7 +150,16 @@ function ManagerOperationsPage() {
     }
   };
 
-  const handleStatusUpdate = async (resId, newStatus) => {
+  const handleStatusUpdate = async (resId, newStatus, booking = null) => {
+    const targetBooking = booking || reservations.find(r => r._id === resId || r.id === resId || r.bookingId === resId);
+    const source = targetBooking?.source || "";
+    const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
+    
+    if (newStatus === "Checked-in" && targetBooking && !isWalkIn) {
+      navigate({ to: `/manager/check-in/${resId}` });
+      return;
+    }
+
     try {
       await managerService.updateReservation(resId, { status: newStatus });
       setReservations(prev => prev.map(r => 
@@ -473,7 +482,7 @@ function ManagerOperationsPage() {
                           </>
                         ) : (r.status !== "Checked-out" && r.status !== "Checked Out" && r.status !== "Cancelled") ? (
                           <Button
-                            onClick={() => handleStatusUpdate(r._id || r.id, "Checked-in")}
+                            onClick={() => handleStatusUpdate(r._id || r.id, "Checked-in", r)}
                             size="icon"
                             variant="ghost"
                             className="size-7 text-success hover:text-success/80 hover:bg-success/10 cursor-pointer"
@@ -582,7 +591,7 @@ function ManagerOperationsPage() {
                 <div className="flex flex-wrap gap-2">
                   {(selectedRes.status === "Confirmed" || selectedRes.status === "Pending" || selectedRes.status === "Pre-checked") && (
                     <Button
-                      onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Checked-in")}
+                      onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Checked-in", selectedRes)}
                       className="bg-success hover:bg-success/90 text-white font-bold h-9 px-4 rounded-md cursor-pointer flex items-center gap-1.5"
                     >
                       <UserCheck className="size-4" /> Check In

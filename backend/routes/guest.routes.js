@@ -44,12 +44,27 @@ router.get('/bookings', async (req, res) => {
     // Show bookings linked to the logged-in guest
     const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
 
+    // Fetch existing feedbacks to mark which bookings already have feedback
+    const feedbackQuery = [];
+    if (userId) feedbackQuery.push({ userId });
+    if (req.user?.email) feedbackQuery.push({ guestEmail: req.user.email });
+    if (req.user?.mobile) feedbackQuery.push({ guestPhone: req.user.mobile });
+    if (req.user?.name) feedbackQuery.push({ guestName: req.user.name });
+
+    const feedbacks = await Feedback.find(feedbackQuery.length > 0 ? { $or: feedbackQuery } : {}).lean();
+    const feedbackMap = new Map();
+    feedbacks.forEach(f => {
+      if (f.bookingId) feedbackMap.set(String(f.bookingId), f);
+    });
+
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
       const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
       const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
       const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
+      const bId = b.bookingId || b._id || b.id;
+      const fb = feedbackMap.get(String(bId)) || feedbackMap.get(String(b._id)) || feedbackMap.get(String(b.bookingId));
 
       return {
         id: b.bookingId || b._id || b.id,
@@ -67,6 +82,8 @@ router.get('/bookings', async (req, res) => {
         status: b.status || 'Confirmed',
         paymentStatus: b.paymentStatus || 'Paid',
         balance: Number(b.balance || 0),
+        hasFeedback: Boolean(fb),
+        feedbackRating: fb?.rating || null,
         createdAt: b.createdAt
       };
     });

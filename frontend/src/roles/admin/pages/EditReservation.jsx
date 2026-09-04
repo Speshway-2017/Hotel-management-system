@@ -4,12 +4,14 @@ import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
+import { managerService } from "@/services/manager";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 
 function EditReservation() {
-  const { id } = useParams();
+  const params = useParams() || {};
+  const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,34 +35,50 @@ function EditReservation() {
 
   useEffect(() => {
     const loadBooking = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
-        const res = await superAdminService.getReservations();
-        if (res.success) {
-          const match = res.data.find(r => r._id === id || r.id === id);
-          if (match) {
-            setGuest(match.guest || "");
-            let currentRoomNum = match.room || match.roomNumber || "";
-            if (currentRoomNum.includes("·")) {
-              currentRoomNum = currentRoomNum.split("·")[0].trim();
-            }
-            if (currentRoomNum.toLowerCase().includes("room")) {
-              currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
-            }
-            setRoom(currentRoomNum);
-            if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
-            if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
-            setNights(match.nights || 1);
-            setPax(match.pax || "2 Adults");
-            setSource(match.source || "Direct");
-            setStatus(match.status || "Pending");
-            setAmount(match.amount || "");
-            setBalance(match.balance || "");
-            setIsGroupBooking(!!match.isGroupBooking);
-          } else {
-            setError("Reservation details not found.");
+        const cleanId = decodeURIComponent(String(id)).trim().toLowerCase();
+        const [superRes, mgrRes] = await Promise.all([
+          superAdminService.getReservations().catch(() => ({ success: false })),
+          managerService.getReservations().catch(() => ({ success: false }))
+        ]);
+
+        let allReservations = [];
+        if (superRes.success && Array.isArray(superRes.data)) allReservations.push(...superRes.data);
+        if (mgrRes.success && Array.isArray(mgrRes.data)) allReservations.push(...mgrRes.data);
+
+        const match = allReservations.find(r => 
+          String(r._id).toLowerCase() === cleanId || 
+          String(r.id).toLowerCase() === cleanId || 
+          String(r.bookingId).toLowerCase() === cleanId
+        );
+        let assignedNum = "";
+
+        if (match) {
+          setGuest(match.guest || match.guestName || "");
+          setPhone(match.phone || match.mobile || match.phoneNumber || "");
+          let currentRoomNum = match.room || match.roomNumber || "";
+          if (currentRoomNum.includes("·")) {
+            currentRoomNum = currentRoomNum.split("·")[0].trim();
           }
+          if (currentRoomNum.toLowerCase().includes("room")) {
+            currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
+          }
+          assignedNum = currentRoomNum;
+          setRoom(currentRoomNum);
+          if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
+          if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
+          setNights(match.nights || 1);
+          setPax(match.pax || "2 Adults");
+          setSource(match.source || "Direct");
+          setStatus(match.status || "Pending");
+          setAmount(match.totalAmount || match.amount || "");
+          setBalance(match.balance !== undefined ? match.balance : "");
+          setIsGroupBooking(!!match.isGroupBooking);
+        } else {
+          setError("Reservation details not found.");
         }
 
         // Dynamic MongoDB & Room Types available rooms computation
@@ -150,6 +168,15 @@ function EditReservation() {
             uniqueAvailable.push(r);
           }
         });
+
+        if (assignedNum && !seen.has(assignedNum)) {
+          seen.add(assignedNum);
+          uniqueAvailable.unshift({
+            num: assignedNum,
+            type: match?.roomType || 'Standard Room',
+            status: 'Assigned'
+          });
+        }
 
         uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
         setAvailableRoomsList(uniqueAvailable);
