@@ -1,17 +1,19 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import { 
-  Calendar, Bed, Gift, Sparkles, Hotel, MapPin, 
-  ArrowRight, ShieldCheck, RefreshCw, AlertCircle, Clock, CheckCircle2 
+  Calendar, Bed, Sparkles, Hotel, MapPin, 
+  ArrowRight, ShieldCheck, RefreshCw, AlertCircle, Clock, CheckCircle2, Receipt,
+  MessageSquareHeart, Star, MessageSquare
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { apiClient } from "@/services/apiClient";
 
 export const Route = createFileRoute("/guest/")({
   head: () => ({
     meta: [
       { title: "Guest Dashboard — Hour Stay" },
-      { name: "description", content: "Your stays, reservations and rewards with Hour Stay." }
+      { name: "description", content: "Your stays, reservations and account overview with Hour Stay." }
     ]
   }),
   component: GuestDashboardPage
@@ -46,6 +48,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function GuestDashboardPage() {
   const [data, setData] = useState(null);
+  const [feedbackCount, setFeedbackCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -58,23 +61,27 @@ function GuestDashboardPage() {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${apiBase}/v1/guest/dashboard`, { headers });
-      const result = await res.json();
+      const [res, fbRes] = await Promise.all([
+        fetch(`${apiBase}/v1/guest/dashboard`, { headers }).then(r => r.json()).catch(() => ({})),
+        apiClient.get('/v1/guest/feedback').catch(() => apiClient.get('/guest/feedback').catch(() => ({})))
+      ]);
 
-      if (result && result.success && result.data) {
-        setData(result.data);
+      if (res && res.success && res.data) {
+        setData(res.data);
       } else {
         setData({
           stats: {
             upcomingBooking: null,
             currentStay: null,
             totalStays: 0,
-            loyaltyPoints: 0,
-            loyaltyTier: 'Silver',
             totalSpent: 0
           },
           recentBookings: []
         });
+      }
+
+      if (fbRes && fbRes.success && Array.isArray(fbRes.data)) {
+        setFeedbackCount(fbRes.data.length);
       }
     } catch (err) {
       console.error("Failed to load guest dashboard:", err);
@@ -88,7 +95,6 @@ function GuestDashboardPage() {
     fetchDashboardData(false);
 
     const handleFocus = () => fetchDashboardData(true);
-    window.addEventListener('focus', handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       console.log('⚡ Realtime Socket event received on Guest Dashboard. Updating metrics...');
@@ -96,7 +102,6 @@ function GuestDashboardPage() {
     });
 
     return () => {
-      window.removeEventListener('focus', handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -135,7 +140,7 @@ function GuestDashboardPage() {
     <div className="space-y-6 text-left font-ui">
       
       {/* KPI Cards Grid (Manager/Admin UI Style) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <PremiumStatCard
           label="Upcoming Booking"
           value={upcoming ? upcoming.checkIn : "None"}
@@ -158,11 +163,18 @@ function GuestDashboardPage() {
           accentColor="#5B21B6"
         />
         <PremiumStatCard
-          label="Loyalty Rewards"
-          value={`${stats.loyaltyPoints ? stats.loyaltyPoints.toLocaleString() : 0} pts`}
-          hint={`${stats.loyaltyTier || "Silver"} Member Tier`}
-          icon={Gift}
-          accentColor="#F5C06A"
+          label="Total Spend"
+          value={stats.totalSpent ? `₹${stats.totalSpent.toLocaleString('en-IN')}` : "₹0"}
+          hint="Lifetime completed reservations"
+          icon={Receipt}
+          accentColor="#0D1B2A"
+        />
+        <PremiumStatCard
+          label="Feedback"
+          value={`${feedbackCount} Submitted`}
+          hint="Stay ratings & reviews"
+          icon={MessageSquareHeart}
+          accentColor="#10B981"
         />
       </div>
 
@@ -275,6 +287,27 @@ function GuestDashboardPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Guest Feedback & Experience Banner */}
+      <div className="bg-gradient-to-r from-purple/10 via-white to-emerald-500/10 rounded-2xl border border-purple/20 p-6 shadow-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="size-12 rounded-2xl bg-purple text-white flex items-center justify-center shrink-0 shadow-sm">
+            <MessageSquareHeart className="size-6" />
+          </div>
+          <div>
+            <h4 className="font-display text-base font-bold text-navy">Share Your Stay Feedback</h4>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Help us maintain luxury hospitality standards. Rate your recent room cleanliness, service, and amenities.
+            </p>
+          </div>
+        </div>
+        <a
+          href="/guest/feedback"
+          className="shrink-0 px-5 py-2.5 bg-navy text-white rounded-xl text-xs font-bold hover:bg-navy/90 transition-all shadow-soft inline-flex items-center gap-2 cursor-pointer"
+        >
+          <Star className="size-3.5 fill-gold text-gold" /> Submit Feedback <ArrowRight className="size-3.5" />
+        </a>
       </div>
 
     </div>

@@ -29,6 +29,8 @@ import { authService } from "@/services/auth";
 import { managerService } from "@/services/manager";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -87,8 +89,9 @@ function ManagerOperationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
-  // Selected reservation for Actions Modal
+  // Selected reservation  // Selected detail modal
   const [selectedRes, setSelectedRes] = useState(null);
+  const [extendingBooking, setExtendingBooking] = useState(null);
   const [assignRoomNum, setAssignRoomNum] = useState("");
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
 
@@ -120,19 +123,13 @@ function ManagerOperationsPage() {
   };
 
   useEffect(() => {
-    loadData();
-
-    const handleFocus = () => {
-      loadData();
-    };
-    window.addEventListener('focus', handleFocus);
+    loadData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -182,47 +179,29 @@ function ManagerOperationsPage() {
     }
   };
 
-  const getTodayISO = () => new Date().toISOString().split('T')[0];
-  const getTodayFormatted = () => {
-    const d = new Date();
-    const day = String(d.getDate()).padStart(2, '0');
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  };
-
-  const isTodayDate = (dateStr) => {
-    if (!dateStr) return false;
-    const str = String(dateStr).trim();
-    const todayISO = getTodayISO();
-    const todayFormatted = getTodayFormatted();
-    const todaySimple = new Date().toDateString();
-    
-    if (str.includes(todayISO) || str.includes(todayFormatted)) return true;
-    
-    const parsed = new Date(str);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toDateString() === todaySimple;
-    }
-    return false;
-  };
-
   // Calculations for Today's Stats (Scoped to property)
   const activeBookings = reservations.filter(r => (r.status || "").toLowerCase() !== "cancelled");
 
   const arrivalsToday = activeBookings.filter(r => {
     const s = (r.status || "").toLowerCase();
-    return s === "confirmed" || s === "pending" || s === "pre-checked";
+    return isToday(r.checkIn) && (s === "confirmed" || s === "pending" || s === "pre-checked" || s === "paid" || s === "checked-in" || s === "checked in");
   });
   const departuresToday = activeBookings.filter(r => {
     const s = (r.status || "").toLowerCase();
-    return s === "checked-out" || s === "checked out";
+    return isToday(r.checkOut) && (s === "checked-in" || s === "checked in" || s === "staying" || s === "checked-out" || s === "checked out");
   });
   const currentStays = activeBookings.filter(r => {
     const s = (r.status || "").toLowerCase();
     return s === "checked-in" || s === "checked in" || s === "staying";
   });
-  const pendingCheckins = arrivalsToday;
-  const pendingCheckouts = currentStays;
+  const pendingCheckins = activeBookings.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return isToday(r.checkIn) && (s === "confirmed" || s === "pending" || s === "pre-checked");
+  });
+  const pendingCheckouts = activeBookings.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return isToday(r.checkOut) && (s === "checked-in" || s === "checked in" || s === "staying");
+  });
 
   // Property room inventory math - total rooms count is 14
   const totalRoomsCount = 14;
@@ -474,16 +453,24 @@ function ManagerOperationsPage() {
                         </Button>
 
                         {/* Check-out if checked in, else Check-in */}
-                        {(r.status === "Checked-in" || r.status === "Checked In") ? (
-                          <Button
-                            onClick={() => handleStatusUpdate(r._id || r.id, "Checked-out")}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 text-indigo hover:text-indigo-deep hover:bg-indigo/10 cursor-pointer"
-                            title="Process Check-out"
-                          >
-                            <LogOut className="size-3.5" />
-                          </Button>
+                        {(r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying" || r.status === "Staying-In") ? (
+                          <>
+                            <ExtendStayButton
+                              size="xs"
+                              label="Extend"
+                              booking={r}
+                              role="manager"
+                            />
+                            <Button
+                              onClick={() => handleStatusUpdate(r._id || r.id, "Checked-out")}
+                              size="icon"
+                              variant="ghost"
+                              className="size-7 text-indigo hover:text-indigo-deep hover:bg-indigo/10 cursor-pointer"
+                              title="Process Check-out"
+                            >
+                              <LogOut className="size-3.5" />
+                            </Button>
+                          </>
                         ) : (r.status !== "Checked-out" && r.status !== "Checked Out" && r.status !== "Cancelled") ? (
                           <Button
                             onClick={() => handleStatusUpdate(r._id || r.id, "Checked-in")}
@@ -601,13 +588,21 @@ function ManagerOperationsPage() {
                       <UserCheck className="size-4" /> Check In
                     </Button>
                   )}
-                  {(selectedRes.status === "Checked-in" || selectedRes.status === "Checked In" || selectedRes.status === "Staying") && (
-                    <Button
-                      onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Checked-out")}
-                      className="bg-indigo hover:bg-indigo/90 text-white font-bold h-9 px-4 rounded-md cursor-pointer flex items-center gap-1.5"
-                    >
-                      <CheckCircle className="size-4" /> Check Out
-                    </Button>
+                  {(selectedRes.status === "Checked-in" || selectedRes.status === "Checked In" || selectedRes.status === "Staying" || selectedRes.status === "Staying-In") && (
+                    <>
+                      <ExtendStayButton
+                        variant="header"
+                        label="Extend Stay"
+                        booking={selectedRes}
+                        role="manager"
+                      />
+                      <Button
+                        onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Checked-out")}
+                        className="bg-indigo hover:bg-indigo/90 text-white font-bold h-9 px-4 rounded-xl cursor-pointer flex items-center gap-1.5"
+                      >
+                        <CheckCircle className="size-4" /> Check Out
+                      </Button>
+                    </>
                   )}
                   <Button
                     onClick={() => handleStatusUpdate(selectedRes._id || selectedRes.id, "Cancelled")}
@@ -638,6 +633,15 @@ function ManagerOperationsPage() {
           </div>
         </div>
       )}
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadArrivals(false)}
+        userRole="manager"
+      />
 
     </div>
   );

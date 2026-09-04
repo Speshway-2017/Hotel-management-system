@@ -106,15 +106,13 @@ function SuperAdminRoomsRates() {
   useEffect(() => {
     loadProperties(false);
 
-    const handleFocus = () => loadProperties(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadProperties(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadProperties(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

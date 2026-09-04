@@ -300,19 +300,13 @@ function ReportsDashboard() {
   };
 
   useEffect(() => {
-    loadData();
-
-    const handleFocus = () => {
-      loadData();
-    };
-    window.addEventListener('focus', handleFocus);
+    loadData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

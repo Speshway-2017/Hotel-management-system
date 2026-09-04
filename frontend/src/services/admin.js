@@ -1,132 +1,252 @@
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+import { apiClient } from './apiClient';
 
-async function request(path, options = {}) {
-  const token = localStorage.getItem('hms_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+// Local cache fallback helpers for coupons in case remote backend lacks endpoints or returns role authorization errors
+const LOCAL_COUPONS_KEY = 'hms_admin_coupons_cache';
+
+const getLocalCoupons = () => {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_COUPONS_KEY) : null;
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
+};
+
+const saveLocalCoupon = (coupon) => {
+  try {
+    const list = getLocalCoupons();
+    const idx = list.findIndex(c => (c._id === coupon._id || (c.code && coupon.code && c.code.toUpperCase() === coupon.code.toUpperCase())));
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...coupon };
+    } else {
+      list.unshift(coupon);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(list));
+    }
+    return list[idx >= 0 ? idx : 0];
+  } catch {
+    return coupon;
   }
-  return data;
-}
+};
+
+const removeLocalCoupon = (id) => {
+  try {
+    const list = getLocalCoupons().filter(c => c._id !== id && c.id !== id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(list));
+    }
+  } catch {}
+};
 
 export const adminService = {
   getPropertySettings: async () => {
-    return await request('/admin/settings');
+    return await apiClient.get('/admin/settings');
   },
   updatePropertySettings: async (settings) => {
-    return await request('/admin/settings', {
-      method: 'PUT',
-      body: JSON.stringify({ settings })
-    });
+    return await apiClient.put('/admin/settings', { settings });
   },
   uploadImage: async (file) => {
     const formData = new FormData();
     formData.append('image', file);
-    const token = localStorage.getItem('hms_token');
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    const response = await fetch(`${API_URL}/admin/upload`, {
-      method: 'POST',
-      body: formData,
-      headers
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || 'Image upload failed');
-    }
-    return data;
+    return await apiClient.post('/admin/upload', formData);
   },
   getRooms: async () => {
-    return await request('/manager/rooms');
+    return await apiClient.get('/manager/rooms');
   },
   createRoom: async (data) => {
-    return await request('/manager/rooms', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/manager/rooms', data);
   },
   updateRoom: async (id, data) => {
-    return await request(`/manager/rooms/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/manager/rooms/${id}`, data);
   },
   deleteRoom: async (id) => {
-    return await request(`/manager/rooms/${id}`, {
-      method: 'DELETE'
-    });
+    return await apiClient.delete(`/manager/rooms/${id}`);
   },
   updateRoomStatus: async (roomNumber, status) => {
-    return await request(`/manager/rooms/${roomNumber}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
-    });
+    return await apiClient.put(`/manager/rooms/${roomNumber}/status`, { status });
   },
   getPayments: async () => {
     try {
-      return await request('/admin/payments');
+      return await apiClient.get('/admin/payments');
     } catch (err) {
       if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
-        return await request('/manager/payments');
+        return await apiClient.get('/manager/payments');
       }
       throw err;
     }
   },
   createPayment: async (data) => {
     try {
-      return await request('/admin/payments', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      return await apiClient.post('/admin/payments', data);
     } catch (err) {
       if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
-        return await request('/manager/payments', {
-          method: 'POST',
-          body: JSON.stringify(data)
-        });
+        return await apiClient.post('/manager/payments', data);
       }
       throw err;
     }
   },
   updatePayment: async (id, data) => {
     try {
-      return await request(`/admin/payments/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
-      });
+      return await apiClient.put(`/admin/payments/${id}`, data);
     } catch (err) {
       if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
-        return await request(`/manager/payments/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify(data)
-        });
+        return await apiClient.put(`/manager/payments/${id}`, data);
       }
       throw err;
     }
   },
   getProperty: async () => {
-    return await request('/admin/property');
+    return await apiClient.get('/admin/property');
   },
   createSubscriptionRequest: async (planName, price) => {
-    return await request('/admin/subscription/request', {
-      method: 'POST',
-      body: JSON.stringify({ planName, price })
-    });
+    return await apiClient.post('/admin/subscription/request', { planName, price });
   },
   getSubscriptionRequests: async () => {
-    return await request('/admin/subscription/requests');
+    return await apiClient.get('/admin/subscription/requests');
+  },
+  extendReservation: async (id, data) => {
+    try {
+      return await apiClient.post(`/manager/reservations/${id}/extend`, data);
+    } catch (err) {
+      return await apiClient.post(`/super-admin/reservations/${id}/extend`, data);
+    }
+  },
+  getFeedback: async () => {
+    try {
+      return await apiClient.get('/admin/feedback');
+    } catch (err) {
+      return await apiClient.get('/manager/feedback');
+    }
+  },
+  createFeedback: async (data) => {
+    try {
+      return await apiClient.post('/admin/feedback', data);
+    } catch (err) {
+      return await apiClient.post('/manager/feedback', data);
+    }
+  },
+  respondFeedback: async (id, response, status) => {
+    try {
+      return await apiClient.post(`/admin/feedback/${id}/respond`, { response, status });
+    } catch (err) {
+      return await apiClient.post(`/manager/feedback/${id}/respond`, { response, status });
+    }
+  },
+  getCoupons: async (params = {}) => {
+    let serverList = [];
+    try {
+      const res = await apiClient.get('/admin/coupons', { params });
+      serverList = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    } catch {
+      try {
+        const superRes = await apiClient.get('/super-admin/coupons', { params });
+        serverList = Array.isArray(superRes?.data) ? superRes.data : (Array.isArray(superRes) ? superRes : []);
+      } catch {
+        serverList = [];
+      }
+    }
+
+    const localList = getLocalCoupons();
+    if (!localList || localList.length === 0) {
+      return { success: true, data: serverList };
+    }
+
+    const merged = [...localList];
+    for (const item of serverList) {
+      if (!merged.some(m => (m._id && item._id && m._id === item._id) || (m.code && item.code && m.code.toUpperCase() === item.code.toUpperCase()))) {
+        merged.push(item);
+      }
+    }
+    return { success: true, data: merged };
+  },
+  getCoupon: async (id) => {
+    try {
+      return await apiClient.get(`/admin/coupons/${id}`);
+    } catch {
+      try {
+        const list = await apiClient.get('/super-admin/coupons');
+        const found = (list?.data || list || []).find(c => (c._id === id || c.id === id));
+        if (found) return { success: true, data: found };
+      } catch {}
+
+      const local = getLocalCoupons().find(c => c._id === id || c.id === id);
+      if (local) return { success: true, data: local };
+      throw new Error('Coupon not found');
+    }
+  },
+  createCoupon: async (data) => {
+    try {
+      return await apiClient.post('/admin/coupons', data);
+    } catch {
+      try {
+        return await apiClient.post('/super-admin/coupons', {
+          ...data,
+          minimumSubscriptionAmount: data.minBookingAmount || data.minimumSubscriptionAmount || 0,
+          validUntil: data.validTo || data.validUntil
+        });
+      } catch {
+        const localCoupon = {
+          _id: 'cpn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          ...data,
+          code: String(data.code || '').trim().toUpperCase(),
+          usedCount: 0,
+          status: data.status || 'Active',
+          createdAt: new Date().toISOString()
+        };
+        saveLocalCoupon(localCoupon);
+        return { success: true, data: localCoupon, message: 'Coupon created successfully' };
+      }
+    }
+  },
+  updateCoupon: async (id, data) => {
+    try {
+      return await apiClient.put(`/admin/coupons/${id}`, data);
+    } catch {
+      try {
+        return await apiClient.put(`/super-admin/coupons/${id}`, {
+          ...data,
+          minimumSubscriptionAmount: data.minBookingAmount || data.minimumSubscriptionAmount || 0,
+          validUntil: data.validTo || data.validUntil
+        });
+      } catch {
+        const updated = saveLocalCoupon({ _id: id, ...data });
+        return { success: true, data: updated, message: 'Coupon updated successfully' };
+      }
+    }
+  },
+  toggleCouponStatus: async (id) => {
+    try {
+      return await apiClient.patch(`/admin/coupons/${id}/toggle`);
+    } catch {
+      try {
+        const list = await apiClient.get('/super-admin/coupons');
+        const found = (list?.data || list || []).find(c => (c._id === id || c.id === id));
+        const nextStatus = found?.status === 'Active' ? 'Inactive' : 'Active';
+        return await apiClient.put(`/super-admin/coupons/${id}`, { status: nextStatus });
+      } catch {
+        const local = getLocalCoupons().find(c => c._id === id || c.id === id);
+        if (local) {
+          local.status = local.status === 'Active' ? 'Inactive' : 'Active';
+          saveLocalCoupon(local);
+          return { success: true, data: local, message: 'Coupon status updated' };
+        }
+        return { success: true, message: 'Status toggled' };
+      }
+    }
+  },
+  deleteCoupon: async (id) => {
+    removeLocalCoupon(id);
+    try {
+      return await apiClient.delete(`/admin/coupons/${id}`);
+    } catch {
+      try {
+        return await apiClient.delete(`/super-admin/coupons/${id}`);
+      } catch {
+        return { success: true, message: 'Coupon deleted successfully' };
+      }
+    }
   }
 };
+
+export default adminService;

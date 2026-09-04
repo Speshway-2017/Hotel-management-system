@@ -56,10 +56,15 @@ import { Route as AdminTaxes } from "./roles/admin/pages/Taxes";
 import { Route as AdminFeedback } from "./roles/admin/pages/Feedback";
 import { Route as AdminCrm } from "./roles/admin/pages/Crm";
 import { Route as AdminSubscription } from "./roles/admin/pages/Subscription";
+import { Route as AdminCoupons } from "./roles/admin/pages/Coupons";
+import { Route as AdminAddCoupon } from "./roles/admin/pages/AddCoupon";
+import { Route as AdminEditCoupon } from "./roles/admin/pages/EditCoupon";
+import { Route as AdminViewCoupon } from "./roles/admin/pages/ViewCoupon";
 import { Route as AdminProfile } from "./roles/admin/pages/Profile";
 import { Route as AdminAddReservation } from "./roles/admin/pages/AddReservation";
 import { Route as AdminEditReservation } from "./roles/admin/pages/EditReservation";
 import { Route as AdminViewReservation } from "./roles/admin/pages/ViewReservation";
+import { Route as AdminExtendReservation } from "./roles/admin/pages/ExtendReservation";
 import { Route as AdminAssignRoomDesk } from "./roles/admin/pages/AssignRoomDesk";
 import { Route as AdminCollectPaymentDesk } from "./roles/admin/pages/CollectPaymentDesk";
 
@@ -84,6 +89,7 @@ import { Route as ManagerReservations } from "./roles/manager/pages/Reservations
 import { Route as ManagerAddReservation } from "./roles/manager/pages/AddReservation";
 import { Route as ManagerViewReservation } from "./roles/manager/pages/ViewReservation";
 import { Route as ManagerEditReservation } from "./roles/manager/pages/EditReservation";
+import { Route as ManagerExtendReservation } from "./roles/manager/pages/ExtendReservation";
 import { Route as ManagerShifts } from "./roles/manager/pages/Shifts";
 import { Route as ManagerProfile } from "./roles/manager/pages/Profile";
 import { Route as ManagerRooms } from "./roles/manager/pages/Rooms";
@@ -116,9 +122,11 @@ import { Route as ReceptionCheckInDetails } from "./roles/receptionist/pages/Che
 import { Route as ReceptionCheckOutDetails } from "./roles/receptionist/pages/CheckOutDetails";
 import { Route as ReceptionFolioDetails } from "./roles/receptionist/pages/FolioDetails";
 import { Route as ReceptionReservationDetails } from "./roles/receptionist/pages/ReservationDetails";
+import { Route as ReceptionExtendReservation } from "./roles/receptionist/pages/ExtendReservation";
 import { Route as ReceptionRoomDetails } from "./roles/receptionist/pages/RoomDetails";
 import { Route as ReceptionGuestDetails } from "./roles/receptionist/pages/GuestDetails";
 import { Route as ReceptionNotificationDetails } from "./roles/receptionist/pages/NotificationDetails";
+import { Route as ReceptionFeedback } from "./roles/receptionist/pages/Feedback";
 
 // Import Guest Workspace Pages
 import { Route as GuestLayout } from "./roles/guest/pages/GuestLayout";
@@ -126,7 +134,6 @@ import { Route as GuestDashboard } from "./roles/guest/pages/Dashboard";
 import { Route as GuestBooking } from "./roles/guest/pages/Booking";
 import { Route as GuestBookings } from "./roles/guest/pages/Bookings";
 import { Route as GuestFolio } from "./roles/guest/pages/Folio";
-import { Route as GuestLoyalty } from "./roles/guest/pages/Loyalty";
 import { Route as GuestNotifications } from "./roles/guest/pages/Notifications";
 import { Route as GuestPayment } from "./roles/guest/pages/Payment";
 import { Route as GuestPreCheckIn } from "./roles/guest/pages/PreCheckIn";
@@ -316,6 +323,8 @@ export default function App() {
             <Route path="/admin/reservations/add" element={<RouteWrapper routeObj={AdminAddReservation} />} />
             <Route path="/admin/reservations/edit/:id" element={<RouteWrapper routeObj={AdminEditReservation} />} />
             <Route path="/admin/reservations/view/:id" element={<RouteWrapper routeObj={AdminViewReservation} />} />
+            <Route path="/admin/reservations/extend/:id" element={<RouteWrapper routeObj={AdminExtendReservation} />} />
+            <Route path="/admin/reservations/extend" element={<RouteWrapper routeObj={AdminExtendReservation} />} />
             <Route path="/admin/rooms" element={<RouteWrapper routeObj={AdminRooms} />} />
             <Route path="/admin/rooms/add" element={<RouteWrapper routeObj={AdminAddRoom} />} />
             <Route path="/admin/rooms/add-type" element={<RouteWrapper routeObj={AdminAddRoomType} />} />
@@ -331,6 +340,10 @@ export default function App() {
             <Route path="/admin/feedback" element={<RouteWrapper routeObj={AdminFeedback} />} />
             <Route path="/admin/crm" element={<RouteWrapper routeObj={AdminCrm} />} />
             <Route path="/admin/subscription" element={<RouteWrapper routeObj={AdminSubscription} />} />
+            <Route path="/admin/coupons" element={<RouteWrapper routeObj={AdminCoupons} />} />
+            <Route path="/admin/coupons/add" element={<RouteWrapper routeObj={AdminAddCoupon} />} />
+            <Route path="/admin/coupons/edit/:id" element={<RouteWrapper routeObj={AdminEditCoupon} />} />
+            <Route path="/admin/coupons/view/:id" element={<RouteWrapper routeObj={AdminViewCoupon} />} />
             <Route path="/admin/profile" element={<RouteWrapper routeObj={AdminProfile} />} />
           </Route>
 
@@ -359,6 +372,8 @@ export default function App() {
             <Route path="/manager/reservations/new" element={<RouteWrapper routeObj={ManagerAddReservation} />} />
             <Route path="/manager/reservations/view/:id" element={<RouteWrapper routeObj={ManagerViewReservation} />} />
             <Route path="/manager/reservations/edit/:id" element={<RouteWrapper routeObj={ManagerEditReservation} />} />
+            <Route path="/manager/reservations/extend/:id" element={<RouteWrapper routeObj={ManagerExtendReservation} />} />
+            <Route path="/manager/reservations/extend" element={<RouteWrapper routeObj={ManagerExtendReservation} />} />
             <Route path="/manager/rooms" element={<RouteWrapper routeObj={ManagerRooms} />} />
             <Route path="/manager/shifts" element={<RouteWrapper routeObj={ManagerShifts} />} />
             <Route path="/manager/attendance" element={<RouteWrapper routeObj={ManagerAttendance} />} />
@@ -386,11 +401,16 @@ export default function App() {
             <Route path="/reception/payments/view/:id" element={<RouteWrapper routeObj={ReceptionPaymentDetails} />} />
             <Route path="/reception/reservations" element={<RouteWrapper routeObj={ReceptionReservations} />} />
             <Route path="/reception/room-assignment" element={<RouteWrapper routeObj={ReceptionRoomAssignment} />} />
+            <Route path="/reception/feedback" element={<RouteWrapper routeObj={ReceptionFeedback} />} />
             <Route path="/reception/profile" element={<RouteWrapper routeObj={ReceptionProfile} />} />
             <Route path="/reception/check-in/:id" element={<RouteWrapper routeObj={ReceptionCheckInDetails} />} />
             <Route path="/reception/check-out/:id" element={<RouteWrapper routeObj={ReceptionCheckOutDetails} />} />
             <Route path="/reception/folio/:id" element={<RouteWrapper routeObj={ReceptionFolioDetails} />} />
             <Route path="/reception/reservations/:id" element={<RouteWrapper routeObj={ReceptionReservationDetails} />} />
+            <Route path="/reception/reservations/extend/:id" element={<RouteWrapper routeObj={ReceptionExtendReservation} />} />
+            <Route path="/reception/reservations/extend" element={<RouteWrapper routeObj={ReceptionExtendReservation} />} />
+            <Route path="/reception/extend/:id" element={<RouteWrapper routeObj={ReceptionExtendReservation} />} />
+            <Route path="/reception/extend" element={<RouteWrapper routeObj={ReceptionExtendReservation} />} />
             <Route path="/reception/room-assignment/:id" element={<RouteWrapper routeObj={ReceptionRoomDetails} />} />
             <Route path="/reception/guest-search/:id" element={<RouteWrapper routeObj={ReceptionGuestDetails} />} />
             <Route path="/reception/notifications/:id" element={<RouteWrapper routeObj={ReceptionNotificationDetails} />} />
@@ -404,11 +424,11 @@ export default function App() {
             <Route path="/guest/bookings/:id" element={<RouteWrapper routeObj={GuestBookings} />} />
             <Route path="/guest/folio" element={<RouteWrapper routeObj={GuestFolio} />} />
             <Route path="/guest/folio/:id" element={<RouteWrapper routeObj={GuestFolio} />} />
-            <Route path="/guest/loyalty" element={<RouteWrapper routeObj={GuestLoyalty} />} />
             <Route path="/guest/notifications" element={<RouteWrapper routeObj={GuestNotifications} />} />
             <Route path="/guest/payment" element={<RouteWrapper routeObj={GuestPayment} />} />
             <Route path="/guest/pre-check-in" element={<RouteWrapper routeObj={GuestPreCheckIn} />} />
             <Route path="/guest/profile" element={<RouteWrapper routeObj={GuestProfile} />} />
+            <Route path="/guest/feedback" element={<RouteWrapper routeObj={GuestReviews} />} />
             <Route path="/guest/reviews" element={<RouteWrapper routeObj={GuestReviews} />} />
             <Route path="/guest/search" element={<RouteWrapper routeObj={GuestSearch} />} />
             <Route path="/guest/services" element={<RouteWrapper routeObj={GuestServices} />} />

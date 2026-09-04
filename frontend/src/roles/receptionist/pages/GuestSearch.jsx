@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ExtendStayModal } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 export const Route = createFileRoute("/reception/guest-search")({
   head: () => ({
@@ -53,6 +55,7 @@ function InHouseGuestsPage() {
   const [filterRoomType, setFilterRoomType] = useState("all");
   const [loading, setLoading] = useState(true);
   const [guests, setGuests] = useState([]);
+  const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadGuests = (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -84,7 +87,6 @@ function InHouseGuestsPage() {
                   balance: bal,
                   paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
                   status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : b.status,
-                  vipTier: 'Gold Elite',
                   specialRequests: b.notes || b.specialRequests || 'None',
                   timeline: [
                     { time: b.checkIn || 'Today', action: 'Guest in-house active stay.' }
@@ -107,20 +109,14 @@ function InHouseGuestsPage() {
 
     const interval = setInterval(() => {
       loadGuests(true);
-    }, 10000);
-
-    const handleFocus = () => {
-      loadGuests(true);
-    };
-    window.addEventListener('focus', handleFocus);
+    }, 10000);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadGuests(true);
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -137,8 +133,7 @@ function InHouseGuestsPage() {
   const totalCount = guests.length;
   const stayingCount = guests.filter(g => g.status === "Staying" || g.status === "Checked-in" || g.status === "Checked-In").length;
   const extendedCount = guests.filter(g => g.status === "Extended Stay").length;
-  const todayIso = new Date().toISOString().split('T')[0];
-  const dueOutCount = guests.filter(g => g.checkOut === todayIso || g.checkOut === 'Today').length;
+  const dueOutCount = guests.filter(g => isToday(g.checkOut) && (g.status === "Staying" || g.status === "Checked-in" || g.status === "Checked-In")).length;
 
   // Search and filter calculation
   const filteredGuests = guests.filter(g => {
@@ -366,6 +361,18 @@ function InHouseGuestsPage() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
+                        {(g.status === "Staying" || g.status === "Extended Stay" || g.status === "Checked-in" || g.status === "Checked In") && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => navigate(`/reception/reservations/extend/${g.id || g._id}`)}
+                            className="text-brand border-brand/30 hover:bg-brand/10 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                            title="Extend Stay Duration"
+                          >
+                            Extend
+                          </Button>
+                        )}
+
                         <Button
                           asChild
                           size="xs"
@@ -395,6 +402,15 @@ function InHouseGuestsPage() {
           </table>
         </div>
       </Panel>
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadGuests(false)}
+        userRole="receptionist"
+      />
 
     </div>
   );

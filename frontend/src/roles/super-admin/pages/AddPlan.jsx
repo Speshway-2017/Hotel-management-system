@@ -139,7 +139,7 @@ function AddPlan() {
           <FormField label="Included Features (Comma separated)" id="includedFeatures">
             <Textarea
               id="includedFeatures"
-              placeholder="e.g. Direct Website Builder, 2-Way OTA XML Channel Sync, Custom Loyalty System"
+              placeholder="e.g. Direct Website Builder, 2-Way OTA XML Channel Sync, Advanced CRM Module"
               value={formData.includedFeaturesText}
               onChange={(e) => setFormData({ ...formData, includedFeaturesText: e.target.value })}
               className="min-h-[70px]"

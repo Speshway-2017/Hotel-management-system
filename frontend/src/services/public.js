@@ -1,75 +1,60 @@
-const API_URL = import.meta.env.VITE_PUBLIC_API_URL || (import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/v1/public` : 'http://localhost:5000/api/v1/public');
+import { apiClient } from './apiClient';
 
-async function request(path, options = {}) {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-
-  return data;
-}
+const PUBLIC_PREFIX = '/v1/public';
 
 export const publicService = {
   getBranding: async () => {
-    return await request('/branding');
+    return await apiClient.get(`${PUBLIC_PREFIX}/branding`);
   },
   getHome: async () => {
-    return await request('/home');
+    return await apiClient.get(`${PUBLIC_PREFIX}/home`);
   },
   getAbout: async () => {
-    return await request('/about');
+    return await apiClient.get(`${PUBLIC_PREFIX}/about`);
   },
   getFeatures: async () => {
-    return await request('/features');
+    return await apiClient.get(`${PUBLIC_PREFIX}/features`);
   },
   getBlogs: async () => {
-    return await request('/blogs');
+    return await apiClient.get(`${PUBLIC_PREFIX}/blogs`);
   },
   getContact: async () => {
-    return await request('/contact');
+    return await apiClient.get(`${PUBLIC_PREFIX}/contact`);
   },
   getSettings: async () => {
-    return await request('/settings');
+    return await apiClient.get(`${PUBLIC_PREFIX}/settings`);
   },
   getFaqs: async () => {
-    return await request('/faqs');
+    return await apiClient.get(`${PUBLIC_PREFIX}/faqs`);
   },
   getMedia: async () => {
-    return await request('/media');
+    return await apiClient.get(`${PUBLIC_PREFIX}/media`);
   },
   getProperties: async () => {
-    return await request('/properties');
+    return await apiClient.get(`${PUBLIC_PREFIX}/properties`);
   },
   getProperty: async (id) => {
-    return await request(`/properties/${id}`);
+    return await apiClient.get(`${PUBLIC_PREFIX}/properties/${id}`);
   },
   getPropertyRooms: async (id) => {
-    return await request(`/properties/${id}/rooms`);
+    return await apiClient.get(`${PUBLIC_PREFIX}/properties/${id}/rooms`);
   },
   createBooking: async (bookingData) => {
-    return await request('/bookings', {
-      method: 'POST',
-      body: JSON.stringify(bookingData)
-    });
+    return await apiClient.post(`${PUBLIC_PREFIX}/bookings`, bookingData);
   },
   submitContact: async (contactData) => {
-    return await request('/contact', {
-      method: 'POST',
-      body: JSON.stringify(contactData)
-    });
+    return await apiClient.post(`${PUBLIC_PREFIX}/contact`, contactData);
   },
   getSubscriptionPlans: async () => {
-    return await request('/plans');
+    return await apiClient.get(`${PUBLIC_PREFIX}/plans`);
+  },
+  getCoupons: async (propertyId = '') => {
+    const params = propertyId ? { propertyId } : {};
+    return await apiClient.get(`${PUBLIC_PREFIX}/coupons`, { params });
+  },
+  validateCoupon: async (payload) => {
+    return await apiClient.post(`${PUBLIC_PREFIX}/coupons/validate`, payload);
   }
 };
+
+export default publicService;

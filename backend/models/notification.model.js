@@ -17,6 +17,10 @@ const notificationSchema = new mongoose.Schema({
   isRead: { type: Boolean, default: false }
 }, { timestamps: true });
 
+notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ role: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ propertyId: 1, isRead: 1, createdAt: -1 });
+
 let MongooseNotification;
 try {
   MongooseNotification = mongoose.model('Notification');

@@ -6,6 +6,8 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { toast } from "sonner";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { formatDisplayDate, isToday } from "@/utils/dateUtils";
 import {
   CalendarCheck,
   Bed,
@@ -106,9 +108,10 @@ function ReservationsPage() {
   // Selected Reservation drawer state
   const [selectedRes, setSelectedRes] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [extendingBooking, setExtendingBooking] = useState(null);
 
   // Calendar View Start Date and Helpers
-  const [calendarStart, setCalendarStart] = useState(new Date("2026-08-17"));
+  const [calendarStart, setCalendarStart] = useState(() => new Date());
 
   const getCalendarDates = () => {
     const dates = [];
@@ -230,19 +233,13 @@ function ReservationsPage() {
   };
 
   useEffect(() => {
-    loadReservations(false);
-
-    const handleFocus = () => {
-      loadReservations(false);
-    };
-    window.addEventListener('focus', handleFocus);
+    loadReservations(false);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadReservations(false);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -386,9 +383,9 @@ function ReservationsPage() {
 
   // Calculate high-level KPIs matching design references
   const totalCount = reservations.length;
-  const confirmedCount = reservations.filter((r) => r.status === "Confirmed").length;
-  const checkedInCount = reservations.filter((r) => r.status === "Checked-in").length;
-  const checkedOutCount = reservations.filter((r) => r.status === "Checked-out").length;
+  const confirmedCount = reservations.filter((r) => r.status === "Confirmed" || r.status === "Pre-checked" || r.status === "Paid").length;
+  const checkedInCount = reservations.filter((r) => r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying").length;
+  const checkedOutCount = reservations.filter((r) => r.status === "Checked-out" || r.status === "Checked Out").length;
   const pendingCount = reservations.filter((r) => r.status === "Pending").length;
   const cancelledCount = reservations.filter((r) => r.status === "Cancelled").length;
 
@@ -582,7 +579,7 @@ function ReservationsPage() {
                           </td>
                           <td className="py-3.5 px-2 font-mono text-xs font-bold text-navy align-middle">{res.room || "—"}</td>
                           <td className="py-3.5 px-3 align-middle">
-                            <div className="font-bold text-navy whitespace-nowrap">{res.checkIn} → {res.checkOut}</div>
+                            <div className="font-bold text-navy whitespace-nowrap">{formatDisplayDate(res.checkIn)} → {formatDisplayDate(res.checkOut)}</div>
                             <div className="text-[11px] text-muted-foreground font-medium">{res.nights || 1} Night(s) / {res.pax || "2 Adults"}</div>
                           </td>
                           <td className="py-3.5 px-3 align-middle">
@@ -646,15 +643,23 @@ function ReservationsPage() {
                                   Check-In
                                 </Button>
                               )}
-                              {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying") && (
-                                <Button
-                                  onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
-                                  size="xs"
-                                  variant="outline"
-                                  className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                                >
-                                  Check-Out
-                                </Button>
+                              {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
+                                <>
+                                  <ExtendStayButton
+                                    size="xs"
+                                    label="Extend"
+                                    booking={res}
+                                    onClick={() => navigate({ to: `/admin/reservations/extend/${res._id || res.id || res.bookingId}` })}
+                                  />
+                                  <Button
+                                    onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
+                                    size="xs"
+                                    variant="outline"
+                                    className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                                  >
+                                    Check-Out
+                                  </Button>
+                                </>
                               )}
                               <Button
                                 onClick={() => navigate({ to: `/admin/reservations/view/${res._id || res.id}` })}
@@ -1022,13 +1027,22 @@ function ReservationsPage() {
                   Confirm Check-In
                 </Button>
               )}
-              {(selectedRes.status === "Checked-in" || selectedRes.status === "Checked In" || selectedRes.status === "Staying") && (
-                <Button
-                  onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Checked-out")}
-                  className="bg-navy hover:bg-navy-deep text-white text-xs font-bold px-4 h-9 rounded-full flex-1 cursor-pointer"
-                >
-                  Confirm Check-Out
-                </Button>
+              {(selectedRes.status === "Checked-in" || selectedRes.status === "Checked In" || selectedRes.status === "Staying" || selectedRes.status === "Staying-In") && (
+                <>
+                  <ExtendStayButton
+                    variant="header"
+                    label="Extend Stay"
+                    booking={selectedRes}
+                    onClick={() => navigate({ to: `/admin/reservations/extend/${selectedRes._id || selectedRes.id || selectedRes.bookingId}` })}
+                    className="flex-1 justify-center"
+                  />
+                  <Button
+                    onClick={() => handleStatusChange(selectedRes._id || selectedRes.id, "Checked-out")}
+                    className="bg-navy hover:bg-navy-deep text-white text-xs font-bold px-4 h-9 rounded-xl flex-1 cursor-pointer"
+                  >
+                    Confirm Check-Out
+                  </Button>
+                </>
               )}
               {selectedRes.status !== "Cancelled" && selectedRes.status !== "Checked-out" && selectedRes.status !== "Checked Out" && (
                 <Button
@@ -1050,6 +1064,15 @@ function ReservationsPage() {
           </div>
         </div>
       )}
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadReservations(false)}
+        userRole="admin"
+      />
     </div>
   );
 }

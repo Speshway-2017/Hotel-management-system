@@ -6,7 +6,7 @@ import { cn } from "@/utils/utils";
 import {
   UserCog,
   Activity,
-  Gift,
+  Users,
   Bell,
   CheckCheck,
   Building
@@ -18,7 +18,7 @@ import { toast } from "sonner";
 const managementTabs = [
   { label: "Staff Management", to: "/admin/staff", icon: UserCog },
   { label: "OTA / Channels", to: "/admin/channels", icon: Activity },
-  { label: "CRM / Loyalty", to: "/admin/crm", icon: Gift },
+  { label: "Guest CRM", to: "/admin/crm", icon: Users },
   { label: "Notifications", to: "/admin/notifications", icon: Bell }
 ];
 
@@ -79,15 +79,13 @@ function AdminNotificationsPage() {
   useEffect(() => {
     loadNotifications(false);
 
-    const handleFocus = () => loadNotifications(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadNotifications(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadNotifications(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

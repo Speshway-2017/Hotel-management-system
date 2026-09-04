@@ -121,15 +121,13 @@ function ManagerApprovalsPage() {
   useEffect(() => {
     loadData(false);
 
-    const handleFocus = () => loadData(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

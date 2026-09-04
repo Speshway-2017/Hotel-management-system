@@ -107,15 +107,13 @@ function ReceptionNotificationsPage() {
   useEffect(() => {
     loadNotificationsData(false);
 
-    const handleFocus = () => loadNotificationsData(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadNotificationsData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadNotificationsData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

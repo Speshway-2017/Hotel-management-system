@@ -7,6 +7,8 @@ import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import {
   CalendarCheck,
   Bed,
@@ -100,6 +102,8 @@ function FrontDeskPage() {
   const [targetRoomNum, setTargetRoomNum] = useState("");
   const [extendNightsCount, setExtendNightsCount] = useState("2");
   const [collectAmount, setCollectAmount] = useState("");
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
 
   const notifySocketEvents = (action = 'update', roomNum = null) => {
     emitRealtimeEvent('booking_updated', { action, roomNum });
@@ -247,26 +251,20 @@ function FrontDeskPage() {
   };
 
   useEffect(() => {
-    loadData();
-
-    const handleFocus = () => {
-      loadData(true);
-    };
-    window.addEventListener('focus', handleFocus);
+    loadData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
   // Helper selectors
-  const activeCheckInsToday = reservations.filter(r => r.status === "Confirmed" || r.status === "Pending" || r.status === "Pre-checked");
-  const activeCheckOutsToday = reservations.filter(r => r.status === "Checked-out" || r.status === "Checked Out");
+  const activeCheckInsToday = reservations.filter(r => isToday(r.checkIn) && (r.status === "Confirmed" || r.status === "Pending" || r.status === "Pre-checked" || r.status === "Paid" || r.status === "Checked-in"));
+  const activeCheckOutsToday = reservations.filter(r => isToday(r.checkOut) && (r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying" || r.status === "Checked-out" || r.status === "Checked Out"));
   const inHouseGuests = reservations.filter(r => r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying");
 
   // State modification logic
@@ -819,8 +817,8 @@ function FrontDeskPage() {
                         }`}>{dep.paymentStatus}</span>
                       </td>
                       <td className="py-3.5 px-4"><Tag tone={dep.status === "Checked-out" ? "neutral" : "brand"}>{dep.status}</Tag></td>
-                      <td className="py-3 px-4 text-left" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
-                        <div className="flex items-center justify-start gap-1 select-none">
+                      <td className="py-3 px-4 text-left" style={{ width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+                        <div className="flex items-center justify-start gap-1 select-none flex-wrap">
                           <Button
                             onClick={() => navigate({ to: `/admin/reservations/view/${dep._id}` })}
                             variant="ghost"
@@ -839,13 +837,21 @@ function FrontDeskPage() {
                             </Button>
                           )}
                           {dep.status === "Checked-in" && (
-                            <Button
-                              onClick={() => handleCheckoutAction(dep._id)}
-                              className="h-7 w-7 p-0 bg-navy hover:bg-navy-deep text-white flex items-center justify-center rounded-full"
-                              title="Check-Out"
-                            >
-                              <LogOut className="size-4" />
-                            </Button>
+                            <>
+                              <ExtendStayButton
+                                size="xs"
+                                label="Extend"
+                                booking={dep}
+                                role="admin"
+                              />
+                              <Button
+                                onClick={() => handleCheckoutAction(dep._id)}
+                                className="h-7 w-7 p-0 bg-navy hover:bg-navy-deep text-white flex items-center justify-center rounded-full"
+                                title="Check-Out"
+                              >
+                                <LogOut className="size-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -874,7 +880,7 @@ function FrontDeskPage() {
                     <th className="py-3 px-4">Departure Target</th>
                     <th className="py-3 px-4">Stay Nights</th>
                     <th className="py-3 px-4">Balance</th>
-                    <th className="py-3 px-4 text-left font-bold" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>Action</th>
+                    <th className="py-3 px-4 text-left font-bold" style={{ width: '180px', minWidth: '180px', maxWidth: '180px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30">
@@ -886,8 +892,8 @@ function FrontDeskPage() {
                       <td className="py-3.5 px-4 text-muted-foreground">{res.checkOut}</td>
                       <td className="py-3.5 px-4">{res.nights} Nights</td>
                       <td className="py-3.5 px-4 font-semibold text-navy">₹{res.balance?.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-left" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
-                        <div className="flex items-center justify-start gap-1 select-none">
+                      <td className="py-3 px-4 text-left" style={{ width: '180px', minWidth: '180px', maxWidth: '180px' }}>
+                        <div className="flex items-center justify-start gap-1 select-none flex-wrap">
                           <Button
                             onClick={() => navigate({ to: `/admin/reservations/view/${res._id}` })}
                             variant="ghost"
@@ -904,14 +910,12 @@ function FrontDeskPage() {
                           >
                             <Sliders className="size-4" />
                           </Button>
-                          <Button
-                            onClick={() => { setTargetBookingId(res._id); setExtendNightsCount("1"); setActiveModal("extend"); }}
-                            variant="ghost"
-                            className="h-7 w-7 p-0 hover:text-navy hover:bg-muted/15 flex items-center justify-center rounded-full"
-                            title="Extend Stay"
-                          >
-                            <CalendarDays className="size-4" />
-                          </Button>
+                          <ExtendStayButton
+                            size="xs"
+                            label="Extend"
+                            booking={res}
+                            role="admin"
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1500,6 +1504,20 @@ function FrontDeskPage() {
           </div>
         </div>
       )}
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        isOpen={extendModalOpen}
+        booking={selectedBookingForExtend}
+        onClose={() => {
+          setExtendModalOpen(false);
+          setSelectedBookingForExtend(null);
+        }}
+        onSuccess={() => {
+          loadData(true);
+        }}
+        userRole="admin"
+      />
 
     </div>
   );

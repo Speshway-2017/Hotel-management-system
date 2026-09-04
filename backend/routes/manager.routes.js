@@ -16,12 +16,14 @@ import {
 } from '../models/managerData.model.js';
 import { triggerNotification } from '../utils/notification.helper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
+import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
+import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 
 const router = express.Router();
 
 // All manager routes are protected and restricted to manager role
 router.use(protect);
-router.use(authorize('manager', 'admin', 'super-admin'));
+router.use(authorize('manager', 'admin', 'super-admin', 'receptionist'));
 
 // Helper to seed default rooms for a property if empty
 const seedDefaultRooms = async (propertyId) => {
@@ -95,7 +97,7 @@ const seedDefaultApprovals = async (propertyId) => {
         category: "Discount",
         requestedBy: "receptionist@hourstay.com",
         amount: 2500,
-        reason: "Repeat corporate guest requested loyalty tariff override.",
+        reason: "Repeat corporate guest requested corporate tariff override.",
         status: "Pending",
         propertyId
       },
@@ -125,27 +127,75 @@ const seedDefaultApprovals = async (propertyId) => {
 
 // Helper to seed default reviews/feedback if empty
 const seedDefaultFeedback = async (propertyId) => {
-  const count = await Feedback.countDocuments({ propertyId });
+  const propId = propertyId || 'HS-JAI';
+  const count = await Feedback.countDocuments({ propertyId: propId });
   if (count === 0) {
     const defaults = [
       {
         bookingId: "BK-10301",
         guestName: "Surya",
+        guestEmail: "surya@example.com",
+        guestPhone: "+91 98765 43210",
         room: "103 · Standard Room",
-        ratings: { cleanliness: 5, service: 5, room: 4 },
-        comment: "Excellent stay structure! Friendly reception personnel.",
+        roomType: "Standard Room",
+        rating: 5,
+        ratings: { cleanliness: 5, service: 5, room: 4, food: 5, overall: 5 },
+        category: "Room Stay",
+        sentiment: "Positive",
+        status: "Published",
+        comment: "Excellent stay structure! Friendly reception personnel and prompt room service.",
         response: "",
-        propertyId
+        propertyId: propId
       },
       {
         bookingId: "BK-10101",
         guestName: "Mounika",
+        guestEmail: "mounika@example.com",
+        guestPhone: "+91 98765 43211",
         room: "101 · Standard Room",
-        ratings: { cleanliness: 4, service: 4, room: 4 },
-        comment: "Linens and room were spotless on arrival.",
-        response: "Thank you for staying with us!",
+        roomType: "Standard Room",
+        rating: 4,
+        ratings: { cleanliness: 4, service: 4, room: 4, food: 4, overall: 4 },
+        category: "Front Desk Service",
+        sentiment: "Positive",
+        status: "Resolved",
+        comment: "Linens and room were spotless on arrival. Very smooth check-in process.",
+        response: "Thank you for staying with us! We look forward to hosting you again.",
         respondedAt: new Date(),
-        propertyId
+        propertyId: propId
+      },
+      {
+        bookingId: "BK-10402",
+        guestName: "Rohit Verma",
+        guestEmail: "rohit.verma@example.com",
+        guestPhone: "+91 98765 43212",
+        room: "104 · Deluxe Suite",
+        roomType: "Deluxe Suite",
+        rating: 5,
+        ratings: { cleanliness: 5, service: 5, room: 5, food: 5, overall: 5 },
+        category: "Amenities",
+        sentiment: "Positive",
+        status: "Published",
+        comment: "The complimentary breakfast and high-speed Wi-Fi exceeded expectations.",
+        response: "Glad you enjoyed the amenities, Rohit! Have a wonderful journey.",
+        respondedAt: new Date(),
+        propertyId: propId
+      },
+      {
+        bookingId: "BK-10205",
+        guestName: "Ananya Sharma",
+        guestEmail: "ananya.s@example.com",
+        guestPhone: "+91 98765 43213",
+        room: "102 · Executive Suite",
+        roomType: "Executive Suite",
+        rating: 3,
+        ratings: { cleanliness: 3, service: 4, room: 3, food: 3, overall: 3 },
+        category: "Room Maintenance",
+        sentiment: "Neutral",
+        status: "Pending",
+        comment: "AC took some time to cool the room, but the front desk team sent a technician promptly.",
+        response: "",
+        propertyId: propId
       }
     ];
     await Feedback.insertMany(defaults);
@@ -181,7 +231,7 @@ const seedDefaultNotifications = async (propertyId) => {
 // ==========================================
 router.get('/property', async (req, res) => {
   try {
-    const property = await Property.findById(req.user.propertyId);
+    const property = await findPropertySafely(req.user?.propertyId, req.user);
     if (!property) {
       return sendError(res, 404, 'Assigned property profile not found.');
     }
@@ -896,9 +946,67 @@ router.get('/attendance', async (req, res) => {
 // ==========================================
 router.get('/feedback', async (req, res) => {
   try {
-    await seedDefaultFeedback(req.user.propertyId);
-    const list = await Feedback.find({ propertyId: req.user.propertyId }).sort({ createdAt: -1 });
-    return sendSuccess(res, 200, list, 'Reviews and guest feedback list retrieved.');
+    const propId = req.query.propertyId || req.user?.propertyId || 'HS-JAI';
+    await seedDefaultFeedback(propId);
+    const query = (propId && propId !== 'all')
+      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
+      : {};
+    const list = await getUnifiedFeedbacksAndReviews(query);
+    return sendSuccess(res, 200, list, 'Reviews and guest feedback list retrieved from MongoDB (Feedbacks & Reviews collections).');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/feedback', async (req, res) => {
+  try {
+    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-JAI';
+    const {
+      bookingId = `BK-${Date.now().toString().slice(-5)}`,
+      guestName,
+      guestEmail = '',
+      guestPhone = '',
+      room = '101 · Standard Room',
+      roomType = 'Standard Room',
+      rating = 5,
+      ratings = { cleanliness: 5, service: 5, room: 5, food: 5, overall: 5 },
+      category = 'General',
+      sentiment = 'Positive',
+      status = 'Published',
+      comment = '',
+      response = ''
+    } = req.body;
+
+    if (!guestName || !comment) {
+      return sendError(res, 400, 'Guest name and review comment are required.');
+    }
+
+    const created = await Feedback.create({
+      bookingId,
+      guestName,
+      guestEmail,
+      guestPhone,
+      room,
+      roomType,
+      rating: Number(rating) || 5,
+      ratings,
+      category,
+      sentiment,
+      status,
+      comment,
+      comments: comment,
+      response,
+      respondedAt: response ? new Date() : null,
+      propertyId: propId
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'feedback_received', created);
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_received' });
+    }
+
+    return sendSuccess(res, 201, created, 'Guest feedback recorded successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -906,14 +1014,21 @@ router.get('/feedback', async (req, res) => {
 
 router.post('/feedback/:id/respond', async (req, res) => {
   try {
-    const { response } = req.body;
+    const { response, status } = req.body;
     if (!response) {
       return sendError(res, 400, 'Response comment content is required.');
     }
 
-    const updated = await Feedback.findOneAndUpdate(
-      { _id: req.params.id, propertyId: req.user.propertyId },
-      { response, respondedAt: new Date() },
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const updateData = {
+      response,
+      respondedAt: new Date(),
+      status: status || 'Resolved'
+    };
+
+    let updated = await Feedback.findOneAndUpdate(
+      { _id: req.params.id },
+      updateData,
       { new: true }
     );
 
@@ -921,7 +1036,13 @@ router.post('/feedback/:id/respond', async (req, res) => {
       return sendError(res, 404, 'Review feedback record not found.');
     }
 
-    return sendSuccess(res, 200, updated, 'Manager response published successfully.');
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'feedback_updated', updated);
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_updated' });
+    }
+
+    return sendSuccess(res, 200, updated, 'Response published successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -1124,6 +1245,25 @@ const handleExtendReservation = async (req, res) => {
       },
       { new: true }
     );
+
+    // Trigger notification
+    await triggerNotification({
+      role: 'manager',
+      propertyId: booking.propertyId || req.user.propertyId || 'HS-JAI',
+      title: 'Stay Extended',
+      message: `Stay extended by ${additionalNights} night(s) for guest ${booking.guest}. New checkout: ${newCheckOut}.`,
+      category: 'Operations'
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-JAI', 'booking_updated', {
+        action: 'extend',
+        booking: updated,
+        bookingId: updated._id,
+        checkOut: newCheckOut
+      });
+    }
 
     return sendSuccess(res, 200, updated, 'Stay reservation extended successfully.');
   } catch (err) {

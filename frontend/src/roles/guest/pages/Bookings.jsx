@@ -75,8 +75,7 @@ function GuestBookingsPage() {
   useEffect(() => {
     fetchBookings(false);
 
-    const handleFocus = () => fetchBookings(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => fetchBookings(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       console.log('⚡ Socket event received. Refreshing bookings ledger...');
@@ -92,8 +91,7 @@ function GuestBookingsPage() {
     };
 
     window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       window.removeEventListener('popstate', handlePopState);
       if (unsubscribe) unsubscribe();
     };

@@ -1,127 +1,100 @@
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-async function request(path, options = {}) {
-  const token = localStorage.getItem('hms_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-  return data;
-}
+import { apiClient } from './apiClient';
 
 export const receptionistService = {
   getProperty: async () => {
-    return await request(`/receptionist/property?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/property');
   },
   getDashboard: async () => {
-    return await request(`/receptionist/dashboard?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/dashboard');
   },
   getGuests: async () => {
-    return await request(`/receptionist/guests?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/guests');
   },
   postGuestCharge: async (id, amount, description) => {
-    return await request(`/receptionist/guests/${id}/charge`, {
-      method: 'POST',
-      body: JSON.stringify({ amount, description })
-    });
+    return await apiClient.post(`/receptionist/guests/${id}/charge`, { amount, description });
   },
   extendGuestStay: async (id, days) => {
-    return await request(`/receptionist/guests/${id}/extend`, {
-      method: 'POST',
-      body: JSON.stringify({ days })
-    });
+    return await apiClient.post(`/receptionist/guests/${id}/extend`, typeof days === 'object' ? days : { days });
+  },
+  extendReservation: async (id, data) => {
+    try {
+      return await apiClient.post(`/receptionist/reservations/${id}/extend`, data);
+    } catch (err) {
+      return await apiClient.post(`/manager/reservations/${id}/extend`, data);
+    }
   },
   getRooms: async () => {
-    return await request(`/receptionist/rooms?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/rooms');
   },
   updateRoomStatus: async (roomNumber, status, housekeeping) => {
-    return await request(`/receptionist/rooms/${roomNumber}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status, housekeeping })
-    });
+    return await apiClient.put(`/receptionist/rooms/${roomNumber}/status`, { status, housekeeping });
   },
   getReservations: async () => {
-    return await request(`/receptionist/reservations?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/reservations');
   },
   createReservation: async (data) => {
-    return await request('/receptionist/reservations', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/receptionist/reservations', data);
   },
   updateReservationStatus: async (id, status, room) => {
-    return await request(`/receptionist/reservations/${id}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status, room })
-    });
+    return await apiClient.put(`/receptionist/reservations/${id}/status`, { status, room });
   },
   getFolios: async () => {
-    return await request(`/receptionist/folios?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/folios');
   },
   getFolioDetails: async (id) => {
-    return await request(`/receptionist/folios/${id}?t=${Date.now()}`);
+    return await apiClient.get(`/receptionist/folios/${id}`);
   },
   postFolioCharge: async (id, amount, description, category) => {
-    return await request(`/receptionist/folios/${id}/charges`, {
-      method: 'POST',
-      body: JSON.stringify({ amount, description, category })
-    });
+    return await apiClient.post(`/receptionist/folios/${id}/charges`, { amount, description, category });
   },
   postFolioPayment: async (id, amount, method) => {
-    return await request(`/receptionist/folios/${id}/payments`, {
-      method: 'POST',
-      body: JSON.stringify({ amount, method })
-    });
+    return await apiClient.post(`/receptionist/folios/${id}/payments`, { amount, method });
   },
   getPayments: async () => {
-    return await request(`/receptionist/payments?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/payments');
   },
   logPayment: async (data) => {
-    return await request('/receptionist/payments', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/receptionist/payments', data);
   },
   createPayment: async (data) => {
-    return await request('/receptionist/payments', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.post('/receptionist/payments', data);
   },
   updatePayment: async (id, data) => {
-    return await request(`/receptionist/payments/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+    return await apiClient.put(`/receptionist/payments/${id}`, data);
   },
   getNotifications: async () => {
-    return await request(`/receptionist/notifications?t=${Date.now()}`);
+    return await apiClient.get('/receptionist/notifications');
   },
   markNotificationRead: async (id) => {
-    return await request(`/receptionist/notifications/${id}/read`, {
-      method: 'POST'
-    });
+    return await apiClient.post(`/receptionist/notifications/${id}/read`);
   },
   markAllNotificationsRead: async () => {
-    return await request('/receptionist/notifications/read-all', {
-      method: 'POST'
-    });
+    return await apiClient.post('/receptionist/notifications/read-all');
   },
   changePassword: async (currentPassword, newPassword) => {
-    return await request('/receptionist/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword })
-    });
+    return await apiClient.post('/receptionist/change-password', { currentPassword, newPassword });
+  },
+  getFeedback: async () => {
+    try {
+      return await apiClient.get('/receptionist/feedback');
+    } catch (err) {
+      return await apiClient.get('/manager/feedback');
+    }
+  },
+  createFeedback: async (data) => {
+    try {
+      return await apiClient.post('/receptionist/feedback', data);
+    } catch (err) {
+      return await apiClient.post('/manager/feedback', data);
+    }
+  },
+  respondFeedback: async (id, response, status) => {
+    try {
+      return await apiClient.post(`/receptionist/feedback/${id}/respond`, { response, status });
+    } catch (err) {
+      return await apiClient.post(`/manager/feedback/${id}/respond`, { response, status });
+    }
   }
 };
+
+export default receptionistService;

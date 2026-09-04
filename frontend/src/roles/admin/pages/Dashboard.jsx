@@ -45,6 +45,8 @@ const pieColors = [
 import { managerService } from "@/services/manager";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 const AdminDashboardRoute = {
   head: () => ({
@@ -101,6 +103,9 @@ function AdminDashboard() {
   const [chartTab, setChartTab] = useState("revenue"); // revenue | occupancy | adr | revpar | channels
   const [opTab, setOpTab] = useState("property"); // property | occupancy | reservations | revenue | approvals | staff | channels | alerts
   const [approvalsList, setApprovalsList] = useState([]);
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
 
   async function loadDashboardData(isSilent = false) {
     try {
@@ -108,12 +113,13 @@ function AdminDashboard() {
       const user = authService.getCurrentUser();
       if (!user) throw new Error("No authenticated user found.");
 
-      const [propertiesRes, reservationsRes, roomsRes, staffRes, approvalsRes] = await Promise.all([
+      const [propertiesRes, reservationsRes, roomsRes, staffRes, approvalsRes, feedbackRes] = await Promise.all([
         superAdminService.getProperties().catch(() => ({ success: true, data: [] })),
         superAdminService.getReservations().catch(() => ({ success: true, data: [] })),
         adminService.getRooms().catch(() => ({ success: true, data: [] })),
         superAdminService.getUsers().catch(() => ({ success: true, data: [] })),
-        managerService.getApprovals().catch(() => ({ success: true, data: [] }))
+        managerService.getApprovals().catch(() => ({ success: true, data: [] })),
+        adminService.getFeedback().catch(() => ({ success: true, data: [] }))
       ]);
 
       if (propertiesRes.success && propertiesRes.data.length > 0) {
@@ -127,6 +133,9 @@ function AdminDashboard() {
       }
       if (approvalsRes.success && approvalsRes.data) {
         setApprovalsList(approvalsRes.data);
+      }
+      if (feedbackRes && feedbackRes.success && Array.isArray(feedbackRes.data)) {
+        setFeedbackList(feedbackRes.data);
       }
 
       // Dynamic Room Inventory Resolution from DB documents + Property Room Types
@@ -191,19 +200,13 @@ function AdminDashboard() {
   }
 
   useEffect(() => {
-    loadDashboardData();
-
-    const handleFocus = () => {
-      loadDashboardData(true);
-    };
-    window.addEventListener('focus', handleFocus);
+    loadDashboardData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDashboardData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -286,8 +289,8 @@ function AdminDashboard() {
   const activeBookingsCount = reservations.filter(r => r.status !== 'Checked-out' && r.status !== 'Cancelled').length;
   const pendingPayments = reservations.reduce((sum, r) => sum + Number(r.balance || 0), 0);
   
-  const arrivalsCount = reservations.filter(r => r.status === "Confirmed" || r.status === "Pending").length;
-  const departuresCount = reservations.filter(r => r.status === "Checked-out").length;
+  const arrivalsCount = reservations.filter(r => isToday(r.checkIn) && (r.status === "Confirmed" || r.status === "Pending" || r.status === "Pre-checked" || r.status === "Paid" || r.status === "Checked-in")).length;
+  const departuresCount = reservations.filter(r => isToday(r.checkOut) && (r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying" || r.status === "Checked-out" || r.status === "Checked Out")).length;
 
   // Dynamic Room Type performance listing
   const roomTypeCounts = {};
@@ -565,6 +568,7 @@ function AdminDashboard() {
               { id: "occupancy", label: "Occupancy Grid" },
               { id: "reservations", label: "Reservations" },
               { id: "revenue", label: "Revenue Ledger" },
+              { id: "feedback", label: `Guest Feedback (${feedbackList.length})` },
               { id: "approvals", label: "Approvals Logs" },
               { id: "staff", label: "Staff List" },
               { id: "channels", label: "OTA Parity" },
@@ -640,31 +644,44 @@ function AdminDashboard() {
 
           {/* 3. Reservations Tab */}
           {opTab === "reservations" && (
-            <div className="overflow-x-auto min-w-[700px] border border-muted rounded-xl bg-white shadow-soft">
-              <div className="grid grid-cols-6 gap-4 px-4 py-3 border-b border-muted text-[10px] uppercase font-bold text-muted-foreground bg-muted/10 rounded-t-xl">
-                <div className="text-left">Guest Name</div>
+            <div className="overflow-x-auto min-w-[760px] border border-muted rounded-xl bg-white shadow-soft">
+              <div className="grid grid-cols-7 gap-3 px-4 py-3 border-b border-muted text-[10px] uppercase font-bold text-muted-foreground bg-muted/10 rounded-t-xl">
+                <div className="text-left col-span-2">Guest Name</div>
                 <div className="text-left">Room Number</div>
                 <div className="text-left">Stay Dates</div>
-                <div className="text-left">Source Channel</div>
-                <div className="text-right">Invoice Amount</div>
-                <div className="text-center">Status</div>
+                <div className="text-left">Source</div>
+                <div className="text-right">Amount</div>
+                <div className="text-center">Status / Action</div>
               </div>
               <div className="divide-y divide-muted/60">
                 {reservations.length === 0 ? (
                   <div className="py-8 text-center text-muted-foreground font-semibold">No reservations loaded.</div>
                 ) : (
-                  reservations.slice(0, 8).map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-6 gap-4 px-4 py-3.5 items-center hover:bg-[#fcfcfc] transition-colors text-xs">
-                      <div className="text-left font-semibold text-navy truncate">{item.guestName || "Walk-in Guest"}</div>
-                      <div className="text-left font-mono">{item.roomNumber || "Unassigned"}</div>
-                      <div className="text-left text-muted-foreground truncate">{item.checkIn} → {item.checkOut}</div>
-                      <div className="text-left"><Tag tone="brand">{item.source || "Direct"}</Tag></div>
-                      <div className="text-right font-bold text-navy">₹{(item.amount || 0).toLocaleString()}</div>
-                      <div className="flex items-center justify-center">
-                        <Tag tone={item.status === "Confirmed" || item.status === "Checked-in" ? "success" : "warning"}>{item.status}</Tag>
+                  reservations.slice(0, 10).map((item, idx) => {
+                    const isCheckedIn = ["checked-in", "checked in", "staying", "staying-in"].includes(String(item.status || "").toLowerCase().trim());
+                    return (
+                      <div key={idx} className="grid grid-cols-7 gap-3 px-4 py-3.5 items-center hover:bg-[#fcfcfc] transition-colors text-xs">
+                        <div className="text-left font-semibold text-navy truncate col-span-2">{item.guestName || item.guest || "Walk-in Guest"}</div>
+                        <div className="text-left font-mono font-bold">{item.roomNumber || item.room || "Unassigned"}</div>
+                        <div className="text-left text-muted-foreground truncate">{item.checkIn} → {item.checkOut}</div>
+                        <div className="text-left"><Tag tone="brand">{item.source || "Direct"}</Tag></div>
+                        <div className="text-right font-bold text-navy">₹{(item.amount || item.totalAmount || 0).toLocaleString()}</div>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Tag tone={isCheckedIn || item.status === "Confirmed" ? "success" : "warning"}>{item.status}</Tag>
+                          {isCheckedIn && (
+                            <ExtendStayButton
+                              size="xs"
+                              label="Extend"
+                              onClick={() => {
+                                setSelectedBookingForExtend(item);
+                                setExtendModalOpen(true);
+                              }}
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -803,6 +820,57 @@ function AdminDashboard() {
             </div>
           )}
 
+          {/* 7. Guest Feedback Tab */}
+          {opTab === "feedback" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-sm text-navy">Verified Guest Stay Feedback</h4>
+                  <p className="text-[11px] text-muted-foreground">Live records synchronized from MongoDB database.</p>
+                </div>
+                <Link
+                  to="/admin/feedback"
+                  className="text-xs font-bold text-purple hover:underline inline-flex items-center gap-1"
+                >
+                  Manage Feedback Ledger <ArrowRight className="size-3" />
+                </Link>
+              </div>
+
+              {feedbackList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground font-semibold select-none border border-dashed border-muted rounded-xl bg-[#fcfcfc]">
+                  No feedback records found.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {feedbackList.slice(0, 6).map((f) => (
+                    <div key={f._id || f.id} className="p-4 rounded-xl border border-muted bg-white shadow-2xs space-y-2.5 text-xs text-left">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-navy">{f.guestName || "Valued Guest"}</p>
+                          <p className="text-[10px] text-muted-foreground">Room #{f.room || "101"} · Ref: {f.bookingId || "BK-1001"}</p>
+                        </div>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
+                          <Star className="size-3 fill-amber-400 text-amber-400" /> {f.rating || 5}.0
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground italic text-[11px] line-clamp-2">
+                        "{f.comment || f.comments || "Pleasant stay experience."}"
+                      </p>
+                      <div className="flex items-center justify-between pt-1 border-t border-muted/60 text-[10px]">
+                        <span className="font-semibold text-muted-foreground">
+                          {f.createdAt ? new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : "Recently"}
+                        </span>
+                        <span className={`font-bold ${f.response ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {f.response ? "✓ Responded" : "Pending Reply"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 8. System Alerts Tab */}
           {opTab === "alerts" && (
             <div className="space-y-2">
@@ -827,6 +895,20 @@ function AdminDashboard() {
 
         </div>
       </Panel>
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        isOpen={extendModalOpen}
+        booking={selectedBookingForExtend}
+        onClose={() => {
+          setExtendModalOpen(false);
+          setSelectedBookingForExtend(null);
+        }}
+        onSuccess={() => {
+          loadDashboardData(true);
+        }}
+        userRole="admin"
+      />
 
     </div>
   );

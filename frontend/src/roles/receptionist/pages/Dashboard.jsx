@@ -8,11 +8,14 @@ import { receptionistService } from "@/services/receptionist";
 import { properties } from "@/data/hs-data";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
-  Clock, AlertTriangle, ClipboardCheck, ArrowRightLeft, CreditCard, Eye
+  Clock, AlertTriangle, ClipboardCheck, ArrowRightLeft, CreditCard, Eye,
+  Star, MessageSquareHeart
 } from "lucide-react";
 
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 const FrontDeskDashboardRoute = {
   head: () => ({
@@ -65,45 +68,60 @@ function FrontDeskDashboard() {
   });
 
   const [propName, setPropName] = useState("Assigned Hotel");
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
+
+  const [feedbackStats, setFeedbackStats] = useState({ average: "5.0", count: 0 });
 
   const fetchDashboardData = () => {
     Promise.all([
       receptionistService.getDashboard().catch(() => ({})),
       receptionistService.getReservations().catch(() => ({})),
-      receptionistService.getRooms().catch(() => ({}))
-    ]).then(([dashRes, resRes, roomsRes]) => {
+      receptionistService.getRooms().catch(() => ({})),
+      receptionistService.getFeedback().catch(() => ({}))
+    ]).then(([dashRes, resRes, roomsRes, fbRes]) => {
       const allBookings = resRes?.success && Array.isArray(resRes.data) ? resRes.data : [];
       const allRooms = roomsRes?.success && Array.isArray(roomsRes.data) ? roomsRes.data : [];
+      const feedbacks = fbRes?.success && Array.isArray(fbRes.data) ? fbRes.data : [];
 
-      // 1. Dynamic Arrivals (Confirmed / Paid / Pending / Pre-checked)
+      if (feedbacks.length > 0) {
+        const avg = (feedbacks.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbacks.length).toFixed(1);
+        setFeedbackStats({ average: avg, count: feedbacks.length });
+      }
+
+      // 1. Dynamic Arrivals (Check-in is TODAY and status is Confirmed / Paid / Pending / Pre-checked)
       const finalArrivals = allBookings
-        .filter(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked')
+        .filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked'))
         .map(b => ({
           id: b.bookingId || b.id || b._id,
           _id: b._id || b.id || b.bookingId,
           name: b.guest || b.name || 'Guest',
           room: b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101'),
           type: b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room')),
-          time: b.checkIn || 'Today',
+          time: formatDisplayDate(b.checkIn) || 'Today',
+          checkIn: b.checkIn || 'Today',
+          checkOut: b.checkOut || 'Tomorrow',
           source: b.source || 'Direct Web',
           status: b.status === 'Confirmed' ? 'Pre-checked' : b.status
         }));
 
-      // 2. Dynamic Departures (Checked-in / Checked-out)
+      // 2. Dynamic Departures (Check-out is TODAY and status is Checked-in / Checked In / Staying / Checked-out / Checked Out)
       const finalDepartures = allBookings
-        .filter(b => b.status === 'Checked-in' || b.status === 'Checked-out' || b.status === 'Checked In')
+        .filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'))
         .map(b => ({
           id: b.bookingId || b.id || b._id,
           _id: b._id || b.id || b.bookingId,
           name: b.guest || b.name || 'Guest',
           room: b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101'),
-          time: b.checkOut || 'Today',
+          time: formatDisplayDate(b.checkOut) || 'Today',
+          checkIn: b.checkIn || 'Today',
+          checkOut: b.checkOut || 'Today',
           balance: Number(b.balance || 0),
-          status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+          status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
         }));
 
-      // 3. Dynamic In-Stay count
-      const inStayCount = allBookings.filter(b => b.status === 'Checked-in').length;
+      // 3. Dynamic In-Stay count (currently checked-in guests)
+      const inStayCount = allBookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying').length;
 
       // 4. Dynamic Room metrics
       const totalRoomsCount = allRooms.length > 0 ? allRooms.length : 12;
@@ -157,16 +175,14 @@ function FrontDeskDashboard() {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 15000); // 15 seconds poll fallback
 
-    const handleFocus = () => fetchDashboardData();
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => fetchDashboardData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchDashboardData();
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -229,12 +245,13 @@ function FrontDeskDashboard() {
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
 
       {/* Premium KPI Stat Cards Grid */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-6">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked').length} Pre-checked, ${arrivals.filter(a => a.status === 'Pending').length} Pending`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
         <PremiumStatCard label="In-Stay" value={stats.inStay ?? 1} hint={`${stats.occupied ?? 1} Room occupied`} icon={Users} accentColor="#10b981" />
         <PremiumStatCard label="Available Rooms" value={stats.available ?? 13} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
         <PremiumStatCard label="Total Revenue" value={`₹${Number(stats.totalRevenue || 0).toLocaleString('en-IN')}`} hint="Real-time ledger collection" icon={IndianRupee} accentColor="#10b981" />
+        <PremiumStatCard label="Guest Feedback" value={`${feedbackStats.average} ★`} hint={`${feedbackStats.count} stay records logged`} icon={MessageSquareHeart} accentColor="#f59e0b" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -343,14 +360,22 @@ function FrontDeskDashboard() {
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             {dep.status !== "Checked-out" && dep.status !== "Checked Out" && (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                onClick={() => handleCheckOut(dep.id || dep._id)}
-                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                              >
-                                Check-Out
-                              </Button>
+                              <>
+                                <ExtendStayButton
+                                  size="xs"
+                                  label="Extend"
+                                  booking={dep}
+                                  onClick={() => navigate(`/reception/reservations/extend/${dep.id || dep._id || dep.bookingId}`)}
+                                />
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  onClick={() => handleCheckOut(dep.id || dep._id)}
+                                  className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                                >
+                                  Check-Out
+                                </Button>
+                              </>
                             )}
                             <Button
                               asChild
@@ -428,6 +453,20 @@ function FrontDeskDashboard() {
 
         </div>
       </div>
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        isOpen={extendModalOpen}
+        booking={selectedBookingForExtend}
+        onClose={() => {
+          setExtendModalOpen(false);
+          setSelectedBookingForExtend(null);
+        }}
+        onSuccess={() => {
+          fetchDashboardData();
+        }}
+        userRole="receptionist"
+      />
 
     </div>
   );

@@ -69,15 +69,13 @@ function GuestFolioPage() {
   useEffect(() => {
     fetchFolioData(false);
 
-    const handleFocus = () => fetchFolioData(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => fetchFolioData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchFolioData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -224,7 +222,7 @@ function GuestFolioPage() {
                   <tr className="hover:bg-muted/10 transition-colors bg-emerald-50/50">
                     <td className="py-3.5 px-4 font-mono text-emerald-700 whitespace-nowrap">{f.checkIn}</td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="font-bold text-emerald-700 block">Loyalty / Corporate Discount</span>
+                      <span className="font-bold text-emerald-700 block">Promotional / Corporate Discount</span>
                       <span className="text-[11px] text-emerald-600">Promotional credit applied</span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-emerald-700 whitespace-nowrap">-{inr(f.discount)}</td>

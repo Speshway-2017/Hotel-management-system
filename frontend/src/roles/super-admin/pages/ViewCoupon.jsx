@@ -1,12 +1,12 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
-import { Ticket, Calendar, Settings, List, ChevronLeft } from "lucide-react";
+import { Ticket, Calendar, Settings, List, ChevronLeft, ArrowLeft, Edit2, Percent, DollarSign, TrendingUp, CheckCircle2 } from "lucide-react";
 
-function ViewCoupon() {
+export function ViewCoupon() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -36,17 +36,39 @@ function ViewCoupon() {
     if (id) loadCouponDetail();
   }, [id]);
 
+  const couponId = coupon?._id || coupon?.id || id;
+
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left pb-16">
       <PageHeader
         title={coupon ? `Promo Coupon: ${coupon.code}` : "Coupon Details"}
         subtitle="Operational parameters, discount slabs, plans coverage, and utilization index."
+        actions={
+          <div className="flex items-center gap-2.5">
+            <Link
+              to="/super-admin/coupons"
+              className="inline-flex items-center gap-1.5 px-4 h-10 rounded-full border border-muted bg-white text-xs font-bold text-navy hover:bg-muted/50 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="size-4" /> Back to Coupons
+            </Link>
+            {coupon && (
+              <Link
+                to={`/super-admin/coupons/edit/${couponId}`}
+                className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy/90 shadow-soft transition-all cursor-pointer"
+              >
+                <Edit2 className="size-4" /> Edit Coupon
+              </Link>
+            )}
+          </div>
+        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
       {loading ? (
-        <LoadingRows rows={3} />
+        <div className="p-6 bg-white rounded-2xl border border-muted shadow-soft">
+          <LoadingRows rows={3} />
+        </div>
       ) : coupon ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-sans">
           {/* Coupon Slabs */}
@@ -139,3 +161,5 @@ function ViewCoupon() {
 export const Route = createFileRoute("/super-admin/coupons/view/$id")({
   component: ViewCoupon
 });
+
+export default ViewCoupon;

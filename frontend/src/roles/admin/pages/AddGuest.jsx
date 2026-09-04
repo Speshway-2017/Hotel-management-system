@@ -32,7 +32,6 @@ function AddGuestPage() {
     preferences: "",
     idDocType: "Aadhaar Card",
     idDocNumber: "",
-    loyaltyPoints: "0",
     notes: ""
   });
 
@@ -66,7 +65,6 @@ function AddGuestPage() {
         preferences: formData.preferences,
         idDocType: formData.idDocType,
         idDocNumber: formData.idDocNumber,
-        loyaltyPoints: parseInt(formData.loyaltyPoints) || 0,
         notes: formData.notes
       });
       
@@ -217,15 +215,6 @@ function AddGuestPage() {
                   type="text"
                   placeholder="e.g. High floor, Silent room"
                   value={formData.preferences}
-                  onChange={handleChange}
-                />
-              </FormField>
-              <FormField label="Starting Loyalty Points" id="loyaltyPoints">
-                <Input
-                  id="loyaltyPoints"
-                  type="number"
-                  placeholder="0"
-                  value={formData.loyaltyPoints}
                   onChange={handleChange}
                 />
               </FormField>

@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { formatDisplayDate, isToday } from "@/utils/dateUtils";
 
 export const Route = createFileRoute("/reception/reservations")({
   head: () => ({
@@ -32,6 +34,7 @@ function ReservationsPage() {
   const [filterSource, setFilterSource] = useState("all");
   const [loading, setLoading] = useState(true);
   const [reservations, setReservations] = useState([]);
+  const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadReservations = (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -60,16 +63,14 @@ function ReservationsPage() {
   useEffect(() => {
     loadReservations(false);
     const interval = setInterval(() => loadReservations(true), 10000);
-    const handleFocus = () => loadReservations(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadReservations(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadReservations(true);
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -316,8 +317,8 @@ function ReservationsPage() {
                         <span className="font-semibold">{res.roomType}</span>
                         <span className="text-[10px] text-muted-foreground block font-bold">Room #{res.room}</span>
                       </td>
-                      <td className="py-3.5 px-4 font-semibold text-navy">{res.checkIn}</td>
-                      <td className="py-3.5 px-4 font-semibold text-navy">{res.checkOut}</td>
+                      <td className="py-3.5 px-4 font-semibold text-navy">{formatDisplayDate(res.checkIn)}</td>
+                      <td className="py-3.5 px-4 font-semibold text-navy">{formatDisplayDate(res.checkOut)}</td>
                       <td className="py-3.5 px-4 text-navy">
                         <p className="font-bold">{res.nights}</p>
                         <p className="text-[10px] text-muted-foreground font-bold">{res.pax}</p>
@@ -347,16 +348,24 @@ function ReservationsPage() {
                             </Button>
                           )}
 
-                          {/* Check-Out Button -> enabled as soon as status is Checked-in */}
-                          {(res.status === "Checked In" || res.status === "Checked-in" || res.status === "Staying") && (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              onClick={() => handleCheckOut(res.id || res._id || res.bookingId)}
-                              className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-Out
-                            </Button>
+                          {/* Check-Out Button & Extend Button -> enabled as soon as status is Checked-in */}
+                          {(res.status === "Checked In" || res.status === "Checked-in" || res.status === "Staying" || res.status === "Staying-In") && (
+                            <>
+                              <ExtendStayButton
+                                size="xs"
+                                label="Extend"
+                                booking={res}
+                                onClick={() => navigate(`/reception/reservations/extend/${res.id || res._id || res.bookingId}`)}
+                              />
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleCheckOut(res.id || res._id || res.bookingId)}
+                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                              >
+                                Check-Out
+                              </Button>
+                            </>
                           )}
 
                           {/* Completed indicator for Checked-out stays */}
@@ -401,6 +410,15 @@ function ReservationsPage() {
           </table>
         </div>
       </Panel>
+
+      {/* Reusable Extend Stay Modal */}
+      <ExtendStayModal
+        booking={extendingBooking}
+        isOpen={!!extendingBooking}
+        onClose={() => setExtendingBooking(null)}
+        onSuccess={() => loadReservations(false)}
+        userRole="receptionist"
+      />
     </div>
   );
 }

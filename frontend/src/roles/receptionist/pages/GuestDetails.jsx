@@ -22,6 +22,7 @@ export const Route = createFileRoute("/reception/guest-search/$id")({
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ExtendStayModal } from "@/components/common/ExtendStayModal";
 
 function ReceptionGuestDetailsPage() {
   const { id } = useParams();
@@ -29,6 +30,7 @@ function ReceptionGuestDetailsPage() {
 
   const [loading, setLoading] = useState(true);
   const [guest, setGuest] = useState(null);
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
 
   // Quick Action form inputs
   const [chargeAmount, setChargeAmount] = useState("");
@@ -127,7 +129,15 @@ function ReceptionGuestDetailsPage() {
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
       
       {/* Top Navbar Header */}
-      <PageHeader />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <PageHeader title={guest ? `Guest Dossier — ${guest.name}` : "Guest Profile"} subtitle={`Room #${guest.room} · ${guest.type || "In-House Guest"}`} />
+        <Button
+          onClick={() => setIsExtendModalOpen(true)}
+          className="bg-brand hover:bg-brand-deep text-white text-xs font-bold px-5 h-9 rounded-full shadow-soft cursor-pointer"
+        >
+          <Calendar className="size-3.5 mr-1.5" /> Extend Stay Duration
+        </Button>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-3">
         
@@ -197,10 +207,6 @@ function ReceptionGuestDetailsPage() {
                   <Tag tone={sM.tone}>{sM.label}</Tag>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">VIP Tier Level:</span>
-                  <Tag tone="brand">{guest.vipTier}</Tag>
-                </div>
-                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Payment Status:</span>
                   <Tag tone={guest.paymentStatus === "Paid" ? "success" : "warning"}>{guest.paymentStatus}</Tag>
                 </div>
@@ -265,10 +271,10 @@ function ReceptionGuestDetailsPage() {
                     <option value="3">3 Nights stays extension</option>
                   </select>
                   <Button 
-                    onClick={handleExtendStay}
+                    onClick={() => navigate(`/reception/reservations/extend/${guest?.id || guest?._id || id}`)}
                     className="bg-purple hover:bg-purple/90 text-white h-9 rounded-xl text-xs font-bold cursor-pointer w-1/3"
                   >
-                    Extend
+                    Extend Stay
                   </Button>
                 </div>
               </div>
@@ -278,6 +284,21 @@ function ReceptionGuestDetailsPage() {
         </div>
 
       </div>
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        booking={guest ? {
+          ...guest,
+          _id: guest._id || guest.id || guest.bookingId,
+          id: guest.id || guest._id || guest.bookingId,
+          guest: guest.name,
+          checkOut: guest.checkOut ? (guest.checkOut.includes(',') ? guest.checkOut.split(',')[0].trim() : guest.checkOut) : undefined
+        } : null}
+        isOpen={isExtendModalOpen}
+        onClose={() => setIsExtendModalOpen(false)}
+        onSuccess={() => loadGuestDetails()}
+        userRole="receptionist"
+      />
 
     </div>
   );

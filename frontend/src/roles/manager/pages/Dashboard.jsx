@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -63,6 +65,8 @@ function ManagerDashboard() {
   
   // Operational tabs
   const [chartTab, setChartTab] = useState("revenue");
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -130,19 +134,13 @@ function ManagerDashboard() {
   };
 
   useEffect(() => {
-    loadDashboardData();
-
-    const handleFocus = () => {
-      loadDashboardData();
-    };
-    window.addEventListener('focus', handleFocus);
+    loadDashboardData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDashboardData();
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -186,32 +184,14 @@ function ManagerDashboard() {
     );
   }
 
-  // Calculate live scoped KPI metrics
-  const getTodayISO = () => new Date().toISOString().split('T')[0];
-  const getTodayFormatted = () => {
-    const d = new Date();
-    const day = String(d.getDate()).padStart(2, '0');
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  };
-
-  const isTodayDate = (dateStr) => {
-    if (!dateStr) return false;
-    const str = String(dateStr).trim();
-    const todayISO = getTodayISO();
-    const todayFormatted = getTodayFormatted();
-    const todaySimple = new Date().toDateString();
-    return str.includes(todayISO) || str.includes(todayFormatted) || new Date(str).toDateString() === todaySimple;
-  };
-
   const activeBookings = bookings.filter(b => b.status !== "Cancelled");
   
-  const arrivalsToday = activeBookings.filter(b => isTodayDate(b.checkIn) || b.status === "Checked-in");
-  const departuresToday = activeBookings.filter(b => isTodayDate(b.checkOut) || b.status === "Checked-out");
+  const arrivalsToday = activeBookings.filter(b => isToday(b.checkIn) && (b.status === "Confirmed" || b.status === "Pending" || b.status === "Pre-checked" || b.status === "Paid" || b.status === "Checked-in" || b.status === "Checked In"));
+  const departuresToday = activeBookings.filter(b => isToday(b.checkOut) && (b.status === "Checked-in" || b.status === "Checked In" || b.status === "Staying" || b.status === "Checked-out" || b.status === "Checked Out"));
   
-  const currentStays = activeBookings.filter(b => b.status === "Checked-in");
-  const pendingCheckins = activeBookings.filter(b => isTodayDate(b.checkIn) && (b.status === "Confirmed" || b.status === "Pending"));
-  const pendingCheckouts = activeBookings.filter(b => (isTodayDate(b.checkOut) || b.status === "Checked-in") && b.status !== "Checked-out");
+  const currentStays = activeBookings.filter(b => b.status === "Checked-in" || b.status === "Checked In" || b.status === "Staying");
+  const pendingCheckins = activeBookings.filter(b => isToday(b.checkIn) && (b.status === "Confirmed" || b.status === "Pending" || b.status === "Pre-checked"));
+  const pendingCheckouts = activeBookings.filter(b => isToday(b.checkOut) && (b.status === "Checked-in" || b.status === "Checked In" || b.status === "Staying"));
 
   // Occupancy, ADR, RevPAR computations
   const totalRooms = rooms.length > 0 ? rooms.length : (property.rooms || 12);
@@ -264,7 +244,7 @@ function ManagerDashboard() {
     <div className="space-y-6 text-left">
 
       {/* KPI Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div>
           <PremiumStatCard label="Arrivals" value={arrivalsToday.length.toString()} hint="Today's bookings" icon={Calendar} accentColor="#FF7A59" />
         </div>
@@ -279,6 +259,15 @@ function ManagerDashboard() {
         </div>
         <div>
           <PremiumStatCard label="Occupancy Rate" value={`${occupancyPercent}%`} hint={`Stays: ${currentStays.length}/${totalRooms} rms`} icon={Percent} accentColor="#FF6B8B" />
+        </div>
+        <div>
+          <PremiumStatCard
+            label="Guest Feedback"
+            value={`${feedbackList.length > 0 ? (feedbackList.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbackList.length).toFixed(1) : "5.0"} ★`}
+            hint={`${feedbackList.length} feedback records`}
+            icon={MessageSquare}
+            accentColor="#10B981"
+          />
         </div>
       </div>
 
@@ -528,6 +517,128 @@ function ManagerDashboard() {
           </div>
         </div>
       </Panel>
+
+      {/* In-House Guests & Stay Extension Desk */}
+      <Panel 
+        title="In-House Stays & Extension Controls" 
+        description="Active guests currently checked-in with instant stay extension facilities."
+        actions={
+          <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 rounded-lg">
+            {currentStays.length} Active Stay(s)
+          </span>
+        }
+      >
+        <div className="overflow-x-auto bg-white rounded-b-xl">
+          {currentStays.length === 0 ? (
+            <div className="p-8 text-center text-xs text-muted-foreground font-semibold select-none">
+              No guests currently checked-in.
+            </div>
+          ) : (
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+                  <th className="py-3 px-4">Guest Name</th>
+                  <th className="py-3 px-4">Assigned Room</th>
+                  <th className="py-3 px-4">Check-In Date</th>
+                  <th className="py-3 px-4">Current Checkout</th>
+                  <th className="py-3 px-4">Stay Duration</th>
+                  <th className="py-3 px-4">Folio Total</th>
+                  <th className="py-3 px-4 text-right">Extension Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-muted/30 whitespace-nowrap">
+                {currentStays.map((booking) => (
+                  <tr key={booking._id || booking.id} className="hover:bg-muted/5 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-navy">
+                      {booking.guest || booking.guestName || "Guest"}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-navy-deep">
+                      Room #{booking.room || booking.roomNumber || "101"}
+                    </td>
+                    <td className="py-3.5 px-4 text-muted-foreground">{booking.checkIn}</td>
+                    <td className="py-3.5 px-4 font-semibold text-navy">{booking.checkOut}</td>
+                    <td className="py-3.5 px-4">{booking.nights || 1} Nights</td>
+                    <td className="py-3.5 px-4 font-bold text-navy">
+                      ₹{(booking.amount || booking.totalAmount || 0).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <ExtendStayButton
+                        size="xs"
+                        label="Extend Stay"
+                        booking={booking}
+                        role="manager"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Panel>
+
+      {/* Guest Feedback Ledger */}
+      <Panel
+        title="Recent Guest Feedback"
+        description="Live ratings, sentiments, and comments submitted by verified guests."
+        actions={
+          <Link
+            to="/manager/feedback"
+            className="text-xs font-bold text-purple hover:underline inline-flex items-center gap-1"
+          >
+            View All Feedback ({feedbackList.length}) <ArrowRight className="size-3" />
+          </Link>
+        }
+      >
+        <div className="p-4 bg-white rounded-b-xl">
+          {feedbackList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-muted-foreground font-semibold select-none">
+              No guest feedback records submitted yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {feedbackList.slice(0, 3).map((f) => (
+                <div key={f._id || f.id} className="p-4 rounded-xl border border-muted bg-[#fcfcfc] space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-navy">{f.guestName || "Valued Guest"}</p>
+                      <p className="text-[10px] text-muted-foreground">Room #{f.room || "101"} · {f.bookingId || "BK-1001"}</p>
+                    </div>
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
+                      <Star className="size-3 fill-amber-400 text-amber-400" /> {f.rating || 5}.0
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground italic text-[11px] line-clamp-2">
+                    "{f.comment || f.comments || "Pleasant stay, good cleanliness and hospitality."}"
+                  </p>
+                  <div className="flex items-center justify-between pt-1 border-t border-muted/60 text-[10px]">
+                    <span className="font-semibold text-muted-foreground">
+                      {f.createdAt ? new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : "Recently"}
+                    </span>
+                    <span className={`font-bold ${f.response ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {f.response ? "✓ Responded" : "Pending Reply"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        isOpen={extendModalOpen}
+        booking={selectedBookingForExtend}
+        onClose={() => {
+          setExtendModalOpen(false);
+          setSelectedBookingForExtend(null);
+        }}
+        onSuccess={() => {
+          loadDashboardData();
+        }}
+        userRole="manager"
+      />
     </div>
   );
 }

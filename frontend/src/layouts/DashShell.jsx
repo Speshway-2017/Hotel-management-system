@@ -66,7 +66,8 @@ const subModules = {
       { label: "Staff", to: "/admin/staff" },
       { label: "Approvals", to: "/admin/approvals" },
       { label: "Channel Manager", to: "/admin/channels" },
-      { label: "Feedback", to: "/admin/feedback" }
+      { label: "Feedback", to: "/admin/feedback" },
+      { label: "Coupons", to: "/admin/coupons" }
     ],
     "Settings": [
       { label: "Hotel Profile", to: "/admin/settings?tab=hotel-info" },
@@ -84,7 +85,8 @@ const subModules = {
     "Management": [
       { label: "Approvals", to: "/manager/approvals" },
       { label: "Staff & Shifts", to: "/manager/shifts" },
-      { label: "Attendance", to: "/manager/attendance" }
+      { label: "Attendance", to: "/manager/attendance" },
+      { label: "Guest Feedback", to: "/manager/feedback" }
     ]
   },
   "reception": {
@@ -92,7 +94,8 @@ const subModules = {
       { label: "Arrivals", to: "/reception/check-in" },
       { label: "Departures", to: "/reception/check-out" },
       { label: "In-House Guests", to: "/reception/guest-search" },
-      { label: "Room Status", to: "/reception/room-assignment" }
+      { label: "Room Status", to: "/reception/room-assignment" },
+      { label: "Guest Feedback", to: "/reception/feedback" }
     ]
   }
 };
@@ -114,6 +117,7 @@ export function DashShell({ role, children }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchUnreadCount = async () => {
       try {
         const token = localStorage.getItem('hms_token');
@@ -121,21 +125,17 @@ export function DashShell({ role, children }) {
         
         const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
         const res = await fetch(`${apiBase}/notifications/unread-count`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.success && isMounted) {
           setUnreadCount(data.unreadCount || 0);
         }
-      } catch (err) {
-        console.error("Failed to load notifications unread count:", err);
-      }
+      } catch (err) {}
     };
 
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 15000); // 15 seconds poll
+    const interval = setInterval(fetchUnreadCount, 60000); // 60s gentle background fallback
     
     const handleForceRefresh = () => fetchUnreadCount();
     window.addEventListener('refresh-unread-notifications-count', handleForceRefresh);
@@ -145,6 +145,7 @@ export function DashShell({ role, children }) {
     });
 
     return () => {
+      isMounted = false;
       clearInterval(interval);
       window.removeEventListener('refresh-unread-notifications-count', handleForceRefresh);
       if (unsubscribe) unsubscribe();
@@ -160,6 +161,7 @@ export function DashShell({ role, children }) {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchPropertyDetails = async () => {
       try {
         let res;
@@ -170,17 +172,16 @@ export function DashShell({ role, children }) {
         } else if (role === "reception") {
           res = await receptionistService.getProperty();
         }
-        if (res && res.success && res.data) {
+        if (res && res.success && res.data && isMounted) {
           setUserProperty(res.data);
         }
-      } catch (err) {
-        console.error("Failed to load userProperty details:", err);
-      }
+      } catch (err) {}
     };
     
     if (role === "admin" || role === "manager" || role === "reception") {
       fetchPropertyDetails();
     }
+    return () => { isMounted = false; };
   }, [role, currentUser?.propertyId]);
 
   const [tooltip, setTooltip] = useState({
@@ -510,7 +511,7 @@ export function DashShell({ role, children }) {
                 if (path.startsWith("/admin/guests")) {
                   return {
                     title: "Guests Database (CRM)",
-                    subtitle: "Manage secure profiles, loyalty status level tiers, feedback, complaints, and preferences."
+                    subtitle: "Manage secure profiles, stay records, feedback, complaints, and preferences."
                   };
                 }
                 if (path.startsWith("/admin/front-desk")) {
@@ -563,14 +564,20 @@ export function DashShell({ role, children }) {
                 }
                 if (path.startsWith("/admin/feedback")) {
                   return {
-                    title: "Guest Feedback & Reviews",
-                    subtitle: "Monitor guest reviews, star ratings, and post managerial responses."
+                    title: "Guest Feedback",
+                    subtitle: "Monitor guest stay feedback, ratings, and managerial responses."
+                  };
+                }
+                if (path.startsWith("/admin/coupons")) {
+                  return {
+                    title: "Promotional Coupons & Direct Booking Offers",
+                    subtitle: "Create, configure, and manage website discount coupons."
                   };
                 }
                 if (path.startsWith("/admin/crm")) {
                   return {
-                    title: "CRM & Loyalty Console",
-                    subtitle: "Audit guest profile checkouts, calculate lifetime values, track accumulated loyalty points, and distribute tier rewards."
+                    title: "Guest CRM Console",
+                    subtitle: "Audit guest profiles, calculate lifetime stays and spend, track preferences, and manage guest communications."
                   };
                 }
                 if (path.startsWith("/admin/profile")) {
@@ -740,9 +747,9 @@ export function DashShell({ role, children }) {
                     subtitle: "View reservation invoices and receipt ledgers."
                   };
                 }
-                if (path.startsWith("/guest/reviews")) {
+                if (path.startsWith("/guest/feedback") || path.startsWith("/guest/reviews")) {
                   return {
-                    title: "Feedback",
+                    title: "Guest Feedback",
                     subtitle: "Rate your stay experience and share feedback."
                   };
                 }
@@ -761,7 +768,7 @@ export function DashShell({ role, children }) {
                 if (path.startsWith("/guest/profile")) {
                   return {
                     title: "Profile",
-                    subtitle: "Manage your personal details, contact info, and loyalty account."
+                    subtitle: "Manage your personal details, contact info, and account settings."
                   };
                 }
               }
@@ -916,11 +923,30 @@ export function DashShell({ role, children }) {
                 ],
                 "/admin/feedback": [
                   { label: "Management", to: "/admin/staff" },
-                  { label: "Feedback" }
+                  { label: "Guest Feedback" }
+                ],
+                "/admin/coupons": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Coupons" }
+                ],
+                "/admin/coupons/add": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Coupons", to: "/admin/coupons" },
+                  { label: "Create Coupon" }
+                ],
+                "/admin/coupons/edit": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Coupons", to: "/admin/coupons" },
+                  { label: "Edit Coupon" }
+                ],
+                "/admin/coupons/view": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Coupons", to: "/admin/coupons" },
+                  { label: "Coupon Details" }
                 ],
                 "/admin/crm": [
                   { label: "Management", to: "/admin/staff" },
-                  { label: "CRM & Loyalty" }
+                  { label: "Guest CRM" }
                 ],
                 "/admin/notifications": [
                   { label: "Management", to: "/admin/staff" },
@@ -993,9 +1019,9 @@ export function DashShell({ role, children }) {
                 "/guest/services": [{ label: "Service Requests" }],
                 "/guest/folio": [{ label: "Digital Folio" }],
                 "/guest/folio/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Folio Details" }],
-                "/guest/reviews": [{ label: "Feedback" }],
+                "/guest/feedback": [{ label: "Guest Feedback" }],
+                "/guest/reviews": [{ label: "Guest Feedback" }],
                 "/guest/invoices": [{ label: "Invoices" }],
-                "/guest/loyalty": [{ label: "Loyalty" }],
                 "/guest/settings": [{ label: "Settings" }],
                 "/guest/profile": [{ label: "Profile" }],
                 "/guest/notifications": [{ label: "Notifications" }]

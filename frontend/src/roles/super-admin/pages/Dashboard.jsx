@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { adminService } from "@/services/admin";
 import { 
   Building2, TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, 
   Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, AlertTriangle, 
   Play, Bed, RefreshCw, Eye, ExternalLink, ChevronUp, ChevronDown, Search, ArrowRight,
-  Plus, X, Ticket
+  Plus, X, Ticket, Star, MessageSquareHeart
 } from "lucide-react";
 
 function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -55,6 +56,7 @@ function SuperAdminDashboard() {
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
   const [subscriptionRequests, setSubscriptionRequests] = useState([]);
+  const [feedbackList, setFeedbackList] = useState([]);
   const [decidingId, setDecidingId] = useState(null);
   const [rejectionModalId, setRejectionModalId] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -86,12 +88,13 @@ function SuperAdminDashboard() {
   async function loadDashboardData(isSilent = false) {
     try {
       if (!isSilent) setLoading(true);
-      const [statsRes, propertiesRes, reservationsRes, logsRes, requestsRes] = await Promise.all([
+      const [statsRes, propertiesRes, reservationsRes, logsRes, requestsRes, fbRes] = await Promise.all([
         superAdminService.getDashboardStats().catch(() => ({})),
         superAdminService.getProperties().catch(() => ({})),
         superAdminService.getReservations().catch(() => ({})),
         superAdminService.getAuditLogs().catch(() => ({})),
-        superAdminService.getSubscriptionRequests().catch(() => ({}))
+        superAdminService.getSubscriptionRequests().catch(() => ({})),
+        adminService.getFeedback().catch(() => ({}))
       ]);
       
       if (statsRes.success) setStats(statsRes.data.stats);
@@ -99,6 +102,7 @@ function SuperAdminDashboard() {
       if (reservationsRes.success) setReservations(reservationsRes.data);
       if (logsRes.success) setLogs(logsRes.data);
       if (requestsRes.success) setSubscriptionRequests(requestsRes.data);
+      if (fbRes?.success && Array.isArray(fbRes.data)) setFeedbackList(fbRes.data);
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to sync dashboard data.");
     } finally {
@@ -110,15 +114,13 @@ function SuperAdminDashboard() {
   useEffect(() => {
     loadDashboardData(false);
 
-    const handleFocus = () => loadDashboardData(true);
-    window.addEventListener('focus', handleFocus);
+    const handleFocus = () => loadDashboardData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDashboardData(true);
     });
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -646,6 +648,55 @@ function SuperAdminDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      {/* Guest Feedback & Hospitality Sentiment Panel */}
+      <Panel
+        title="Portfolio Guest Feedback & Hospitality Rating"
+        description="Unified feedback ledger submitted across all Hour Stay properties from MongoDB database."
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-navy bg-muted/60 px-3 py-1 rounded-full flex items-center gap-1.5">
+              <Star className="size-3.5 fill-gold text-gold" />
+              {feedbackList.length > 0 ? (feedbackList.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbackList.length).toFixed(1) : "5.0"} Portfolio Avg
+            </span>
+          </div>
+        }
+      >
+        <div className="p-4 bg-white rounded-b-xl">
+          {feedbackList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-muted-foreground font-semibold select-none border border-dashed border-muted rounded-xl bg-[#fcfcfc]">
+              No guest feedback records submitted across properties yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {feedbackList.slice(0, 3).map((f) => (
+                <div key={f._id || f.id} className="p-4 rounded-xl border border-muted bg-[#fcfcfc] space-y-2.5 text-xs text-left">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-navy">{f.guestName || "Valued Guest"}</p>
+                      <p className="text-[10px] text-muted-foreground">{f.propertyId || "HS-JAI"} · Room #{f.room || "101"}</p>
+                    </div>
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
+                      <Star className="size-3 fill-amber-400 text-amber-400" /> {f.rating || 5}.0
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground italic text-[11px] line-clamp-2">
+                    "{f.comment || f.comments || "Exceptional stay experience and hospitality."}"
+                  </p>
+                  <div className="flex items-center justify-between pt-1 border-t border-muted/60 text-[10px]">
+                    <span className="font-semibold text-muted-foreground">
+                      {f.createdAt ? new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : "Recently"}
+                    </span>
+                    <span className="font-bold text-purple uppercase text-[9px] tracking-wider">
+                      {f.status || 'Published'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

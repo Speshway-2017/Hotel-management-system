@@ -1,19 +1,22 @@
 import { io } from 'socket.io-client';
+import { invalidateApiCache } from './apiClient';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
 
 export const socket = io(SOCKET_URL, {
   transports: ['websocket', 'polling'],
   autoConnect: true,
   reconnection: true,
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 1000
+  reconnectionAttempts: 10,
+  reconnectionDelay: 2000,
+  reconnectionDelayMax: 10000,
+  timeout: 10000
 });
 
 // Helper to get current authenticated user's property ID
 export const getCurrentPropertyId = () => {
   try {
-    const raw = localStorage.getItem('hms_user');
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('hms_user') : null;
     if (raw) {
       const user = JSON.parse(raw);
       return user?.propertyId || null;
@@ -33,17 +36,15 @@ export const joinCurrentProperty = () => {
 };
 
 socket.on('connect', () => {
-  console.log('⚡ Connected to HMS Realtime Socket.io server:', socket.id);
   joinCurrentProperty();
 });
 
 socket.on('reconnect', () => {
-  console.log('🔄 Reconnected to HMS Realtime Socket.io server:', socket.id);
   joinCurrentProperty();
 });
 
-socket.on('disconnect', () => {
-  console.log('🔌 Disconnected from HMS Realtime Socket.io server');
+socket.on('connect_error', (err) => {
+  // Silent fallback to polling without console spam
 });
 
 // Re-join property if login changes or storage updates
@@ -75,18 +76,23 @@ export const ALL_REALTIME_EVENTS = [
 
 /**
  * Universal subscription helper for real-time synchronization across dashboards.
+ * Features 250ms debouncing and automatic API cache invalidation.
  * @param {Function} callback - Function called with (data, eventName) when an event matches.
  * @param {Array<string>} [events] - Optional list of specific events to listen for. Defaults to all sync events.
  * @returns {Function} cleanup function to unsubscribe listeners.
  */
 export const subscribeRealtimeSync = (callback, events = ALL_REALTIME_EVENTS) => {
-  const currentPropId = getCurrentPropertyId();
-  const rawUser = typeof window !== 'undefined' ? localStorage.getItem('hms_user') : null;
-  const isSuperAdmin = rawUser && rawUser.includes('"role":"super-admin"');
+  let debounceTimer = null;
 
-  const handler = (eventName) => (data = {}) => {
+  const debouncedHandler = (eventName) => (data = {}) => {
     try {
-      callback(data, eventName);
+      // Invalidate frontend cache on relevant data change events
+      invalidateApiCache();
+
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        callback(data, eventName);
+      }, 200);
     } catch (err) {
       console.error('Realtime sync handler error:', err);
     }
@@ -94,12 +100,13 @@ export const subscribeRealtimeSync = (callback, events = ALL_REALTIME_EVENTS) =>
 
   const activeHandlers = [];
   events.forEach((evt) => {
-    const fn = handler(evt);
+    const fn = debouncedHandler(evt);
     socket.on(evt, fn);
     activeHandlers.push({ evt, fn });
   });
 
   return () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
     activeHandlers.forEach(({ evt, fn }) => {
       socket.off(evt, fn);
     });
@@ -111,6 +118,7 @@ export const subscribeRealtimeSync = (callback, events = ALL_REALTIME_EVENTS) =>
  */
 export const emitRealtimeEvent = (eventName, data = {}) => {
   const propertyId = getCurrentPropertyId();
+  invalidateApiCache();
   socket.emit(eventName, {
     ...data,
     propertyId: data.propertyId || propertyId || null,
@@ -118,3 +126,4 @@ export const emitRealtimeEvent = (eventName, data = {}) => {
   });
 };
 
+export default socket;

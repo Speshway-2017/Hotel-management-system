@@ -17,7 +17,14 @@ export const protect = async (req, res, next) => {
 
       // Get user from token
       req.user = await User.findById(decoded.id).select('-password');
+      if (!req.user && decoded.id) {
+        req.user = await User.findOne({ $or: [{ _id: decoded.id }, { id: decoded.id }] }).select('-password');
+      }
+      if (!req.user && decoded.email) {
+        req.user = await User.findOne({ email: decoded.email }).select('-password');
+      }
       if (!req.user) {
+        console.warn('❌ User not found for token payload:', decoded, 'on url:', req.originalUrl);
         return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
       }
 

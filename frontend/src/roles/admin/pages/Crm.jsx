@@ -5,18 +5,19 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { managerService } from "@/services/manager";
+import { inr } from "@/data/hs-data";
 import { toast } from "sonner";
 import {
-  Award, Search, Eye, Sparkles, DollarSign, TrendingUp, XCircle, Heart,
-  Users, CheckCircle2, MessageSquareText, ShieldAlert, Award as AwardIcon, Gift,
-  Star
+  Search, Eye, Sparkles, DollarSign, TrendingUp, XCircle, Heart,
+  Users, CheckCircle2, MessageSquareText, ShieldAlert, Star,
+  Mail, Phone, Calendar, UserCheck
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/crm")({
   head: () => ({
     meta: [
-      { title: "CRM & Loyalty Directory — Speshway Luxury Hotel" },
-      { name: "description", content: "Manage guest segments, loyalty tiers, member rewards points, and dining preferences." }
+      { title: "Guest CRM Directory — Speshway Luxury Hotel" },
+      { name: "description", content: "Manage guest segments, stay histories, contact details, and guest preferences." }
     ]
   }),
   component: AdminCrmPage
@@ -56,7 +57,6 @@ function AdminCrmPage() {
 
   // Directory Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [tierFilter, setTierFilter] = useState("all");
   const [segmentFilter, setSegmentFilter] = useState("all");
 
   // Feedback Filters
@@ -93,12 +93,7 @@ function AdminCrmPage() {
     loadData();
   }, []);
 
-  const getPropertyName = (pId) => {
-    const found = properties.find(p => p._id === pId || p.id === pId);
-    return found ? found.name : pId;
-  };
-
-  // Aggregation of guest loyalty stats from reservations
+  // Aggregation of guest stats from reservations
   const guestGroup = {};
 
   reservations.forEach((r) => {
@@ -122,47 +117,29 @@ function AdminCrmPage() {
     }
 
     guestGroup[name].totalStays += 1;
-    guestGroup[name].lifetimeSpend += r.amount || 0;
+    guestGroup[name].lifetimeSpend += (r.amount || r.totalAmount || 0);
     guestGroup[name].reservationsList.push(r);
     if (r.checkIn > guestGroup[name].lastStay) {
       guestGroup[name].lastStay = r.checkIn;
     }
   });
 
-  // Transform to loyalty profiles with tier scoring and points mapping
+  // Transform to CRM guest profiles with segmentation
   const guestProfiles = Object.values(guestGroup).map((profile) => {
     const stays = profile.totalStays;
-    let tier = "Bronze";
-    let reward = "Welcome Drink";
-    let pointsMultiplier = 1;
     let segment = "Leisure";
 
-    if (stays >= 5) {
-      tier = "Platinum";
-      reward = "Complimentary Suite Upgrade, Spa Access";
-      pointsMultiplier = 1.5;
+    if (stays >= 4 || profile.lifetimeSpend > 25000) {
       segment = "VIP";
-    } else if (stays >= 3) {
-      tier = "Gold";
-      reward = "Complimentary Lounge Access, Late Check-Out";
-      pointsMultiplier = 1.25;
-      segment = "Corporate";
-    } else if (stays === 2) {
-      tier = "Silver";
-      reward = "Premium Wi-Fi, Welcome Drink";
-      pointsMultiplier = 1.1;
+    } else if (stays >= 2) {
       segment = "Corporate";
     }
 
-    const calculatedPoints = Math.round(profile.lifetimeSpend * 0.05 * pointsMultiplier);
-    const preferences = profile.specialRequests || "High floor room";
+    const preferences = profile.specialRequests || "Standard room preferences";
 
     return {
       ...profile,
-      tier,
-      reward,
       segment,
-      points: calculatedPoints,
       preferences
     };
   });
@@ -173,26 +150,26 @@ function AdminCrmPage() {
         guest: p.name,
         channel: idx === 0 ? "WhatsApp" : idx === 1 ? "Email" : "SMS",
         message: idx === 0
-          ? `Sent ${p.tier} member privileges & benefits digest`
+          ? "Pre-arrival confirmation and itinerary dispatched"
           : idx === 1
-          ? "Post-stay feedback invite dispatched"
-          : "Pre-arrival reservation verification confirmed"
+          ? "Post-stay feedback review invite dispatched"
+          : "Stay invoice summary sent"
       }))
     : [
-        { date: "Recent", guest: "Real Guests", channel: "WhatsApp", message: "Automated loyalty updates synced." }
+        { date: "Recent", guest: "Recent Guests", channel: "WhatsApp", message: "Guest communication synced." }
       ];
 
-  // Filter application for loyalty
+  // Filter application for directory
   const filteredProfiles = guestProfiles.filter(p => {
     const s = searchQuery.toLowerCase();
     const matchesSearch =
       p.name.toLowerCase().includes(s) ||
-      p.email.toLowerCase().includes(s);
+      p.email.toLowerCase().includes(s) ||
+      p.phone.toLowerCase().includes(s);
 
-    const matchesTier = tierFilter === "all" || p.tier === tierFilter;
     const matchesSegment = segmentFilter === "all" || p.segment === segmentFilter;
 
-    return matchesSearch && matchesTier && matchesSegment;
+    return matchesSearch && matchesSegment;
   });
 
   // Filter application for feedbacks
@@ -213,9 +190,10 @@ function AdminCrmPage() {
   });
 
   // KPIs
-  const totalMembers = guestProfiles.length;
-  const platinumCount = guestProfiles.filter(p => p.tier === "Platinum").length;
-  const totalLoyaltyPoints = guestProfiles.reduce((acc, curr) => acc + curr.points, 0);
+  const totalGuestsCount = guestProfiles.length;
+  const repeatGuestsCount = guestProfiles.filter(p => p.totalStays > 1).length;
+  const totalLifetimeRevenue = guestProfiles.reduce((acc, curr) => acc + curr.lifetimeSpend, 0);
+  const avgSpendPerGuest = totalGuestsCount > 0 ? Math.round(totalLifetimeRevenue / totalGuestsCount) : 0;
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
@@ -232,7 +210,7 @@ function AdminCrmPage() {
               : "border-transparent text-muted-foreground hover:text-navy"
           }`}
         >
-          Loyalty Directory
+          Guest Directory
         </button>
         <button
           onClick={() => setActiveTab("feedback")}
@@ -253,38 +231,38 @@ function AdminCrmPage() {
           {/* KPI Stats cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <PremiumStatCard
-              label="Total Loyalty Members"
-              value={totalMembers.toString()}
-              hint="Registered loyalty database"
+              label="Total Profiled Guests"
+              value={totalGuestsCount.toString()}
+              hint="Unique registered guests"
               icon={Users}
               accentColor="#6366f1"
             />
             <PremiumStatCard
-              label="Platinum Tier Members"
-              value={platinumCount.toString()}
-              hint="Top-tier VIP guest segment"
-              icon={Award}
+              label="Repeat Guests (2+ Stays)"
+              value={repeatGuestsCount.toString()}
+              hint="Returning customer base"
+              icon={UserCheck}
               accentColor="#10b981"
             />
             <PremiumStatCard
-              label="Total Reward Points Issued"
-              value={totalLoyaltyPoints.toLocaleString()}
-              hint="Total accrued member points"
-              icon={Sparkles}
+              label="Avg Lifetime Spend"
+              value={inr(avgSpendPerGuest)}
+              hint="Average revenue per guest"
+              icon={DollarSign}
               accentColor="#a855f7"
             />
             <PremiumStatCard
               label="Avg Rating Index"
               value="4.8 / 5.0"
-              hint="Member guest feedback index"
+              hint="Guest satisfaction score"
               icon={Heart}
               accentColor="#ec4899"
             />
           </div>
 
           {/* Search & Filters */}
-          <Panel title="CRM Directory Search Filters">
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+          <Panel title="Guest Directory Search Filters">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
               <FormField label="Search Guest Profile" id="search">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -292,29 +270,14 @@ function AdminCrmPage() {
                     id="search"
                     type="text"
                     className="pl-9 h-10 text-xs font-bold"
-                    placeholder="Name, email address..."
+                    placeholder="Name, email, phone number..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
               </FormField>
 
-              <FormField label="Loyalty Tier Status" id="tier">
-                <Select
-                  id="tier"
-                  value={tierFilter}
-                  onChange={(e) => setTierFilter(e.target.value)}
-                  className="h-10 text-xs font-bold"
-                >
-                  <option value="all">All Loyalty Tiers</option>
-                  <option value="Platinum">Platinum Elite</option>
-                  <option value="Gold">Gold Star</option>
-                  <option value="Silver">Silver Member</option>
-                  <option value="Bronze">Bronze Tier</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Guest Segment Class" id="segment">
+              <FormField label="Guest Segment" id="segment">
                 <Select
                   id="segment"
                   value={segmentFilter}
@@ -322,9 +285,9 @@ function AdminCrmPage() {
                   className="h-10 text-xs font-bold"
                 >
                   <option value="all">All Segments</option>
-                  <option value="VIP">VIP Elite</option>
-                  <option value="Corporate">Corporate Accounts</option>
-                  <option value="Leisure">Leisure / Retail</option>
+                  <option value="VIP">VIP</option>
+                  <option value="Corporate">Corporate</option>
+                  <option value="Leisure">Leisure</option>
                 </Select>
               </FormField>
             </div>
@@ -332,22 +295,22 @@ function AdminCrmPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Main loyalty table */}
+            {/* Main guest table */}
             <div className="lg:col-span-2 space-y-4">
-              <Panel title="Loyalty Members Registry">
+              <Panel title="Guest Directory Registry">
                 {filteredProfiles.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-muted-foreground select-none">No loyalty profiles matched query filters.</div>
+                  <div className="p-8 text-center text-xs text-muted-foreground select-none">No guest profiles matched query filters.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs min-w-[750px]">
+                    <table className="w-full text-left text-xs min-w-[700px]">
                       <thead>
                         <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                          <th className="py-3 px-4 text-left">Loyalty Member</th>
-                          <th className="py-3 px-4 text-left">Tier Level</th>
-                          <th className="py-3 px-4 text-center font-bold">Stays Count</th>
-                          <th className="py-3 px-4 text-right">Points Accrued</th>
-                          <th className="py-3 px-4 text-left">Preferences / Custom Notes</th>
+                          <th className="py-3 px-4 text-left">Guest Profile</th>
                           <th className="py-3 px-4 text-left">Segment</th>
+                          <th className="py-3 px-4 text-center font-bold">Total Stays</th>
+                          <th className="py-3 px-4 text-right">Lifetime Spend</th>
+                          <th className="py-3 px-4 text-left">Preferences / Notes</th>
+                          <th className="py-3 px-4 text-left">Last Stay</th>
                           <th className="py-3 px-4 text-center font-bold" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>Action</th>
                         </tr>
                       </thead>
@@ -360,16 +323,16 @@ function AdminCrmPage() {
                                 <p className="text-[10px] text-muted-foreground font-semibold">{p.email}</p>
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 font-black">
-                              <span className={`px-2 py-0.5 rounded text-[9.5px] font-black uppercase tracking-wider ${
-                                p.tier === "Platinum" ? "bg-purple-100 text-purple-800" : p.tier === "Gold" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-800"
-                              }`}>{p.tier}</span>
+                            <td className="py-3.5 px-4">
+                              <Tag tone={p.segment === "VIP" ? "brand" : p.segment === "Corporate" ? "info" : "neutral"}>
+                                {p.segment}
+                              </Tag>
                             </td>
-                            <td className="py-3.5 px-4 text-center font-mono font-bold text-navy">{p.totalStays} stays</td>
-                            <td className="py-3.5 px-4 text-right font-black text-navy">{p.points.toLocaleString()} pts</td>
-                            <td className="py-3.5 px-4 text-muted-foreground font-medium truncate max-w-[150px]">{p.preferences}</td>
-                            <td className="py-3.5 px-4 font-semibold text-navy">{p.segment}</td>
-                            <td className="py-3 px-4 text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
+                            <td className="py-3.5 px-4 text-center font-mono font-bold text-navy">{p.totalStays} {p.totalStays === 1 ? 'stay' : 'stays'}</td>
+                            <td className="py-3.5 px-4 text-right font-black text-navy">{inr(p.lifetimeSpend)}</td>
+                            <td className="py-3.5 px-4 text-muted-foreground font-medium truncate max-w-[160px]">{p.preferences}</td>
+                            <td className="py-3.5 px-4 font-semibold text-navy">{p.lastStay || "N/A"}</td>
+                            <td className="py-3.5 px-4 text-center" style={{ width: '60px', minWidth: '60px', maxWidth: '60px' }}>
                               <Button
                                 onClick={() => setSelectedGuest(p)}
                                 variant="ghost"
@@ -390,7 +353,7 @@ function AdminCrmPage() {
 
             {/* Customer Engagement */}
             <div className="lg:col-span-1">
-              <Panel title="Loyalty Engagement Dispatcher" description="Review recent guest campaigns.">
+              <Panel title="Guest Communications Dispatcher" description="Review recent guest notifications.">
                 <div className="p-4 space-y-4">
                   {engagementLogs.map((log, idx) => (
                     <div key={idx} className="p-3 bg-[#fafafa]/50 border border-muted rounded-xl space-y-1.5 text-xs text-left">
@@ -448,50 +411,40 @@ function AdminCrmPage() {
               <div className="p-8 text-center text-xs text-muted-foreground select-none">No guest reviews matched your filters.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs min-w-[850px]">
+                <table className="w-full text-left text-xs min-w-[700px]">
                   <thead>
                     <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                      <th className="py-3 px-4 text-left">Guest Name</th>
-                      <th className="py-3 px-4 text-left">Property Branch</th>
-                      <th className="py-3 px-4 text-left">Cleanliness / Service / Room</th>
-                      <th className="py-3 px-4 text-left">Feedback & Comments</th>
-                      <th className="py-3 px-4 text-left">Submitted Date</th>
-                      <th className="py-3 px-4 text-left">Status</th>
+                      <th className="py-3 px-4">Guest</th>
+                      <th className="py-3 px-4">Date</th>
+                      <th className="py-3 px-4">Review Ratings</th>
+                      <th className="py-3 px-4">Comments</th>
+                      <th className="py-3 px-4">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                    {filteredFeedbacks.map((f) => {
+                  <tbody className="divide-y divide-muted/30">
+                    {filteredFeedbacks.map((f, i) => {
                       const overall = Math.round((f.ratings.cleanliness + f.ratings.service + f.ratings.room) / 3);
                       return (
-                        <tr key={f._id || f.id} className="hover:bg-muted/5">
+                        <tr key={f._id || i} className="hover:bg-muted/5">
                           <td className="py-3.5 px-4 font-bold text-navy">{f.guestName}</td>
-                          <td className="py-3.5 px-4 font-semibold text-navy-deep">{getPropertyName(f.propertyId)}</td>
+                          <td className="py-3.5 px-4 text-muted-foreground font-semibold">{f.date}</td>
                           <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1 font-semibold">
-                              <span className="font-bold text-navy flex items-center gap-0.5">
-                                {overall} <Star className="size-3 text-amber-500 fill-amber-500" />
-                              </span>
-                              <span className="text-[10px] text-muted-foreground font-semibold">
-                                ({f.ratings.cleanliness}/{f.ratings.service}/{f.ratings.room})
-                              </span>
+                            <div className="flex items-center gap-1">
+                              {[...Array(5)].map((_, idx) => (
+                                <Star
+                                  key={idx}
+                                  className={`size-3.5 ${
+                                    idx < overall
+                                      ? "text-amber-500 fill-amber-500"
+                                      : "text-muted-foreground/30"
+                                  }`}
+                                />
+                              ))}
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 text-navy font-semibold whitespace-normal max-w-[300px]">
-                            <p>{f.comment}</p>
-                            {f.response && (
-                              <div className="mt-1.5 p-2 bg-[#f0f9ff] border border-blue-100 rounded text-[11px] text-blue-800">
-                                <span className="font-bold block">Response:</span>
-                                {f.response}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-muted-foreground font-semibold">
-                            {new Date(f.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </td>
+                          <td className="py-3.5 px-4 text-navy max-w-xs truncate font-medium">{f.comment || "No written remarks."}</td>
                           <td className="py-3.5 px-4">
-                            <Tag tone={f.response ? "success" : "warning"}>
-                              {f.response ? "Responded" : "Pending Response"}
-                            </Tag>
+                            <Tag tone={f.status === "Published" ? "success" : "warning"}>{f.status}</Tag>
                           </td>
                         </tr>
                       );
@@ -511,13 +464,13 @@ function AdminCrmPage() {
             
             <div className="p-4.5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-navy text-sm">Loyalty Profile: {selectedGuest.name}</h3>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-0.5">Tier Tiers: {selectedGuest.tier}</p>
+                <h3 className="font-bold text-navy text-sm">Guest Profile: {selectedGuest.name}</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-0.5">Segment: {selectedGuest.segment}</p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7 rounded-full text-muted-foreground hover:text-navy"
+                className="size-7 rounded-full text-muted-foreground hover:text-navy cursor-pointer"
                 onClick={() => setSelectedGuest(null)}
               >
                 <XCircle className="size-4" />
@@ -528,23 +481,23 @@ function AdminCrmPage() {
             <div className="p-5 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-muted/20 border border-muted rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Reward Balance</span>
-                  <span className="font-black text-navy text-sm">{selectedGuest.points.toLocaleString()} Points</span>
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Lifetime Spend</span>
+                  <span className="font-black text-navy text-sm">{inr(selectedGuest.lifetimeSpend)}</span>
                 </div>
                 <div className="p-3 bg-muted/20 border border-muted rounded-lg">
                   <span className="text-[10px] text-muted-foreground uppercase block font-bold">Stays Count</span>
-                  <span className="font-black text-navy text-sm">{selectedGuest.totalStays} Stays</span>
+                  <span className="font-black text-navy text-sm">{selectedGuest.totalStays} {selectedGuest.totalStays === 1 ? 'Stay' : 'Stays'}</span>
                 </div>
               </div>
 
               <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-lg space-y-1">
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Preferences</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Preferences & Remarks</p>
                 <p className="text-navy font-bold">{selectedGuest.preferences}</p>
               </div>
 
               <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-lg space-y-1">
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Active rewards privileges</p>
-                <p className="text-[11px] leading-relaxed text-muted-foreground">{selectedGuest.reward}</p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Contact Details</p>
+                <p className="text-xs text-navy font-medium">{selectedGuest.email} · {selectedGuest.phone}</p>
               </div>
 
               {/* Stays History */}
@@ -554,10 +507,10 @@ function AdminCrmPage() {
                   {selectedGuest.reservationsList.map((res, i) => (
                     <div key={i} className="flex justify-between items-center p-2 bg-[#fcfcfc] border border-muted rounded">
                       <div>
-                        <p className="font-bold text-navy">Room #{res.room} • {res.checkIn}</p>
-                        <p className="text-[10px] text-muted-foreground">Reference: {res.id}</p>
+                        <p className="font-bold text-navy">Room #{res.room || res.roomNumber || '101'} • {res.checkIn}</p>
+                        <p className="text-[10px] text-muted-foreground">ID: {res._id || res.id || res.bookingId}</p>
                       </div>
-                      <span className="font-black text-navy">₹{(res.amount || 0).toLocaleString()}</span>
+                      <span className="font-black text-navy">{inr(res.amount || res.totalAmount || 0)}</span>
                     </div>
                   ))}
                 </div>
@@ -568,7 +521,7 @@ function AdminCrmPage() {
               <Button
                 variant="ghost"
                 onClick={() => setSelectedGuest(null)}
-                className="h-8 px-4 text-xs rounded-full"
+                className="h-8 px-4 text-xs rounded-full cursor-pointer"
               >
                 Close Profile
               </Button>
@@ -581,3 +534,5 @@ function AdminCrmPage() {
     </div>
   );
 }
+
+export default AdminCrmPage;

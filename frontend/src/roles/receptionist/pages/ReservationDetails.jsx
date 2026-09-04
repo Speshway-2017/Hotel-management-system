@@ -22,6 +22,7 @@ export const Route = createFileRoute("/reception/reservations/$id")({
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
+import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 
 function ReceptionReservationDetailsPage() {
   const { id } = useParams();
@@ -29,6 +30,7 @@ function ReceptionReservationDetailsPage() {
 
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(null);
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
 
   const loadReservationDetails = () => {
     receptionistService.getReservations()
@@ -166,11 +168,17 @@ function ReceptionReservationDetailsPage() {
                 </div>
               )}
 
-              {(booking.status === "Checked In" || booking.status === "Checked-in" || booking.status === "Staying") && (
+              {(booking.status === "Checked In" || booking.status === "Checked-in" || booking.status === "Staying" || booking.status === "Staying-In") && (
                 <div className="flex gap-2 border-t border-muted/50 pt-5 justify-end">
+                  <ExtendStayButton 
+                    variant="header"
+                    label="Extend Stay"
+                    booking={booking}
+                    onClick={() => navigate(`/reception/reservations/extend/${booking._id || booking.id || booking.bookingId || id}`)}
+                  />
                   <Button 
                     asChild
-                    className="bg-navy hover:bg-navy-deep text-white h-9 px-6 text-xs rounded-full font-bold cursor-pointer"
+                    className="bg-navy hover:bg-navy-deep text-white h-9 px-6 text-xs rounded-xl font-bold cursor-pointer"
                   >
                     <Link to={`/reception/check-out/${booking._id || booking.id || booking.bookingId}`}>Check Out Guest</Link>
                   </Button>
@@ -222,6 +230,15 @@ function ReceptionReservationDetailsPage() {
         </div>
 
       </div>
+
+      {/* Extend Stay Modal */}
+      <ExtendStayModal
+        booking={booking}
+        isOpen={isExtendModalOpen}
+        onClose={() => setIsExtendModalOpen(false)}
+        onSuccess={() => loadReservationDetails()}
+        userRole="receptionist"
+      />
 
     </div>
   );

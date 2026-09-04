@@ -22,7 +22,7 @@ export const Route = createFileRoute("/super-admin/users")({
   head: () => ({
     meta: [
       { title: "Guests Portfolio — Super Admin | Hour Stay" },
-      { name: "description", content: "Consolidated guest accounts, portfolio profiles, and guest loyalty registry across all properties." }
+      { name: "description", content: "Consolidated guest accounts, portfolio profiles, and guest directory registry across all properties." }
     ]
   }),
   component: SuperAdminGuests
@@ -74,15 +74,13 @@ function SuperAdminGuests() {
   useEffect(() => {
     loadData(false);
 
-    const handleFocus = () => loadData(true);
-    window.addEventListener("focus", handleFocus);
+    const handleFocus = () => loadData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
-      window.removeEventListener("focus", handleFocus);
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);

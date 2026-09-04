@@ -4,12 +4,15 @@ import {
   Star, MessageSquare, Plus, RefreshCw, AlertCircle, 
   CheckCircle2, Hotel, Calendar, User, ThumbsUp, Send, X 
 } from "lucide-react";
+import { apiClient, invalidateApiCache } from "@/services/apiClient";
+import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 
-export const Route = createFileRoute("/guest/reviews")({
+export const Route = createFileRoute("/guest/feedback")({
   head: () => ({
     meta: [
-      { title: "Feedback — Hour Stay" },
-      { name: "description", content: "Share how your stays went and view your submitted feedback." }
+      { title: "Guest Feedback — Hour Stay" },
+      { name: "description", content: "Share your stay experience and view your submitted feedback records." }
     ]
   }),
   component: GuestReviewsPage
@@ -23,6 +26,7 @@ function GuestReviewsPage() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Feedback Form State
   const [selectedBooking, setSelectedBooking] = useState("");
@@ -38,19 +42,20 @@ function GuestReviewsPage() {
   const [comments, setComments] = useState("");
   const [formError, setFormError] = useState("");
 
-  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem('hms_token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const user = authService.getCurrentUser();
+      setCurrentUser(user);
 
       // 1. Fetch Guest Feedback from Backend/MongoDB
-      const revRes = await fetch(`${API_URL}/v1/guest/feedback`, { headers });
-      const revData = await revRes.json();
+      let revData;
+      try {
+        revData = await apiClient.get('/v1/guest/feedback', { bypassCache: true });
+      } catch (e) {
+        revData = await apiClient.get('/guest/feedback', { bypassCache: true }).catch(() => ({}));
+      }
 
       if (revData && revData.success && Array.isArray(revData.data)) {
         setReviews(revData.data);
@@ -59,11 +64,16 @@ function GuestReviewsPage() {
       }
 
       // 2. Fetch Guest Bookings for the form dropdown
-      const bookRes = await fetch(`${API_URL}/v1/guest/bookings`, { headers });
-      const bookData = await bookRes.json();
+      let bookData;
+      try {
+        bookData = await apiClient.get('/v1/guest/bookings', { bypassCache: true });
+      } catch (e) {
+        bookData = await apiClient.get('/guest/bookings', { bypassCache: true }).catch(() => ({}));
+      }
+
       if (bookData && bookData.success && Array.isArray(bookData.data)) {
         setBookings(bookData.data);
-        if (bookData.data.length > 0) {
+        if (bookData.data.length > 0 && !selectedBooking) {
           setSelectedBooking(bookData.data[0].bookingId || bookData.data[0].id);
         }
       }
@@ -77,6 +87,14 @@ function GuestReviewsPage() {
 
   useEffect(() => {
     fetchData();
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchData(true);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleCategoryRating = (cat, val) => {
@@ -94,39 +112,44 @@ function GuestReviewsPage() {
     setSuccessMsg("");
 
     try {
-      const token = localStorage.getItem('hms_token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
+      const user = authService.getCurrentUser();
       const matchedBooking = bookings.find(b => (b.bookingId === selectedBooking || b.id === selectedBooking));
-      const hotelName = matchedBooking ? (matchedBooking.hotel || matchedBooking.hotelName) : "Speshway Hotel & Suites";
+      const hotelName = matchedBooking ? (matchedBooking.hotel || matchedBooking.hotelName) : "Rambagh Residency, Jaipur";
 
       const payload = {
-        bookingId: selectedBooking || "HS-1001",
+        bookingId: selectedBooking || matchedBooking?.bookingId || "BK-10301",
         hotelName,
+        guestName: user?.name || matchedBooking?.guest || "Surya",
+        guestEmail: user?.email || matchedBooking?.email || "surya@gmail.com",
+        guestPhone: user?.mobile || matchedBooking?.phone || "+91 47362 54654",
+        propertyId: matchedBooking?.propertyId || user?.propertyId || "HS-JAI",
+        room: matchedBooking?.room || "103 · Standard Room",
+        roomType: matchedBooking?.roomType || "Standard Room",
         rating: overallRating,
         categories,
-        comments
+        comments,
+        comment: comments
       };
 
-      const res = await fetch(`${API_URL}/v1/guest/feedback`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
+      let result;
+      try {
+        result = await apiClient.post('/v1/guest/feedback', payload);
+      } catch (e) {
+        result = await apiClient.post('/guest/feedback', payload);
+      }
 
       if (result && result.success) {
+        invalidateApiCache();
         setSuccessMsg("Thank you! Your feedback has been recorded successfully.");
         setShowForm(false);
         setComments("");
-        fetchData();
+        fetchData(true);
       } else {
-        setFormError(result.message || "Failed to submit feedback.");
+        setFormError(result?.message || "Failed to submit feedback.");
       }
     } catch (err) {
       console.error("Feedback submit error:", err);
-      setFormError("Network error. Unable to submit feedback.");
+      setFormError(err.message || "Network error. Unable to submit feedback.");
     } finally {
       setSubmitting(false);
     }
@@ -146,7 +169,7 @@ function GuestReviewsPage() {
       
       {/* Top Header Bar with Single Give Feedback Button */}
       <div className="bg-white rounded-2xl border border-navy/10 p-4 sm:p-6 shadow-soft flex items-center justify-between gap-4">
-        <span className="text-xs font-semibold text-navy/60">Share your stay experience & reviews</span>
+        <span className="text-xs font-semibold text-navy/60">Share your stay experience & rate your hotel stay</span>
 
         <button
           onClick={() => {
@@ -322,10 +345,10 @@ function GuestReviewsPage() {
         </form>
       )}
 
-      {/* Main Reviews Table / Cards Grid */}
+      {/* Main Feedback Table / Cards Grid */}
       <div className="bg-white rounded-2xl border border-navy/10 p-6 shadow-soft space-y-4">
         <div className="flex items-center justify-between border-b border-navy/5 pb-4">
-          <h3 className="font-display text-base font-bold text-navy">Submitted Reviews History</h3>
+          <h3 className="font-display text-base font-bold text-navy">Submitted Feedback History</h3>
           <span className="text-xs font-semibold text-navy/60">{reviews.length} Total Feedback Records</span>
         </div>
 

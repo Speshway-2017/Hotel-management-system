@@ -170,6 +170,10 @@ export function HotelDetailsPage() {
     if (['dirty', 'cleaning', 'maintenance', 'out of order'].includes(statusVal)) return;
 
     const cat = rm.category || 'Standard Room';
+    const planName = (rm.ratePlan && rm.ratePlan !== 'Standard Plan' && rm.ratePlan !== 'Standard Rate Plan')
+      ? rm.ratePlan
+      : (cat.toLowerCase().includes('deluxe') ? 'Deluxe Plan' : cat.toLowerCase().includes('suite') ? 'Executive Suite Plan' : `${cat} Plan`);
+
     if (!roomTypesMap[cat]) {
       roomTypesMap[cat] = {
         id: rm.id || rm._id || cat,
@@ -177,7 +181,7 @@ export function HotelDetailsPage() {
         name: cat,
         description: rm.description || `Luxury ${cat} configuration with modern amenities.`,
         price: Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3000),
-        ratePlan: rm.ratePlan || 'Standard Plan',
+        ratePlan: planName,
         beds: rm.beds || rm.bedType || 'King Bed',
         capacity: rm.capacity || '2 Adults',
         floor: rm.floor || 'Floor 1',
