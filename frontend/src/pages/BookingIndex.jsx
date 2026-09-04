@@ -24,8 +24,7 @@ export const Route = {
 function Booking() {
   const [property, setProperty] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
@@ -53,9 +52,7 @@ function Booking() {
     const currentUser = authService.getCurrentUser();
     if (currentUser) {
       if (currentUser.name) {
-        const parts = currentUser.name.split(' ');
-        setFirstName(parts[0] || '');
-        setLastName(parts.slice(1).join(' ') || '');
+        setGuestName(currentUser.name);
       }
       if (currentUser.email) setEmail(currentUser.email);
       if (currentUser.mobile) setPhone(currentUser.mobile);
@@ -266,7 +263,7 @@ function Booking() {
     setSubmitting(true);
     try {
       const propId = property?._id || property?.id || localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
-      const guestFullName = `${firstName} ${lastName}`.trim() || 'Guest';
+      const guestFullName = guestName.trim() || 'Guest';
 
       const bookingPayload = {
         propertyId: propId,
@@ -375,13 +372,9 @@ function Booking() {
               <div>
                 <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">Guest Details</h2>
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="fn" className="text-xs font-bold text-navy">First Name</Label>
-                    <Input id="fn" className="mt-1.5 h-11 text-xs font-medium" value={firstName} onChange={e => setFirstName(e.target.value)} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="ln" className="text-xs font-bold text-navy">Last Name</Label>
-                    <Input id="ln" className="mt-1.5 h-11 text-xs font-medium" value={lastName} onChange={e => setLastName(e.target.value)} required />
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="guestName" className="text-xs font-bold text-navy">Full Name</Label>
+                    <Input id="guestName" className="mt-1.5 h-11 text-xs font-medium" value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="e.g. Surya Sharma" required />
                   </div>
                   <div>
                     <Label htmlFor="em" className="text-xs font-bold text-navy">Email Address</Label>
