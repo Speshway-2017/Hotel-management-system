@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { HorizontalRouteTabs, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { HorizontalRouteTabs, Panel, Tag, Notice, LoadingRows, ActionGroup, DownloadActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import {
@@ -270,7 +270,7 @@ function TaxesGstPage() {
                   <th className="py-4 px-4 text-right">SGST (9%)</th>
                   <th className="py-4 px-4 text-right">IGST</th>
                   <th className="py-4 px-4 text-right font-bold text-navy">Total GST</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
+                  <th className="py-4 px-6 text-left min-w-[120px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-xs text-[#2a2a2a]">
@@ -300,15 +300,13 @@ function TaxesGstPage() {
                         <td className="py-4 px-4 text-right font-mono text-muted-foreground">₹{sTax.toLocaleString()}</td>
                         <td className="py-4 px-4 text-right font-mono text-muted-foreground/35">₹0</td>
                         <td className="py-4 px-4 text-right font-black text-navy font-mono">₹{totTax.toLocaleString()}</td>
-                        <td className="py-4 px-6 text-right select-none">
-                          <Button
-                            onClick={() => handleDownloadInvoice(invoiceNumber)}
-                            size="xs"
-                            variant="ghost"
-                            className="h-7 text-xs text-navy hover:text-brand px-2"
-                          >
-                            <Download className="size-3.5 mr-1" /> Invoice
-                          </Button>
+                        <td className="py-4 px-6 text-left align-middle min-w-[120px] whitespace-nowrap">
+                          <ActionGroup align="left">
+                            <DownloadActionButton
+                              onClick={() => handleDownloadInvoice(invoiceNumber)}
+                              title="Download GST Tax Invoice"
+                            />
+                          </ActionGroup>
                         </td>
                       </tr>
                     );

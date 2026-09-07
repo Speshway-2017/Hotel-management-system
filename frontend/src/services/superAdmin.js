@@ -23,6 +23,9 @@ export const superAdminService = {
   getUsers: async () => {
     return await apiClient.get('/super-admin/users');
   },
+  getUser: async (id) => {
+    return await apiClient.get(`/super-admin/users/${id}`);
+  },
   createUser: async (data) => {
     return await apiClient.post('/super-admin/users', data);
   },
@@ -58,6 +61,20 @@ export const superAdminService = {
 
   getAuditLogs: async () => {
     return await apiClient.get('/super-admin/audit-logs');
+  },
+  getApprovals: async () => {
+    try {
+      return await apiClient.get('/super-admin/approvals');
+    } catch (e) {
+      return await apiClient.get('/manager/approvals');
+    }
+  },
+  updateApproval: async (id, action, decisionReason = '') => {
+    try {
+      return await apiClient.post(`/super-admin/approvals/${id}`, { action, decisionReason });
+    } catch (e) {
+      return await apiClient.post(`/manager/approvals/${id}`, { action, decisionReason });
+    }
   },
   getCommissionReports: async () => {
     return await apiClient.get('/super-admin/commission-reports');

@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { useEffect, useState, useCallback } from "react";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, EditActionButton, DeleteActionButton, DownloadActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
 import { receptionistService } from "@/services/receptionist";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { invalidateApiCache } from "@/services/apiClient";
 import {
-  CreditCard, Search, Eye, CheckCircle2, ArrowUpRight,
+  CreditCard, Search, CheckCircle2, ArrowUpRight,
   Undo2, RefreshCw, Plus, Wallet, Landmark,
-  IndianRupee, Download
+  IndianRupee, Download, Check
 } from "lucide-react";
 
 function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -38,8 +39,10 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 }
 
 export function UnifiedPaymentsView({ role = "admin" }) {
+  const navigate = useNavigate();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,6 +55,11 @@ export function UnifiedPaymentsView({ role = "admin" }) {
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Edit Payment Modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+
   // New Payment Form
   const [newPayment, setNewPayment] = useState({
     guestName: "",
@@ -62,67 +70,75 @@ export function UnifiedPaymentsView({ role = "admin" }) {
     status: "Settled"
   });
 
-  const getService = () => {
+  const getService = useCallback(() => {
     if (role === "admin") return adminService;
     if (role === "manager") return managerService;
     return receptionistService;
-  };
+  }, [role]);
 
-  const loadPayments = async (isSilent = false) => {
+  const loadPayments = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
+    else setRefreshing(true);
+
     const service = getService();
     try {
+      invalidateApiCache();
       const res = await service.getPayments();
       const rawList = (res && res.data && Array.isArray(res.data))
         ? res.data
         : (Array.isArray(res) ? res : []);
 
-      const fallbackList = [
-        { _id: "PAY-10301", bookingId: "BK-10301", guestName: "Surya", roomNumber: "103", amount: 8500, paymentMethod: "UPI", status: "Settled", createdAt: "2026-09-01T10:00:00Z" },
-        { _id: "PAY-10101", bookingId: "BK-10101", guestName: "Mounika", roomNumber: "101", amount: 11400, paymentMethod: "Card", status: "Settled", createdAt: "2026-09-02T11:30:00Z" },
-        { _id: "PAY-20202", bookingId: "BK-20202", guestName: "Aswini", roomNumber: "202", amount: 14500, paymentMethod: "UPI", status: "Settled", createdAt: "2026-09-02T14:15:00Z" },
-        { _id: "PAY-10202", bookingId: "BK-10202", guestName: "Vamsi", roomNumber: "102", amount: 7000, paymentMethod: "UPI", status: "Settled", createdAt: "2026-09-03T09:45:00Z" },
-        { _id: "PAY-30101", bookingId: "BK-30101", guestName: "Sai", roomNumber: "301", amount: 21000, paymentMethod: "Net Banking", status: "Settled", createdAt: "2026-09-03T12:00:00Z" }
-      ];
-
-      const listToUse = rawList.length > 0 ? rawList : fallbackList;
-
-      const formatted = listToUse.map(p => ({
-        _id: p._id || p.id,
-        bookingId: p.bookingId || "BK-1000",
-        guestName: p.guestName || p.guest || "Guest",
+      const formatted = rawList.map(p => ({
+        _id: String(p._id || p.id || ""),
+        bookingId: p.bookingId || "—",
+        guestName: p.guestName || p.guest || p.customerName || "Guest",
         roomNumber: p.roomNumber || p.room || "101",
         amount: Number(p.amount || 0),
         paymentMethod: p.paymentMethod || p.method || "UPI",
         status: p.status || "Settled",
+        propertyId: p.propertyId || "",
         createdAt: p.createdAt || p.date || new Date().toISOString()
       }));
 
       setPayments(formatted);
     } catch (err) {
       console.error("Failed to load payments ledger:", err);
+      if (!isSilent) {
+        toast.error("Could not fetch payments ledger.");
+      }
     } finally {
       if (!isSilent) setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [getService]);
 
   useEffect(() => {
     loadPayments(false);
 
-    const handleFocus = () => loadPayments(true);
+    const handleFocus = () => loadPayments(true);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadPayments(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadPayments(true);
     });
 
-    return () => {
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (unsubscribe) unsubscribe();
     };
-  }, [role]);
+  }, [loadPayments]);
 
   // Method Icon Helper
   const getMethodIcon = (method) => {
-    const m = String(method).toLowerCase();
+    const m = String(method || "").toLowerCase();
     if (m.includes("card")) return CreditCard;
     if (m.includes("upi") || m.includes("wallet")) return Wallet;
     if (m.includes("net") || m.includes("bank") || m.includes("transfer")) return Landmark;
@@ -131,7 +147,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
   // Status Tone Helper
   const getStatusTone = (status) => {
-    const s = String(status).toLowerCase();
+    const s = String(status || "").toLowerCase();
     if (s === "settled" || s === "paid" || s === "success") return "success";
     if (s === "refunded") return "error";
     if (s === "pending" || s === "partial") return "warning";
@@ -141,8 +157,8 @@ export function UnifiedPaymentsView({ role = "admin" }) {
   // Record Payment Submit Handler
   const handleRecordPaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!newPayment.guestName || !newPayment.bookingId || !newPayment.amount) {
-      toast.error("Please fill in all required fields.");
+    if (!newPayment.guestName || !newPayment.amount) {
+      toast.error("Please fill in required fields (Guest Name & Amount).");
       return;
     }
 
@@ -151,7 +167,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
     try {
       const payload = {
         guestName: newPayment.guestName,
-        bookingId: newPayment.bookingId,
+        bookingId: newPayment.bookingId || `BK-${Math.floor(100000 + Math.random() * 900000)}`,
         roomNumber: newPayment.roomNumber || "101",
         amount: Number(newPayment.amount),
         paymentMethod: newPayment.paymentMethod || "UPI",
@@ -178,7 +194,98 @@ export function UnifiedPaymentsView({ role = "admin" }) {
     }
   };
 
-  // Export CSV Handler
+  // Open Edit Modal
+  const handleOpenEditModal = (p) => {
+    setEditingPayment({
+      _id: p._id,
+      bookingId: p.bookingId,
+      guestName: p.guestName,
+      roomNumber: p.roomNumber,
+      amount: p.amount,
+      paymentMethod: p.paymentMethod,
+      status: p.status
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Save Edit Handler
+  const handleSaveEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+
+    setIsEditing(true);
+    const service = getService();
+    try {
+      const payload = {
+        guestName: editingPayment.guestName,
+        bookingId: editingPayment.bookingId,
+        roomNumber: editingPayment.roomNumber,
+        amount: Number(editingPayment.amount),
+        paymentMethod: editingPayment.paymentMethod,
+        status: editingPayment.status
+      };
+
+      await service.updatePayment(editingPayment._id, payload);
+      toast.success(`Payment transaction updated for ${editingPayment.guestName}!`);
+      setIsEditModalOpen(false);
+      setEditingPayment(null);
+      loadPayments(true);
+    } catch (err) {
+      console.error("Failed to update payment:", err);
+      toast.error(err.message || "Failed to update payment.");
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  // Quick Settle Handler
+  const handleQuickStatusChange = async (payment, newStatus) => {
+    const service = getService();
+    try {
+      await service.updatePayment(payment._id, { status: newStatus });
+      toast.success(`Payment status updated to ${newStatus}`);
+      loadPayments(true);
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      toast.error("Failed to update status.");
+    }
+  };
+
+  // Delete Payment Handler
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm("Are you sure you want to delete this payment transaction?")) {
+      return;
+    }
+    const service = getService();
+    try {
+      if (service.deletePayment) {
+        await service.deletePayment(paymentId);
+      } else {
+        await service.updatePayment(paymentId, { status: "Refunded" });
+      }
+      toast.success("Payment record removed.");
+      loadPayments(true);
+    } catch (err) {
+      console.error("Failed to delete payment:", err);
+      toast.error("Failed to delete payment.");
+    }
+  };
+
+  // Single Receipt Download / CSV
+  const handleDownloadSingleReceipt = (p) => {
+    const headers = "Transaction ID,Booking ID,Guest Name,Room Number,Amount (INR),Payment Method,Status,Date & Time\n";
+    const row = `"${p._id}","${p.bookingId}","${p.guestName}","${p.roomNumber}","${p.amount}","${p.paymentMethod}","${p.status}","${new Date(p.createdAt).toLocaleString()}"\n`;
+    const blob = new Blob([headers + row], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `receipt_${p.guestName.replace(/\s+/g, "_")}_${p.bookingId || p._id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Receipt downloaded for ${p.guestName}.`);
+  };
+
+  // Export All CSV Handler
   const handleExportAllCSV = () => {
     if (filteredPayments.length === 0) {
       toast.error("No payment records available to export.");
@@ -205,9 +312,9 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
   const todayCollected = settledPayments
     .filter(p => new Date(p.createdAt).toDateString() === new Date().toDateString())
-    .reduce((sum, p) => sum + p.amount, 0) || Math.round(totalCollected * 0.45);
+    .reduce((sum, p) => sum + p.amount, 0);
 
-  const pendingCount = payments.filter(p => p.status === "Pending").length;
+  const pendingCount = payments.filter(p => p.status === "Pending" || p.status === "Partial").length;
   const refundedAmount = payments.filter(p => p.status === "Refunded").reduce((sum, p) => sum + p.amount, 0);
 
   // Filtered List
@@ -217,7 +324,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
       (p.guestName || "").toLowerCase().includes(q) ||
       (p.bookingId || "").toLowerCase().includes(q) ||
       (p._id || "").toLowerCase().includes(q) ||
-      (p.roomNumber || "").includes(q);
+      (String(p.roomNumber) || "").includes(q);
 
     const matchesMethod = methodFilter === "all" || (p.paymentMethod || "").toLowerCase() === methodFilter.toLowerCase();
     const matchesStatus = statusFilter === "all" || (p.status || "").toLowerCase() === statusFilter.toLowerCase();
@@ -240,21 +347,21 @@ export function UnifiedPaymentsView({ role = "admin" }) {
       {/* 2. KPI Summary Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard
-          label="Total Payments"
-          value={`₹${totalCollected.toLocaleString()}`}
+          label="Total Collected"
+          value={`₹${totalCollected.toLocaleString("en-IN")}`}
           hint="All settled guest collections"
           icon={CheckCircle2}
           accentColor="#10b981"
         />
         <PremiumStatCard
           label="Today's Collections"
-          value={`₹${todayCollected.toLocaleString()}`}
+          value={`₹${todayCollected.toLocaleString("en-IN")}`}
           hint="Gross logged today"
           icon={ArrowUpRight}
           accentColor="#6366f1"
         />
         <PremiumStatCard
-          label="Transactions"
+          label="Total Transactions"
           value={`${payments.length} Records`}
           hint={`${settledPayments.length} Settled, ${pendingCount} Pending`}
           icon={CreditCard}
@@ -262,7 +369,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
         />
         <PremiumStatCard
           label="Refunds Processed"
-          value={`₹${refundedAmount.toLocaleString()}`}
+          value={`₹${refundedAmount.toLocaleString("en-IN")}`}
           hint="Deducted reversal volume"
           icon={Undo2}
           accentColor="#f43f5e"
@@ -286,6 +393,17 @@ export function UnifiedPaymentsView({ role = "admin" }) {
           </div>
 
           <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <Button
+              onClick={() => loadPayments(true)}
+              variant="outline"
+              size="sm"
+              disabled={refreshing}
+              className="h-9 px-3 text-xs font-bold rounded-xl border-muted hover:bg-muted/50 cursor-pointer flex items-center gap-1.5"
+              title="Refresh ledger from database"
+            >
+              <RefreshCw className={`size-3.5 text-navy ${refreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
             <Button
               onClick={handleExportAllCSV}
               variant="outline"
@@ -360,17 +478,17 @@ export function UnifiedPaymentsView({ role = "admin" }) {
         description={`Audit real-time guest transaction records and settlement status (${filteredPayments.length} total entries).`}
       >
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[950px]">
+          <table className="w-full text-left text-xs min-w-[1000px]">
             <thead>
-              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                <th className="py-3.5 px-4">Transaction ID</th>
-                <th className="py-3.5 px-4">Booking ID / Guest</th>
-                <th className="py-3.5 px-4">Room No</th>
-                <th className="py-3.5 px-4">Payment Method</th>
+              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none whitespace-nowrap">
+                <th className="py-3.5 px-4 text-left">Transaction ID</th>
+                <th className="py-3.5 px-4 text-left">Booking ID / Guest</th>
+                <th className="py-3.5 px-4 text-left">Room No</th>
+                <th className="py-3.5 px-4 text-left">Payment Method</th>
                 <th className="py-3.5 px-4 text-right">Amount</th>
-                <th className="py-3.5 px-4">Date & Time</th>
+                <th className="py-3.5 px-4 text-left">Date & Time</th>
                 <th className="py-3.5 px-4 text-center">Status</th>
-                <th className="py-3.5 px-4 text-center" style={{ width: '70px', minWidth: '70px' }}>Action</th>
+                <th className="py-3.5 px-4 text-left min-w-[140px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -401,24 +519,26 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
                   return (
                     <tr key={p._id} className="hover:bg-muted/5 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-navy-deep">{p._id}</td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 font-mono font-bold text-navy-deep text-left">
+                        {p._id ? p._id.substring(p._id.length - 8).toUpperCase() : "—"}
+                      </td>
+                      <td className="py-3.5 px-4 text-left">
                         <div className="flex flex-col">
                           <span className="font-bold text-navy">{p.guestName}</span>
                           <span className="text-[10px] font-mono text-indigo font-semibold">{p.bookingId}</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-brand">Room #{p.roomNumber}</td>
-                      <td className="py-3.5 px-4 text-navy">
+                      <td className="py-3.5 px-4 text-left font-bold text-brand">Room #{p.roomNumber}</td>
+                      <td className="py-3.5 px-4 text-left text-navy">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/40 font-semibold text-[11px]">
                           <MethodIcon className="size-3.5 text-navy-deep shrink-0" />
                           {p.paymentMethod}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right font-black text-navy text-sm">
-                        ₹{p.amount.toLocaleString()}
+                        ₹{p.amount.toLocaleString("en-IN")}
                       </td>
-                      <td className="py-3.5 px-4 text-muted-foreground font-medium text-[11px]">
+                      <td className="py-3.5 px-4 text-left text-muted-foreground font-medium text-[11px]">
                         {formattedDate}
                       </td>
                       <td className="py-3.5 px-4 text-center">
@@ -426,18 +546,35 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                           {p.status}
                         </Tag>
                       </td>
-                      <td className="py-3.5 px-4 text-center" style={{ width: '70px', minWidth: '70px' }}>
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 rounded-lg text-navy hover:text-navy-deep hover:bg-navy/10 cursor-pointer mx-auto transition-colors"
-                          title="View Payment Details"
-                        >
-                          <Link to={`/${role}/payments/${p._id}`}>
-                            <Eye className="size-4" />
-                          </Link>
-                        </Button>
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[140px]">
+                        <ActionGroup align="left">
+                          <ViewActionButton
+                            onClick={() => navigate(`/${role}/payments/${p._id}`)}
+                            title="View Payment Details"
+                          />
+                          {!(p.status === "Settled" || p.status === "Paid" || p.status === "Success") && (
+                            <EditActionButton
+                              onClick={() => handleOpenEditModal(p)}
+                              title="Edit Payment Record"
+                            />
+                          )}
+                          <DownloadActionButton
+                            onClick={() => handleDownloadSingleReceipt(p)}
+                            title="Download Payment Receipt"
+                          />
+                          {(p.status === "Pending" || p.status === "Partial") && (
+                            <ActionButton
+                              icon={Check}
+                              variant="success"
+                              onClick={() => handleQuickStatusChange(p, "Settled")}
+                              title="Mark as Settled"
+                            />
+                          )}
+                          <DeleteActionButton
+                            onClick={() => handleDeletePayment(p._id)}
+                            title="Delete Payment Record"
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );
@@ -505,7 +642,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Surya"
+                  placeholder="e.g. Sunny or Abhi"
                   value={newPayment.guestName}
                   onChange={(e) => setNewPayment({ ...newPayment, guestName: e.target.value })}
                   className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
@@ -515,12 +652,11 @@ export function UnifiedPaymentsView({ role = "admin" }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                    Booking ID *
+                    Booking ID
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. BK-10301"
+                    placeholder="e.g. BK780567"
                     value={newPayment.bookingId}
                     onChange={(e) => setNewPayment({ ...newPayment, bookingId: e.target.value })}
                     className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
@@ -532,7 +668,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 103"
+                    placeholder="e.g. 201"
                     value={newPayment.roomNumber}
                     onChange={(e) => setNewPayment({ ...newPayment, roomNumber: e.target.value })}
                     className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
@@ -548,7 +684,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   type="number"
                   required
                   min="1"
-                  placeholder="e.g. 8500"
+                  placeholder="e.g. 6797"
                   value={newPayment.amount}
                   onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
                   className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-black text-navy focus:outline-none focus:ring-1 focus:ring-navy"
@@ -584,6 +720,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   >
                     <option value="Settled">Settled</option>
                     <option value="Pending">Pending</option>
+                    <option value="Refunded">Refunded</option>
                   </select>
                 </div>
               </div>
@@ -603,6 +740,137 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-5 text-xs rounded-xl cursor-pointer"
                 >
                   {isSubmitting ? "Recording..." : "Save Payment"}
+                </Button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 6. Edit Payment Modal */}
+      {isEditModalOpen && editingPayment && (
+        <div className="fixed inset-0 z-50 bg-navy-deep/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
+          <div className="bg-white rounded-2xl border border-muted max-w-md w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
+            
+            <div className="p-4.5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-navy text-sm">Edit Payment Record</h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Modify ledger details for {editingPayment.guestName}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 rounded-full text-muted-foreground hover:text-navy cursor-pointer"
+                onClick={() => { setIsEditModalOpen(false); setEditingPayment(null); }}
+              >
+                ✕
+              </Button>
+            </div>
+
+            <form onSubmit={handleSaveEditSubmit} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                  Guest Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingPayment.guestName}
+                  onChange={(e) => setEditingPayment({ ...editingPayment, guestName: e.target.value })}
+                  className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                    Booking ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPayment.bookingId}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, bookingId: e.target.value })}
+                    className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                    Room Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPayment.roomNumber}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, roomNumber: e.target.value })}
+                    className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                  Amount (₹) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={editingPayment.amount}
+                  onChange={(e) => setEditingPayment({ ...editingPayment, amount: e.target.value })}
+                  className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-black text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={editingPayment.paymentMethod}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, paymentMethod: e.target.value })}
+                    className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer"
+                  >
+                    <option value="UPI">UPI</option>
+                    <option value="Card">Card</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Net Banking">Net Banking</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={editingPayment.status}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer"
+                  >
+                    <option value="Settled">Settled</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Refunded">Refunded</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 flex gap-2 justify-end border-t border-muted/50">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setIsEditModalOpen(false); setEditingPayment(null); }}
+                  className="h-9 px-4 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isEditing}
+                  className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-5 text-xs rounded-xl cursor-pointer"
+                >
+                  {isEditing ? "Updating..." : "Save Changes"}
                 </Button>
               </div>
 

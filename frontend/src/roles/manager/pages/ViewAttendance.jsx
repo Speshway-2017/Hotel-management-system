@@ -1,12 +1,11 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import {
   Clock,
-  ChevronLeft,
   User,
   Calendar,
   AlertCircle,
@@ -124,15 +123,18 @@ function ManagerViewAttendance() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view attendance logs. Scoped properties access only.
         </Notice>
-        <Link to="/manager/attendance" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Attendance Hub
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
+      <Crumbs
+        items={[
+          { label: "Attendance", to: "/manager/attendance" },
+          { label: record ? `${record.name}'s Attendance` : "Attendance Audit" }
+        ]}
+      />
       
       <PageHeader
         title={record ? `${record.name}'s Attendance Audit` : "Attendance Audit"}

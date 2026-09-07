@@ -47,6 +47,7 @@ import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
 
 const AdminDashboardRoute = {
   head: () => ({
@@ -200,13 +201,22 @@ function AdminDashboard() {
   }
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData();
+
+    const interval = setInterval(() => {
+      loadDashboardData(true);
+    }, 10000); // 10 seconds polling fallback
+
+    const handleFocus = () => loadDashboardData(true);
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDashboardData(true);
     });
 
-    return () => {
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -244,41 +254,13 @@ function AdminDashboard() {
   const propName = property?.name || "Speshway Luxury Hotel";
   const propCity = property?.city || "Madhapur, Hyderabad";
   
-  const totalRooms = rooms.length;
-
-  const occupiedRoomNums = new Set();
-  const reservedRoomNums = new Set();
-
-  reservations.forEach(r => {
-    const stat = String(r.status || '').toLowerCase().trim();
-    let rNum = String(r.room || r.roomNumber || '');
-    if (rNum.includes('·')) rNum = rNum.split('·')[0].trim();
-    if (rNum.toLowerCase().includes('room')) rNum = rNum.replace(/room/i, '').trim();
-
-    if (stat === 'checked-in' || stat === 'occupied' || stat === 'checkedin') {
-      if (rNum) occupiedRoomNums.add(rNum);
-    } else if (stat === 'confirmed' || stat === 'pending' || stat === 'reserved' || stat === 'booked') {
-      if (rNum) reservedRoomNums.add(rNum);
-    }
-  });
-
-  rooms.forEach(r => {
-    const rStat = String(r.status || '').toLowerCase().trim();
-    const rNum = String(r.roomNumber || r.num || '');
-    if (rStat === 'occupied' || rStat === 'checked-in' || rStat === 'checkedin') {
-      if (rNum) occupiedRoomNums.add(rNum);
-    } else if (rStat === 'reserved' || rStat === 'confirmed' || rStat === 'pending') {
-      if (rNum && !occupiedRoomNums.has(rNum)) reservedRoomNums.add(rNum);
-    }
-  });
-
-  const occupiedRooms = occupiedRoomNums.size;
-  const reservedRooms = reservedRoomNums.size || reservations.filter(r => {
-    const s = String(r.status || '').toLowerCase().trim();
-    return s === 'confirmed' || s === 'pending' || s === 'reserved' || s === 'booked';
-  }).length;
-  const availableRooms = Math.max(0, totalRooms - occupiedRooms);
-  const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+  const roomKPIs = calculateRoomKPIs(rooms, reservations);
+  const totalRooms = roomKPIs.totalRooms;
+  const occupiedRooms = roomKPIs.occupiedRooms;
+  const reservedRooms = roomKPIs.reservedRooms;
+  const availableRooms = roomKPIs.availableRooms;
+  const occupancyRate = roomKPIs.occupancyRate;
+  const occupiedRoomNums = roomKPIs.occupiedRoomNums;
 
   const revenueToday = reservations.filter(r => r.status !== 'Cancelled').reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const adr = occupiedRooms > 0 ? Math.round(revenueToday / occupiedRooms) : (totalRooms > 0 ? Math.round(revenueToday / totalRooms) : 0);
@@ -529,8 +511,8 @@ function AdminDashboard() {
             </div>
           </Panel>
 
-          {/* Today's Front Desk Card */}
-          <Panel title="Today's Front Desk" description="Check-in flows and expected stays">
+          {/* Today's Operations Card */}
+          <Panel title="Today's Room Operations" description="Check-in flows and expected stays">
             <div className="p-4 sm:p-5 space-y-3.5 text-xs font-semibold text-navy bg-white rounded-b-xl">
               <div className="flex items-center justify-between py-2 border-b border-muted">
                 <span className="flex items-center gap-2 text-muted-foreground"><Calendar className="size-4 text-indigo shrink-0" /> Expected Arrivals</span>

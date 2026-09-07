@@ -9,6 +9,7 @@ import {
 import { inr } from "@/data/hs-data";
 import { calculateStayNights } from "@/utils/dateUtils";
 import { Button } from "@/components/ui/button";
+import { ActionGroup, ActionIcon, ViewActionIcon } from "@/components/hs/kit";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { authService } from "@/services/auth";
 
@@ -176,13 +177,17 @@ function GuestBookingsPage() {
 
     return (
       <div className="space-y-4 text-left font-ui">
-        {/* Back navigation button */}
-        <button
-          onClick={() => handleSelectBooking(null)}
-          className="inline-flex items-center gap-2 text-xs font-bold text-navy/70 hover:text-purple transition-colors cursor-pointer border-none bg-transparent"
-        >
-          <ArrowLeft className="size-4" /> Back to My Bookings
-        </button>
+        {/* Breadcrumbs Navigation */}
+        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <button
+            onClick={() => handleSelectBooking(null)}
+            className="transition-colors hover:text-foreground cursor-pointer font-medium"
+          >
+            My Bookings
+          </button>
+          <span aria-hidden>/</span>
+          <span className="text-foreground font-semibold">Booking #{b.id || b.bookingId || b._id}</span>
+        </nav>
         
         {/* Detailed Booking Page Card (Admin/Manager Panel Style) */}
         <div className="bg-white rounded-2xl border border-navy/10 p-6 sm:p-8 shadow-soft space-y-6">
@@ -378,7 +383,7 @@ function GuestBookingsPage() {
                   <th className="py-3 px-4 text-right whitespace-nowrap">Tariff</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Payment</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Status</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Action</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap min-w-[100px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
@@ -432,44 +437,38 @@ function GuestBookingsPage() {
                         );
                       })()}
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[100px]" onClick={(e) => e.stopPropagation()}>
+                      <ActionGroup align="right">
                         {(((b.status || '').toLowerCase() === 'checked-out' || 
                           (b.status || '').toLowerCase() === 'checked out' || 
                           (b.status || '').toLowerCase() === 'completed')) && (
                           (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
-                            <span
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1 text-[11px] font-bold"
+                            <ActionIcon
+                              icon={CheckCircle2}
+                              variant="success"
                               title="Feedback already submitted"
-                            >
-                              <CheckCircle2 className="size-3 text-emerald-600" />
-                              <span>Reviewed</span>
-                            </span>
+                              disabled
+                            />
                           ) : (
-                            <button
+                            <ActionIcon
+                              icon={Star}
+                              variant="warning"
+                              title="Add Stay Feedback"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 inline-flex items-center gap-1 text-[11px] font-bold transition-colors cursor-pointer"
-                              title="Add Feedback"
-                            >
-                              <Star className="size-3 fill-amber-500 text-amber-500" />
-                              <span>Add Feedback</span>
-                            </button>
+                            />
                           )
                         )}
-                        <button
+                        <ViewActionIcon
+                          title="View Booking Details"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleSelectBooking(b);
                           }}
-                          className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-cream text-navy inline-flex items-center justify-center transition-colors cursor-pointer border-none"
-                          title="View Booking Details"
-                        >
-                          <Eye className="size-4" />
-                        </button>
-                      </div>
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}

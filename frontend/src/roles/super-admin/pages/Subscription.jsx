@@ -3,7 +3,20 @@ import { Label } from "@/components/ui/label";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import {
+  PageHeader,
+  Panel,
+  Tag,
+  Notice,
+  LoadingRows,
+  ActionGroup,
+  ViewActionButton,
+  EditActionButton,
+  DeleteActionButton,
+  ApproveActionButton,
+  RejectActionButton,
+  ActionButton
+} from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
@@ -252,7 +265,7 @@ function SuperAdminSubscription() {
                         <th className="p-4">Property / Room Limits</th>
                         <th className="p-4">Active Subscribers</th>
                         <th className="p-4">Status</th>
-                        <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
+                        <th className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y font-sans">
@@ -274,37 +287,18 @@ function SuperAdminSubscription() {
                           <td className="p-4">
                             <Tag tone={p.status === "Active" ? "success" : "neutral"}>{p.status}</Tag>
                           </td>
-                          <td className="p-4 text-right pr-6 w-36 whitespace-nowrap space-x-1">
-                            <Link
-                              to={`/super-admin/subscription/view/${p._id || p.id}`}
-                              className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
-                              title="View Plan Details"
-                            >
-                              <Eye className="size-4" />
-                            </Link>
-                            <Link
-                              to={`/super-admin/subscription/edit/${p._id || p.id}`}
-                              className="size-8 p-0 rounded-full text-purple hover:bg-purple/10 cursor-pointer inline-flex items-center justify-center"
-                              title="Edit Plan"
-                            >
-                              <Edit2 className="size-4" />
-                            </Link>
-                            <Button
-                              onClick={() => triggerToggleStatus(p)}
-                              variant="ghost"
-                              className={`size-8 p-0 rounded-full hover:bg-muted cursor-pointer ${p.status === "Active" ? "text-warning" : "text-success"}`}
-                              title={p.status === "Active" ? "Deactivate Plan" : "Activate Plan"}
-                            >
-                              {p.status === "Active" ? <ToggleLeft className="size-5" /> : <ToggleRight className="size-5" />}
-                            </Button>
-                            <Button
-                              onClick={() => triggerDelete(p)}
-                              variant="ghost"
-                              className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
-                              title="Delete Plan"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
+                          <td className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">
+                            <ActionGroup>
+                              <ViewActionButton onClick={() => navigate({ to: `/super-admin/subscription/view/${p._id || p.id}` })} />
+                              <EditActionButton onClick={() => navigate({ to: `/super-admin/subscription/edit/${p._id || p.id}` })} />
+                              <ActionButton
+                                icon={p.status === "Active" ? ToggleLeft : ToggleRight}
+                                label={p.status === "Active" ? "Deactivate" : "Activate"}
+                                variant={p.status === "Active" ? "warning" : "success"}
+                                onClick={() => triggerToggleStatus(p)}
+                              />
+                              <DeleteActionButton onClick={() => triggerDelete(p)} />
+                            </ActionGroup>
                           </td>
                         </tr>
                       ))}
@@ -386,7 +380,7 @@ function SuperAdminSubscription() {
                         <th className="p-4 text-right">Price</th>
                         <th className="p-4 text-center">Status</th>
                         <th className="p-4">Request Date</th>
-                        <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
+                        <th className="p-4 text-right pr-6 min-w-[220px] whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y font-sans">
@@ -404,36 +398,25 @@ function SuperAdminSubscription() {
                           <td className="p-4 text-muted-foreground font-semibold">
                             {new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
                           </td>
-                          <td className="p-4 text-right pr-6 w-36 whitespace-nowrap space-x-1">
-                            <Button
-                              onClick={() => navigate({ to: `/super-admin/subscription/requests/view/${req._id || req.id}` })}
-                              variant="ghost"
-                              className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
-                              title="View Request Details"
-                            >
-                              <Eye className="size-4" />
-                            </Button>
-                            {req.status === 'Pending' && (
-                              <>
-                                <Button
-                                  disabled={decidingId !== null}
-                                  onClick={() => handleDecide(req._id || req.id, 'Approve')}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer inline-flex items-center justify-center gap-1"
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  disabled={decidingId !== null}
-                                  onClick={() => {
-                                    setRejectionModalId(req._id || req.id);
-                                    setRejectionReason("");
-                                  }}
-                                  className="bg-red-600 hover:bg-red-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer inline-flex items-center justify-center gap-1"
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
+                          <td className="p-4 text-right pr-6 min-w-[220px] whitespace-nowrap">
+                            <ActionGroup>
+                              <ViewActionButton onClick={() => navigate({ to: `/super-admin/subscription/requests/view/${req._id || req.id}` })} />
+                              {req.status === 'Pending' && (
+                                <>
+                                  <ApproveActionButton
+                                    disabled={decidingId !== null}
+                                    onClick={() => handleDecide(req._id || req.id, 'Approve')}
+                                  />
+                                  <RejectActionButton
+                                    disabled={decidingId !== null}
+                                    onClick={() => {
+                                      setRejectionModalId(req._id || req.id);
+                                      setRejectionReason("");
+                                    }}
+                                  />
+                                </>
+                              )}
+                            </ActionGroup>
                           </td>
                         </tr>
                       ))}

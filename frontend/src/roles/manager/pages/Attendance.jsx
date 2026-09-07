@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -280,7 +280,7 @@ function ManagerAttendancePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[1000px]">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
                   <th className="py-4.5 px-6">Staff Name</th>
@@ -291,7 +291,7 @@ function ManagerAttendancePage() {
                   <th className="py-4.5 px-4">Check-out Time</th>
                   <th className="py-4.5 px-4">Working Hours</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-6 text-right">Actions</th>
+                  <th className="py-4.5 px-6 text-right min-w-[120px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -335,16 +335,13 @@ function ManagerAttendancePage() {
                           {a.attendanceStatus}
                         </Tag>
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <Button
-                          onClick={() => navigate({ to: `/manager/attendance/view/${btoa(a.id + "|" + selectedDate)}` })}
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 hover:text-brand cursor-pointer"
-                          title="View Attendance Details"
-                        >
-                          <Eye className="size-3.5" />
-                        </Button>
+                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[120px]">
+                        <ActionGroup align="right">
+                          <ViewActionButton
+                            onClick={() => navigate({ to: `/manager/attendance/view/${btoa(a.id + "|" + selectedDate)}` })}
+                            title="View Attendance Details"
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

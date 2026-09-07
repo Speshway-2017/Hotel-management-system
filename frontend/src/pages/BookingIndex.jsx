@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ChevronRight, CheckCircle2, AlertCircle, Ticket, Tag, Sparkles, X, Check } from "lucide-react";
+import { ChevronRight, CheckCircle2, AlertCircle, Ticket, Tag, Sparkles, X, Check } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -342,20 +342,10 @@ function Booking() {
             <span className="text-navy font-bold">Booking</span>
           </nav>
 
-          {/* 2. Header with Back Button */}
-          <div className="flex justify-between items-center gap-4 mb-6 flex-wrap">
-            <div>
-              <h1 className="font-display text-3xl font-bold text-navy">Complete your booking</h1>
-              <p className="text-xs text-navy/60 mt-1 font-medium">Verify your details, stay schedule, and instant tariff breakdown</p>
-            </div>
-            <Button
-              type="button"
-              onClick={() => window.history.back()}
-              variant="outline"
-              className="flex items-center gap-2 text-xs font-bold text-navy border-navy/20 hover:bg-navy/5 cursor-pointer h-9 px-4 rounded-xl"
-            >
-              <ArrowLeft className="size-3.5" /> Back
-            </Button>
+          {/* 2. Header */}
+          <div className="mb-6">
+            <h1 className="font-display text-3xl font-bold text-navy">Complete your booking</h1>
+            <p className="text-xs text-navy/60 mt-1 font-medium">Verify your details, stay schedule, and instant tariff breakdown</p>
           </div>
 
           <div className="grid gap-8 lg:grid-cols-[1fr_340px]">

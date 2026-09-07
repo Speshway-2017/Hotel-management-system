@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -287,9 +287,9 @@ function ArrivalsPage() {
       {/* Main Arrivals Table */}
       <Panel title="Arrivals Registration Ledger" description="Real-time listing of expected guest arrivals, verification status, and checklist tools.">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[900px]">
+          <table className="w-full text-left text-xs min-w-[1100px]">
             <thead>
-              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none whitespace-nowrap">
                 <th className="py-3.5 px-4">Guest Name</th>
                 <th className="py-3.5 px-4">Booking ID</th>
                 <th className="py-3.5 px-4">Room Type / No</th>
@@ -298,7 +298,7 @@ function ArrivalsPage() {
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">ID Status</th>
                 <th className="py-3.5 px-4">Check-in Status</th>
-                <th className="py-3.5 px-4">Actions</th>
+                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -353,17 +353,12 @@ function ArrivalsPage() {
                         {guest.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
+                      <ActionGroup align="right">
                         {guest.status !== "Checked-In" && guest.status !== "Checked-in" && guest.status !== "No-Show" && guest.status !== "No-show" && (
-                          <Button
-                            size="xs"
-                            variant="outline"
+                          <CheckInActionButton
                             onClick={() => handleCheckIn(guest.id || guest._id, guest.roomNumber || guest.room)}
-                            className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                          >
-                            Check-In
-                          </Button>
+                          />
                         )}
 
                         {(guest.status === "Checked-In" || guest.status === "Checked-in" || guest.status === "Staying" || guest.status === "Staying-In") && (
@@ -374,43 +369,29 @@ function ArrivalsPage() {
                               booking={guest}
                               onClick={() => navigate(`/reception/reservations/extend/${guest.id || guest._id || guest.bookingId}`)}
                             />
-                            <Button
-                              size="xs"
-                              variant="outline"
+                            <CheckOutActionButton
                               onClick={() => handleCheckOut(guest.id || guest._id)}
-                              className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-Out
-                            </Button>
+                            />
                           </>
                         )}
                         
-                        {/* View Details Ghost Icon Button */}
-                        <Button
-                          asChild
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 text-navy/70 hover:text-brand hover:bg-brand/10 rounded-lg cursor-pointer transition-colors"
+                        {/* View Details */}
+                        <ViewActionButton
+                          onClick={() => navigate(`/reception/reservations/${guest.id || guest._id}`)}
                           title="View Details"
-                        >
-                          <Link to={`/reception/reservations/${guest.id || guest._id}`}>
-                            <Eye className="size-3.5" />
-                          </Link>
-                        </Button>
+                        />
 
                         {/* No-Show Action */}
-                        {(guest.status === "Pending" || guest.status === "Confirmed") && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
+                        {(guest.status === "Pending" || guest.status === "Confirmed" || guest.status === "Pre-checked") && (
+                          <ActionButton
+                            icon={XCircle}
+                            label="No-Show"
+                            variant="danger"
                             onClick={() => handleMarkNoShow(guest.id || guest._id)}
-                            className="size-7 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
                             title="Mark as No-Show"
-                          >
-                            <XCircle className="size-3.5" />
-                          </Button>
+                          />
                         )}
-                      </div>
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))

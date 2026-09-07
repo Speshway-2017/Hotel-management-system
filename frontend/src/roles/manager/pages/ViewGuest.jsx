@@ -1,17 +1,17 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { extractRoomNumber } from "@/utils/roomUtils";
 import { Button } from "@/components/ui/button";
 import {
   User,
   Calendar,
   Home,
   CreditCard,
-  ChevronLeft,
   ShieldAlert,
   Award,
   Sparkles,
@@ -20,7 +20,6 @@ import {
   FileText
 } from "lucide-react";
 import { toast } from "sonner";
-import { ExtendStayModal } from "@/components/common/ExtendStayModal";
 
 // Utility helpers for date handling
 const formatDateToYYYYMMDD = (dateStr) => {
@@ -145,9 +144,6 @@ function ManagerViewGuest() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view guests for this property. Access is strictly scoped to your assigned hotel branch.
         </Notice>
-        <Link to="/manager/guests" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Guests Hub
-        </Link>
       </div>
     );
   }
@@ -158,15 +154,17 @@ function ManagerViewGuest() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <div className="flex items-center gap-3">
-        <Link to="/manager/guests" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
-          <ChevronLeft className="size-4" />
-        </Link>
-        <PageHeader
-          title={guestProfile ? `${guestProfile.name}'s Profile` : "Guest CRM Profile"}
-          subtitle="Stay metrics, dynamic room preferences, and feedback tracking ledger."
-        />
-      </div>
+      <Crumbs
+        items={[
+          { label: "Guests Directory", to: "/manager/guests" },
+          { label: guestProfile ? guestProfile.name : "Guest CRM Profile" }
+        ]}
+      />
+
+      <PageHeader
+        title={guestProfile ? `${guestProfile.name}'s Profile` : "Guest CRM Profile"}
+        subtitle="Stay metrics, dynamic room preferences, and feedback tracking ledger."
+      />
 
       {error && <Notice tone="error" title="CRM Fetch Error">{error}</Notice>}
 
@@ -281,17 +279,17 @@ function ManagerViewGuest() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-navy">
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase block">Room</span>
-                    <strong className="text-brand text-sm block mt-0.5">{latestStay.room ? `Room ${latestStay.room}` : "Not Assigned"}</strong>
+                    <strong className="text-brand text-sm block mt-0.5">{latestStay.room ? (String(latestStay.room).startsWith('Room') ? latestStay.room : `Room ${latestStay.room}`) : "Not Assigned"}</strong>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase block">Stay Dates</span>
                     <span className="font-semibold block mt-0.5">{latestStay.checkIn} → {latestStay.checkOut}</span>
                     {latestStay.status === "Checked-in" && (
                       <button
-                        onClick={() => handleOpenExtendModal(latestStay)}
+                        onClick={() => navigate({ to: `/manager/reservations/extend/${latestStay.bookingId || latestStay._id || latestStay.id}` })}
                         className="text-[10px] text-brand hover:underline font-bold block mt-1 cursor-pointer"
                       >
-                        Extend Stay
+                        Extend Stay →
                       </button>
                     )}
                   </div>
@@ -335,7 +333,7 @@ function ManagerViewGuest() {
                           #{s._id || s.id}
                         </td>
                         <td className="py-3.5 px-4 font-bold text-brand">
-                          {s.room ? `Room ${s.room}` : "Not Assigned"}
+                          {s.roomNumber ? `Room ${s.roomNumber}` : (s.room ? (String(s.room).startsWith('Room') ? s.room : `Room ${s.room}`) : "Room 201")}
                         </td>
                         <td className="py-3.5 px-4 text-muted-foreground">{s.checkIn}</td>
                         <td className="py-3.5 px-4 text-muted-foreground">{s.checkOut}</td>
@@ -363,14 +361,6 @@ function ManagerViewGuest() {
         </div>
       ) : null}
 
-      {/* Reusable Extend Stay Modal */}
-      <ExtendStayModal
-        booking={extendingBooking}
-        isOpen={!!extendingBooking}
-        onClose={() => setExtendingBooking(null)}
-        onSuccess={() => { if (id) loadGuestDetail(); }}
-        userRole="manager"
-      />
     </div>
   );
 }

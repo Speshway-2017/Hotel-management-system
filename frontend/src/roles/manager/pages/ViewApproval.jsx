@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { FormField, Textarea } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -12,7 +12,6 @@ import {
   Calendar,
   User,
   Building,
-  ChevronLeft,
   ShieldCheck,
   AlertTriangle,
   Clock,
@@ -144,24 +143,23 @@ function ManagerViewApproval() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view approval logs for this property. Access is strictly scoped to your assigned hotel branch.
         </Notice>
-        <Link to="/manager/approvals" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Approvals Ledger
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <div className="flex items-center gap-3">
-        <Link to="/manager/approvals" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
-          <ChevronLeft className="size-4" />
-        </Link>
-        <PageHeader
-          title={request ? `Approval Request: ${request.id}` : "Approval Details"}
-          subtitle="Audit operational exceptions, check values change, and log authorization decisions."
-        />
-      </div>
+      <Crumbs
+        items={[
+          { label: "Approvals", to: "/manager/approvals" },
+          { label: request ? `Approval: ${request.id}` : "Approval Details" }
+        ]}
+      />
+
+      <PageHeader
+        title={request ? `Approval Request: ${request.id}` : "Approval Details"}
+        subtitle="Audit operational exceptions, check values change, and log authorization decisions."
+      />
 
       {error && <Notice tone="error" title="Ledger Fetch Error">{error}</Notice>}
 

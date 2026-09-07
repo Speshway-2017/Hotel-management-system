@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
-import { Ticket, Calendar, Settings, List, ChevronLeft, ArrowLeft, Edit2, Percent, DollarSign, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Ticket, Calendar, Settings, List, Edit2, Percent, DollarSign, TrendingUp, CheckCircle2 } from "lucide-react";
 
 export function ViewCoupon() {
   const { id } = useParams();
@@ -40,26 +40,27 @@ export function ViewCoupon() {
 
   return (
     <div className="space-y-6 text-left pb-16">
+      <Crumbs
+        items={[
+          { label: "Coupons", to: "/super-admin/coupons" },
+          { label: coupon ? coupon.code : "Coupon Details" }
+        ]}
+      />
+
       <PageHeader
         title={coupon ? `Promo Coupon: ${coupon.code}` : "Coupon Details"}
         subtitle="Operational parameters, discount slabs, plans coverage, and utilization index."
         actions={
-          <div className="flex items-center gap-2.5">
-            <Link
-              to="/super-admin/coupons"
-              className="inline-flex items-center gap-1.5 px-4 h-10 rounded-full border border-muted bg-white text-xs font-bold text-navy hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="size-4" /> Back to Coupons
-            </Link>
-            {coupon && (
+          coupon ? (
+            <div className="flex items-center gap-2.5">
               <Link
                 to={`/super-admin/coupons/edit/${couponId}`}
                 className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-navy text-white text-xs font-bold hover:bg-navy/90 shadow-soft transition-all cursor-pointer"
               >
                 <Edit2 className="size-4" /> Edit Coupon
               </Link>
-            )}
-          </div>
+            </div>
+          ) : null
         }
       />
 

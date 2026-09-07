@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
   Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
-  ShieldAlert, Sparkles, Upload, FileText, CheckCircle2, AlertOctagon, HelpCircle, ArrowLeft, Wrench, Shield
+  ShieldAlert, Sparkles, Upload, FileText, CheckCircle2, AlertOctagon, HelpCircle, Wrench, Shield
 } from "lucide-react";
 
 export const Route = createFileRoute("/reception/room-assignment/$id")({
@@ -125,6 +125,12 @@ function ReceptionRoomDetailsPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
+      <Crumbs
+        items={[
+          { label: "Room Status", to: "/reception/room-assignment" },
+          { label: `Room #${roomObj.room}` }
+        ]}
+      />
       
       {/* Dynamic navbar header override */}
       <PageHeader />

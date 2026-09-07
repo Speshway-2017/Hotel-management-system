@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, ActionGroup, ViewActionButton, EditActionButton, ActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
@@ -165,63 +165,49 @@ function SuperAdminAdmins() {
                       <th className="p-4 pl-6">Admin Name</th>
                       <th className="p-4">Email</th>
                       <th className="p-4">Phone</th>
-                      <th className="p-4">Assigned Property</th>
-                      <th className="p-4">Location</th>
-                      <th className="p-4">Last Login</th>
+                      <th className="p-4">Assigned Properties</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
+                      <th className="p-4 text-right pr-6 min-w-[280px] whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
                     {filteredAdmins.map((a) => (
                       <tr key={a.id || a._id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 pl-6 font-semibold text-navy text-sm" title={a.name}>{a.name}</td>
-                        <td className="p-4 text-muted-foreground" title={a.email}>{a.email}</td>
-                        <td className="p-4 font-mono text-xs text-muted-foreground" title={a.mobile}>{a.mobile || "—"}</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-1.5 text-navy font-semibold" title={getPropertyName(a.propertyId)}>
-                            <Building className="size-3.5 text-purple shrink-0" />
-                            <span>{getPropertyName(a.propertyId)}</span>
+                        <td className="p-4 pl-6 font-semibold text-navy">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="size-4 text-purple shrink-0" />
+                            <span>{a.name}</span>
                           </div>
                         </td>
-                        <td className="p-4 text-muted-foreground" title={getPropertyLocation(a.propertyId)}>{getPropertyLocation(a.propertyId)}</td>
-                        <td className="p-4 text-muted-foreground font-mono text-[10px]" title={a.lastLogin || "14 Aug 2026, 11:20 AM"}>
-                          {a.lastLogin || "14 Aug 2026, 11:20 AM"}
+                        <td className="p-4 text-muted-foreground">{a.email}</td>
+                        <td className="p-4 text-muted-foreground">{a.phone || "—"}</td>
+                        <td className="p-4 font-semibold text-navy">
+                          {a.properties && a.properties.length > 0 ? (
+                            <span className="truncate max-w-xs block">{a.properties.join(", ")}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">None Assigned</span>
+                          )}
                         </td>
                         <td className="p-4">
                           <Tag tone={statusTone(a.status || "Active")}>{a.status || "Active"}</Tag>
                         </td>
-                        <td className="p-4 text-right pr-6 w-36 whitespace-nowrap">
-                          <div className="flex gap-1.5 justify-end items-center">
-                            <button
-                              onClick={() => navigate({ to: `/super-admin/admins/view/${a.id || a._id}` })}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
-                              title="View Admin Details"
-                            >
-                              <Eye className="size-4" />
-                            </button>
-                            <button
-                              onClick={() => navigate({ to: `/super-admin/admins/edit/${a.id || a._id}` })}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
-                              title="Edit Credentials"
-                            >
-                              <Edit2 className="size-4" />
-                            </button>
-                            <button
+                        <td className="p-4 text-right pr-6 min-w-[280px] whitespace-nowrap">
+                          <ActionGroup>
+                            <ViewActionButton onClick={() => navigate({ to: `/super-admin/admins/view/${a.id || a._id}` })} />
+                            <EditActionButton onClick={() => navigate({ to: `/super-admin/admins/edit/${a.id || a._id}` })} />
+                            <ActionButton
+                              icon={a.status === "Active" ? X : Check}
+                              label={a.status === "Active" ? "Deactivate" : "Activate"}
+                              variant={a.status === "Active" ? "warning" : "success"}
                               onClick={() => handleToggleStatus(a)}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
-                              title={a.status === "Active" ? "Deactivate" : "Activate"}
-                            >
-                              {a.status === "Active" ? <X className="size-4 text-warning" /> : <Check className="size-4 text-success" />}
-                            </button>
-                            <button
+                            />
+                            <ActionButton
+                              icon={Lock}
+                              label="Reset"
+                              variant="secondary"
                               onClick={() => handleResetPassword(a)}
-                              className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
-                              title="Reset Password"
-                            >
-                              <Lock className="size-4 text-gold" />
-                            </button>
-                          </div>
+                            />
+                          </ActionGroup>
                         </td>
                       </tr>
                     ))}

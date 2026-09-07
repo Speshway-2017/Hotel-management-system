@@ -65,6 +65,9 @@ export const receptionistService = {
   updatePayment: async (id, data) => {
     return await apiClient.put(`/receptionist/payments/${id}`, data);
   },
+  deletePayment: async (id) => {
+    return await apiClient.delete(`/receptionist/payments/${id}`);
+  },
   getNotifications: async () => {
     return await apiClient.get('/receptionist/notifications');
   },

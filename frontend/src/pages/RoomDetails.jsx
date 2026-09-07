@@ -226,8 +226,8 @@ export function RoomDetailsPage() {
                     <span>{rating} Rating</span>
                   </div>
                 </div>
-                <h1 className="font-display text-3xl sm:text-4xl font-bold text-navy">{hotelName}</h1>
-                <p className="text-xs sm:text-sm text-navy/70 flex items-center gap-1.5 mt-2 font-medium">
+                <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">{hotelName}</h1>
+                <p className="text-xs sm:text-sm text-[#4A4F58] flex items-center gap-1.5 mt-2 font-medium font-ui">
                   <MapPin className="size-4 text-purple shrink-0" />
                   <span>{roomType} {roomNumber ? `(${roomNumber})` : ""} — {location}</span>
                 </p>
@@ -267,13 +267,13 @@ export function RoomDetailsPage() {
               
               {/* 4. Room Overview */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-5">
-                <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">Room Overview</h2>
-                <p className="text-xs sm:text-sm text-navy/75 leading-relaxed">{roomDescription}</p>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Room Overview</h2>
+                <p className="text-xs sm:text-sm text-[#4A4F58] leading-relaxed font-ui">{roomDescription}</p>
 
                 {/* Key Spec Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-navy/50 font-bold uppercase block mb-0.5">Bed Type</span>
+                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Bed Type</span>
                     <strong className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Bed className="size-3.5 text-purple shrink-0" />
                       <span>{bedType}</span>
@@ -281,7 +281,7 @@ export function RoomDetailsPage() {
                   </div>
 
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-navy/50 font-bold uppercase block mb-0.5">Capacity</span>
+                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Capacity</span>
                     <strong className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Users className="size-3.5 text-purple shrink-0" />
                       <span>{capacity}</span>
@@ -289,7 +289,7 @@ export function RoomDetailsPage() {
                   </div>
 
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-navy/50 font-bold uppercase block mb-0.5">Floor</span>
+                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Floor</span>
                     <strong className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Sparkles className="size-3.5 text-purple shrink-0" />
                       <span>{roomFloor}</span>
@@ -297,7 +297,7 @@ export function RoomDetailsPage() {
                   </div>
 
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-navy/50 font-bold uppercase block mb-0.5">Rate Plan</span>
+                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Rate Plan</span>
                     <strong className="text-xs font-bold text-purple truncate block">
                       {ratePlan}
                     </strong>
@@ -307,7 +307,7 @@ export function RoomDetailsPage() {
 
               {/* 5. Room Amenities */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">Room Amenities</h2>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Room Amenities</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {roomAmenities.map((a, i) => (
                     <div key={i} className="flex items-center gap-2.5 p-3 rounded-xl bg-cream/40 border border-navy/5 text-xs text-navy font-semibold">
@@ -320,7 +320,7 @@ export function RoomDetailsPage() {
 
               {/* 6. Pricing & Taxes Breakdown */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">Pricing & Tariff Details</h2>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Pricing & Tariff Details</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 space-y-1">
                     <span className="text-[10px] text-purple font-bold uppercase tracking-wider block">Base Nightly Tariff</span>

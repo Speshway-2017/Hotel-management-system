@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
-import { ExtendStayModal } from "@/components/common/ExtendStayModal";
+import { extractRoomNumber } from "@/utils/roomUtils";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import {
   Users,
@@ -197,19 +197,21 @@ function ManagerGuestsPage() {
   const corporateGuests = compiledGuests.filter(g => g.stays.length > 2).length;
 
   const getRoomDisplay = (b) => {
+    const rNum = extractRoomNumber(b);
+    if (rNum) return `Room ${rNum}`;
     if (b?.roomNumber) return `Room ${b.roomNumber}`;
     if (!b?.room) return "Unassigned";
-    const str = String(b.room).split("·")[0].split("-")[0].replace(/room/i, "").trim();
-    return str ? `Room ${str}` : "Room 101";
+    if (String(b.room).toLowerCase().includes("deluxe")) return "Room 201";
+    return "Unassigned";
   };
 
   const getRoomCategoryDisplay = (b) => {
     if (b?.roomType) return b.roomType;
     if (b?.category) return b.category;
     if (b?.room && String(b.room).includes("·")) {
-      return String(b.room).split("·")[1]?.trim() || "Standard Room";
+      return String(b.room).split("·")[1]?.trim() || "Deluxe Room";
     }
-    return "Standard Room";
+    return "Deluxe Room";
   };
 
   // Filter Computations
@@ -345,7 +347,7 @@ function ManagerGuestsPage() {
                   <th className="w-[10%] py-3.5 px-4 text-left align-middle">Check-Out</th>
                   <th className="w-[9%] py-3.5 px-4 text-center align-middle">Stay Status</th>
                   <th className="w-[9%] py-3.5 px-4 text-left align-middle">Payment</th>
-                  <th className="w-[8%] py-3.5 px-4 text-center align-middle">Actions</th>
+                  <th className="py-3.5 px-4 text-right align-middle min-w-[120px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-xs text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -386,7 +388,7 @@ function ManagerGuestsPage() {
                         <div>{b.checkOut}</div>
                         {b.status === "Checked-in" && (
                           <button
-                            onClick={() => handleOpenExtendModal(b)}
+                            onClick={() => navigate({ to: `/manager/reservations/extend/${b.bookingId || b._id || b.id}` })}
                             className="text-[10px] text-brand hover:underline font-bold block mt-0.5 cursor-pointer"
                           >
                             Extend Stay
@@ -410,18 +412,12 @@ function ManagerGuestsPage() {
                           </Tag>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-center align-middle">
-                        <div className="flex items-center justify-center select-none">
-                          <Button
+                      <td className="py-3.5 px-4 text-right align-middle min-w-[120px] whitespace-nowrap">
+                        <ActionGroup>
+                          <ViewActionButton
                             onClick={() => navigate({ to: `/manager/guests/view/${btoa(g.phone || g.name)}` })}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 hover:bg-brand/10 hover:text-brand cursor-pointer text-navy transition-colors"
-                            title="View CRM Guest Profile"
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
-                        </div>
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );
@@ -457,14 +453,6 @@ function ManagerGuestsPage() {
         )}
       </div>
 
-      {/* Reusable Extend Stay Modal */}
-      <ExtendStayModal
-        booking={extendingBooking}
-        isOpen={!!extendingBooking}
-        onClose={() => setExtendingBooking(null)}
-        onSuccess={() => loadData()}
-        userRole="manager"
-      />
     </div>
   );
 }

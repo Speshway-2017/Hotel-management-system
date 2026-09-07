@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Panel } from "@/components/hs/kit";
+import { PageHeader, Panel, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ function AddReservation() {
   const searchParams = new URLSearchParams(window.location.search);
   const [guest, setGuest] = useState(searchParams.get("guest") || "");
   const [phone, setPhone] = useState(searchParams.get("phone") || "");
+  const [idProofType, setIdProofType] = useState(searchParams.get("idProofType") || "Aadhaar Card");
+  const [idProofNumber, setIdProofNumber] = useState(searchParams.get("idProofNumber") || "");
   const [room, setRoom] = useState(searchParams.get("room") || "");
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
@@ -163,6 +165,8 @@ function AddReservation() {
       const payload = {
         guest,
         phone,
+        idProofType,
+        idProofNumber,
         room,
         checkIn,
         checkOut,
@@ -189,8 +193,15 @@ function AddReservation() {
   };
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left max-w-4xl pb-16">
+      <PageHeader
+        title="Add Reservation"
+        subtitle="Assign reservation particulars, guest identification, room details, and tariff."
+      />
+
+
       <div className="max-w-xl">
+
         <Panel title="Booking Parameters Form" description="Assign reservation particulars.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
             <div className="grid grid-cols-2 gap-4">
@@ -213,6 +224,31 @@ function AddReservation() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 XXXXX XXXXX"
+                />
+              </FormField>
+
+              <FormField label="ID Proof Type" id="idProofType">
+                <Select
+                  id="idProofType"
+                  value={idProofType}
+                  onChange={(e) => setIdProofType(e.target.value)}
+                >
+                  <option value="Aadhaar Card">Aadhaar Card</option>
+                  <option value="Passport">Passport</option>
+                  <option value="Driving License">Driving License</option>
+                  <option value="Voter ID">Voter ID</option>
+                  <option value="PAN Card">PAN Card</option>
+                  <option value="National ID">National ID</option>
+                </Select>
+              </FormField>
+
+              <FormField label="ID Proof Number" id="idProofNumber">
+                <Input
+                  id="idProofNumber"
+                  type="text"
+                  value={idProofNumber}
+                  onChange={(e) => setIdProofNumber(e.target.value)}
+                  placeholder="e.g. 1234 5678 9012"
                 />
               </FormField>
 

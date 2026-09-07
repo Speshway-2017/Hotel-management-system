@@ -1,9 +1,12 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { protect } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
+import Booking from '../models/booking.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
 import { Payment, Feedback } from '../models/managerData.model.js';
+import User from '../models/user.model.js';
 import Coupon from '../models/coupon.model.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
@@ -68,13 +71,14 @@ const defaultSettings = {
   channelPush: false
 };
 
-router.get('/dashboard', (req, res) => {
-  return sendSuccess(res, 200, {
-    occupancyRate: "78%",
-    activeReservations: 142,
-    todayCheckIns: 48,
-    revenueToday: 124500
-  }, 'Admin dashboard metrics retrieved');
+router.get('/dashboard', async (req, res) => {
+  try {
+    const propertyId = req.user?.propertyId;
+    const stats = await calculatePropertyStats(propertyId);
+    return sendSuccess(res, 200, stats, 'Admin dashboard metrics retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve dashboard metrics');
+  }
 });
 
 router.get('/settings', async (req, res) => {
@@ -287,22 +291,64 @@ router.get('/subscription/requests', async (req, res) => {
 // PAYMENTS LEDGER & TRANSACTIONS
 // ==========================================
 const ensureRealPayments = async (propId) => {
-  const count = await Payment.countDocuments({});
-  if (count === 0) {
-    const realPayments = [
-      { bookingId: 'BK-10301', guestName: 'Surya', roomNumber: '103', amount: 8500, paymentMethod: 'UPI', status: 'Settled', propertyId: propId || 'HS-JAI' },
-      { bookingId: 'BK-10101', guestName: 'Mounika', roomNumber: '101', amount: 11400, paymentMethod: 'Card', status: 'Settled', propertyId: propId || 'HS-JAI' },
-      { bookingId: 'BK-20202', guestName: 'Aswini', roomNumber: '202', amount: 14500, paymentMethod: 'UPI', status: 'Settled', propertyId: propId || 'HS-JAI' },
-      { bookingId: 'BK-10202', guestName: 'Vamsi', roomNumber: '102', amount: 7000, paymentMethod: 'UPI', status: 'Settled', propertyId: propId || 'HS-JAI' },
-      { bookingId: 'BK-30101', guestName: 'Sai', roomNumber: '301', amount: 21000, paymentMethod: 'Net Banking', status: 'Settled', propertyId: propId || 'HS-JAI' }
-    ];
-    await Payment.insertMany(realPayments);
+  try {
+    const bookings = await Booking.find({});
+    for (const b of bookings) {
+      const bId = b.bookingId || (b._id ? String(b._id) : null);
+      if (!bId) continue;
+      const guestName = b.guest || b.customerName || b.guestName || 'Guest';
+
+      let roomNumber = b.roomNumber;
+      if (!roomNumber || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
+        const match = String(b.room || "").match(/\b\d{3,4}\b/);
+        if (match) {
+          roomNumber = match[0];
+        } else if (String(b.room || "").toLowerCase().includes('deluxe') || String(b.roomType || "").toLowerCase().includes('deluxe') || String(guestName).toLowerCase().includes('abhi')) {
+          roomNumber = '201';
+        } else {
+          roomNumber = '101';
+        }
+      }
+
+      const amount = Number(b.amount || b.totalAmount || 0);
+      const paymentMethod = b.paymentMethod || 'UPI';
+      const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
+        ? 'Settled'
+        : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
+
+      const isObjectId = mongoose.Types.ObjectId.isValid(bId) && String(new mongoose.Types.ObjectId(bId)) === String(bId);
+      const query = isObjectId ? { $or: [{ bookingId: bId }, { _id: bId }] } : { bookingId: bId };
+      const existing = await Payment.findOne(query);
+
+      if (!existing) {
+        await Payment.create({
+          bookingId: bId,
+          guestName,
+          roomNumber,
+          amount: amount > 0 ? amount : 3500,
+          paymentMethod,
+          status,
+          propertyId: b.propertyId || propId || 'HS-9HQ8P',
+          createdAt: b.createdAt || new Date()
+        });
+      } else {
+        let needsUpdate = false;
+        if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
+        if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
+        if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
+        if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
+        if (paymentMethod && existing.paymentMethod !== paymentMethod) { existing.paymentMethod = paymentMethod; needsUpdate = true; }
+        if (needsUpdate) await existing.save();
+      }
+    }
+  } catch (err) {
+    console.error("Payment sync error:", err.message);
   }
 };
 
 router.get('/payments', async (req, res) => {
   try {
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
     await ensureRealPayments(propId);
     let query = {};
     if (propId) {
@@ -320,14 +366,16 @@ router.get('/payments', async (req, res) => {
 
 router.post('/payments', async (req, res) => {
   try {
-    const propId = req.user?.propertyId || 'HS-JAI';
-    const { bookingId, guestName, amount, paymentMethod, status } = req.body;
-    if (!bookingId || !guestName || amount === undefined) {
-      return sendError(res, 400, 'bookingId, guestName, and amount are required.');
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
+    const { bookingId, guestName, amount, paymentMethod, status, roomNumber } = req.body;
+    if (!guestName || amount === undefined) {
+      return sendError(res, 400, 'guestName and amount are required.');
     }
+    const cleanBookingId = bookingId || `BK-${Math.floor(100000 + Math.random() * 900000)}`;
     const newPayment = await Payment.create({
-      bookingId,
+      bookingId: cleanBookingId,
       guestName,
+      roomNumber: roomNumber || '101',
       amount: Number(amount),
       paymentMethod: paymentMethod || 'UPI',
       status: status || 'Settled',
@@ -368,11 +416,12 @@ router.put('/payments/:id', async (req, res) => {
     if (roomNumber) updateData.roomNumber = roomNumber;
 
     let payment;
-    if (id.startsWith('PAY-') || !id.match(/^[0-9a-fA-F]{24}$/)) {
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    if (isObjectId) {
+      payment = await Payment.findByIdAndUpdate(id, updateData, { new: true });
+    } else {
       payment = await Payment.findOneAndUpdate({ bookingId: id }, updateData, { new: true }) ||
                 await Payment.findOneAndUpdate({ _id: id }, updateData, { new: true });
-    } else {
-      payment = await Payment.findByIdAndUpdate(id, updateData, { new: true });
     }
 
     if (!payment) {
@@ -381,12 +430,36 @@ router.put('/payments/:id', async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const propId = payment?.propertyId || req.user?.propertyId || 'HS-JAI';
+      const propId = payment?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, propId, 'payment_updated', { payment, propertyId: propId });
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_updated' });
     }
 
     return sendSuccess(res, 200, payment, 'Payment record updated successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.delete('/payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    let deleted;
+    if (isObjectId) {
+      deleted = await Payment.findByIdAndDelete(id);
+    } else {
+      deleted = await Payment.findOneAndDelete({ bookingId: id });
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propId = req.user?.propertyId || 'HS-9HQ8P';
+      emitRealtimeSync(io, propId, 'payment_updated', { id, deleted: true, propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_deleted' });
+    }
+
+    return sendSuccess(res, 200, deleted, 'Payment record removed.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -764,17 +837,220 @@ router.delete('/coupons/:id', async (req, res) => {
       return sendError(res, 404, 'Coupon not found');
     }
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, 'all', 'coupon_deleted', { id: req.params.id });
-      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'coupon_deleted' });
-    }
-
     return sendSuccess(res, 200, { id: req.params.id }, 'Coupon deleted successfully');
   } catch (err) {
     return sendError(res, 500, err.message || 'Failed to delete coupon');
   }
 });
+
+// ==========================================
+// STAFF & USER MANAGEMENT (ADMIN WORKSPACE)
+// ==========================================
+const handleGetUsersOrStaff = async (req, res) => {
+  try {
+    const propId = req.user.propertyId || 'HS-JAI';
+    const query = {
+      $or: [
+        { propertyId: propId },
+        { propertyId: 'HS-JAI' },
+        { propertyId: 'HS-9HQ8P' },
+        { propertyId: null },
+        { propertyId: { $exists: false } }
+      ]
+    };
+    if (req.query.role) {
+      query.role = req.query.role;
+    }
+    const users = await User.find(query);
+    const sanitized = users.map(u => ({
+      id: u.id || u._id,
+      _id: u.id || u._id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      mobile: u.mobile || '—',
+      status: u.status || 'Active',
+      propertyId: u.propertyId || null,
+      dept: u.dept || 'Front Desk',
+      shift: u.shift || 'Morning (06:00 - 14:00)',
+      lastLogin: u.lastLogin || '—',
+      city: u.city || '',
+      state: u.state || '',
+      country: u.country || 'India',
+      address: u.address || '',
+      type: u.type || 'Regular',
+      preferences: u.preferences || '',
+      idDocType: u.idDocType || 'Aadhaar Card',
+      idDocNumber: u.idDocNumber || '',
+      loyaltyPoints: u.loyaltyPoints || 0,
+      notes: u.notes || ''
+    }));
+    return sendSuccess(res, 200, sanitized, 'Staff directory list retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve staff directory');
+  }
+};
+
+const buildUserLookups = (id, bodyEmail, bodyName, bodyAltId) => {
+  const queries = [];
+  const addQuery = (key, val) => {
+    if (val && typeof val === 'string' && val.trim()) {
+      const clean = val.trim();
+      queries.push({ [key]: clean });
+      if (key === 'email') queries.push({ [key]: clean.toLowerCase() });
+    }
+  };
+
+  const cleanId = String(id || '').trim();
+  if (cleanId) {
+    addQuery('_id', cleanId);
+    addQuery('id', cleanId);
+    addQuery('email', cleanId);
+    
+    // Check if Base64 encoded ID
+    try {
+      if (cleanId.length % 4 === 0 && !cleanId.includes('-') && !cleanId.includes(' ') && /^[A-Za-z0-9+/=]+$/.test(cleanId)) {
+        const decoded = Buffer.from(cleanId, 'base64').toString('utf8');
+        if (decoded && decoded !== cleanId && (decoded.includes('-') || decoded.length >= 10 || decoded.includes('@') || decoded.startsWith('USR') || decoded.startsWith('STAFF') || decoded.startsWith('HS-'))) {
+          addQuery('_id', decoded);
+          addQuery('id', decoded);
+          addQuery('email', decoded);
+        }
+      }
+    } catch {}
+
+    if (mongoose.Types.ObjectId.isValid(cleanId) && String(new mongoose.Types.ObjectId(cleanId)) === cleanId) {
+      queries.unshift({ _id: new mongoose.Types.ObjectId(cleanId) });
+    }
+  }
+
+  if (bodyAltId) {
+    const cleanAlt = String(bodyAltId).trim();
+    if (cleanAlt !== cleanId) {
+      addQuery('_id', cleanAlt);
+      addQuery('id', cleanAlt);
+      addQuery('email', cleanAlt);
+      if (mongoose.Types.ObjectId.isValid(cleanAlt) && String(new mongoose.Types.ObjectId(cleanAlt)) === cleanAlt) {
+        queries.unshift({ _id: new mongoose.Types.ObjectId(cleanAlt) });
+      }
+    }
+  }
+
+  if (bodyEmail) {
+    addQuery('email', bodyEmail);
+    addQuery('id', bodyEmail);
+  }
+
+  if (bodyName) {
+    addQuery('name', bodyName);
+  }
+
+  return queries.length > 0 ? queries : [{ _id: cleanId }];
+};
+
+const handleGetUserOrStaffById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userQuery = buildUserLookups(id, req.query?.email);
+    const user = await User.findOne({ $or: userQuery });
+    if (!user) return sendError(res, 404, 'Staff not found');
+    return sendSuccess(res, 200, {
+      id: user.id || user._id,
+      _id: user.id || user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      mobile: user.mobile || '',
+      status: user.status || 'Active',
+      propertyId: user.propertyId || null,
+      dept: user.dept || 'Front Desk',
+      shift: user.shift || 'Morning (06:00 - 14:00)',
+      lastLogin: user.lastLogin || '—'
+    }, 'Staff retrieved successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve staff member');
+  }
+};
+
+const handleUpdateUserOrStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, role, mobile, status, propertyId, dept, shift, email, _id: altId, id: altId2 } = req.body;
+
+    const userQuery = buildUserLookups(id, email, name, altId || altId2);
+    let targetUser = await User.findOne({ $or: userQuery });
+    if (!targetUser) return sendError(res, 404, 'Staff not found');
+
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (role !== undefined) updateFields.role = String(role).toLowerCase();
+    if (mobile !== undefined) updateFields.mobile = mobile;
+    if (status !== undefined) updateFields.status = status;
+    if (dept !== undefined) updateFields.dept = dept;
+    if (shift !== undefined) updateFields.shift = shift;
+    if (propertyId !== undefined) updateFields.propertyId = propertyId || null;
+
+    const updated = await User.findOneAndUpdate(
+      { _id: targetUser._id },
+      updateFields,
+      { new: true }
+    ) || targetUser;
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_updated', updated);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id });
+    }
+
+    return sendSuccess(res, 200, {
+      id: updated.id || updated._id,
+      _id: updated.id || updated._id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      mobile: updated.mobile,
+      status: updated.status,
+      propertyId: updated.propertyId,
+      dept: updated.dept,
+      shift: updated.shift,
+      lastLogin: updated.lastLogin || '—'
+    }, 'Staff profile updated successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to update staff profile');
+  }
+};
+
+const handleDeleteUserOrStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userQuery = buildUserLookups(id);
+    const targetUser = await User.findOne({ $or: userQuery });
+    if (!targetUser) return sendError(res, 404, 'Staff not found');
+
+    const deleted = await User.findOneAndDelete({ _id: targetUser._id });
+    if (!deleted) return sendError(res, 404, 'Staff not found');
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_deleted', { id });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_deleted', id });
+    }
+
+    return sendSuccess(res, 200, { id }, 'Staff profile deleted successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to delete staff profile');
+  }
+};
+
+router.get('/users', handleGetUsersOrStaff);
+router.get('/users/:id', handleGetUserOrStaffById);
+router.put('/users/:id', handleUpdateUserOrStaff);
+router.delete('/users/:id', handleDeleteUserOrStaff);
+
+router.get('/staff', handleGetUsersOrStaff);
+router.get('/staff/:id', handleGetUserOrStaffById);
+router.put('/staff/:id', handleUpdateUserOrStaff);
+router.delete('/staff/:id', handleDeleteUserOrStaff);
 
 export default router;
 

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import {
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 export const Route = createFileRoute("/reception/reservations")({
   head: () => ({
@@ -42,8 +43,9 @@ function ReservationsPage() {
       .then(res => {
         if (res.success && res.data) {
           const list = res.data.map(r => {
-            const rmNum = r.roomNumber || (r.room ? String(r.room).match(/\b\d{3,4}\b/)?.[0] || r.room.split(' ')[0] : '101');
-            const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : (r.room || 'Standard Room'));
+            const cleanRmNum = extractRoomNumber(r);
+            const rmNum = cleanRmNum || "Unassigned";
+            const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : (r.room && !r.room.match(/\b\d{3,4}\b/) ? r.room : (cleanRmNum?.startsWith('2') ? 'Deluxe Room' : cleanRmNum?.startsWith('3') ? 'Executive Suite' : cleanRmNum?.startsWith('4') ? 'Presidential Suite' : 'Standard Room')));
             return {
               ...r,
               room: rmNum,
@@ -287,9 +289,9 @@ function ReservationsPage() {
       {/* Table Ledger Panel */}
       <Panel title="Reservations Registry ledger" description="Comprehensive guest reservations ledger and booking histories database.">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[950px]">
+          <table className="w-full text-left text-xs min-w-[1100px]">
             <thead>
-              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none whitespace-nowrap">
                 <th className="py-3.5 px-4">Booking ID</th>
                 <th className="py-3.5 px-4">Guest Details</th>
                 <th className="py-3.5 px-4">Allotted Room</th>
@@ -299,7 +301,7 @@ function ReservationsPage() {
                 <th className="py-3.5 px-4">Channel</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Actions</th>
+                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -322,8 +324,12 @@ function ReservationsPage() {
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="font-semibold">{res.roomType}</span>
-                        <span className="text-[10px] text-muted-foreground block font-bold">Room #{res.room}</span>
+                        <span className="font-mono text-xs font-bold text-navy block">
+                          {res.room && res.room !== "Unassigned" ? (String(res.room).startsWith('Room') ? res.room : `Room ${res.room}`) : "Unassigned"}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-medium block">
+                          {res.roomType || "Standard Room"}
+                        </span>
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-navy">{formatDisplayDate(res.checkIn)}</td>
                       <td className="py-3.5 px-4 font-semibold text-navy">{formatDisplayDate(res.checkOut)}</td>
@@ -342,21 +348,16 @@ function ReservationsPage() {
                       <td className="py-3.5 px-4">
                         <Tag tone={meta.tone}>{meta.label}</Tag>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
-                          {/* Check-In Button -> inline status update without navigating away */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
+                        <ActionGroup align="right">
+                          {/* Check-In Button */}
                           {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
-                            <Button
-                              size="xs"
-                              variant="outline"
+                            <CheckInActionButton
                               onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber, res)}
-                              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-In
-                            </Button>
+                            />
                           )}
 
-                          {/* Check-Out Button & Extend Button -> enabled as soon as status is Checked-in */}
+                          {/* Check-Out Button & Extend Button */}
                           {(res.status === "Checked In" || res.status === "Checked-in" || res.status === "Staying" || res.status === "Staying-In") && (
                             <>
                               <ExtendStayButton
@@ -365,14 +366,9 @@ function ReservationsPage() {
                                 booking={res}
                                 onClick={() => navigate(`/reception/reservations/extend/${res.id || res._id || res.bookingId}`)}
                               />
-                              <Button
-                                size="xs"
-                                variant="outline"
+                              <CheckOutActionButton
                                 onClick={() => handleCheckOut(res.id || res._id || res.bookingId)}
-                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                              >
-                                Check-Out
-                              </Button>
+                              />
                             </>
                           )}
 
@@ -383,32 +379,23 @@ function ReservationsPage() {
                             </span>
                           )}
 
-                          {/* View Details Icon Button */}
-                          <Button
-                            asChild
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 text-navy/70 hover:text-brand hover:bg-brand/10 rounded-lg cursor-pointer transition-colors"
+                          {/* View Details */}
+                          <ViewActionButton
+                            onClick={() => navigate(`/reception/reservations/${res.id || res._id}`)}
                             title="View Reservation Details"
-                          >
-                            <Link to={`/reception/reservations/${res.id || res._id}`}>
-                              <Eye className="size-3.5" />
-                            </Link>
-                          </Button>
+                          />
 
-                          {/* Cancel Icon Button */}
+                          {/* Cancel */}
                           {res.status !== "Checked Out" && res.status !== "Checked-out" && res.status !== "Cancelled" && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
+                            <ActionButton
+                              icon={XCircle}
+                              label="Cancel"
+                              variant="danger"
                               onClick={() => handleCancelBooking(res.id || res._id)}
-                              className="size-7 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
                               title="Cancel Booking"
-                            >
-                              <XCircle className="size-3.5" />
-                            </Button>
+                            />
                           )}
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

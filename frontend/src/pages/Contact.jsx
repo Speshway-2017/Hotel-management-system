@@ -233,7 +233,7 @@ function Contact() {
                     <OptIcon className="size-5" />
                   </span>
                   <h3 className="font-display text-base sm:text-lg font-bold text-navy">{opt.title}</h3>
-                  <p className="mt-2 text-xs text-muted-foreground font-ui leading-relaxed">{opt.desc}</p>
+                  <p className="mt-2 text-xs text-[#4A4F58] font-ui leading-relaxed">{opt.desc}</p>
                   <p className="mt-4 pt-3 border-t border-navy/5 text-xs font-bold text-purple font-ui">
                     {opt.action}: <span className="text-navy">{opt.contact}</span>
                   </p>
@@ -262,24 +262,24 @@ function Contact() {
                     <Phone className="size-4.5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Call Support</p>
-                      <p className="text-muted-foreground mt-0.5">{contactData.phone}</p>
+                      <p className="text-[#4A4F58] mt-0.5">{contactData.phone}</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
                     <Mail className="size-4.5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Email Inquiry</p>
-                      <p className="text-muted-foreground mt-0.5">{contactData.email}</p>
+                      <p className="text-[#4A4F58] mt-0.5">{contactData.email}</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
                     <MapPin className="size-4.5 text-gold shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Headquarters Office</p>
-                      <p className="text-muted-foreground mt-0.5">{contactData.address}</p>
+                      <p className="text-[#4A4F58] mt-0.5">{contactData.address}</p>
                     </div>
                   </li>
-                  <li className="flex items-start gap-3 pt-3 border-t border-navy/5 text-[11px] text-muted-foreground font-medium">
+                  <li className="flex items-start gap-3 pt-3 border-t border-navy/5 text-[11px] text-[#4A4F58] font-medium">
                     <span>Business Hours: {contactData.hours}</span>
                   </li>
                 </ul>
@@ -287,7 +287,7 @@ function Contact() {
 
               {/* FAQ Accordion Section */}
               <div className="space-y-4">
-                <h3 className="font-display text-lg sm:text-xl font-bold text-navy">
+                <h3 className="font-display text-2xl font-bold text-navy">
                   Frequently Asked Questions
                 </h3>
                 <div className="space-y-2">
@@ -306,7 +306,7 @@ function Contact() {
                           {isOpen ? <ChevronUp className="size-4 text-gold shrink-0" /> : <ChevronDown className="size-4 text-gold shrink-0" />}
                         </button>
                         {isOpen && (
-                          <div className="px-4 pb-4 text-xs sm:text-sm text-muted-foreground font-ui leading-relaxed border-t border-navy/5 pt-3 animate-fade-in">
+                          <div className="px-4 pb-4 text-xs sm:text-sm text-[#4A4F58] font-ui leading-relaxed border-t border-navy/5 pt-3 animate-fade-in">
                             {faq.a}
                           </div>
                         )}
@@ -441,10 +441,10 @@ function Contact() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(91,33,182,0.03),transparent_60%)]" />
         </div>
         <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6">
-          <h2 className="font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
             Simplify your hotel operations today.
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground font-ui">
+          <p className="mx-auto mt-4 max-w-lg text-base text-[#4A4F58] font-ui leading-relaxed">
             Schedule a free 30-minute sandbox demo populated with mock hotel keys.
           </p>
           <div className="mt-8 flex justify-center">

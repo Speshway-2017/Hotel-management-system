@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
@@ -20,6 +20,8 @@ function EditReservation() {
   // Form states
   const [guest, setGuest] = useState("");
   const [phone, setPhone] = useState("");
+  const [idProofType, setIdProofType] = useState("Aadhaar Card");
+  const [idProofNumber, setIdProofNumber] = useState("");
   const [room, setRoom] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -59,6 +61,8 @@ function EditReservation() {
         if (match) {
           setGuest(match.guest || match.guestName || "");
           setPhone(match.phone || match.mobile || match.phoneNumber || "");
+          setIdProofType(match.idProofType || "Aadhaar Card");
+          setIdProofNumber(match.idProofNumber || "");
           let currentRoomNum = match.room || match.roomNumber || "";
           if (currentRoomNum.includes("·")) {
             currentRoomNum = currentRoomNum.split("·")[0].trim();
@@ -223,6 +227,8 @@ function EditReservation() {
       const payload = {
         guest,
         phone,
+        idProofType,
+        idProofNumber,
         room,
         checkIn,
         checkOut,
@@ -250,11 +256,19 @@ function EditReservation() {
   };
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="space-y-6 text-left max-w-4xl pb-16">
+      <Crumbs
+        items={[
+          { label: "Reservations", to: "/admin/reservations" },
+          { label: `Edit Reservation: ${guest || id}` }
+        ]}
+      />
+
       <PageHeader
-        title="Edit Reservation"
+        title={`Edit Reservation: ${guest || id}`}
         subtitle="Update guest folio stay dates, room parameters, and cost slab metrics."
       />
+
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
@@ -286,6 +300,31 @@ function EditReservation() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91 XXXXX XXXXX"
+                  />
+                </FormField>
+
+                <FormField label="ID Proof Type" id="idProofType">
+                  <Select
+                    id="idProofType"
+                    value={idProofType}
+                    onChange={(e) => setIdProofType(e.target.value)}
+                  >
+                    <option value="Aadhaar Card">Aadhaar Card</option>
+                    <option value="Passport">Passport</option>
+                    <option value="Driving License">Driving License</option>
+                    <option value="Voter ID">Voter ID</option>
+                    <option value="PAN Card">PAN Card</option>
+                    <option value="National ID">National ID</option>
+                  </Select>
+                </FormField>
+
+                <FormField label="ID Proof Number" id="idProofNumber">
+                  <Input
+                    id="idProofNumber"
+                    type="text"
+                    value={idProofNumber}
+                    onChange={(e) => setIdProofNumber(e.target.value)}
+                    placeholder="e.g. 1234 5678 9012"
                   />
                 </FormField>
 

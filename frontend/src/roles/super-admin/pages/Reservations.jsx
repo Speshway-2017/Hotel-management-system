@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, ActionGroup, ViewActionButton, ActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/utils/utils";
 import { Search, RefreshCw, Eye, X, Building, ChevronDown, Calendar, User, Landmark } from "lucide-react";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 function SuperAdminReservations() {
   const [reservations, setReservations] = useState([]);
@@ -230,20 +231,20 @@ function SuperAdminReservations() {
           <div className="text-center py-12 text-muted-foreground">No bookings found matching filters.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[1100px] table-fixed">
+            <table className="w-full text-left text-xs border-collapse min-w-[1100px]">
               <thead>
                 <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                  <th className="p-4 w-[8%] text-left">Booking ID</th>
-                  <th className="p-4 w-[12%] text-left">Guest Name</th>
-                  <th className="p-4 w-[14%] text-left">Property</th>
-                  <th className="p-4 w-[12%] text-left">Room/Room Type</th>
-                  <th className="p-4 w-[9%] text-left">Check-in</th>
-                  <th className="p-4 w-[9%] text-left">Check-out</th>
-                  <th className="p-4 w-[10%] text-left">Source</th>
-                  <th className="p-4 w-[8%] text-left">Amount</th>
-                  <th className="p-4 w-[8%] text-left">Payment</th>
-                  <th className="p-4 w-[10%] text-left">Status</th>
-                  <th className="p-4 w-[10%] text-left">Actions</th>
+                  <th className="p-4 text-left">Booking ID</th>
+                  <th className="p-4 text-left">Guest Name</th>
+                  <th className="p-4 text-left">Property</th>
+                  <th className="p-4 text-left">Room/Room Type</th>
+                  <th className="p-4 text-left">Check-in</th>
+                  <th className="p-4 text-left">Check-out</th>
+                  <th className="p-4 text-left">Source</th>
+                  <th className="p-4 text-left">Amount</th>
+                  <th className="p-4 text-left">Payment</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-right pr-6 min-w-[160px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
@@ -253,53 +254,51 @@ function SuperAdminReservations() {
 
                   return (
                     <tr key={r.id || r._id} className="hover:bg-muted/15 transition-colors">
-                      <td className="p-4 w-[8%] text-left font-semibold text-navy truncate" title={r.id || r._id}>{r.id || r._id}</td>
-                      <td className="p-4 w-[12%] text-left">
+                      <td className="p-4 text-left font-semibold text-navy truncate" title={r.id || r._id}>{r.id || r._id}</td>
+                      <td className="p-4 text-left">
                         <div className="truncate">
                           <p className="font-semibold text-navy text-sm truncate" title={r.guest}>{r.guest}</p>
                           <p className="text-muted-foreground text-[10px] truncate" title={r.phone}>{r.phone || "—"}</p>
                         </div>
                       </td>
-                      <td className="p-4 w-[14%] text-left">
+                      <td className="p-4 text-left">
                         <div className="flex items-center gap-1.5 text-navy font-semibold truncate" title={getPropertyName(r.propertyId)}>
                           <Building className="size-3.5 text-purple shrink-0" />
                           <span className="truncate">{getPropertyName(r.propertyId)}</span>
                         </div>
                       </td>
-                      <td className="p-4 w-[12%] text-left text-muted-foreground truncate" title={r.room}>{r.room}</td>
-                      <td className="p-4 w-[9%] text-left text-muted-foreground font-mono text-[10px] truncate" title={r.checkIn}>{r.checkIn}</td>
-                      <td className="p-4 w-[9%] text-left text-muted-foreground font-mono text-[10px] truncate" title={r.checkOut}>{r.checkOut}</td>
-                      <td className="p-4 w-[10%] text-left">
+                      <td className="p-4 text-left">
+                        <p className="font-bold text-navy text-xs">{extractRoomNumber(r) ? `Room ${extractRoomNumber(r)}` : "Unassigned"}</p>
+                        <p className="text-muted-foreground text-[10px] truncate">{r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : (r.room && !r.room.match(/\b\d{3,4}\b/) ? r.room : 'Standard Room'))}</p>
+                      </td>
+                      <td className="p-4 text-left text-muted-foreground font-mono text-[10px] truncate" title={r.checkIn}>{r.checkIn}</td>
+                      <td className="p-4 text-left text-muted-foreground font-mono text-[10px] truncate" title={r.checkOut}>{r.checkOut}</td>
+                      <td className="p-4 text-left">
                         <Tag tone="brand">{r.source}</Tag>
                       </td>
-                      <td className="p-4 w-[8%] text-left font-bold text-navy font-mono">
+                      <td className="p-4 text-left font-bold text-navy font-mono">
                         ₹{(r.amount || 0).toLocaleString("en-IN")}
                       </td>
-                      <td className="p-4 w-[8%] text-left">
+                      <td className="p-4 text-left">
                         <Tag tone={pay.tone}>{pay.label}</Tag>
                       </td>
-                      <td className="p-4 w-[10%] text-left">
+                      <td className="p-4 text-left">
                         <Tag tone={statusTone(r.status)}>{r.status}</Tag>
                       </td>
-                      <td className="p-4 w-[10%] text-left">
-                        <div className="flex gap-1.5 justify-start items-center">
-                          <button
+                      <td className="p-4 text-right pr-6 min-w-[160px] whitespace-nowrap">
+                        <ActionGroup>
+                          <ViewActionButton
                             onClick={() => { setSelectedBooking(r); setModalOpen(true); }}
-                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer flex items-center justify-center h-7 w-7"
-                            title="View Details"
-                          >
-                            <Eye className="size-3.5" />
-                          </button>
+                          />
                           {isCancellable && (
-                            <button
+                            <ActionButton
+                              icon={X}
+                              label="Cancel"
+                              variant="danger"
                               onClick={() => handleCancelReservation(r)}
-                              className="p-1.5 rounded-full hover:bg-muted text-warning cursor-pointer flex items-center justify-center h-7 w-7"
-                              title="Cancel Booking"
-                            >
-                              <X className="size-4" />
-                            </button>
+                            />
                           )}
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

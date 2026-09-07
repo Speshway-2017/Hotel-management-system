@@ -13,10 +13,10 @@ import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import PromoCoupon from '../models/promoCoupon.model.js';
 import Coupon from '../models/coupon.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
-import { Room, ContactMessage } from '../models/managerData.model.js';
-import { triggerNotification } from '../utils/notification.helper.js';
+import { Room, ContactMessage, Approval } from '../models/managerData.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { invalidatePropertyCache } from '../utils/propertyCache.js';
+import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 
 const router = express.Router();
 
@@ -322,7 +322,8 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
   try {
     let query = {};
     if (req.user.role !== 'super-admin') {
-      query.propertyId = req.user.propertyId;
+      const propId = req.user.propertyId || 'HS-JAI';
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
     }
     if (req.query.role) {
       query.role = req.query.role;
@@ -337,6 +338,8 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
       mobile: u.mobile || '—',
       status: u.status || 'Active',
       propertyId: u.propertyId || null,
+      dept: u.dept || 'Front Desk',
+      shift: u.shift || 'Morning (06:00 - 14:00)',
       lastLogin: u.lastLogin || '—',
       city: u.city || '',
       state: u.state || '',
@@ -355,6 +358,33 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
   }
 });
 
+router.get('/users/:id', checkPropertyStatus, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userQuery = [{ _id: id }, { id: id }, { email: id }];
+    if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id) {
+      userQuery.unshift({ _id: new mongoose.Types.ObjectId(id) });
+    }
+    const user = await User.findOne({ $or: userQuery });
+    if (!user) return sendError(res, 404, 'Staff not found');
+    return sendSuccess(res, 200, {
+      id: user.id || user._id,
+      _id: user.id || user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      mobile: user.mobile || '',
+      status: user.status || 'Active',
+      propertyId: user.propertyId || null,
+      dept: user.dept || 'Front Desk',
+      shift: user.shift || 'Morning (06:00 - 14:00)',
+      lastLogin: user.lastLogin || '—'
+    }, 'User retrieved successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve user');
+  }
+});
+
 router.post('/users', checkPropertyStatus, async (req, res) => {
   try {
     const { name, email, password, role, mobile, propertyId, status, dept, shift } = req.body;
@@ -364,7 +394,7 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
 
     let targetPropertyId = propertyId || null;
     if (req.user.role !== 'super-admin') {
-      targetPropertyId = req.user.propertyId;
+      targetPropertyId = req.user.propertyId || 'HS-9HQ8P';
       if (role === 'super-admin') {
         return sendError(res, 403, 'Access denied: You cannot create super-admin users');
       }
@@ -388,6 +418,7 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
     await logAction(req.user, 'Created User', `${name} (${role})`, req);
     return sendSuccess(res, 201, {
       id: newUser.id || newUser._id,
+      _id: newUser.id || newUser._id,
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
@@ -408,31 +439,45 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
     const { id } = req.params;
     const { name, role, mobile, status, propertyId, dept, shift } = req.body;
 
-    const userQuery = [{ id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      userQuery.unshift({ _id: id });
+    const userQuery = [{ _id: id }, { id: id }, { email: id }];
+    if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id) {
+      userQuery.unshift({ _id: new mongoose.Types.ObjectId(id) });
     }
 
     let targetUser = await User.findOne({ $or: userQuery });
-    if (!targetUser) return sendError(res, 404, 'User not found');
+    if (!targetUser) return sendError(res, 404, 'Staff not found');
 
-    if (req.user.role !== 'super-admin') {
-      if (!targetUser.propertyId || targetUser.propertyId.toString() !== req.user.propertyId.toString()) {
+    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      if (targetUser.propertyId && req.user.propertyId && targetUser.propertyId.toString() !== req.user.propertyId.toString()) {
         return sendError(res, 403, 'Access denied: You are not authorized to update this user');
       }
     }
 
-    const updateFields = { name, role, mobile, status, dept, shift };
-    if (req.user.role === 'super-admin') {
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (role !== undefined) updateFields.role = role;
+    if (mobile !== undefined) updateFields.mobile = mobile;
+    if (status !== undefined) updateFields.status = status;
+    if (dept !== undefined) updateFields.dept = dept;
+    if (shift !== undefined) updateFields.shift = shift;
+    if (req.user.role === 'super-admin' && propertyId !== undefined) {
       updateFields.propertyId = propertyId || null;
     }
 
     const updated = await User.findOneAndUpdate({ $or: userQuery }, updateFields, { new: true });
-    if (!updated) return sendError(res, 404, 'User not found');
+    if (!updated) return sendError(res, 404, 'Staff not found');
 
     await logAction(req.user, 'Updated User', `${updated.name}`, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_updated', updated);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id });
+    }
+
     return sendSuccess(res, 200, {
       id: updated.id || updated._id,
+      _id: updated.id || updated._id,
       name: updated.name,
       email: updated.email,
       role: updated.role,
@@ -451,26 +496,89 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
 router.delete('/users/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
-
-    const userQuery = [{ id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      userQuery.unshift({ _id: id });
-    }
+    const userQuery = [{ _id: id }, { id }, { email: id }];
 
     let targetUser = await User.findOne({ $or: userQuery });
-    if (!targetUser) return sendError(res, 404, 'User not found');
+    if (!targetUser) return sendError(res, 404, 'Staff not found');
 
     if (req.user.role !== 'super-admin') {
-      if (!targetUser.propertyId || targetUser.propertyId.toString() !== req.user.propertyId.toString()) {
+      if (targetUser.propertyId && req.user.propertyId && targetUser.propertyId.toString() !== req.user.propertyId.toString()) {
         return sendError(res, 403, 'Access denied: You are not authorized to delete this user');
       }
     }
 
     const deleted = await User.findOneAndDelete({ $or: userQuery });
-    await logAction(req.user, 'Deleted User', `${deleted.name}`, req);
+    await logAction(req.user, 'Deleted User', `${deleted?.name || id}`, req);
     return sendSuccess(res, 200, deleted, 'User deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete user');
+  }
+});
+
+// ==========================================
+// 3.5 APPROVALS & OVERRIDES MANAGEMENT
+// ==========================================
+router.get('/approvals', checkPropertyStatus, async (req, res) => {
+  try {
+    const targetPropId = req.user.propertyId || 'HS-JAI';
+    let query = {};
+    if (req.user.role === 'super-admin') {
+      query = {};
+    } else {
+      query = { $or: [{ propertyId: targetPropId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
+    }
+    const list = await Approval.find(query).sort({ createdAt: -1 });
+    return sendSuccess(res, 200, list, 'Approvals requests list retrieved.');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve approvals');
+  }
+});
+
+router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
+  try {
+    const { action, decisionReason } = req.body;
+    if (!action) {
+      return sendError(res, 400, 'Decision action is required (Approve or Reject).');
+    }
+    let finalAction = action;
+    if (finalAction.toLowerCase() === 'approve') finalAction = 'Approved';
+    if (finalAction.toLowerCase() === 'reject') finalAction = 'Rejected';
+
+    if (!['Approved', 'Rejected'].includes(finalAction)) {
+      return sendError(res, 400, 'Invalid decision action. Must be Approve or Reject.');
+    }
+
+    const approvalQuery = [{ id: req.params.id }];
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      approvalQuery.unshift({ _id: req.params.id });
+    }
+
+    const updated = await Approval.findOneAndUpdate(
+      { $or: approvalQuery },
+      {
+        status: finalAction,
+        decisionReason: decisionReason || (finalAction === 'Approved' ? 'Approved via Approvals Console' : 'Rejected via Approvals Console'),
+        decidedBy: req.user.name || req.user.email || 'Administrator',
+        decidedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return sendError(res, 404, 'Approval request not found.');
+    }
+
+    const targetPropId = updated.propertyId || req.user.propertyId || 'HS-JAI';
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, targetPropId, 'approval_updated', { approval: updated, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'approval_updated' });
+    }
+
+    return sendSuccess(res, 200, updated, `Approval request decision marked as ${finalAction}.`);
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to update approval');
   }
 });
 
@@ -519,16 +627,11 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
     const booking = await Booking.create(bookingData);
     await logAction(req.user, 'Created Booking', `${booking.guest}`, req);
 
-    let roomNum = booking.roomNumber || booking.room;
-    if (typeof roomNum === 'string' && roomNum.includes('·')) roomNum = roomNum.split('·')[0].trim();
-    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) roomNum = roomNum.replace(/room/i, '').trim();
+    const roomNum = extractRoomNumber(booking);
 
     if (roomNum) {
       const rmStatus = booking.status === 'Checked-in' ? 'Occupied' : 'Reserved';
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNum, propertyId: targetPropId },
-        { status: rmStatus }
-      );
+      await syncRoomStatus(roomNum, rmStatus, targetPropId);
     }
 
     const io = req.app.get('socketio');
@@ -634,9 +737,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
     await logAction(req.user, 'Updated Booking', `${booking.guest}`, req);
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
-    let roomNum = booking.roomNumber || booking.room;
-    if (typeof roomNum === 'string' && roomNum.includes('·')) roomNum = roomNum.split('·')[0].trim();
-    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) roomNum = roomNum.replace(/room/i, '').trim();
+    const roomNum = extractRoomNumber(booking);
 
     // Sync Room operational status on check-in, check-out, or cancellation
     if (roomNum) {
@@ -646,10 +747,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       else if (booking.status === 'Checked-out') rmStatus = 'Available';
       else if (booking.status === 'Cancelled' || booking.status === 'No-show') rmStatus = 'Available';
 
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNum, $or: [{ propertyId: targetPropId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] },
-        { status: rmStatus }
-      );
+      await syncRoomStatus(roomNum, rmStatus, targetPropId);
     }
 
     // Realtime broadcast across all dashboards
@@ -774,15 +872,9 @@ router.delete('/reservations/:id', checkPropertyStatus, async (req, res) => {
     await logAction(req.user, 'Deleted Booking', `${booking.guest}`, req);
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
-    if (booking.roomNumber || booking.room) {
-      let rNum = booking.roomNumber || booking.room;
-      if (typeof rNum === 'string' && rNum.includes('·')) rNum = rNum.split('·')[0].trim();
-      if (typeof rNum === 'string' && rNum.toLowerCase().includes('room')) rNum = rNum.replace(/room/i, '').trim();
-
-      await Room.findOneAndUpdate(
-        { roomNumber: rNum, propertyId: targetPropId },
-        { status: 'Available' }
-      );
+    const rNum = extractRoomNumber(booking);
+    if (rNum) {
+      await syncRoomStatus(rNum, 'Available', targetPropId);
     }
 
     const io = req.app.get('socketio');

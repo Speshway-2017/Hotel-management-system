@@ -7,6 +7,7 @@ import {
   CheckCircle2, Eye, ArrowLeft 
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
+import { ActionGroup, ViewActionIcon } from "@/components/hs/kit";
 import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/guest/folio")({
@@ -342,17 +343,16 @@ function GuestFolioPage() {
                         {f.paymentStatus}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectFolio(f);
-                        }}
-                        className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-cream text-navy inline-flex items-center justify-center transition-colors cursor-pointer border-none"
-                        title="View Folio Details"
-                      >
-                        <Eye className="size-4" />
-                      </button>
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[80px]" onClick={(e) => e.stopPropagation()}>
+                      <ActionGroup align="right">
+                        <ViewActionIcon
+                          title="View Folio Details"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectFolio(f);
+                          }}
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}
@@ -365,3 +365,5 @@ function GuestFolioPage() {
     </div>
   );
 }
+
+export default GuestFolioPage;

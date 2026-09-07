@@ -1,12 +1,23 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { HorizontalRouteTabs, PageHeader, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import {
+  HorizontalRouteTabs,
+  PageHeader,
+  Notice,
+  LoadingRows,
+  Tag,
+  ActionGroup,
+  ViewActionButton,
+  EditActionButton,
+  ActionButton
+} from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 import {
   Bed,
   Users,
@@ -85,6 +96,7 @@ function RoomsRatesPage() {
   const [activeTab, setActiveTab] = useState("rooms");
   // Core Data States
   const [roomsList, setRoomsList] = useState([]);
+  const [reservationsList, setReservationsList] = useState([]);
 
   const [roomTypesList, setRoomTypesList] = useState(() => {
     const saved = localStorage.getItem("hms_room_types_list_v2");
@@ -166,17 +178,8 @@ function RoomsRatesPage() {
         if (settings.restrictions) setRestrictionsList(settings.restrictions);
       }
 
-      const checkedInRoomNums = new Set();
-      if (resRes && resRes.success && Array.isArray(resRes.data)) {
-        resRes.data
-          .filter(r => r.status === "Checked-in" || r.status === "Checked In")
-          .forEach(r => {
-            const roomVal = String(r.room || r.roomNumber || "");
-            const match = roomVal.match(/\b\d{3,4}\b/);
-            const num = match ? match[0] : roomVal.split("·")[0].split(" ")[0].trim();
-            if (num) checkedInRoomNums.add(num);
-          });
-      }
+      const reservationsData = (resRes && resRes.success && Array.isArray(resRes.data)) ? resRes.data : [];
+      setReservationsList(reservationsData);
 
       let initialRooms = (roomsRes.success && roomsRes.data && roomsRes.data.length > 0)
         ? roomsRes.data
@@ -212,39 +215,7 @@ function RoomsRatesPage() {
         });
       });
 
-      const normalized = initialRooms.map(rm => {
-        const numStr = String(rm.roomNumber || rm.num || '');
-        let cleanStatus = rm.status || 'Available';
-
-        if (checkedInRoomNums.has(numStr)) {
-          cleanStatus = 'Occupied';
-        } else if (cleanStatus === 'Occupied') {
-          cleanStatus = 'Available';
-        }
-        
-        let roomFloor = rm.floor;
-        if (!roomFloor) {
-          const firstDigit = rm.roomNumber ? String(rm.roomNumber).charAt(0) : '';
-          if (firstDigit && !isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
-            roomFloor = `Floor ${firstDigit}`;
-          } else {
-            roomFloor = 'Floor 1';
-          }
-        }
-
-        const actualRate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500);
-
-        return {
-          ...rm,
-          status: cleanStatus,
-          floor: roomFloor,
-          category: rm.category || 'Standard Room',
-          ratePlan: rm.ratePlan || 'Standard Plan',
-          currentRate: actualRate,
-          dailyRate: actualRate,
-          baseRate: actualRate
-        };
-      });
+      const normalized = normalizeRoomList(initialRooms, reservationsData);
       setRoomsList(normalized);
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to load properties and rooms dataset");
@@ -271,13 +242,22 @@ function RoomsRatesPage() {
   const itemsPerPage = 8;
 
   useEffect(() => {
-    loadData(false);
+    loadData(false);
+
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 10000); // 10 seconds polling fallback
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -580,12 +560,13 @@ function RoomsRatesPage() {
   };
 
   // KPI Computations
-  const kpiTotal = roomsList.length;
-  const kpiAvailable = roomsList.filter(r => r.status === "Available").length;
-  const kpiOccupied = roomsList.filter(r => r.status === "Occupied").length;
-  const kpiReserved = 4; // Mock reservations
+  const roomKPIs = calculateRoomKPIs(roomsList, reservationsList);
+  const kpiTotal = roomKPIs.totalRooms;
+  const kpiAvailable = roomKPIs.availableRooms;
+  const kpiOccupied = roomKPIs.occupiedRooms;
+  const kpiReserved = roomKPIs.reservedRooms;
   const kpiBlocked = roomsList.filter(r => r.status === "Blocked").length;
-  const kpiMaintenance = roomsList.filter(r => r.status === "Out of Order" || r.status === "Dirty").length;
+  const kpiMaintenance = roomsList.filter(r => r.status === "Out of Order" || r.status === "Dirty" || r.status === "Maintenance").length;
   const kpiRatePlans = ratePlansList.filter(r => r.status === "Active").length;
 
   // Filter Computations for Rooms inventory table
@@ -749,7 +730,7 @@ function RoomsRatesPage() {
                       <th className="py-4.5 px-4 w-[140px] min-w-[140px]">Active Rate Plan</th>
                       <th className="py-4.5 px-4 w-[130px] min-w-[130px]">Daily Rate</th>
                       <th className="py-4.5 px-4 w-[120px] min-w-[120px]">Status</th>
-                      <th className="py-4.5 px-2 w-[110px] min-w-[110px] text-left">Actions</th>
+                      <th className="py-4.5 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -769,40 +750,26 @@ function RoomsRatesPage() {
                               <span>{meta.label}</span>
                             </Tag>
                           </td>
-                          <td className="py-4 px-2 text-left w-[110px] min-w-[110px]">
-                            <div className="flex items-center justify-start gap-1 select-none opacity-85 group-hover:opacity-100 transition-opacity">
-                              <Button
+                          <td className="py-4 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
+                            <ActionGroup align="left">
+                              <ViewActionButton
                                 onClick={() => navigate({ to: `/admin/rooms/view/${rm._id || rm.id || rm.roomNumber}` })}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 hover:text-[#4f46e5] cursor-pointer"
-                                title="View Specifications"
-                              >
-                                <Eye className="size-3.5" />
-                              </Button>
-                              <Button
+                              />
+                              <ActionButton
+                                icon={Sliders}
+                                label="Status"
+                                title="Change Room Status"
+                                variant="warning"
                                 onClick={() => {
                                   setSelectedItem(rm);
                                   setFormRoomStatus(rm.status);
                                   setIsChangeStatusOpen(true);
                                 }}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 hover:text-success cursor-pointer"
-                                title="Override Status"
-                              >
-                                <Sliders className="size-3.5" />
-                              </Button>
-                              <Button
+                              />
+                              <EditActionButton
                                 onClick={() => navigate({ to: `/admin/rooms/edit/${rm._id || rm.id || rm.roomNumber}` })}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 hover:text-brand cursor-pointer"
-                                title="Edit Configuration"
-                              >
-                                <Edit2 className="size-3.5" />
-                              </Button>
-                            </div>
+                              />
+                            </ActionGroup>
                           </td>
                         </tr>
                       );

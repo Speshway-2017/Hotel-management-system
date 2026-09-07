@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import {
@@ -9,7 +9,6 @@ import {
   Calendar,
   User,
   CreditCard,
-  ChevronLeft,
   DollarSign,
   Briefcase,
   AlertCircle,
@@ -126,15 +125,18 @@ function ManagerViewBilling() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view invoice details for this property. Scoped hotel access only.
         </Notice>
-        <Link to="/manager/billing" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Billing Overview
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans">
+      <Crumbs
+        items={[
+          { label: "Billing & Finance", to: "/manager/billing" },
+          { label: invoice ? `Folio ${invoice.id}` : "Billing Details" }
+        ]}
+      />
 
       <PageHeader
         title={invoice ? `Folio ${invoice.id}` : "Billing Details"}

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
-import { superAdminService } from "@/services/superAdmin";
+import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Clock, UserCheck, ThumbsUp } from "lucide-react";
 
@@ -18,22 +18,37 @@ function ViewStaff() {
       setLoading(true);
       setError(null);
       try {
-        const res = await superAdminService.getUsers();
-        if (res.success) {
-          const match = res.data.find(u => u._id === id || u.id === id);
-          if (match) {
-            // Re-map or mock the custom UI properties if they aren't explicitly on schema
-            setSelectedStaff({
-              ...match,
-              empId: match.id || match._id,
-              dept: match.dept || "Front Desk",
-              shift: match.shift || "Morning (06:00 - 14:00)",
-              attendance: match.attendance || "96.5% Present",
-              rating: match.rating || "4.8 / 5.0"
-            });
-          } else {
-            setError("Employee profile not found.");
+        let match = null;
+
+        try {
+          const directRes = await adminService.getStaffMember(id);
+          if (directRes && (directRes.success || directRes.data)) {
+            match = directRes.data || directRes;
           }
+        } catch {}
+
+        if (!match) {
+          const res = await adminService.getStaff();
+          const list = Array.isArray(res) ? res : (res?.data || []);
+          match = list.find(u => 
+            String(u._id) === String(id) || 
+            String(u.id) === String(id) || 
+            String(u.email).toLowerCase() === String(id).toLowerCase()
+          );
+        }
+
+        if (match) {
+          setSelectedStaff({
+            ...match,
+            empId: match.id || match._id || id,
+            dept: match.dept || match.department || "Front Desk",
+            shift: match.shift || "Morning (06:00 - 14:00)",
+            attendance: match.attendance || "96.5% Present",
+            rating: match.rating || "4.8 / 5.0"
+          });
+          setError(null);
+        } else {
+          setError("Employee profile not found.");
         }
       } catch (err) {
         setError(err.message || "Failed to load employee details.");

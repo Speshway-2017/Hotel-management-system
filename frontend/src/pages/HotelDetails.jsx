@@ -228,8 +228,8 @@ export function HotelDetailsPage() {
                   </div>
                 </div>
 
-                <h1 className="font-display text-3xl sm:text-4xl font-bold text-navy">{hotelName}</h1>
-                <p className="text-xs sm:text-sm text-navy/60 flex items-center gap-1.5 mt-2">
+                <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">{hotelName}</h1>
+                <p className="text-xs sm:text-sm text-[#4A4F58] flex items-center gap-1.5 mt-2">
                   <MapPin className="size-4 text-purple shrink-0" />
                   <span>{fullLocation}</span>
                 </p>
@@ -286,13 +286,13 @@ export function HotelDetailsPage() {
               
               {/* About Hotel */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">About Property</h2>
-                <p className="text-xs sm:text-sm text-navy/75 leading-relaxed">{description}</p>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">About Property</h2>
+                <p className="text-xs sm:text-sm text-[#4A4F58] leading-relaxed font-ui">{description}</p>
               </div>
 
               {/* Property Amenities */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">Hotel Amenities</h2>
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Hotel Amenities</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {amenitiesList.map((a, i) => (
                     <div key={i} className="flex items-center gap-2.5 p-3 rounded-xl bg-cream/40 border border-navy/5 text-xs text-navy font-semibold">
@@ -307,8 +307,8 @@ export function HotelDetailsPage() {
               <div className="space-y-6 font-ui text-left">
                 <div className="flex justify-between items-center border-b border-navy/5 pb-3">
                   <div>
-                    <h2 className="font-display text-2xl font-bold text-navy">Available Rooms</h2>
-                    <p className="text-xs text-navy/60">Configured room types and live tariffs fetched from MongoDB</p>
+                    <h2 className="font-display text-2xl sm:text-3xl font-bold text-navy">Available Rooms</h2>
+                    <p className="text-xs sm:text-sm text-[#4A4F58] font-ui">Configured room types and live tariffs fetched from MongoDB</p>
                   </div>
                   {roomTypeCards.length > 0 && (
                     <span className="text-xs font-bold text-purple bg-purple/10 px-3.5 py-1 rounded-full border border-purple/20">
@@ -321,7 +321,7 @@ export function HotelDetailsPage() {
                   <div className="bg-white rounded-2xl p-12 text-center border border-navy/5 shadow-soft">
                     <Bed className="size-10 text-navy/30 mx-auto mb-3" />
                     <h3 className="font-display text-lg font-bold text-navy">No Rooms Currently Available</h3>
-                    <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">There are no active room configurations available for this property at the moment.</p>
+                    <p className="text-xs text-[#4A4F58] max-w-sm mx-auto mt-1 font-ui">There are no active room configurations available for this property at the moment.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -372,7 +372,7 @@ export function HotelDetailsPage() {
                                   <h3 className="font-display text-lg font-bold text-navy leading-snug">
                                     {type.category}
                                   </h3>
-                                  <div className="flex items-center gap-2.5 text-xs text-navy/60 mt-1 flex-wrap font-medium">
+                                  <div className="flex items-center gap-2.5 text-xs text-[#4A4F58] mt-1 flex-wrap font-medium">
                                     <span className="flex items-center gap-1">
                                       <Bed className="size-3.5 text-purple shrink-0" />
                                       <span>{type.beds}</span>
@@ -389,11 +389,11 @@ export function HotelDetailsPage() {
                                   <span className="font-display text-xl font-bold text-navy block leading-none">
                                     {inr(type.price)}
                                   </span>
-                                  <span className="text-[10px] text-navy/50 font-bold block mt-0.5">/ night + 18% GST</span>
+                                  <span className="text-[10px] text-[#4A4F58] font-bold block mt-0.5">/ night + 18% GST</span>
                                 </div>
                               </div>
 
-                              <p className="text-xs text-navy/70 leading-relaxed line-clamp-2 pt-1">
+                              <p className="text-xs text-[#4A4F58] leading-relaxed line-clamp-2 pt-1 font-ui">
                                 {type.description}
                               </p>
 
@@ -459,7 +459,7 @@ export function HotelDetailsPage() {
                   <FileText className="size-4 text-purple" />
                   <span>Policies & Guidelines</span>
                 </h3>
-                <div className="space-y-3 text-xs text-navy/70 leading-relaxed">
+                <div className="space-y-3 text-xs text-[#4A4F58] leading-relaxed font-ui">
                   <div>
                     <strong className="text-navy font-bold block mb-0.5">Cancellation Policy:</strong>
                     <span>{cancelPolicy}</span>

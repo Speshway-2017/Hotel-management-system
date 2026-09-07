@@ -30,7 +30,6 @@ import { Route as AdminDashboard } from "./roles/admin/pages/Dashboard";
 import { Route as AdminApprovals } from "./roles/admin/pages/Approvals";
 import { Route as AdminBilling } from "./roles/admin/pages/Billing";
 import { Route as AdminChannels } from "./roles/admin/pages/Channels";
-import { Route as AdminFrontDesk } from "./roles/admin/pages/FrontDesk";
 import { Route as AdminGuests } from "./roles/admin/pages/Guests";
 import { Route as AdminAddGuest } from "./roles/admin/pages/AddGuest";
 import { Route as AdminEditGuest } from "./roles/admin/pages/EditGuest";
@@ -65,8 +64,6 @@ import { Route as AdminAddReservation } from "./roles/admin/pages/AddReservation
 import { Route as AdminEditReservation } from "./roles/admin/pages/EditReservation";
 import { Route as AdminViewReservation } from "./roles/admin/pages/ViewReservation";
 import { Route as AdminExtendReservation } from "./roles/admin/pages/ExtendReservation";
-import { Route as AdminAssignRoomDesk } from "./roles/admin/pages/AssignRoomDesk";
-import { Route as AdminCollectPaymentDesk } from "./roles/admin/pages/CollectPaymentDesk";
 import { Route as AdminCheckInDetails } from "./roles/admin/pages/CheckInDetails";
 
 // Import Manager Workspace Pages
@@ -277,11 +274,6 @@ export default function App() {
             <Route path="/admin/approvals" element={<RouteWrapper routeObj={AdminApprovals} />} />
             <Route path="/admin/billing" element={<RouteWrapper routeObj={AdminBilling} />} />
             <Route path="/admin/channels" element={<RouteWrapper routeObj={AdminChannels} />} />
-            <Route path="/admin/front-desk" element={<RouteWrapper routeObj={AdminFrontDesk} />} />
-            <Route path="/admin/front-desk/assign/:id" element={<RouteWrapper routeObj={AdminAssignRoomDesk} />} />
-            <Route path="/admin/front-desk/assign" element={<RouteWrapper routeObj={AdminAssignRoomDesk} />} />
-            <Route path="/admin/front-desk/payment/:id" element={<RouteWrapper routeObj={AdminCollectPaymentDesk} />} />
-            <Route path="/admin/front-desk/payment" element={<RouteWrapper routeObj={AdminCollectPaymentDesk} />} />
             <Route path="/admin/guests" element={<RouteWrapper routeObj={AdminGuests} />} />
             <Route path="/admin/guests/add" element={<RouteWrapper routeObj={AdminAddGuest} />} />
             <Route path="/admin/guests/edit/:id" element={<RouteWrapper routeObj={AdminEditGuest} />} />

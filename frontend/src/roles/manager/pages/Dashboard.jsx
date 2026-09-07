@@ -18,6 +18,7 @@ import {
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -134,13 +135,22 @@ function ManagerDashboard() {
   };
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData();
+
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 10000); // 10s poll fallback
+
+    const handleFocus = () => loadDashboardData();
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDashboardData();
     });
 
-    return () => {
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -193,10 +203,10 @@ function ManagerDashboard() {
   const pendingCheckins = activeBookings.filter(b => isToday(b.checkIn) && (b.status === "Confirmed" || b.status === "Pending" || b.status === "Pre-checked"));
   const pendingCheckouts = activeBookings.filter(b => isToday(b.checkOut) && (b.status === "Checked-in" || b.status === "Checked In" || b.status === "Staying"));
 
-  // Occupancy, ADR, RevPAR computations
-  const totalRooms = rooms.length > 0 ? rooms.length : (property.rooms || 12);
-  const rawOccupancy = totalRooms > 0 ? (currentStays.length / totalRooms) * 100 : 0;
-  const occupancyPercent = Math.round(rawOccupancy);
+  // Dynamic Occupancy, ADR, RevPAR computations using shared KPI helper
+  const roomKPIs = calculateRoomKPIs(rooms, bookings);
+  const totalRooms = roomKPIs.totalRooms;
+  const occupancyPercent = roomKPIs.occupancyRate;
   
   const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
   const adrValue = activeBookings.length > 0 ? Math.round(totalRevenue / activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0)) : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0);

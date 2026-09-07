@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
-import { User, Mail, Phone, Building, Calendar, ArrowLeft, ShieldCheck, Sparkles } from "lucide-react";
+import { User, Mail, Phone, Building, Calendar, ShieldCheck, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/super-admin/users/view/$id")({
   head: () => ({
@@ -84,21 +84,17 @@ function ViewGuest() {
 
   return (
     <div className="space-y-6 text-left font-ui">
-      <div className="flex items-center justify-between">
-        <PageHeader
-          title={guest ? `Guest Profile: ${guest.name}` : "Guest Profile"}
-          subtitle="Verified guest account details, contact coordinates, and lifetime visit metrics."
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate({ to: "/super-admin/users" })}
-          className="rounded-full text-xs font-semibold cursor-pointer"
-        >
-          <ArrowLeft className="size-3.5 mr-1.5" />
-          Back to Directory
-        </Button>
-      </div>
+      <Crumbs
+        items={[
+          { label: "Guests Directory", to: "/super-admin/users" },
+          { label: guest ? guest.name : "Guest Profile" }
+        ]}
+      />
+
+      <PageHeader
+        title={guest ? `Guest Profile: ${guest.name}` : "Guest Profile"}
+        subtitle="Verified guest account details, contact coordinates, and lifetime visit metrics."
+      />
 
       {error && <Notice tone="error" title="Profile Notice">{error}</Notice>}
 

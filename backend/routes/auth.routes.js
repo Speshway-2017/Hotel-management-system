@@ -184,39 +184,71 @@ router.post('/reset-password', async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 router.get('/profile', protect, async (req, res) => {
-  return sendSuccess(res, 200, req.user, 'Profile details retrieved');
+  const user = req.user;
+  return sendSuccess(res, 200, {
+    id: user.id || user._id,
+    _id: user.id || user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    mobile: user.mobile || user.phone || '',
+    phone: user.mobile || user.phone || '',
+    status: user.status || 'Active',
+    propertyId: user.propertyId || null,
+    avatar: user.avatar || null,
+    dept: user.dept || 'Front Desk',
+    shift: user.shift || 'Morning (06:00 - 14:00)'
+  }, 'Profile details retrieved');
 });
 
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private
 router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
-  const { name, mobile } = req.body;
+  const { name, mobile, avatar, phone } = req.body;
   const updateData = {};
   if (name !== undefined) updateData.name = name;
   if (mobile !== undefined) updateData.mobile = mobile;
+  if (phone !== undefined && mobile === undefined) updateData.mobile = phone;
 
   try {
     if (req.file) {
       const uploadResult = await uploadImageToCloudinary(req.file.path);
       updateData.avatar = uploadResult.url;
+    } else if (avatar !== undefined) {
+      updateData.avatar = avatar;
     }
 
     const userId = req.user._id || req.user.id;
-    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
+    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    const updatedUser = await User.findOneAndUpdate({ $or: query }, updateData, { new: true });
     if (!updatedUser) {
       return sendError(res, 404, 'User not found');
     }
 
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_updated', updatedUser);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'profile_updated', id: userId });
+    }
+
     return sendSuccess(res, 200, {
       id: updatedUser.id || updatedUser._id,
+      _id: updatedUser.id || updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
-      mobile: updatedUser.mobile,
+      mobile: updatedUser.mobile || '',
+      phone: updatedUser.mobile || '',
       status: updatedUser.status,
       propertyId: updatedUser.propertyId || null,
-      avatar: updatedUser.avatar || null
+      avatar: updatedUser.avatar || null,
+      dept: updatedUser.dept || 'Front Desk',
+      shift: updatedUser.shift || 'Morning (06:00 - 14:00)'
     }, 'Profile updated successfully');
   } catch (error) {
     console.error('Update Profile Error:', error);

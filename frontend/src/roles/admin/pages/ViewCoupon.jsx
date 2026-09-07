@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createFileRoute, useNavigate, useParams, Link } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
@@ -11,7 +11,6 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  ArrowLeft,
   CheckCircle2,
   Tag as TagIcon,
   Flame,
@@ -100,29 +99,20 @@ export function ViewCouponPage() {
   if (error || !coupon) {
     return (
       <div className="space-y-6 text-left pb-16">
+        <Crumbs
+          items={[
+            { label: "Coupons", to: "/admin/coupons" },
+            { label: "Coupon Details" }
+          ]}
+        />
         <PageHeader
           title="Coupon Details"
           subtitle="View promotional campaign parameters"
-          actions={
-            <Button
-              onClick={() => navigate({ to: "/admin/coupons" })}
-              variant="outline"
-              className="rounded-full text-xs font-bold gap-2 cursor-pointer"
-            >
-              <ArrowLeft className="size-4" /> Back to Coupons
-            </Button>
-          }
         />
         <div className="p-8 bg-white rounded-2xl border border-rose-200 text-center shadow-soft">
           <AlertCircle className="size-10 text-rose-500 mx-auto mb-3" />
           <h3 className="font-display text-lg font-bold text-navy">Unable to Load Coupon</h3>
           <p className="text-xs text-rose-600 mt-1">{error || "Coupon record not found."}</p>
-          <Button
-            onClick={() => navigate({ to: "/admin/coupons" })}
-            className="mt-4 bg-navy text-white rounded-full text-xs font-bold px-4 h-9 cursor-pointer"
-          >
-            Return to Coupons List
-          </Button>
         </div>
       </div>
     );
@@ -138,19 +128,19 @@ export function ViewCouponPage() {
 
   return (
     <div className="space-y-6 text-left pb-16">
-      {/* 1. Page Header with Back & Edit Actions */}
+      <Crumbs
+        items={[
+          { label: "Coupons", to: "/admin/coupons" },
+          { label: coupon ? coupon.code : "Coupon Details" }
+        ]}
+      />
+
+      {/* 1. Page Header with Edit Action */}
       <PageHeader
         title={`Coupon: ${coupon.code}`}
         subtitle="Full operational parameters, discount rules, and usage ledger."
         actions={
           <div className="flex items-center gap-2.5">
-            <Button
-              onClick={() => navigate({ to: "/admin/coupons" })}
-              variant="outline"
-              className="rounded-full text-xs font-bold gap-1.5 h-10 px-4 cursor-pointer"
-            >
-              <ArrowLeft className="size-4" /> Back to Coupons
-            </Button>
             <Button
               onClick={() => navigate({ to: `/admin/coupons/edit/${couponId}` })}
               className="bg-navy hover:bg-navy/90 text-white rounded-full font-bold shadow-soft hover:shadow-lift transition-all px-5 h-10 gap-2 cursor-pointer"

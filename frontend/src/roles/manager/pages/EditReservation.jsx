@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { superAdminService } from "@/services/superAdmin";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
-import { ChevronLeft } from "lucide-react";
 
 function ManagerEditReservation() {
   const params = useParams() || {};
@@ -193,18 +192,17 @@ function ManagerEditReservation() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">
-      <div className="flex items-center gap-3">
-        <Link
-          to="/manager/reservations"
-          className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer"
-        >
-          <ChevronLeft className="size-4" />
-        </Link>
-        <PageHeader
-          title={`Modify Reservation: ${guest || id}`}
-          subtitle="Adjust room allocation, stay dates, guest folio, tariffs, and distribution parameters."
-        />
-      </div>
+      <Crumbs
+        items={[
+          { label: "Reservations", to: "/manager/reservations" },
+          { label: `Modify Reservation: ${guest || id}` }
+        ]}
+      />
+
+      <PageHeader
+        title={`Modify Reservation: ${guest || id}`}
+        subtitle="Adjust room allocation, stay dates, guest folio, tariffs, and distribution parameters."
+      />
 
       {error && <Notice tone="error" title="Synchronization Warning">{error}</Notice>}
 

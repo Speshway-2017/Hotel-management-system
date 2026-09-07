@@ -13,6 +13,7 @@ import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitt
 import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { calculateStayNights, parseDateSafe } from '../utils/dateUtils.js';
+import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 
 const router = express.Router();
 
@@ -480,15 +481,22 @@ router.post('/bookings', async (req, res) => {
       status: 'Confirmed'
     });
 
+    // Mark assigned room as Reserved in MongoDB
+    if (assignedRoomNumber) {
+      await syncRoomStatus(assignedRoomNumber, 'Reserved', targetPropId);
+    }
+
     // Notify Realtime (Socket.io) across all dashboards and guest view
     const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, targetPropId, {
-        action: 'status_change',
+        action: 'booking_created',
         booking: newBooking,
         roomNumber: assignedRoomNumber,
         status: 'Confirmed'
       });
+      emitRealtimeSync(io, targetPropId, 'booking_created', { booking: newBooking, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'booking_created' });
     }
 
     // Trigger Notifications

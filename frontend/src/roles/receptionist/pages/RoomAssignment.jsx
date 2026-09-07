@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, ActionGroup, ActionButton, DetailsActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { receptionistService } from "@/services/receptionist";
@@ -326,54 +326,43 @@ function RoomStatusPage() {
                   </span>
 
                   {/* Actions list */}
-                  <div className="flex items-center gap-1 whitespace-nowrap select-none">
-                    
+                  <ActionGroup align="right">
                     {rm.housekeeping === "Dirty" && (
-                      <Button
-                        size="xs"
-                        variant="outline"
+                      <ActionButton
+                        icon={Sparkles}
+                        label="Clean"
+                        variant="success"
                         onClick={() => handleMarkClean(rm.room)}
-                        className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                         title="Mark Clean"
-                      >
-                        Clean
-                      </Button>
+                      />
                     )}
 
                     {rm.housekeeping === "Clean" && (
-                      <Button
-                        size="xs"
-                        variant="outline"
+                      <ActionButton
+                        icon={CheckCircle2}
+                        label="Inspect"
+                        variant="info"
                         onClick={() => handleMarkInspected(rm.room)}
-                        className="text-sky-700 border-sky-300 hover:bg-sky-50 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                         title="Approve Inspection"
-                      >
-                        Inspect
-                      </Button>
+                      />
                     )}
 
                     {rm.status !== "Out of Order" && rm.status !== "Occupied" && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
+                      <ActionButton
+                        icon={Wrench}
+                        label="OOO"
+                        variant="danger"
                         onClick={() => handleMarkOutOfOrder(rm.room)}
-                        className="text-rose-600 hover:bg-rose-50 border border-rose-200 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors"
                         title="Mark Out of Order"
-                      >
-                        OOO
-                      </Button>
+                      />
                     )}
 
-                    <Button
+                    <DetailsActionButton
                       asChild
-                      size="xs"
-                      variant="outline"
-                      className="text-navy border-navy/30 hover:bg-navy/5 h-6 px-2 text-[9px] font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
                     >
                       <Link to={`/reception/room-assignment/${rm.room}`}>Details</Link>
-                    </Button>
-
-                  </div>
+                    </DetailsActionButton>
+                  </ActionGroup>
 
                 </div>
 

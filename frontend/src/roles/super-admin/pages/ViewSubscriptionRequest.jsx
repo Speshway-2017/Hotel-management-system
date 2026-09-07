@@ -1,13 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Building,
   Calendar,
   CreditCard,
@@ -88,22 +87,17 @@ export function ViewSubscriptionRequest() {
 
   return (
     <div className="space-y-6 text-left font-ui">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <PageHeader
-          title={requestItem ? `Subscription Request: ${requestItem.propertyName}` : "Subscription Request"}
-          subtitle="Review plan tier upgrade/renewal details and grant workspace access."
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate({ to: "/super-admin/subscription" })}
-          className="rounded-full text-xs font-semibold cursor-pointer"
-        >
-          <ArrowLeft className="size-3.5 mr-1.5" />
-          Back to Plans & Billing
-        </Button>
-      </div>
+      <Crumbs
+        items={[
+          { label: "Plans & Billing", to: "/super-admin/subscription" },
+          { label: requestItem ? `Request #${requestItem.id || id}` : "Subscription Request" }
+        ]}
+      />
+
+      <PageHeader
+        title={requestItem ? `Subscription Request: ${requestItem.propertyName}` : "Subscription Request"}
+        subtitle="Review plan tier upgrade/renewal details and grant workspace access."
+      />
 
       {error && <Notice tone="error" title="Request Notice">{error}</Notice>}
 

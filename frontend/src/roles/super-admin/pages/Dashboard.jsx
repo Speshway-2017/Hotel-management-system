@@ -114,13 +114,20 @@ function SuperAdminDashboard() {
   useEffect(() => {
     loadDashboardData(false);
 
-    const handleFocus = () => loadDashboardData(true);
+    const interval = setInterval(() => {
+      loadDashboardData(true);
+    }, 10000); // 10s poll fallback
+
+    const handleFocus = () => loadDashboardData(true);
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadDashboardData(true);
     });
 
-    return () => {
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);

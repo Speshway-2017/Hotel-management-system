@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton, EditActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -273,7 +273,7 @@ function ManagerShiftsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[1050px]">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
                   <th className="py-4.5 px-6">Staff Name</th>
@@ -283,7 +283,7 @@ function ManagerShiftsPage() {
                   <th className="py-4.5 px-4">Assigned Shift</th>
                   <th className="py-4.5 px-4">Shift Timing</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-6 text-right">Actions</th>
+                  <th className="py-4.5 px-6 text-right min-w-[240px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -322,40 +322,30 @@ function ManagerShiftsPage() {
                           {s.status}
                         </Tag>
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5 select-none">
-                          <Button
-                            onClick={() => navigate({ to: `/manager/staff/view/${btoa(targetId)}` })}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 hover:text-brand cursor-pointer"
+                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[240px]">
+                        <ActionGroup align="right">
+                          <ViewActionButton
+                            onClick={() => navigate({ to: `/manager/staff/view/${targetId}`, state: { member: s } })}
                             title="View Staff Profile"
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
+                          />
 
-                          <Button
-                            onClick={() => navigate({ to: `/manager/staff/edit/${btoa(targetId)}` })}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 hover:text-brand cursor-pointer"
+                          <EditActionButton
+                            onClick={() => navigate({ to: `/manager/staff/edit/${targetId}`, state: { member: s } })}
                             title="Edit Staff Profile"
-                          >
-                            <Edit className="size-3.5" />
-                          </Button>
+                          />
                           
                           {/* Reassign Shift dropdown */}
                           <Select
                             value={s.assignedShift}
                             onChange={(e) => handleShiftChange(targetId, e.target.value)}
-                            className="w-32 text-[9px] h-6 py-0 font-bold ml-1.5"
+                            className="w-32 text-[10px] h-7 py-0 font-bold ml-1 rounded-lg border border-muted shadow-2xs"
                           >
                             <option value="Morning Shift">Morning Shift</option>
                             <option value="Afternoon Shift">Afternoon Shift</option>
                             <option value="Night Shift">Night Shift</option>
                             <option value="General Shift">General Shift</option>
                           </Select>
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

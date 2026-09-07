@@ -59,10 +59,16 @@ export const Attendance = mongoose.models.Attendance || mongoose.model('Attendan
 // APPROVAL REQUEST MODEL
 // ==========================================
 const approvalSchema = new mongoose.Schema({
+  id: { type: String },
   category: { type: String, required: true },
   requestedBy: { type: String, required: true },
+  guest: { type: String, default: '' },
+  bookingId: { type: String, default: '' },
+  room: { type: String, default: '' },
   amount: { type: Number, default: 0 },
+  value: { type: String, default: '' },
   reason: { type: String, required: true },
+  description: { type: String, default: '' },
   status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
   propertyId: { type: String, required: true },
   decisionReason: { type: String, default: '' },
