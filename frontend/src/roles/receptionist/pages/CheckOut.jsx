@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { receptionistService } from "@/services/receptionist";
 import { 
@@ -51,6 +51,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 }
 
 function DeparturesPage() {
+  const navigate = useNavigate();
   const todayStr = formatDisplayDate(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -210,9 +211,9 @@ function DeparturesPage() {
       {/* Departures Table */}
       <Panel title="Departures & Folio Settlement Ledger" description="Real-time tracking of scheduled check-outs, outstanding folio bills, and room release flags.">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[900px]">
+          <table className="w-full text-left text-xs min-w-[1100px]">
             <thead>
-              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none whitespace-nowrap">
                 <th className="py-3.5 px-4">Room No</th>
                 <th className="py-3.5 px-4">Guest Name</th>
                 <th className="py-3.5 px-4">Booking ID</th>
@@ -222,7 +223,7 @@ function DeparturesPage() {
                 <th className="py-3.5 px-4">Folio Balance</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Release Status</th>
-                <th className="py-3.5 px-4">Actions</th>
+                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -268,8 +269,8 @@ function DeparturesPage() {
                         {guest.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
+                      <ActionGroup align="right">
                         {guest.status !== "Checked Out" && guest.status !== "Checked-out" && (
                           <>
                             <ExtendStayButton
@@ -279,42 +280,24 @@ function DeparturesPage() {
                               onClick={() => navigate(`/reception/reservations/extend/${guest.id || guest._id || guest.bookingId}`)}
                             />
                             {guest.balance > 0 ? (
-                              <Button
-                                asChild
-                                size="xs"
-                                variant="outline"
-                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                              >
-                                <Link to={`/reception/check-out/${guest.id || guest._id}`}>
-                                  Collect & Check-Out
-                                </Link>
-                              </Button>
+                              <CheckOutActionButton
+                                label="Collect & Out"
+                                onClick={() => navigate(`/reception/check-out/${guest.id || guest._id}`)}
+                              />
                             ) : (
-                              <Button
-                                size="xs"
-                                variant="outline"
+                              <CheckOutActionButton
                                 onClick={() => handleCheckOut(guest.id || guest._id)}
-                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                              >
-                                Check-Out
-                              </Button>
+                              />
                             )}
                           </>
                         )}
                         
-                        {/* View Folio / Details Ghost Icon Button */}
-                        <Button
-                          asChild
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 text-navy/70 hover:text-brand hover:bg-brand/10 rounded-lg cursor-pointer transition-colors"
+                        {/* View Folio / Details */}
+                        <ViewActionButton
+                          onClick={() => navigate(`/reception/reservations/${guest.id || guest._id}`)}
                           title="View Folio / Reservation"
-                        >
-                          <Link to={`/reception/reservations/${guest.id || guest._id}`}>
-                            <Eye className="size-3.5" />
-                          </Link>
-                        </Button>
-                      </div>
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))

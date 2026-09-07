@@ -129,9 +129,9 @@ function About() {
           <div className="grid gap-8 lg:grid-cols-12">
             <div className="lg:col-span-4">
               <span className="text-xs font-bold uppercase tracking-widest text-purple">The Journey</span>
-              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy">Our Story</h2>
+              <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">Our Story</h2>
             </div>
-            <div className="lg:col-span-8 space-y-6 text-base text-muted-foreground font-ui leading-relaxed">
+            <div className="lg:col-span-8 space-y-6 text-base text-[#4A4F58] font-ui leading-relaxed">
               {aboutData.story.split("\n\n").map((para, i) => (
                 <p key={i}>{para}</p>
               ))}
@@ -147,14 +147,14 @@ function About() {
             <div className="bg-white border rounded-2xl p-6 sm:p-8 shadow-soft">
               <span className="text-xs font-bold uppercase tracking-widest text-purple">Purpose</span>
               <h3 className="mt-2 font-display text-xl font-bold text-navy">Our Mission</h3>
-              <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed font-ui font-medium">
+              <p className="mt-3 text-xs sm:text-sm text-[#4A4F58] leading-relaxed font-ui font-medium">
                 {aboutData.mission}
               </p>
             </div>
             <div className="bg-white border rounded-2xl p-6 sm:p-8 shadow-soft">
               <span className="text-xs font-bold uppercase tracking-widest text-purple">Future</span>
               <h3 className="mt-2 font-display text-xl font-bold text-navy">Our Vision</h3>
-              <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed font-ui font-medium">
+              <p className="mt-3 text-xs sm:text-sm text-[#4A4F58] leading-relaxed font-ui font-medium">
                 {aboutData.vision}
               </p>
             </div>
@@ -167,7 +167,7 @@ function About() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Core Pillars</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Why Indian hotels run on Hour Stay
             </h2>
           </div>
@@ -212,7 +212,7 @@ function About() {
                     <PillarIcon className="size-5" />
                   </span>
                   <h3 className="font-display text-lg font-bold text-navy">{p.title}</h3>
-                  <p className="mt-2 text-xs sm:text-sm text-muted-foreground font-ui leading-relaxed">{p.desc}</p>
+                  <p className="mt-2 text-xs sm:text-sm text-[#4A4F58] font-ui leading-relaxed">{p.desc}</p>
                 </div>
               );
             })}
@@ -225,7 +225,7 @@ function About() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Engineered For Scale</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Powering diverse property structures
             </h2>
           </div>
@@ -244,7 +244,7 @@ function About() {
                   <h3 className="absolute bottom-4 left-4 font-display text-lg font-bold text-cream">{cat.label}</h3>
                 </div>
                 <div className="p-4 text-left font-ui">
-                  <p className="text-xs text-muted-foreground leading-relaxed">{cat.desc}</p>
+                  <p className="text-xs text-[#4A4F58] leading-relaxed">{cat.desc}</p>
                 </div>
               </div>
             ))}
@@ -257,10 +257,10 @@ function About() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Operational Cycle</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               One platform, every operation
             </h2>
-            <p className="mt-4 mx-auto max-w-2xl text-sm text-muted-foreground font-ui">
+            <p className="mt-4 mx-auto max-w-2xl text-base text-[#4A4F58] font-ui leading-relaxed">
               See how reservations, front desk check-in, housekeeping tasks, billing invoices, and guest experience components link together in one closed loop.
             </p>
           </div>
@@ -281,7 +281,7 @@ function About() {
                     <ItemIcon className="size-5" />
                   </span>
                   <h4 className="text-sm font-bold text-navy">{item.label}</h4>
-                  <p className="mt-1 text-[11px] text-muted-foreground leading-normal">{item.desc}</p>
+                  <p className="mt-1 text-[11px] text-[#4A4F58] leading-normal">{item.desc}</p>
                 </div>
               );
             })}

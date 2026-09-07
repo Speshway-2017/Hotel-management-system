@@ -28,6 +28,8 @@ function getAdditionalNights(currentOutStr, newOutStr) {
   return Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
 }
 
+const inr = (val) => "₹" + Math.round(Number(val || 0)).toLocaleString("en-IN");
+
 /**
  * Reusable, Redesigned Extend Stay Button
  * Used across Admin, Manager, and Receptionist views
@@ -133,17 +135,26 @@ export function ExtendStayButton({
     );
   }
 
-  // Default: "table" sleek pill badge button
+  // Default: "table" sleek icon button (icon-only size-7 with tooltip)
+  const tooltipTitle = title || "Extend Stay";
   return (
     <button
       type="button"
       onClick={handleClick}
       disabled={disabled}
-      title={title}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50/90 text-indigo-700 border border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer group select-none whitespace-nowrap ${className}`}
+      title={tooltipTitle}
+      aria-label={tooltipTitle}
+      className={`size-7 w-7 h-7 min-w-7 min-h-7 max-w-7 max-h-7 p-0 rounded-lg border text-xs font-bold leading-none font-ui select-none shrink-0 shadow-2xs transition-colors duration-150 cursor-pointer bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 inline-flex items-center justify-center ${className}`}
+      style={{
+        width: "28px",
+        height: "28px",
+        minWidth: "28px",
+        minHeight: "28px",
+        maxWidth: "28px",
+        maxHeight: "28px"
+      }}
     >
-      <CalendarPlus className="size-3.5 text-indigo-500 group-hover:text-white transition-colors" />
-      <span>{label === "Extend Stay" ? "Extend" : label}</span>
+      <CalendarPlus className="size-3.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 shrink-0" />
     </button>
   );
 }
@@ -155,12 +166,14 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
   const [submitting, setSubmitting] = useState(false);
   const [notes, setNotes] = useState("");
 
+  const currentCheckOut = booking?.checkOut || formatDateToYYYYMMDD(new Date());
+  const currentOutDate = new Date(currentCheckOut);
+  const minDate = formatDateToYYYYMMDD(currentOutDate);
+
   useEffect(() => {
     if (booking && isOpen) {
-      const currentOut = booking.checkOut ? new Date(booking.checkOut) : new Date();
-      // Default to next day
-      const nextDay = new Date(currentOut.getTime() + 24 * 60 * 60 * 1000);
-      setNewCheckOutDate(formatDateToYYYYMMDD(nextDay));
+      const baseDate = booking.checkOut ? formatDateToYYYYMMDD(new Date(booking.checkOut)) : formatDateToYYYYMMDD(new Date());
+      setNewCheckOutDate(baseDate);
 
       // Calculate approximate daily base rate
       const totalAmount = Number(booking.amount || booking.totalAmount || 3000);
@@ -168,16 +181,12 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
       const avgNightWithTax = totalAmount / Math.max(1, totalNights);
       // Remove 18% GST to get base rate
       const baseDailyRate = Math.round(avgNightWithTax / 1.18);
-      setDailyRate(baseDailyRate > 0 ? baseDailyRate : 2500);
+      setDailyRate(baseDailyRate > 0 ? baseDailyRate : 3000);
       setNotes("");
     }
   }, [booking, isOpen]);
 
   if (!isOpen || !booking) return null;
-
-  const currentCheckOut = booking.checkOut || formatDateToYYYYMMDD(new Date());
-  const currentOutDate = new Date(currentCheckOut);
-  const minDate = formatDateToYYYYMMDD(new Date(currentOutDate.getTime() + 24 * 60 * 60 * 1000));
   
   const additionalNights = getAdditionalNights(currentCheckOut, newCheckOutDate);
   const roomCharges = dailyRate * additionalNights;
@@ -191,7 +200,7 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
 
   const handleConfirmExtend = async () => {
     if (additionalNights <= 0) {
-      toast.error("New check-out date must be after current check-out date.");
+      toast.error("Please select a new check-out date after current check-out.");
       return;
     }
 
@@ -256,25 +265,25 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
   const roomNumber = booking.room || booking.roomNumber || "Unassigned";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-deep/60 backdrop-blur-xs animate-fade-in font-ui">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in font-ui">
       <div 
-        className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-muted transition-all text-left"
+        className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 transition-all text-left"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Banner */}
-        <div className="bg-gradient-to-r from-navy via-indigo-950 to-indigo text-white p-5 flex items-center justify-between shadow-inner">
+        <div className="bg-[#0f172a] text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="size-11 rounded-xl bg-gradient-to-br from-indigo-500/30 to-purple-500/30 border border-white/20 flex items-center justify-center text-cyan-300 backdrop-blur-md shadow-sm">
-              <CalendarPlus className="size-5.5 text-cyan-300" />
+            <div className="size-10 rounded-xl bg-indigo-600/40 border border-indigo-400/30 flex items-center justify-center text-white">
+              <CalendarPlus className="size-5 text-indigo-300" />
             </div>
             <div>
               <h3 className="text-base font-black leading-tight flex items-center gap-2">
                 <span>Extend Guest Stay</span>
-                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   In-House
                 </span>
               </h3>
-              <p className="text-xs text-cyan-100/80 font-medium mt-0.5 flex items-center gap-2">
+              <p className="text-xs text-slate-300 font-medium mt-0.5 flex items-center gap-2">
                 <span>Guest: <strong className="text-white">{guestName}</strong></span>
                 <span>•</span>
                 <span>Room: <strong className="text-white">#{roomNumber}</strong></span>
@@ -295,31 +304,31 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
           {/* Quick Dates Grid */}
           <div className="grid grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
                 Current Checkout
               </label>
-              <div className="font-bold text-navy bg-muted/20 border border-muted/50 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 h-10">
-                <Clock className="size-3.5 text-muted-foreground" />
+              <div className="font-bold text-[#0f172a] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 h-10">
+                <Clock className="size-3.5 text-slate-500" />
                 <span>{currentCheckOut}</span>
               </div>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                New Checkout Date
+              <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                New Checkout Date <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
                 min={minDate}
                 value={newCheckOutDate}
                 onChange={(e) => setNewCheckOutDate(e.target.value)}
-                className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/30 rounded-xl text-xs text-navy font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 h-10 cursor-pointer"
+                className="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs text-[#0f172a] font-bold focus:outline-none focus:ring-2 focus:ring-[#4f46e5] h-10 cursor-pointer"
               />
             </div>
           </div>
 
           {/* Quick Nights Extension Buttons */}
           <div>
-            <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+            <span className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1.5">
               Quick Extension Presets
             </span>
             <div className="grid grid-cols-4 gap-2">
@@ -332,8 +341,8 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
                     onClick={() => handleQuickAddNights(n)}
                     className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                       isSelected
-                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-md scale-[1.02]"
-                        : "bg-muted/15 border-muted hover:bg-muted/30 text-navy"
+                        ? "bg-[#4f46e5] text-white border-[#4f46e5] shadow-sm font-black"
+                        : "bg-slate-50 border-slate-200 hover:bg-indigo-50 text-[#0f172a]"
                     }`}
                   >
                     +{n} Night{n > 1 ? "s" : ""}
@@ -345,78 +354,87 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
 
           {/* Duration & Daily Tariff Rates */}
           <div className="grid grid-cols-2 gap-3.5 pt-1">
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/80 rounded-xl p-3">
-              <span className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+              <span className="block text-[10px] font-black text-[#4338ca] uppercase tracking-wider">
                 Additional Stay Duration
               </span>
-              <p className="text-lg font-black text-emerald-950 mt-0.5">
+              <p className="text-base font-black text-[#1e1b4b] mt-0.5">
                 {additionalNights} Night{additionalNights !== 1 ? "s" : ""}
               </p>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
                 Daily Rate (Excl. GST)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 font-bold text-muted-foreground text-xs">₹</span>
+                <span className="absolute left-3 top-2.5 font-bold text-slate-500 text-xs">₹</span>
                 <input
                   type="number"
                   value={dailyRate}
                   onChange={(e) => setDailyRate(Math.max(0, Number(e.target.value)))}
-                  className="w-full pl-6 pr-3 py-2 border border-muted bg-[#fafafa] rounded-xl text-xs text-navy font-bold focus:outline-none focus:ring-1 focus:ring-navy h-10"
+                  className="w-full pl-6 pr-3 py-2 border border-slate-300 bg-white rounded-xl text-xs text-[#0f172a] font-bold focus:outline-none focus:ring-1 focus:ring-[#4f46e5] h-10"
                 />
               </div>
             </div>
           </div>
 
           {/* Tariff Ledger Breakdown */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2 select-none">
-            <div className="flex justify-between text-muted-foreground font-semibold">
-              <span>Room Charges ({additionalNights} × ₹{dailyRate.toLocaleString()}):</span>
-              <span className="font-bold text-navy">₹{roomCharges.toLocaleString()}</span>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 select-none">
+            <div className="flex justify-between text-slate-600 font-semibold">
+              <span>Room Tariff ({additionalNights} × {inr(dailyRate)}):</span>
+              <span className="font-bold text-slate-900">{inr(roomCharges)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground font-semibold">
-              <span>GST (18% Goods & Services Tax):</span>
-              <span className="font-bold text-navy">₹{gstAmount.toLocaleString()}</span>
+            <div className="flex justify-between text-slate-600 font-semibold">
+              <span>GST (18% Statutory Liability):</span>
+              <span className="font-bold text-slate-900">{inr(gstAmount)}</span>
             </div>
-            <div className="flex justify-between font-black text-navy text-sm pt-2 border-t border-slate-200">
-              <span>Total Additional Payable:</span>
-              <span className="text-emerald-700 font-extrabold text-base">
-                ₹{totalAdditionalAmount.toLocaleString()}
+          </div>
+
+          {/* Prominent Total Additional Payable Banner */}
+          <div className="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-sm border border-slate-800">
+            <div>
+              <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">
+                Total Additional Payable
+              </span>
+              <span className="text-[11px] text-slate-300 font-medium">Tariff + 18% GST</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xl font-black text-emerald-400 block tracking-tight">
+                {inr(totalAdditionalAmount)}
               </span>
             </div>
           </div>
 
           {/* Optional Extension Notes */}
           <div>
-            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+            <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
               Extension Note / Reason (Optional)
             </label>
             <input
               type="text"
-              placeholder="e.g. Guest requested extension for extra business meetings"
+              placeholder="e.g. Guest requested extension for extra meetings"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-muted bg-[#fafafa] rounded-xl text-xs text-navy focus:outline-none focus:ring-1 focus:ring-navy h-9"
+              className="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:ring-1 focus:ring-[#4f46e5] h-9"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-muted/40">
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
             <Button
               type="button"
               variant="ghost"
               onClick={onClose}
-              className="h-10 px-4 text-xs font-bold rounded-xl cursor-pointer hover:bg-slate-100"
+              className="h-10 px-4 text-xs font-bold rounded-xl cursor-pointer hover:bg-slate-100 text-slate-700"
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirmExtend}
               disabled={submitting || additionalNights <= 0}
-              className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-600 text-white font-bold h-10 px-6 rounded-xl shadow-md shadow-indigo-500/20 cursor-pointer transition-all active:scale-95"
+              className="bg-[#4f46e5] hover:bg-[#4338ca] text-white font-black h-10 px-6 rounded-xl shadow-md cursor-pointer transition-all disabled:opacity-50"
             >
-              {submitting ? "Extending Stay..." : "Confirm & Extend Stay"}
+              {submitting ? "Extending Stay..." : `Confirm Extension (${inr(totalAdditionalAmount)})`}
             </Button>
           </div>
         </div>
@@ -426,3 +444,4 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
 }
 
 export default ExtendStayModal;
+

@@ -3,7 +3,19 @@ import { Label } from "@/components/ui/label";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import {
+  PageHeader,
+  Panel,
+  Tag,
+  Notice,
+  LoadingRows,
+  Crumbs,
+  ActionGroup,
+  ViewActionButton,
+  EditActionButton,
+  DeleteActionButton,
+  ActionButton
+} from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 
@@ -201,7 +213,7 @@ function SuperAdminCoupons() {
                       <th className="p-4">Usage Limits</th>
                       <th className="p-4">Used Count</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right pr-6 w-36 whitespace-nowrap">Actions</th>
+                      <th className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
@@ -229,37 +241,18 @@ function SuperAdminCoupons() {
                         <td className="p-4">
                           <Tag tone={c.status === "Active" ? "success" : "neutral"}>{c.status}</Tag>
                         </td>
-                        <td className="p-4 text-right pr-6 w-36 whitespace-nowrap space-x-1">
-                          <Link
-                            to={`/super-admin/coupons/view/${c._id || c.id}`}
-                            className="size-8 p-0 rounded-full text-navy hover:bg-muted cursor-pointer inline-flex items-center justify-center"
-                            title="View Coupon Details"
-                          >
-                            <Eye className="size-4" />
-                          </Link>
-                          <Link
-                            to={`/super-admin/coupons/edit/${c._id || c.id}`}
-                            className="size-8 p-0 rounded-full text-purple hover:bg-purple/10 cursor-pointer inline-flex items-center justify-center"
-                            title="Edit Coupon"
-                          >
-                            <Edit2 className="size-4" />
-                          </Link>
-                          <Button
-                            onClick={() => triggerToggleStatus(c)}
-                            variant="ghost"
-                            className={`size-8 p-0 rounded-full hover:bg-muted cursor-pointer ${c.status === "Active" ? "text-warning" : "text-success"}`}
-                            title={c.status === "Active" ? "Deactivate Coupon" : "Activate Coupon"}
-                          >
-                            {c.status === "Active" ? <ToggleLeft className="size-5" /> : <ToggleRight className="size-5" />}
-                          </Button>
-                          <Button
-                            onClick={() => triggerDelete(c)}
-                            variant="ghost"
-                            className="size-8 p-0 rounded-full text-error hover:bg-error/10 cursor-pointer"
-                            title="Delete Coupon"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                        <td className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">
+                          <ActionGroup>
+                            <ViewActionButton onClick={() => navigate({ to: `/super-admin/coupons/view/${c._id || c.id}` })} />
+                            <EditActionButton onClick={() => navigate({ to: `/super-admin/coupons/edit/${c._id || c.id}` })} />
+                            <ActionButton
+                              icon={c.status === "Active" ? ToggleLeft : ToggleRight}
+                              label={c.status === "Active" ? "Deactivate" : "Activate"}
+                              variant={c.status === "Active" ? "warning" : "success"}
+                              onClick={() => triggerToggleStatus(c)}
+                            />
+                            <DeleteActionButton onClick={() => triggerDelete(c)} />
+                          </ActionGroup>
                         </td>
                       </tr>
                     ))}

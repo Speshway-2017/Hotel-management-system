@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
   Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
-  ShieldAlert, Sparkles, Upload, FileText, CheckCircle2, AlertOctagon, HelpCircle, ArrowLeft, Receipt, CreditCard
+  ShieldAlert, Sparkles, Upload, FileText, CheckCircle2, AlertOctagon, HelpCircle, Receipt, CreditCard
 } from "lucide-react";
 
 export const Route = createFileRoute("/reception/reservations/$id")({
@@ -105,6 +105,12 @@ function ReceptionReservationDetailsPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
+      <Crumbs
+        items={[
+          { label: "Reservations", to: "/reception/reservations" },
+          { label: booking ? `Reservation #${booking.bookingId || id}` : "Reservation Details" }
+        ]}
+      />
       
       {/* Dynamic navbar header override */}
       <PageHeader />

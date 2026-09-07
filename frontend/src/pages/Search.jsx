@@ -178,10 +178,10 @@ export function SearchPage() {
               <span className="text-xs font-bold text-purple uppercase tracking-wider block mb-1">
                 Luxury Stays & Heritage Havelis
               </span>
-              <h1 className="font-display text-3xl sm:text-4xl font-bold text-navy">
+              <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">
                 Book a Stay Across Active Properties
               </h1>
-              <p className="text-xs sm:text-sm text-navy/60 mt-1">
+              <p className="text-xs sm:text-base text-[#4A4F58] mt-1 font-ui">
                 Explore real-time property availability, ratings, and luxury room suites from MongoDB.
               </p>
             </div>
@@ -412,8 +412,8 @@ export function SearchPage() {
                             <div className="space-y-2">
                               <div className="flex justify-between items-start gap-4">
                                 <div>
-                                  <h2 className="font-display text-xl font-bold text-navy">{hotelName}</h2>
-                                  <p className="text-xs text-navy/60 flex items-center gap-1 mt-1">
+                                  <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">{hotelName}</h2>
+                                  <p className="text-xs text-[#4A4F58] flex items-center gap-1 mt-1">
                                     <MapPin className="size-3.5 text-purple shrink-0" />
                                     <span>{address}</span>
                                   </p>
@@ -425,7 +425,7 @@ export function SearchPage() {
                                 </div>
                               </div>
 
-                              <p className="text-xs text-navy/70 leading-relaxed line-clamp-2 pt-1">
+                              <p className="text-xs sm:text-sm text-[#4A4F58] leading-relaxed line-clamp-2 pt-1 font-ui">
                                 {description}
                               </p>
 
@@ -446,7 +446,7 @@ export function SearchPage() {
                                 <span className="text-[10px] font-bold text-navy/40 uppercase tracking-wider block">Starting From</span>
                                 <div className="flex items-baseline gap-1">
                                   <span className="font-display text-2xl font-bold text-navy">{inr(startingPrice)}</span>
-                                  <span className="text-[10px] text-navy/50 font-semibold">/ night + GST</span>
+                                  <span className="text-[10px] text-[#4A4F58] font-semibold">/ night + GST</span>
                                 </div>
                               </div>
 

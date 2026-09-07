@@ -1,13 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import {
   Clock,
-  ChevronLeft,
   Users,
   Eye,
   BookOpen,
@@ -100,9 +99,6 @@ function ManagerViewShift() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view shift logs for this property branch. Access is strictly scoped.
         </Notice>
-        <Link to="/manager/shifts" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Staff Shifts
-        </Link>
       </div>
     );
   }
@@ -112,15 +108,17 @@ function ManagerViewShift() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <div className="flex items-center gap-3">
-        <Link to="/manager/shifts" className="inline-flex items-center justify-center size-8 rounded-full border border-muted bg-white hover:bg-muted/15 text-navy transition-all cursor-pointer">
-          <ChevronLeft className="size-4" />
-        </Link>
-        <PageHeader
-          title={shiftName ? `${shiftName} Details` : "Shift Details"}
-          subtitle="Timings overview, assigned duties parameters, and rostered active personnel."
-        />
-      </div>
+      <Crumbs
+        items={[
+          { label: "Staff & Shifts", to: "/manager/shifts" },
+          { label: shiftName ? `${shiftName} Details` : "Shift Details" }
+        ]}
+      />
+
+      <PageHeader
+        title={shiftName ? `${shiftName} Details` : "Shift Details"}
+        subtitle="Timings overview, assigned duties parameters, and rostered active personnel."
+      />
 
       {error && <Notice tone="error" title="Shift Roster Sync Error">{error}</Notice>}
 

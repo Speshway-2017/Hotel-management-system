@@ -96,6 +96,16 @@ export const adminService = {
       throw err;
     }
   },
+  deletePayment: async (id) => {
+    try {
+      return await apiClient.delete(`/admin/payments/${id}`);
+    } catch (err) {
+      if (err?.message?.includes('not found') || err?.message?.includes('Route')) {
+        return await apiClient.delete(`/manager/payments/${id}`);
+      }
+      throw err;
+    }
+  },
   getProperty: async () => {
     return await apiClient.get('/admin/property');
   },
@@ -296,6 +306,53 @@ export const adminService = {
         return { success: true, message: 'Coupon deleted successfully' };
       }
     }
+  },
+
+  // Staff & User Management methods
+  getStaff: async () => {
+    return await apiClient.get('/admin/staff');
+  },
+  getStaffMember: async (id) => {
+    try {
+      return await apiClient.get(`/admin/staff/${id}`);
+    } catch (err) {
+      try {
+        return await apiClient.get(`/admin/users/${id}`);
+      } catch {}
+      try {
+        return await apiClient.get(`/manager/staff/${id}`);
+      } catch {}
+      throw err;
+    }
+  },
+  updateStaff: async (id, data) => {
+    try {
+      return await apiClient.put(`/admin/staff/${id}`, data);
+    } catch (err) {
+      const altId = data?._id || data?.id || id;
+      try {
+        return await apiClient.put(`/admin/users/${altId}`, data);
+      } catch {}
+      try {
+        return await apiClient.put(`/manager/staff/${altId}`, data);
+      } catch {}
+      try {
+        return await apiClient.put(`/super-admin/staff/${altId}`, data);
+      } catch {}
+      throw err;
+    }
+  },
+  getUsers: async () => {
+    return await apiClient.get('/admin/users');
+  },
+  getUser: async (id) => {
+    return await apiClient.get(`/admin/users/${id}`);
+  },
+  deleteStaff: async (id) => {
+    return await apiClient.delete(`/admin/staff/${id}`);
+  },
+  deleteUser: async (id) => {
+    return await apiClient.delete(`/admin/users/${id}`);
   }
 };
 

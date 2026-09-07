@@ -1,7 +1,7 @@
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -254,7 +254,7 @@ function SuperAdminGuests() {
                 <th className="p-3.5">Lifetime Stays</th>
                 <th className="p-3.5">Joined Date</th>
                 <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right pr-6 w-28 whitespace-nowrap">Actions</th>
+                <th className="p-3.5 text-right pr-6 min-w-[100px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y font-sans">
@@ -336,17 +336,10 @@ function SuperAdminGuests() {
                         </Tag>
                       </td>
 
-                      <td className="p-3.5 text-right pr-6 w-28 whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate({ to: `/super-admin/users/view/${g.id}` })}
-                          className="h-8 px-2.5 rounded-full hover:bg-purple/10 text-purple text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
-                          title="View Guest Details"
-                        >
-                          <Eye className="size-3.5" />
-                          <span>View</span>
-                        </Button>
+                      <td className="p-3.5 text-right pr-6 whitespace-nowrap min-w-[100px]">
+                        <ActionGroup>
+                          <ViewActionButton onClick={() => navigate({ to: `/super-admin/users/view/${g.id}` })} />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

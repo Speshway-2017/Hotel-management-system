@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useNavigate, useLocation } from "react-router-dom";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/hs/FormFields";
 import { apiClient, invalidateApiCache } from "@/services/apiClient";
@@ -11,7 +11,6 @@ import { emitRealtimeEvent } from "@/services/socket";
 import {
   Star,
   MessageSquare,
-  ArrowLeft,
   Sparkles,
   Hotel,
   Bed,
@@ -219,21 +218,17 @@ export default function AddFeedbackPage() {
 
   return (
     <div className="space-y-6 text-left font-ui animate-fade-in max-w-4xl mx-auto pb-12">
-      {/* Top Breadcrumb & Page Header */}
-      <div className="space-y-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-xs font-bold text-navy/70 hover:text-purple transition-colors cursor-pointer border-none bg-transparent"
-        >
-          <ArrowLeft className="size-4" /> Back
-        </button>
+      <Crumbs
+        items={[
+          { label: "Guest Feedback", to: "/guest/feedback" },
+          { label: "Share Feedback" }
+        ]}
+      />
 
-        <PageHeader
-          title="Share Your Stay Feedback"
-          subtitle="Your honest review helps hotel staff continuously elevate hospitality standards."
-        />
-      </div>
+      <PageHeader
+        title="Share Your Stay Feedback"
+        subtitle="Your honest review helps hotel staff continuously elevate hospitality standards."
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Step 1: Select Stay & Booking Summary Card */}

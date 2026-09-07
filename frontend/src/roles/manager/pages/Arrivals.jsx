@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Panel, Notice, Tag } from "@/components/hs/kit";
+import { Panel, Notice, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -401,17 +401,17 @@ function ManagerOperationsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-muted bg-white">
-            <table className="w-full text-left text-xs border-collapse table-fixed min-w-[750px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-muted text-[10px] uppercase font-bold text-muted-foreground select-none whitespace-nowrap">
-                  <th className="py-3 px-4 text-left align-middle w-[20%]">Guest / ID</th>
-                  <th className="py-3 px-4 text-left align-middle w-[15%]">Room / Category</th>
-                  <th className="py-3 px-4 text-left align-middle w-[22%]">Schedule</th>
-                  <th className="py-3 px-4 text-center align-middle w-[8%]">Pax</th>
-                  <th className="py-3 px-4 text-left align-middle w-[12%]">Source</th>
-                  <th className="py-3 px-4 text-left align-middle w-[11%]">Payment</th>
-                  <th className="py-3 px-4 text-center align-middle w-[12%]">Status</th>
-                  <th className="py-3 px-4 text-right align-middle w-[10%]">Actions</th>
+                  <th className="py-3 px-4 text-left align-middle">Guest / ID</th>
+                  <th className="py-3 px-4 text-left align-middle">Room / Category</th>
+                  <th className="py-3 px-4 text-left align-middle">Schedule</th>
+                  <th className="py-3 px-4 text-center align-middle">Pax</th>
+                  <th className="py-3 px-4 text-left align-middle">Source</th>
+                  <th className="py-3 px-4 text-left align-middle">Payment</th>
+                  <th className="py-3 px-4 text-center align-middle">Status</th>
+                  <th className="py-3 px-4 text-right align-middle min-w-[220px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted/45 font-medium text-navy bg-white whitespace-nowrap">
@@ -448,18 +448,13 @@ function ManagerOperationsPage() {
                         {r.status || "Confirmed"}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4 text-right align-middle">
-                      <div className="flex items-center justify-end gap-1 select-none">
-                        {/* View Details Icon */}
-                        <Button
+                    <td className="py-3.5 px-4 text-right align-middle whitespace-nowrap min-w-[220px]">
+                      <ActionGroup align="right">
+                        {/* View Details */}
+                        <ViewActionButton
                           onClick={() => navigate({ to: `/manager/reservations/view/${r._id || r.id}` })}
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 hover:text-brand cursor-pointer"
                           title="View Stay Details"
-                        >
-                          <Eye className="size-3.5" />
-                        </Button>
+                        />
 
                         {/* Check-out if checked in, else Check-in */}
                         {(r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying" || r.status === "Staying-In") ? (
@@ -470,45 +465,33 @@ function ManagerOperationsPage() {
                               booking={r}
                               role="manager"
                             />
-                            <Button
+                            <CheckOutActionButton
                               onClick={() => handleStatusUpdate(r._id || r.id, "Checked-out")}
-                              size="icon"
-                              variant="ghost"
-                              className="size-7 text-indigo hover:text-indigo-deep hover:bg-indigo/10 cursor-pointer"
                               title="Process Check-out"
-                            >
-                              <LogOut className="size-3.5" />
-                            </Button>
+                            />
                           </>
                         ) : (r.status !== "Checked-out" && r.status !== "Checked Out" && r.status !== "Cancelled") ? (
-                          <Button
+                          <CheckInActionButton
                             onClick={() => handleStatusUpdate(r._id || r.id, "Checked-in", r)}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 text-success hover:text-success/80 hover:bg-success/10 cursor-pointer"
                             title="Process Check-in"
-                          >
-                            <CheckCircle2 className="size-3.5" />
-                          </Button>
+                          />
                         ) : null}
 
-                        {/* Cancel Reservation Icon */}
+                        {/* Cancel Reservation */}
                         {r.status !== "Checked-out" && r.status !== "Checked Out" && r.status !== "Cancelled" && (
-                          <Button
+                          <ActionButton
+                            icon={XCircle}
+                            label="Cancel"
+                            variant="danger"
                             onClick={() => {
                               if (confirm("Are you sure you want to cancel this reservation?")) {
                                 handleStatusUpdate(r._id || r.id, "Cancelled");
                               }
                             }}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 text-destructive hover:bg-destructive/10 cursor-pointer"
                             title="Cancel Reservation"
-                          >
-                            <XCircle className="size-3.5" />
-                          </Button>
+                          />
                         )}
-                      </div>
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}

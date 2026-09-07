@@ -1,6 +1,17 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import {
+  PageHeader,
+  Notice,
+  LoadingRows,
+  Tag,
+  ActionGroup,
+  ViewActionButton,
+  EditActionButton,
+  CheckInActionButton,
+  CheckOutActionButton,
+  DeleteActionButton
+} from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -8,6 +19,7 @@ import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { extractRoomNumber } from "@/utils/roomUtils";
 import {
   Search,
   Eye,
@@ -103,23 +115,30 @@ function ManagerReservationsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    loadData();
+
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000); // 10s poll fallback
+
+    const handleFocus = () => loadData();
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData();
     });
 
-    return () => {
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
   // Room Helpers
   const getRoomDisplay = (res) => {
-    if (res?.roomNumber) return `Room ${res.roomNumber}`;
-    if (!res?.room) return "Unassigned";
-    const str = String(res.room).split('·')[0].split('-')[0].replace(/room/i, '').trim();
-    return str ? `Room ${str}` : "Unassigned";
+    const num = extractRoomNumber(res);
+    return num ? `Room ${num}` : "Unassigned";
   };
 
   const getRoomCategoryDisplay = (res) => {
@@ -128,6 +147,13 @@ function ManagerReservationsPage() {
     if (res?.room && String(res.room).includes('·')) {
       return String(res.room).split('·')[1]?.trim() || "Standard Room";
     }
+    if (res?.room && !String(res.room).match(/\b\d{3,4}\b/)) {
+      return res.room;
+    }
+    const num = extractRoomNumber(res);
+    if (num.startsWith('2')) return 'Deluxe Room';
+    if (num.startsWith('3')) return 'Executive Suite';
+    if (num.startsWith('4')) return 'Presidential Suite';
     return "Standard Room";
   };
 
@@ -391,7 +417,7 @@ function ManagerReservationsPage() {
                   <th className="w-[9%] py-4 px-3 text-left align-middle">Channel</th>
                   <th className="w-[9%] py-4 px-3 text-left align-middle">Payment</th>
                   <th className="w-[8%] py-4 px-2 text-center align-middle">Status</th>
-                  <th className="w-[15%] py-4 pl-3 pr-4 text-left align-middle">Actions</th>
+                  <th className="py-4 pl-3 pr-4 text-right align-middle min-w-[280px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-xs text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -448,78 +474,42 @@ function ManagerReservationsPage() {
                           {res.status}
                         </Tag>
                       </td>
-                      <td className="py-3.5 pl-3 pr-4 text-left align-middle">
-                        <div className="flex items-center justify-start gap-1 whitespace-nowrap select-none">
-                          {/* Admin-styled Check-In / Check-Out buttons */}
+                      <td className="py-3.5 pl-3 pr-4 text-right align-middle min-w-[280px] whitespace-nowrap">
+                        <ActionGroup>
                           {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
-                            <Button
+                            <CheckInActionButton
                               onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
-                              size="xs"
-                              variant="outline"
-                              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-In
-                            </Button>
+                            />
                           )}
 
                           {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
                             <>
                               <ExtendStayButton
-                                size="xs"
-                                label="Extend"
                                 booking={res}
                                 onClick={() => navigate({ to: `/manager/reservations/extend/${res._id || res.id || res.bookingId}` })}
                               />
-                              <Button
+                              <CheckOutActionButton
                                 onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
-                                size="xs"
-                                variant="outline"
-                                className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                              >
-                                Check-Out
-                              </Button>
+                              />
                             </>
                           )}
 
-                          {/* View in Dedicated Page */}
-                          <Button
+                          <ViewActionButton
                             onClick={() => navigate({ to: `/manager/reservations/view/${res._id || res.id}` })}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 text-navy/70 hover:text-brand hover:bg-brand/10 rounded-lg cursor-pointer transition-colors"
-                            aria-label="View Details"
-                            title="View Reservation"
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
+                          />
 
-                          {/* Edit in Dedicated Page */}
                           {res.status !== "Checked-out" && res.status !== "Checked Out" && res.status !== "Cancelled" && (
                             <>
-                              <Button
+                              <EditActionButton
                                 onClick={() => navigate({ to: `/manager/reservations/edit/${res._id || res.id}` })}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 text-navy/70 hover:text-brand hover:bg-brand/10 rounded-lg cursor-pointer transition-colors"
-                                aria-label="Modify Booking"
-                                title="Modify Booking"
-                              >
-                                <Edit2 className="size-3.5" />
-                              </Button>
-
-                              <Button
+                              />
+                              <DeleteActionButton
+                                label="Cancel"
                                 onClick={() => handleCancel(res._id || res.id)}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
-                                aria-label="Cancel Reservation"
-                                title="Cancel Booking"
-                              >
-                                <XCircle className="size-3.5" />
-                              </Button>
+                              />
                             </>
                           )}
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

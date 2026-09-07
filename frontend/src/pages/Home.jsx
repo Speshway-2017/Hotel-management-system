@@ -24,7 +24,9 @@ import {
   Smartphone,
   ChevronLeft,
   Search as SearchIcon,
-  ShieldAlert
+  ShieldAlert,
+  Clock,
+  BookOpen
 } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { publicService } from "@/services/public";
@@ -348,20 +350,8 @@ function Home() {
             </div>
           </div>
 
-          {/* Slider Indicators and Caption */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-cream/15 pt-6">
-            <div className="flex items-center gap-3">
-              {(dynamicSlides.length > 0 ? dynamicSlides : slides).map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentSlide(idx)}
-                  className={`h-2.5 rounded-full transition-all duration-500 cursor-pointer ${
-                    idx === currentSlide ? "w-8 bg-gold" : "w-2.5 bg-cream/30 hover:bg-cream/50"
-                  }`}
-                  aria-label={`Go to slide ${idx + 1}`}
-                />
-              ))}
-            </div>
+          {/* Slider Caption (Dots Removed) */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end border-t border-cream/15 pt-6">
             {(() => {
               const activeSlide = dynamicSlides[currentSlide] || dynamicSlides[0] || slides[0] || {};
               return (
@@ -381,10 +371,10 @@ function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Flexible Framework</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Powering every category of Indian stays
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
               From historic royal palaces to modern transit suites, Hour Stay provides custom operational models for diverse property architectures.
             </p>
           </div>
@@ -406,7 +396,7 @@ function Home() {
                   <h3 className="mt-1 font-display text-lg font-bold text-navy group-hover:text-purple transition-colors">
                     {p.name}
                   </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground font-ui">
+                  <p className="mt-2 text-xs leading-relaxed text-[#4A4F58] font-ui">
                     {p.description}
                   </p>
                 </div>
@@ -422,10 +412,10 @@ function Home() {
           <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
             <div className="lg:col-span-5">
               <span className="text-xs font-bold uppercase tracking-widest text-purple">Built for the Soil</span>
-              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+              <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
                 Connected hotel operations engineered for India
               </h2>
-              <p className="mt-4 text-muted-foreground leading-relaxed">
+              <p className="mt-4 text-base text-[#4A4F58] leading-relaxed font-ui">
                 Hospitality platforms built in the West often fail to match the real-world operational challenges of Indian properties. Hour Stay bridges the gap with a hyper-localized feature set.
               </p>
 
@@ -454,7 +444,7 @@ function Home() {
                     </div>
                     <div>
                       <h4 className="text-base font-bold text-navy">{item.title}</h4>
-                      <p className="mt-1 text-sm text-muted-foreground">{item.desc}</p>
+                      <p className="mt-1 text-sm text-[#4A4F58] font-ui leading-relaxed">{item.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -475,9 +465,9 @@ function Home() {
                       </div>
                       <span className="text-xs font-bold text-navy uppercase tracking-wider">UPI Settlement</span>
                     </div>
-                    <p className="mt-4 text-xs text-muted-foreground">Incorporate instant UPI QR codes at checkout. Reduce gateway commissions by up to 82%.</p>
+                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Incorporate instant UPI QR codes at checkout. Reduce gateway commissions by up to 82%.</p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Reconciliation</span>
+                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">Reconciliation</span>
                       <span className="inline-flex items-center gap-1 rounded bg-[#2E7D32]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#2E7D32]">Real-Time</span>
                     </div>
                   </div>
@@ -489,9 +479,9 @@ function Home() {
                       </div>
                       <span className="text-xs font-bold text-navy uppercase tracking-wider">GST Compliance</span>
                     </div>
-                    <p className="mt-4 text-xs text-muted-foreground">Automatically handles CGST, SGST, IGST with zero manual tax computations.</p>
+                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Automatically handles CGST, SGST, IGST with zero manual tax computations.</p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Tax Slab</span>
+                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">Tax Slab</span>
                       <span className="inline-flex items-center gap-1 rounded bg-[#5B21B6]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#5B21B6]">12% / 18% Auto</span>
                     </div>
                   </div>
@@ -503,9 +493,9 @@ function Home() {
                       </div>
                       <span className="text-xs font-bold text-navy uppercase tracking-wider">Offline State</span>
                     </div>
-                    <p className="mt-4 text-xs text-muted-foreground">Local storage cache keeps front desk check-ins active even when broadband fails.</p>
+                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Local storage cache keeps front desk check-ins active even when broadband fails.</p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Sync State</span>
+                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">Sync State</span>
                       <span className="inline-flex items-center gap-1 rounded bg-[#C77700]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#C77700]">Auto-Resilient</span>
                     </div>
                   </div>
@@ -517,9 +507,9 @@ function Home() {
                       </div>
                       <span className="text-xs font-bold text-navy uppercase tracking-wider">Guest Profiles</span>
                     </div>
-                    <p className="mt-4 text-xs text-muted-foreground">Build profiles with preferences, special requests, occasion notes, and personalized greetings.</p>
+                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Build profiles with preferences, special requests, occasion notes, and personalized greetings.</p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">CRM Database</span>
+                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">CRM Database</span>
                       <span className="inline-flex items-center gap-1 rounded bg-navy/10 px-1.5 py-0.5 text-[9px] font-bold text-navy">VIP Segment</span>
                     </div>
                   </div>
@@ -538,19 +528,19 @@ function Home() {
           <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
             <div className="lg:col-span-5">
               <span className="text-xs font-bold uppercase tracking-widest text-purple">2-Way Channel Hub</span>
-              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+              <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
                 Dynamic inventory sync with major OTAs
               </h2>
-              <p className="mt-4 text-muted-foreground leading-relaxed">
+              <p className="mt-4 text-base text-[#4A4F58] leading-relaxed font-ui">
                 Hour Stay’s lightning-fast synchronization engine links your central inventory pool with MakeMyTrip, Goibibo, Booking.com, and Agoda. 
               </p>
-              <p className="mt-3 text-muted-foreground leading-relaxed">
+              <p className="mt-3 text-base text-[#4A4F58] leading-relaxed font-ui">
                 When a guest books directly or on an OTA, availability updates instantly globally. Zero overbookings, zero manual rate conflicts.
               </p>
 
               {/* Simulation triggers */}
               <div className="mt-8 border border-purple/10 rounded-xl bg-cream/40 p-5">
-                <p className="text-xs font-bold text-navy uppercase tracking-wider mb-3">Interactive Demo: Simulate a Booking</p>
+                <p className="text-xs font-bold text-navy uppercase tracking-wider mb-3 font-ui">Interactive Demo: Simulate a Booking</p>
                 <div className="flex flex-wrap gap-2">
                   <button 
                     onClick={() => triggerOtaSync("MakeMyTrip")} 
@@ -574,7 +564,7 @@ function Home() {
                     Direct Web Booking
                   </button>
                 </div>
-                <p className="mt-3 text-[11px] text-muted-foreground italic">Click a channel to watch inventory sync happen across the dashboard and all networks in real-time.</p>
+                <p className="mt-3 text-[11px] text-[#4A4F58] italic font-ui">Click a channel to watch inventory sync happen across the dashboard and all networks in real-time.</p>
               </div>
             </div>
 
@@ -604,7 +594,7 @@ function Home() {
                           <span className={`mt-1.5 inline-block size-2 rounded-full ${
                             isActive ? "bg-red-500 animate-ping" : (otaState === "synced" ? "bg-[#2E7D32]" : "bg-[#2E7D32]/40")
                           }`} />
-                          <span className="text-[9px] text-muted-foreground block mt-1">
+                          <span className="text-[9px] text-[#4A4F58] block mt-1 font-ui">
                             {isActive ? "Booked! -1" : (otaState === "synced" ? "Synced (12 Available)" : "13 Rooms Avail")}
                           </span>
                         </div>
@@ -616,14 +606,14 @@ function Home() {
                   <div className="relative flex flex-col items-center">
                     {/* Pulsing Sync Ring */}
                     <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-all duration-1000 ${
-                      otaState !== "idle" ? "size-28 border-gold animate-pulse" : "size-20 border-purple/20"
+                      otaState !== "idle" ? "size-28 border-gold animate-pulse" : "size-24 border-purple/20"
                     }`} />
                     
-                    <div className={`relative z-10 rounded-full border p-6 shadow-lift text-center transition-all duration-500 ${
+                    <div className={`relative z-10 flex flex-col items-center justify-center size-24 rounded-full border shadow-lift text-center transition-all duration-500 ${
                       otaState === "syncing_pms" || otaState === "syncing_all" ? "bg-gold border-gold text-navy scale-110" : "bg-navy border-navy text-cream"
                     }`}>
-                      <RefreshCw className={`size-8 ${otaState !== "idle" ? "animate-spin" : ""}`} />
-                      <span className="text-[9px] font-bold uppercase tracking-wider block mt-1">PMS Hub</span>
+                      <RefreshCw className={`size-7 shrink-0 ${otaState !== "idle" ? "animate-spin" : ""}`} />
+                      <span className="text-[9px] font-bold uppercase tracking-wider block mt-1.5 font-ui">PMS Hub</span>
                     </div>
                   </div>
 
@@ -633,22 +623,22 @@ function Home() {
                     <div className={`rounded-lg bg-white p-4 border shadow-soft transition-all duration-500 text-center ${
                       activeOtaChannel === "Direct site" ? "border-gold ring-4 ring-gold/45 scale-105" : "border-navy/5"
                     }`}>
-                      <span className="text-xs font-bold text-navy block">Direct Stays Website</span>
+                      <span className="text-xs font-bold text-navy block font-ui">Direct Stays Website</span>
                       <span className={`mt-1.5 inline-block size-2 rounded-full ${
                         activeOtaChannel === "Direct site" ? "bg-red-500 animate-ping" : (otaState === "synced" ? "bg-[#2E7D32]" : "bg-[#2E7D32]/40")
                       }`} />
-                      <span className="text-[10px] text-purple font-semibold block mt-1">
+                      <span className="text-[10px] text-purple font-semibold block mt-1 font-ui">
                         {otaState === "synced" ? "Synced: 12 Available" : "13 Rooms Available"}
                       </span>
                     </div>
 
                     {/* Front Desk Room Grid */}
                     <div className="rounded-lg bg-white p-4 border border-navy/5 shadow-soft text-center">
-                      <span className="text-xs font-bold text-navy block">Front-Desk Grid</span>
+                      <span className="text-xs font-bold text-navy block font-ui">Front-Desk Grid</span>
                       <span className={`mt-1.5 inline-block size-2 rounded-full ${
                         otaState === "syncing_pms" ? "bg-amber-500 animate-pulse" : "bg-[#2E7D32]"
                       }`} />
-                      <span className="text-[10px] text-muted-foreground block mt-1">
+                      <span className="text-[10px] text-[#4A4F58] block mt-1 font-ui">
                         {otaState === "syncing_pms" ? "Updating allocation..." : "Allocation Grid Synced"}
                       </span>
                     </div>
@@ -673,17 +663,15 @@ function Home() {
         </div>
       </section>
 
-
-
       {/* Guest Experience Workflow Section */}
       <section className="bg-white py-24 border-y border-navy/5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Guest Journey Map</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               From reservation checkout to dynamic check-out
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
               A frictionless digital ecosystem built to increase guest satisfaction scores and take operational pressure off your lobby.
             </p>
           </div>
@@ -732,13 +720,13 @@ function Home() {
                   <div className="inline-flex size-14 items-center justify-center rounded-full bg-cream border border-navy/5 text-navy group-hover:bg-purple group-hover:text-cream transition-all duration-300 shadow-soft">
                     <Icon className="size-6 text-current" />
                   </div>
-                  <span className="mt-4 block font-display text-xs font-bold text-gold tracking-widest uppercase">
+                  <span className="mt-4 block font-display text-xs font-bold text-purple tracking-widest uppercase">
                     Step {t.step}
                   </span>
                   <h3 className="mt-2 font-display text-lg font-bold text-navy">
                     {t.title}
                   </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground font-ui max-w-[200px]">
+                  <p className="mt-2 text-xs leading-relaxed text-[#4A4F58] font-ui max-w-[200px]">
                     {t.desc}
                   </p>
                 </div>
@@ -749,18 +737,14 @@ function Home() {
         </div>
       </section>
 
-
-
-
-
       {/* Signature Properties Showcase (Dynamic stay view) */}
       <section className="bg-cream py-20 border-b border-navy/5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
             <div>
               <span className="text-xs font-bold uppercase tracking-widest text-purple">Stay Options</span>
-              <h2 className="mt-2 font-display text-3xl font-bold text-navy">Signature collection properties</h2>
-              <p className="mt-2 max-w-lg text-sm text-muted-foreground">
+              <h2 className="mt-2 font-display text-3xl sm:text-4xl font-bold text-navy">Signature collection properties</h2>
+              <p className="mt-2 max-w-lg text-sm sm:text-base text-[#4A4F58] font-ui leading-relaxed">
                 Sample properties running Hour Stay, available for booking in the interactive demo.
               </p>
             </div>
@@ -800,19 +784,19 @@ function Home() {
                   </div>
 
                   <div className="p-5">
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <p className="flex items-center gap-1 text-xs text-[#4A4F58] font-ui">
                       <MapPin className="size-3.5 text-purple" /> {h.city}
                     </p>
                     <h3 className="mt-1.5 font-display text-base font-bold text-navy group-hover:text-purple transition-colors line-clamp-1">
                       {h.name}
                     </h3>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                    <p className="mt-2 flex items-center gap-1 text-xs text-[#4A4F58] font-ui">
                       <Star className="size-4 fill-gold text-gold" /> {h.rating} · {h.reviews} verified reviews
                     </p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
                       <p className="text-sm font-bold text-navy font-ui">
                         {inr(h.price)}
-                        <span className="text-[10px] font-normal text-muted-foreground"> / night</span>
+                        <span className="text-[10px] font-normal text-[#4A4F58]"> / night</span>
                       </p>
                       <Button asChild size="sm" variant="ghost" className="h-8 px-3 rounded text-purple font-semibold hover:bg-purple/5">
                         <Link to="/rooms/$roomId" params={{ roomId: h.id }}>
@@ -829,43 +813,79 @@ function Home() {
       </section>
 
       {/* Latest Blog Insights from Journal */}
-      <section className="bg-white py-20">
+      <section className="bg-cream/40 py-24 border-t border-navy/5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="text-center mb-12">
+          <div className="text-center mb-14">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Hour Stay Journal</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Insights from the hospitality frontline
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
               Read practical guides on GST slabs, peak wedding season pricing, and modern operational strategies.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {blogPosts.slice(0, 3).map((p) => (
-              <Link
-                key={p.slug}
-                to="/blog/$slug"
-                params={{ slug: p.slug }}
-                className="group flex flex-col justify-between rounded-xl border border-navy/5 bg-white p-6 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift hover:border-purple/30"
-              >
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-purple font-ui">
-                    {p.tag}
-                  </span>
-                  <h3 className="mt-2 font-display text-lg font-bold text-navy group-hover:text-purple transition-colors">
-                    {p.title}
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground font-ui">
-                    {p.excerpt}
-                  </p>
-                </div>
-                <div className="mt-6 border-t border-navy/5 pt-3 flex items-center justify-between text-[10px] text-muted-foreground font-ui">
-                  <span>By {p.author}</span>
-                  <span>{p.date} · {p.readTime}</span>
-                </div>
-              </Link>
-            ))}
+          <div className="grid gap-8 md:grid-cols-3">
+            {blogPosts.slice(0, 3).map((p, idx) => {
+              const gradients = [
+                "from-purple/15 via-purple/5 to-transparent",
+                "from-indigo-600/15 via-indigo-600/5 to-transparent",
+                "from-blue-600/15 via-blue-600/5 to-transparent"
+              ];
+              const badgeColors = [
+                "bg-purple/10 text-purple border-purple/20",
+                "bg-indigo-600/10 text-indigo-700 border-indigo-600/20",
+                "bg-blue-600/10 text-blue-700 border-blue-600/20"
+              ];
+              const grad = gradients[idx % gradients.length];
+              const badge = badgeColors[idx % badgeColors.length];
+
+              return (
+                <Link
+                  key={p.slug}
+                  to="/blog/$slug"
+                  params={{ slug: p.slug }}
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-navy/10 bg-white p-7 shadow-soft transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift hover:border-purple/40"
+                >
+                  {/* Top Ambient Accent Glow */}
+                  <div className={`absolute top-0 inset-x-0 h-28 bg-gradient-to-b ${grad} pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity`} />
+
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <span className={`rounded-full border px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider font-ui ${badge}`}>
+                        {p.tag}
+                      </span>
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-[#4A4F58] font-ui">
+                        <Clock className="size-3 text-purple" /> {p.readTime}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-2 font-display text-lg sm:text-xl font-bold text-navy group-hover:text-purple transition-colors leading-snug">
+                      {p.title}
+                    </h3>
+                    <p className="mt-3 text-xs leading-relaxed text-[#4A4F58] font-ui line-clamp-3">
+                      {p.excerpt}
+                    </p>
+                  </div>
+
+                  <div className="relative z-10 mt-8 border-t border-navy/5 pt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-8 rounded-full bg-navy text-cream flex items-center justify-center font-bold text-xs font-display shrink-0">
+                        {p.author.split(" ").map(n => n[0]).join("")}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-navy leading-tight">{p.author}</p>
+                        <p className="text-[10px] text-[#4A4F58] font-ui">{p.date}</p>
+                      </div>
+                    </div>
+
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-purple group-hover:translate-x-1 transition-transform">
+                      Read <ArrowRight className="size-3.5" />
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -875,10 +895,10 @@ function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Partner Testimonials</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Trusted by leading Indian hoteliers
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
               Hear from owners and general managers who replaced legacy systems with Hour Stay's calm hospitality suite.
             </p>
           </div>
@@ -920,7 +940,7 @@ function Home() {
                       <Star key={i} className="size-4.5 fill-gold text-gold" />
                     ))}
                   </div>
-                  <p className="text-sm sm:text-base leading-relaxed italic">
+                  <p className="text-xs sm:text-[13px] leading-relaxed italic font-ui font-normal">
                     "{t.quote}"
                   </p>
                 </div>

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, DeleteActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { superAdminService } from "@/services/superAdmin";
@@ -269,7 +269,7 @@ export function ContactRequestsPage() {
                 <th className="p-3.5">Inquiry Snippet</th>
                 <th className="p-3.5">Received Date</th>
                 <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right pr-6">Actions</th>
+                <th className="p-3.5 text-right pr-6 min-w-[160px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y font-sans">
@@ -345,26 +345,11 @@ export function ContactRequestsPage() {
                         </select>
                       </td>
 
-                      <td className="p-3.5 text-right pr-6 whitespace-nowrap space-x-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate({ to: `/super-admin/contacts/view/${id}` })}
-                          className="size-8 p-0 rounded-full hover:bg-purple/10 text-purple cursor-pointer"
-                          title="View Message Details"
-                        >
-                          <Eye className="size-4" />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteModal({ open: true, item: c })}
-                          className="size-8 p-0 rounded-full hover:bg-error/10 text-error"
-                          title="Delete Request"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                      <td className="p-3.5 text-right pr-6 min-w-[160px] whitespace-nowrap">
+                        <ActionGroup>
+                          <ViewActionButton onClick={() => navigate({ to: `/super-admin/contacts/view/${id}` })} />
+                          <DeleteActionButton onClick={() => setDeleteModal({ open: true, item: c })} />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

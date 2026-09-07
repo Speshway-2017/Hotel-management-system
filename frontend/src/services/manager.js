@@ -43,11 +43,35 @@ export const managerService = {
   getStaff: async () => {
     return await apiClient.get('/manager/staff');
   },
+  getStaffMember: async (id) => {
+    try {
+      return await apiClient.get(`/manager/staff/${id}`);
+    } catch (err) {
+      try {
+        return await apiClient.get(`/admin/staff/${id}`);
+      } catch {}
+      throw err;
+    }
+  },
   addStaff: async (data) => {
     return await apiClient.post('/manager/staff', data);
   },
   updateStaff: async (id, data) => {
-    return await apiClient.put(`/manager/staff/${id}`, data);
+    try {
+      return await apiClient.put(`/manager/staff/${id}`, data);
+    } catch (err) {
+      const altId = data?._id || data?.id || id;
+      try {
+        return await apiClient.put(`/admin/staff/${altId}`, data);
+      } catch {}
+      try {
+        return await apiClient.put(`/super-admin/staff/${altId}`, data);
+      } catch {}
+      throw err;
+    }
+  },
+  deleteStaff: async (id) => {
+    return await apiClient.delete(`/manager/staff/${id}`);
   },
   getShifts: async () => {
     return await apiClient.get('/manager/shifts');
@@ -84,6 +108,9 @@ export const managerService = {
   },
   updatePayment: async (id, data) => {
     return await apiClient.put(`/manager/payments/${id}`, data);
+  },
+  deletePayment: async (id) => {
+    return await apiClient.delete(`/manager/payments/${id}`);
   },
   recordPayment: async (id, amountPaid) => {
     return await apiClient.post(`/manager/billing/${id}/payment`, { amountPaid });

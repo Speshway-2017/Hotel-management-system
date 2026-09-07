@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Crumbs, ActionGroup, ViewActionButton, EditActionButton, ExtendActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import {
 import { superAdminService } from "@/services/superAdmin";
 import { managerService } from "@/services/manager";
 import { subscribeRealtimeSync } from "@/services/socket";
-import { ExtendStayModal } from "@/components/common/ExtendStayModal";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 export const Route = createFileRoute("/admin/guests")({
   head: () => ({
@@ -116,6 +116,9 @@ function GuestsCrmPage() {
         const guestBookings = bookings.filter(b => b.guest?.toLowerCase() === u.name?.toLowerCase() || (b.phone && (b.phone === u.mobile || b.phone === u.phone)));
         const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
         const latest = sorted[0];
+        const rNum = extractRoomNumber(latest);
+        const roomDisplay = rNum ? `Room ${rNum}` : (latest?.room ? (String(latest.room).startsWith('Room') ? latest.room : `Room ${latest.room}`) : '—');
+        const roomType = latest?.roomType || (latest?.room && String(latest.room).includes('·') ? String(latest.room).split('·')[1]?.trim() : 'Deluxe Room');
         
         return {
           ...u,
@@ -126,8 +129,10 @@ function GuestsCrmPage() {
           phone: u.mobile || u.phone || "—",
           stays: guestBookings.length,
           balance: guestBookings.reduce((sum, b) => sum + (b.balance || 0), 0),
-          room: latest && latest.room ? latest.room.split(" ")[0] : '—',
-          currentStay: latest ? `${latest.room ? latest.room : 'Not Assigned'}` : '—',
+          room: rNum || '—',
+          roomDisplay,
+          roomType,
+          currentStay: latest ? `${roomDisplay} · ${roomType}` : '—',
           status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
           latestStay: latest
         };
@@ -142,6 +147,10 @@ function GuestsCrmPage() {
           const guestBookings = bookings.filter(bk => bk.guest?.toLowerCase() === gNameLower);
           const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
           const latest = sorted[0];
+          const rNum = extractRoomNumber(latest);
+          const roomDisplay = rNum ? `Room ${rNum}` : (latest?.room ? (String(latest.room).startsWith('Room') ? latest.room : `Room ${latest.room}`) : '—');
+          const roomType = latest?.roomType || (latest?.room && String(latest.room).includes('·') ? String(latest.room).split('·')[1]?.trim() : 'Deluxe Room');
+          
           extraGuestsMap[gNameLower] = {
             id: b._id || b.id || `GST-${Date.now()}`,
             _id: b._id || b.id,
@@ -157,8 +166,10 @@ function GuestsCrmPage() {
             stays: guestBookings.length,
             spend: guestBookings.reduce((sum, bk) => sum + (bk.amount || 0), 0),
             balance: guestBookings.reduce((sum, bk) => sum + (bk.balance || 0), 0),
-            room: latest && latest.room ? latest.room.split(" ")[0] : '—',
-            currentStay: latest ? `${latest.room ? latest.room : 'Not Assigned'}` : '—',
+            room: rNum || '—',
+            roomDisplay,
+            roomType,
+            currentStay: latest ? `${roomDisplay} · ${roomType}` : '—',
             status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
             latestStay: latest,
             history: guestBookings,
@@ -388,7 +399,7 @@ function GuestsCrmPage() {
                   <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("stays")}>Total Stays</th>
                   <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("balance")}>Balance</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-left font-bold" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>Action</th>
+                  <th className="py-3 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted/30">
@@ -415,18 +426,12 @@ function GuestsCrmPage() {
                       {g.latestStay && (
                         <div className="text-[10px] text-muted-foreground mt-0.5 select-none font-semibold">
                           Out: {g.latestStay.checkOut}
-                          {g.latestStay.status === "Checked-in" && (
-                            <button
-                              onClick={() => handleOpenExtendModal(g.latestStay)}
-                              className="text-brand hover:underline font-bold ml-1.5 cursor-pointer"
-                            >
-                              Extend
-                            </button>
-                          )}
                         </div>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-left align-middle font-mono font-bold">#{g.room}</td>
+                    <td className="py-3.5 px-4 text-left align-middle font-mono font-bold text-brand">
+                      {g.room && g.room !== '—' ? (String(g.room).startsWith('Room') ? g.room : `Room ${g.room}`) : '—'}
+                    </td>
                     <td className="py-3.5 px-4 text-center align-middle font-bold">{g.stays} {g.stays === 1 ? 'Stay' : 'Stays'}</td>
                     <td className={`py-3.5 px-4 text-left align-middle font-black ${g.balance > 0 ? "text-destructive" : "text-success"}`}>
                       ₹{(g.balance || 0).toLocaleString()}
@@ -436,37 +441,23 @@ function GuestsCrmPage() {
                         {g.status}
                       </Tag>
                     </td>
-                    <td className="py-3 px-4 text-left align-middle" style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
-                      <div className="flex items-center justify-start gap-1 select-none">
-                        <Button
-                          onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
-                          variant="ghost"
-                          className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full cursor-pointer"
-                          title="View Profile"
-                        >
-                          <Eye className="size-4" />
-                        </Button>
-                        {(g.status !== "Checked-out" && g.status !== "Checked Out") && (
-                          <>
-                            <Button
-                              onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
-                              variant="ghost"
-                              className="h-7 w-7 p-0 hover:text-brand hover:bg-brand/10 flex items-center justify-center rounded-full cursor-pointer"
-                              title="Edit Profile"
-                            >
-                              <Edit2 className="size-4" />
-                            </Button>
-                            <Button
-                              onClick={() => { setNoteTargetGuest(g); setNewNoteText(g.notes || ""); }}
-                              variant="ghost"
-                              className="h-7 w-7 p-0 hover:text-navy hover:bg-muted/15 flex items-center justify-center rounded-full cursor-pointer"
-                              title="Add Note"
-                            >
-                              <FileText className="size-4" />
-                            </Button>
-                          </>
+                    <td className="py-3 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
+                      <ActionGroup align="left">
+                        {(g.status === "Staying-In" || g.latestStay?.status === "Checked-in" || g.latestStay?.status === "Staying") && g.latestStay && (
+                          <ExtendActionButton
+                            onClick={() => navigate({ to: `/admin/reservations/extend/${g.latestStay.bookingId || g.latestStay._id || g.latestStay.id}` })}
+                            title="Extend Stay"
+                          />
                         )}
-                      </div>
+                        <ViewActionButton
+                          onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
+                        />
+                        {(g.status !== "Checked-out" && g.status !== "Checked Out") && (
+                          <EditActionButton
+                            onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
+                          />
+                        )}
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}
@@ -549,15 +540,6 @@ function GuestsCrmPage() {
           </div>
         </div>
       )}
-
-      {/* Reusable Extend Stay Modal */}
-      <ExtendStayModal
-        booking={extendingBooking}
-        isOpen={!!extendingBooking}
-        onClose={() => setExtendingBooking(null)}
-        onSuccess={() => loadGuests()}
-        userRole="admin"
-      />
 
     </div>
   );

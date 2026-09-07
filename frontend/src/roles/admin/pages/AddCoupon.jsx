@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { PageHeader, Panel } from "@/components/hs/kit";
+import { PageHeader, Panel, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea, FormField } from "@/components/hs/FormFields";
 import { adminService } from "@/services/admin";
@@ -12,7 +12,6 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  ArrowLeft,
   CheckCircle2,
   Tag as TagIcon,
   Flame,
@@ -113,22 +112,11 @@ function AddCoupon() {
 
   return (
     <div className="space-y-6 text-left max-w-6xl pb-16">
-      {/* Top Breadcrumb / Back Link */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate({ to: "/admin/coupons" })}
-          className="rounded-full gap-2 border-navy/20 hover:bg-navy/5 text-navy font-semibold transition-colors"
-        >
-          <ArrowLeft className="size-4" /> Back to Coupons
-        </Button>
-      </div>
-
       <PageHeader
         title="Create Promotional Coupon"
         subtitle="Configure discount rules, eligibility criteria, and website visibility for direct online bookings."
       />
+
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Form Column (8 cols) */}

@@ -209,6 +209,58 @@ const MockUser = {
     const removed = list.splice(idx, 1)[0];
     writeUsers(list);
     return new UserInstance(removed);
+  },
+  findOneAndUpdate: async (query, update, options = {}) => {
+    const list = readUsers();
+    let idx = -1;
+    if (query.$or) {
+      idx = list.findIndex(u => query.$or.some(q => {
+        if (q._id && (u._id === q._id || u.id === q._id)) return true;
+        if (q.id && (u.id === q.id || u._id === q.id)) return true;
+        if (q.email && u.email === q.email.toLowerCase()) return true;
+        return false;
+      }));
+    } else {
+      idx = list.findIndex(u => {
+        if (query.email && u.email === query.email.toLowerCase()) return true;
+        const qId = query._id || query.id;
+        if (qId && (u.id === qId || u._id === qId)) return true;
+        return false;
+      });
+    }
+    if (idx === -1) return null;
+    const current = list[idx];
+    const updated = {
+      ...current,
+      ...update,
+      updatedAt: new Date().toISOString()
+    };
+    list[idx] = updated;
+    writeUsers(list);
+    return new UserInstance(updated);
+  },
+  findOneAndDelete: async (query) => {
+    const list = readUsers();
+    let idx = -1;
+    if (query.$or) {
+      idx = list.findIndex(u => query.$or.some(q => {
+        if (q._id && (u._id === q._id || u.id === q._id)) return true;
+        if (q.id && (u.id === q.id || u._id === q.id)) return true;
+        if (q.email && u.email === q.email.toLowerCase()) return true;
+        return false;
+      }));
+    } else {
+      idx = list.findIndex(u => {
+        if (query.email && u.email === query.email.toLowerCase()) return true;
+        const qId = query._id || query.id;
+        if (qId && (u.id === qId || u._id === qId)) return true;
+        return false;
+      });
+    }
+    if (idx === -1) return null;
+    const removed = list.splice(idx, 1)[0];
+    writeUsers(list);
+    return new UserInstance(removed);
   }
 };
 
@@ -318,8 +370,14 @@ const User = {
     return await MockUser.create(...args);
   },
   findByIdAndUpdate: async (id, update, options) => {
+    return User.findOneAndUpdate({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] }, update, options);
+  },
+  findByIdAndDelete: async (id) => {
+    return User.findOneAndDelete({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] });
+  },
+  findOneAndUpdate: async (query, update, options = {}) => {
     if (mongoose.connection.readyState === 1) {
-      const updated = await MongooseUser.findOneAndUpdate({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] }, update, { new: true, ...options });
+      const updated = await MongooseUser.findOneAndUpdate(query, update, { new: true, ...options });
       if (updated) {
         try {
           const instance = new UserInstance({
@@ -355,19 +413,33 @@ const User = {
       }
       return updated;
     }
-    return await MockUser.findByIdAndUpdate(id, update, options);
+    return await MockUser.findOneAndUpdate(query, update, options);
   },
-  findByIdAndDelete: async (id) => {
+  findOneAndDelete: async (query) => {
     if (mongoose.connection.readyState === 1) {
-      const deleted = await MongooseUser.findOneAndDelete({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] });
-      try {
-        await MockUser.findByIdAndDelete(id);
-      } catch (err) {
-        console.warn('Mock dual-write delete failed:', err.message);
+      const deleted = await MongooseUser.findOneAndDelete(query);
+      if (deleted) {
+        try {
+          await MockUser.findOneAndDelete({ _id: deleted._id.toString() });
+        } catch (err) {
+          console.warn('Mock dual-write delete failed:', err.message);
+        }
       }
       return deleted;
     }
-    return await MockUser.findByIdAndDelete(id);
+    return await MockUser.findOneAndDelete(query);
+  },
+  updateOne: async (query, update, options = {}) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseUser.updateOne(query, update, options);
+    }
+    return await MockUser.findOneAndUpdate(query, update, options);
+  },
+  deleteOne: async (query) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseUser.deleteOne(query);
+    }
+    return await MockUser.findOneAndDelete(query);
   }
 };
 

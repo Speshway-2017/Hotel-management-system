@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, EditActionButton, ActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -258,68 +258,55 @@ function SuperAdminRoomsRates() {
           <div className="text-center py-12 text-muted-foreground">No room categories found matching filters.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[1050px] table-fixed">
+            <table className="w-full text-left text-xs border-collapse min-w-[1100px]">
               <thead>
                 <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                  <th className="p-4 w-[16%] text-left">Property</th>
-                  <th className="p-4 w-[10%] text-left">Room Type</th>
-                  <th className="p-4 w-[9%] text-left">Total Rooms</th>
-                  <th className="p-4 w-[8%] text-left">Available</th>
-                  <th className="p-4 w-[8%] text-left">Occupied</th>
-                  <th className="p-4 w-[8%] text-left">Blocked</th>
-                  <th className="p-4 w-[9%] text-left">Base Rate</th>
-                  <th className="p-4 w-[9%] text-left">Current Rate</th>
-                  <th className="p-4 w-[11%] text-left">Rate Plan</th>
-                  <th className="p-4 w-[10%] text-left">Status</th>
-                  <th className="p-4 w-[12%] text-left">Actions</th>
+                  <th className="p-4 text-left">Property</th>
+                  <th className="p-4 text-left">Room Type</th>
+                  <th className="p-4 text-left">Total Rooms</th>
+                  <th className="p-4 text-left">Available</th>
+                  <th className="p-4 text-left">Occupied</th>
+                  <th className="p-4 text-left">Blocked</th>
+                  <th className="p-4 text-left">Base Rate</th>
+                  <th className="p-4 text-left">Current Rate</th>
+                  <th className="p-4 text-left">Rate Plan</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
                 {filteredRooms.map((r) => (
                   <tr key={r.id} className="hover:bg-muted/15 transition-colors">
-                    <td className="p-4 w-[16%] text-left">
+                    <td className="p-4 text-left">
                       <div className="flex items-center gap-1.5 font-semibold text-navy truncate" title={r.propertyName}>
                         <Building className="size-3.5 text-purple shrink-0" />
                         <span className="truncate">{r.propertyName}</span>
                       </div>
                     </td>
-                    <td className="p-4 w-[10%] text-left font-semibold text-navy">{r.roomType}</td>
-                    <td className="p-4 w-[9%] text-left text-muted-foreground">{r.totalRooms} Keys</td>
-                    <td className="p-4 w-[8%] text-left text-success font-semibold">{r.available}</td>
-                    <td className="p-4 w-[8%] text-left text-brand font-semibold">{r.occupied}</td>
-                    <td className="p-4 w-[8%] text-left text-warning font-semibold">{r.blocked}</td>
-                    <td className="p-4 w-[9%] text-left font-bold text-navy font-mono">₹{r.baseRate.toLocaleString("en-IN")}</td>
-                    <td className="p-4 w-[9%] text-left font-bold text-purple font-mono">₹{r.currentRate.toLocaleString("en-IN")}</td>
-                    <td className="p-4 w-[11%] text-left">
+                    <td className="p-4 text-left font-semibold text-navy">{r.roomType}</td>
+                    <td className="p-4 text-left text-muted-foreground">{r.totalRooms} Keys</td>
+                    <td className="p-4 text-left text-success font-semibold">{r.available}</td>
+                    <td className="p-4 text-left text-brand font-semibold">{r.occupied}</td>
+                    <td className="p-4 text-left text-warning font-semibold">{r.blocked}</td>
+                    <td className="p-4 text-left font-bold text-navy font-mono">₹{r.baseRate.toLocaleString("en-IN")}</td>
+                    <td className="p-4 text-left font-bold text-purple font-mono">₹{r.currentRate.toLocaleString("en-IN")}</td>
+                    <td className="p-4 text-left">
                       <Tag tone="brand">{r.ratePlan}</Tag>
                     </td>
-                    <td className="p-4 w-[10%] text-left">
+                    <td className="p-4 text-left">
                       <Tag tone={getStatusTone(r.status)}>{r.status}</Tag>
                     </td>
-                    <td className="p-4 w-[12%] text-left">
-                      <div className="flex gap-1.5 justify-start items-center">
-                        <button
-                          onClick={() => handleOpenModal("view", r)}
-                          className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer flex items-center justify-center h-7 w-7"
-                          title="View Category details"
-                        >
-                          <Eye className="size-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenModal("edit", r)}
-                          className="p-1.5 rounded-full hover:bg-muted text-purple cursor-pointer flex items-center justify-center h-7 w-7"
-                          title="Edit Inventory"
-                        >
-                          <Edit2 className="size-3.5" />
-                        </button>
-                        <button
+                    <td className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">
+                      <ActionGroup>
+                        <ViewActionButton onClick={() => handleOpenModal("view", r)} />
+                        <EditActionButton onClick={() => handleOpenModal("edit", r)} />
+                        <ActionButton
+                          icon={Sliders}
+                          label="Rates"
+                          variant="warning"
                           onClick={() => handleOpenModal("rates", r)}
-                          className="p-1.5 rounded-full hover:bg-muted text-warning cursor-pointer flex items-center justify-center h-7 w-7"
-                          title="Manage Rates"
-                        >
-                          <Sliders className="size-3.5" />
-                        </button>
-                      </div>
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}

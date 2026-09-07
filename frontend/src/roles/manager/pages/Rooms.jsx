@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton, EditActionButton, AssignActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 import {
   Bed,
   CheckCircle,
@@ -131,13 +132,22 @@ function ManagerRoomsPage() {
   }
 
   useEffect(() => {
-    loadData(false);
+    loadData(false);
+
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 10000); // 10s poll fallback
+
+    const handleFocus = () => loadData(true);
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -155,23 +165,19 @@ function ManagerRoomsPage() {
     }
   };
 
-  // Compile full Rooms array with dynamic MongoDB status and booking data (Pass 1: explicit room IDs/numbers, Pass 2: category-level bookings)
+  // Compile full Rooms array with dynamic MongoDB status and booking data
   const roomBookingMap = new Map();
-  const unassignedBookings = [];
 
   for (const b of bookings) {
     if (b.status === "Cancelled" || b.status === "Checked-out" || b.status === "No-show") continue;
-    const bRoomNum = b.roomId || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
+    const bRoomNum = extractRoomNumber(b);
     let matchedRm = null;
 
     if (b.roomId) {
       matchedRm = rooms.find(r => String(r._id || r.id) === String(b.roomId));
     }
     if (!matchedRm && bRoomNum) {
-      matchedRm = rooms.find(r => String(r.roomNumber || r.room).trim() === String(bRoomNum).trim());
-    }
-    if (!matchedRm && b.room && !b.room.includes("Standard Room") && !b.room.includes("Deluxe Room") && !b.room.includes("Executive Suite") && !b.room.includes("Villa Suite")) {
-      matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber || r.room)));
+      matchedRm = rooms.find(r => extractRoomNumber(r) === bRoomNum);
     }
 
     if (matchedRm) {
@@ -179,48 +185,19 @@ function ManagerRoomsPage() {
       const k2 = String(matchedRm.roomNumber || matchedRm.room || '');
       if (k1) roomBookingMap.set(k1, b);
       if (k2) roomBookingMap.set(k2, b);
-    } else {
-      unassignedBookings.push(b);
     }
   }
 
-  for (const b of unassignedBookings) {
-    const targetCategory = b.roomType || b.category || b.room;
-    if (!targetCategory) continue;
+  const normalizedRooms = normalizeRoomList(rooms, bookings);
 
-    const candidate = rooms.find(r => {
-      const k1 = String(r._id || r.id || '');
-      const k2 = String(r.roomNumber || r.room || '');
-      if (roomBookingMap.has(k1) || roomBookingMap.has(k2)) return false;
-      if (r.status === 'Blocked') return false;
-
-      const rCat = String(r.category || r.roomType || '').toLowerCase();
-      const bCat = String(targetCategory).toLowerCase();
-      return rCat === bCat || bCat.includes(rCat) || rCat.includes(bCat);
-    });
-
-    if (candidate) {
-      const k1 = String(candidate._id || candidate.id || '');
-      const k2 = String(candidate.roomNumber || candidate.room || '');
-      if (k1) roomBookingMap.set(k1, b);
-      if (k2) roomBookingMap.set(k2, b);
-    }
-  }
-
-  const compiledRooms = rooms.map(r => {
+  const compiledRooms = normalizedRooms.map(r => {
     const k1 = String(r._id || r.id || '');
     const k2 = String(r.roomNumber || r.room || '');
     const activeBooking = roomBookingMap.get(k1) || roomBookingMap.get(k2);
 
     let currentStatus = r.status || "Available";
-    if (activeBooking) {
-      if (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In") {
-        currentStatus = "Occupied";
-      } else {
-        currentStatus = "Reserved";
-      }
-    } else if (currentStatus === "Occupied") {
-      currentStatus = "Available";
+    if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying")) {
+      currentStatus = "Occupied";
     }
 
     return {
@@ -241,12 +218,13 @@ function ManagerRoomsPage() {
   });
 
   // Statistics Computations
-  const totalCount = compiledRooms.length;
-  const availableCount = compiledRooms.filter(r => r.status === "Available").length;
-  const occupiedCount = compiledRooms.filter(r => r.status === "Occupied").length;
-  const dirtyCount = compiledRooms.filter(r => r.status === "Dirty").length;
-  const cleaningCount = compiledRooms.filter(r => r.status === "Cleaning").length;
-  const oooCount = compiledRooms.filter(r => r.status === "Out of Order").length;
+  const roomKPIs = calculateRoomKPIs(compiledRooms, bookings);
+  const totalCount = roomKPIs.totalRooms;
+  const availableCount = roomKPIs.availableRooms;
+  const occupiedCount = roomKPIs.occupiedRooms;
+  const dirtyCount = roomKPIs.dirtyRooms;
+  const cleaningCount = roomKPIs.cleaningRooms;
+  const oooCount = roomKPIs.outOfOrderRooms;
   const blockedCount = compiledRooms.filter(r => r.status === "Blocked").length;
 
   // Filter Computations
@@ -388,7 +366,7 @@ function ManagerRoomsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[1050px]">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
                   <th className="py-4.5 px-6 text-left">Room Number</th>
@@ -399,7 +377,7 @@ function ManagerRoomsPage() {
                   <th className="py-4.5 px-4 text-left">Check-In</th>
                   <th className="py-4.5 px-4 text-left">Check-Out</th>
                   <th className="py-4.5 px-4 text-left">Current Booking</th>
-                  <th className="py-4.5 px-6 text-right">Actions</th>
+                  <th className="py-4.5 px-6 text-right min-w-[170px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -446,43 +424,28 @@ function ManagerRoomsPage() {
                           <span className="text-muted-foreground/45">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1 select-none">
+                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[170px]">
+                        <ActionGroup align="right">
                           {active && (
                             <>
-                              <Button
+                              <ViewActionButton
                                 onClick={() => navigate({ to: `/manager/reservations/view/${active._id || active.id}` })}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 hover:text-brand cursor-pointer"
                                 title="View Stay Details"
-                              >
-                                <Eye className="size-3.5" />
-                              </Button>
-                              <Button
+                              />
+                              <EditActionButton
                                 onClick={() => navigate({ to: `/manager/reservations/edit/${active._id || active.id}` })}
-                                size="icon"
-                                variant="ghost"
-                                className="size-7 hover:text-brand cursor-pointer"
                                 title="Reassign Room / Modify Booking"
-                              >
-                                <Edit2 className="size-3.5" />
-                              </Button>
+                              />
                             </>
                           )}
                           {!active && (
-                            <Button
+                            <AssignActionButton
                               disabled={rm.status === "Occupied"}
                               onClick={() => navigate({ to: `/manager/reservations` })}
-                              size="xs"
-                              variant="outline"
-                              className="text-brand border-brand/40 hover:bg-brand/5 h-6 text-[10px] font-bold px-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Assign Guest
-                            </Button>
+                              label="Assign Guest"
+                            />
                           )}
-                          
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

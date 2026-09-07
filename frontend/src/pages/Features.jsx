@@ -202,10 +202,10 @@ function Features() {
       <section id="pricing" className="bg-white py-20 border-b border-navy/5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 text-center font-ui">
           <span className="text-xs font-bold uppercase tracking-widest text-purple">Transparent Pricing</span>
-          <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+          <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
             Choose the right plan for your property
           </h2>
-          <p className="mt-4 mx-auto max-w-2xl text-sm text-muted-foreground leading-relaxed">
+          <p className="mt-4 mx-auto max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
             All plans include GST compliance, unlimited staff accounts, and dedicated onboarding support.
           </p>
 
@@ -237,7 +237,7 @@ function Features() {
           {/* Plans Grid */}
           <div className="mt-14">
             {plansLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-[#4A4F58]">
                 <RefreshCw className="size-6 animate-spin text-purple" />
                 <p className="text-xs">Loading live subscription plans...</p>
               </div>
@@ -247,7 +247,7 @@ function Features() {
                 <span>{plansError}</span>
               </div>
             ) : plans.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-xs">
+              <div className="py-12 text-center text-[#4A4F58] text-xs">
                 No active subscription plans found at this time.
               </div>
             ) : (
@@ -278,7 +278,7 @@ function Features() {
                             {plan.name}
                           </h3>
                         </div>
-                        <p className={`text-xs min-h-[32px] leading-relaxed mb-6 ${isPopular ? "text-cream/70" : "text-muted-foreground"}`}>
+                        <p className={`text-xs min-h-[32px] leading-relaxed mb-6 font-ui ${isPopular ? "text-cream/70" : "text-[#4A4F58]"}`}>
                           {plan.description || "Complete operations suite for Indian hotels."}
                         </p>
 
@@ -289,7 +289,7 @@ function Features() {
                             <span className={`text-4xl font-extrabold tracking-tight ${isPopular ? "text-[#F5C06A]" : "text-navy"}`}>
                               {price?.toLocaleString("en-IN")}
                             </span>
-                            <span className={`text-xs ${isPopular ? "text-cream/60" : "text-muted-foreground"}`}>
+                            <span className={`text-xs ${isPopular ? "text-cream/60" : "text-[#4A4F58]"}`}>
                               {period}
                             </span>
                           </div>
@@ -305,11 +305,11 @@ function Features() {
                           isPopular ? "bg-white/5 border border-white/10" : "bg-cream/40 border border-navy/5"
                         }`}>
                           <div className="flex justify-between">
-                            <span className={isPopular ? "text-cream/70" : "text-muted-foreground"}>Property Capacity:</span>
+                            <span className={isPopular ? "text-cream/70" : "text-[#4A4F58]"}>Property Capacity:</span>
                             <span className="font-bold">{plan.propertyLimit} {plan.propertyLimit === 1 ? "Property" : "Properties"}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className={isPopular ? "text-cream/70" : "text-muted-foreground"}>Room Keys Limit:</span>
+                            <span className={isPopular ? "text-cream/70" : "text-[#4A4F58]"}>Room Keys Limit:</span>
                             <span className="font-bold">Up to {plan.roomLimit} Rooms</span>
                           </div>
                         </div>
@@ -359,10 +359,10 @@ function Features() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               All Platform Modules & Features
             </h2>
-            <p className="mt-4 mx-auto max-w-2xl text-sm text-muted-foreground font-ui">
+            <p className="mt-4 mx-auto max-w-2xl text-base text-[#4A4F58] font-ui leading-relaxed">
               Explore the exhaustive list of modules built to handle every dimension of modern hospitality operations.
             </p>
           </div>
@@ -371,8 +371,8 @@ function Features() {
             {featuresToRender.map((mod, idx) => (
               <div key={idx} className="card-guest border border-navy/5 bg-white p-6 rounded-xl shadow-soft flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
                 <div>
-                  <h3 className="font-display text-sm font-bold text-navy border-b border-navy/5 pb-2 mb-3">{mod.title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-4">{mod.desc}</p>
+                  <h3 className="font-display text-base font-bold text-navy border-b border-navy/5 pb-2 mb-3">{mod.title}</h3>
+                  <p className="text-xs text-[#4A4F58] leading-relaxed mb-4 font-ui">{mod.desc}</p>
                 </div>
                 <ul className="space-y-1.5 pt-2 border-t border-navy/5">
                   {mod.points.map((pt, pIdx) => (

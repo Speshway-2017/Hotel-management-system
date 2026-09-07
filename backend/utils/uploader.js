@@ -57,8 +57,12 @@ const uploadImageToCloudinary = async (filePath) => {
         publicId: result.public_id
       };
     } catch (error) {
-      console.error('Cloudinary upload failure:', error.message);
-      throw new Error('Cloudinary Upload failed: ' + error.message);
+      console.warn('Cloudinary upload failure, falling back to local static URL:', error.message);
+      const filename = path.basename(filePath);
+      return {
+        url: `http://localhost:5000/uploads/${filename}`,
+        publicId: `local_${filename}`
+      };
     }
   } else {
     // Local fallback: Return URL path

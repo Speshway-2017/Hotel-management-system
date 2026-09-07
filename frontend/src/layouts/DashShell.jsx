@@ -245,10 +245,22 @@ export function DashShell({ role, children }) {
 
   useEffect(() => {
     const handleProfileUpdate = () => {
-      setCurrentUser(authService.getCurrentUser());
+      const fresh = authService.getCurrentUser();
+      if (fresh) setCurrentUser(fresh);
     };
     window.addEventListener('user-profile-updated', handleProfileUpdate);
-    return () => window.removeEventListener('user-profile-updated', handleProfileUpdate);
+    window.addEventListener('storage', handleProfileUpdate);
+
+    authService.getProfile().then((res) => {
+      if (res && res.success && res.data) {
+        setCurrentUser(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      window.removeEventListener('user-profile-updated', handleProfileUpdate);
+      window.removeEventListener('storage', handleProfileUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -605,12 +617,6 @@ export function DashShell({ role, children }) {
                     subtitle: "Manage secure profiles, stay records, feedback, complaints, and preferences."
                   };
                 }
-                if (path.startsWith("/admin/front-desk")) {
-                  return {
-                    title: "Front Desk Control Console",
-                    subtitle: "Manage live room layout mapping grid, instant check-in/out triggers, and invoice folios."
-                  };
-                }
                 if (
                   path.startsWith("/admin/payments") ||
                   path.startsWith("/admin/billing") ||
@@ -941,23 +947,23 @@ export function DashShell({ role, children }) {
               }
               const mappings = {
                 "/admin/reservations": [
-                  { label: "Operations", to: "/admin/reservations" },
                   { label: "Reservations" }
                 ],
                 "/admin/reservations/add": [
-                  { label: "Operations", to: "/admin/reservations" },
                   { label: "Reservations", to: "/admin/reservations" },
                   { label: "Create Booking" }
                 ],
                 "/admin/reservations/edit": [
-                  { label: "Operations", to: "/admin/reservations" },
                   { label: "Reservations", to: "/admin/reservations" },
                   { label: "Edit Booking" }
                 ],
                 "/admin/reservations/view": [
-                  { label: "Operations", to: "/admin/reservations" },
                   { label: "Reservations", to: "/admin/reservations" },
                   { label: "Reservation Details" }
+                ],
+                "/admin/reservations/extend": [
+                  { label: "Reservations", to: "/admin/reservations" },
+                  { label: "Extend Stay" }
                 ],
                 "/admin/rooms": [
                   { label: "Operations", to: "/admin/reservations" },
@@ -966,10 +972,6 @@ export function DashShell({ role, children }) {
                 "/admin/guests": [
                   { label: "Operations", to: "/admin/reservations" },
                   { label: "Guests" }
-                ],
-                "/admin/front-desk": [
-                  { label: "Operations", to: "/admin/reservations" },
-                  { label: "Front Desk" }
                 ],
                 "/admin/billing": [
                   { label: "Finance", to: "/admin/billing" },
@@ -1058,6 +1060,7 @@ export function DashShell({ role, children }) {
                 "/super-admin/occupancy": [{ label: "Occupancy" }],
                 "/super-admin/reservations": [{ label: "Reservations" }],
                 "/super-admin/reservations/view": [{ label: "Reservations", to: "/super-admin/reservations" }, { label: "Reservation Details" }],
+                "/super-admin/reservations/extend": [{ label: "Reservations", to: "/super-admin/reservations" }, { label: "Extend Stay" }],
                 "/super-admin/reports": [{ label: "Reports" }],
                 "/super-admin/channel-manager": [{ label: "Channel Manager" }],
                 "/super-admin/contacts": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests" }],
@@ -1076,7 +1079,8 @@ export function DashShell({ role, children }) {
                 "/super-admin/notifications": [{ label: "Notifications" }],
                 "/super-admin/profile": [{ label: "Profile" }],
                 "/manager/operations": [{ label: "Operations" }, { label: "Today's Operations" }],
-                "/manager/reservations": [{ label: "Operations" }, { label: "Reservations" }],
+                "/manager/reservations": [{ label: "Reservations" }],
+                "/manager/reservations/extend": [{ label: "Reservations", to: "/manager/reservations" }, { label: "Extend Stay" }],
                 "/manager/rooms": [{ label: "Operations" }, { label: "Rooms" }],
                 "/manager/guests": [{ label: "Operations" }, { label: "Guests" }],
                 "/manager/housekeeping": [{ label: "Operations" }, { label: "Housekeeping" }],
@@ -1094,6 +1098,7 @@ export function DashShell({ role, children }) {
                 "/reception/guest-search": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests" }],
                 "/reception/room-assignment": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status" }],
                 "/reception/reservations": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger" }],
+                "/reception/reservations/extend": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Extend Stay" }],
                 "/reception/payments": [{ label: "Payments" }],
                 "/reception/payments/:id": [{ label: "Payments", to: "/reception/payments" }, { label: "Payment Details" }],
                 "/reception/folio": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio" }],
@@ -1119,6 +1124,7 @@ export function DashShell({ role, children }) {
               };
               const cleanPathname = pathname.replace(/\/view\/[^\/]+$/, "/view")
                                             .replace(/\/edit\/[^\/]+$/, "/edit")
+                                            .replace(/\/extend\/[^\/]+$/, "/extend")
                                             .replace(/\/reception\/check-in\/[^\/]+$/, "/reception/check-in/:id")
                                             .replace(/\/reception\/check-out\/[^\/]+$/, "/reception/check-out/:id")
                                             .replace(/\/reception\/folio\/[^\/]+$/, "/reception/folio/:id")

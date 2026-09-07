@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -21,6 +21,7 @@ import {
   Building,
   Calendar
 } from "lucide-react";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
@@ -41,8 +42,6 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
     </div>
   );
 }
-
-import { subscribeRealtimeSync } from "@/services/socket";
 
 function ManagerApprovalsPage() {
   const navigate = useNavigate();
@@ -272,7 +271,7 @@ function ManagerApprovalsPage() {
                   <th className="py-4.5 px-4">Reason</th>
                   <th className="py-4.5 px-4">Requested Date</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-6 text-right">Actions</th>
+                  <th className="py-4.5 px-6 text-right min-w-[220px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -309,39 +308,24 @@ function ManagerApprovalsPage() {
                           {r.status}
                         </Tag>
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5 select-none">
-                          <Button
+                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[200px]">
+                        <ActionGroup align="right">
+                          <ViewActionButton
                             onClick={() => navigate({ to: `/manager/approvals/view/${r.id}` })}
-                            size="icon"
-                            variant="ghost"
-                            className="size-7 hover:text-brand cursor-pointer"
                             title="View Request Details"
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
+                          />
                           
                           {r.status === "Pending" && (
                             <>
-                              <Button
+                              <ApproveActionButton
                                 onClick={() => handleDecision(r.id, "Approved")}
-                                size="xs"
-                                variant="outline"
-                                className="text-success border-success/40 hover:bg-success/5 h-6 text-[10px] font-bold px-2 cursor-pointer"
-                              >
-                                Approve
-                              </Button>
-                              <Button
+                              />
+                              <RejectActionButton
                                 onClick={() => handleDecision(r.id, "Rejected")}
-                                size="xs"
-                                variant="outline"
-                                className="text-destructive border-destructive/40 hover:bg-destructive/5 h-6 text-[10px] font-bold px-2 cursor-pointer"
-                              >
-                                Reject
-                              </Button>
+                              />
                             </>
                           )}
-                        </div>
+                        </ActionGroup>
                       </td>
                     </tr>
                   );

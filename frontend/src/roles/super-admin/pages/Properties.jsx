@@ -2,7 +2,7 @@ import { FormField, Input, Select, Textarea, Checkbox, Switch } from "@/componen
 import { Label } from "@/components/ui/label";
 import { createFileRoute, useNavigate, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, ActionGroup, ViewActionButton, EditActionButton, ActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
@@ -205,7 +205,7 @@ function SuperAdminPlatform() {
                     <th className="p-4">Revenue</th>
                     <th className="p-4">Assigned Admin</th>
                     <th className="p-4">Status</th>
-                    <th className="p-4 text-right pr-6 w-32 whitespace-nowrap">Actions</th>
+                    <th className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y font-sans">
@@ -225,25 +225,26 @@ function SuperAdminPlatform() {
                         <td className="p-4">
                           <Tag tone={statusTone(p.status)}>{p.status}</Tag>
                         </td>
-                        <td className="p-4 text-right pr-6 w-32 whitespace-nowrap">
-                          <div className="flex gap-2 justify-end items-center">
-                            <button onClick={() => navigate({ to: `/super-admin/properties/view/${p._id || p.id}` })} className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer" title="View details">
-                              <Eye className="size-4" />
-                            </button>
-
+                        <td className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">
+                          <ActionGroup>
+                            <ViewActionButton onClick={() => navigate({ to: `/super-admin/properties/view/${p._id || p.id}` })} />
+                            <EditActionButton onClick={() => navigate({ to: `/super-admin/properties/edit/${p._id || p.id}` })} />
                             {p.status === "Active" ? (
-                              <button onClick={() => handleUpdateStatus(p, "Suspended")} className="p-1.5 rounded-full hover:bg-warning/10 text-warning cursor-pointer" title="Deactivate">
-                                <X className="size-4" />
-                              </button>
+                              <ActionButton
+                                icon={X}
+                                label="Suspend"
+                                variant="danger"
+                                onClick={() => handleUpdateStatus(p, "Suspended")}
+                              />
                             ) : (
-                              <button onClick={() => handleUpdateStatus(p, "Active")} className="p-1.5 rounded-full hover:bg-success/10 text-success cursor-pointer" title="Activate">
-                                <Check className="size-4" />
-                              </button>
+                              <ActionButton
+                                icon={Check}
+                                label="Activate"
+                                variant="success"
+                                onClick={() => handleUpdateStatus(p, "Active")}
+                              />
                             )}
-                            <button onClick={() => navigate({ to: `/super-admin/properties/edit/${p._id || p.id}` })} className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer" title="Edit">
-                              <Edit2 className="size-4" />
-                            </button>
-                          </div>
+                          </ActionGroup>
                         </td>
                       </tr>
                     );

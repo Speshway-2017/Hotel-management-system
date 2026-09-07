@@ -14,10 +14,11 @@ import {
   ManagerNotification,
   Payment
 } from '../models/managerData.model.js';
-import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
+import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
+import { triggerNotification } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -90,35 +91,101 @@ const seedDefaultAttendance = async (propertyId, staffMembers) => {
 
 // Helper to seed default approvals if empty
 const seedDefaultApprovals = async (propertyId) => {
-  const count = await Approval.countDocuments({ propertyId });
+  const count = await Approval.countDocuments({});
   if (count === 0) {
     const defaults = [
       {
-        category: "Discount",
-        requestedBy: "receptionist@hourstay.com",
+        id: "APR-9101",
+        category: "Discount Override",
+        requestedBy: "Amit Verma (Receptionist)",
+        guest: "Abhi",
+        bookingId: "BKG-7821",
+        room: "102",
         amount: 2500,
-        reason: "Repeat corporate guest requested corporate tariff override.",
+        value: "₹2,500 Discount",
+        reason: "Repeat corporate guest tariff override request.",
+        description: "Guest requested standard corporate tariff discount match for 3-night stay in Room 102.",
         status: "Pending",
-        propertyId
+        propertyId: propertyId || "HS-JAI"
       },
       {
-        category: "Refund",
-        requestedBy: "receptionist@hourstay.com",
+        id: "APR-9102",
+        category: "Refund Request",
+        requestedBy: "Sunita Rao (Receptionist)",
+        guest: "Sunny",
+        bookingId: "BKG-4491",
+        room: "201",
         amount: 4900,
-        reason: "AC malfunctioning in Room 302. Guest checked out early.",
+        value: "₹4,900 Refund",
+        reason: "AC malfunctioning in Room 201 during stay.",
+        description: "Front desk processed room swap; guest requested refund waiver for first night inconvenience.",
         status: "Pending",
-        propertyId
+        propertyId: propertyId || "HS-JAI"
       },
       {
-        category: "Upgrade",
-        requestedBy: "receptionist@hourstay.com",
+        id: "APR-9103",
+        category: "Room Upgrade",
+        requestedBy: "Amit Verma (Receptionist)",
+        guest: "Surya",
+        bookingId: "BKG-3104",
+        room: "301",
         amount: 0,
+        value: "Complimentary Upgrade",
         reason: "Standard Room overbooked. Complimentary Deluxe upgrade proposal.",
+        description: "High occupancy tier override: upgraded guest to Executive Suite 301 at standard room rate.",
         status: "Approved",
-        propertyId,
-        decisionReason: "Standard overbooking resolved.",
+        propertyId: propertyId || "HS-JAI",
+        decisionReason: "Standard overbooking resolved with guest satisfaction.",
         decidedBy: "Vikram Rathore",
         decidedAt: new Date()
+      },
+      {
+        id: "APR-9104",
+        category: "Cancellation Waiver",
+        requestedBy: "Neha Patel (Front Desk)",
+        guest: "Mounika",
+        bookingId: "BKG-2098",
+        room: "103",
+        amount: 1800,
+        value: "100% Fee Waiver",
+        reason: "Medical emergency cancellation.",
+        description: "Guest provided medical proof for travel disruption and emergency hospital admission.",
+        status: "Approved",
+        propertyId: propertyId || "HS-JAI",
+        decisionReason: "Medical documentation verified.",
+        decidedBy: "Vikram Rathore",
+        decidedAt: new Date()
+      },
+      {
+        id: "APR-9105",
+        category: "Late Check-out Waiver",
+        requestedBy: "Amit Verma (Receptionist)",
+        guest: "Aswini",
+        bookingId: "BKG-6502",
+        room: "401",
+        amount: 1200,
+        value: "₹1,200 Fee Waiver",
+        reason: "Late checkout until 4:00 PM without additional fee.",
+        description: "Flight departure delayed by 5 hours. Requested complimentary late check-out authorization.",
+        status: "Rejected",
+        propertyId: propertyId || "HS-JAI",
+        decisionReason: "Room needed immediately for 2:00 PM incoming check-in arrival.",
+        decidedBy: "Vikram Rathore",
+        decidedAt: new Date()
+      },
+      {
+        id: "APR-9106",
+        category: "Early Check-in Waiver",
+        requestedBy: "Sunita Rao (Receptionist)",
+        guest: "Vamsi",
+        bookingId: "BKG-5120",
+        room: "101",
+        amount: 800,
+        value: "₹800 Fee Waiver",
+        reason: "Early arrival at 8:00 AM requesting complimentary room access.",
+        description: "Room 101 was vacant and inspected since yesterday; requested early key release.",
+        status: "Pending",
+        propertyId: propertyId || "HS-JAI"
       }
     ];
     await Approval.insertMany(defaults);
@@ -201,13 +268,7 @@ router.post('/reservations', async (req, res) => {
     const propId = req.user?.propertyId || 'HS-JAI';
     const bookingId = req.body.bookingId || req.body.id || `BK-${Date.now().toString().slice(-5)}`;
     
-    let roomNum = req.body.roomNumber || req.body.room || '';
-    if (typeof roomNum === 'string' && roomNum.includes('·')) {
-      roomNum = roomNum.split('·')[0].trim();
-    }
-    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) {
-      roomNum = roomNum.replace(/room/i, '').trim();
-    }
+    let roomNum = extractRoomNumber(req.body);
 
     let guestId = req.body.guestId || null;
     const cleanEmail = String(req.body.email || '').trim().toLowerCase();
@@ -240,13 +301,10 @@ router.post('/reservations', async (req, res) => {
 
     const newBooking = await Booking.create(payload);
 
-    // If room is assigned and checked-in, update room status
+    // If room is assigned, update room status
     if (roomNum) {
       const rmStatus = payload.status === 'Checked-in' ? 'Occupied' : 'Reserved';
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNum, propertyId: propId },
-        { status: rmStatus }
-      );
+      await syncRoomStatus(roomNum, rmStatus, propId);
     }
 
     const io = req.app.get('socketio');
@@ -338,18 +396,12 @@ router.put('/reservations/:id', async (req, res) => {
       }
     }
 
-    let roomNum = req.body.roomNumber || req.body.room;
-    if (typeof roomNum === 'string' && roomNum.includes('·')) {
-      roomNum = roomNum.split('·')[0].trim();
-    }
-    if (typeof roomNum === 'string' && roomNum.toLowerCase().includes('room')) {
-      roomNum = roomNum.replace(/room/i, '').trim();
-    }
+    let roomNum = extractRoomNumber(req.body) || extractRoomNumber(existingBooking);
 
     const updatePayload = { ...req.body };
     if (roomNum) {
       updatePayload.roomNumber = roomNum;
-      updatePayload.room = req.body.room || `${roomNum} · ${req.body.roomType || 'Standard Room'}`;
+      updatePayload.room = req.body.room || `${roomNum} · ${req.body.roomType || existingBooking.roomType || 'Standard Room'}`;
     }
 
     if (req.body.idDocNumber) {
@@ -370,17 +422,14 @@ router.put('/reservations/:id', async (req, res) => {
     if (!updated) return sendError(res, 404, 'Reservation not found');
 
     // Update Room table accordingly
-    let rmStatus = 'Available';
     if (roomNum) {
+      let rmStatus = 'Available';
       if (updated.status === 'Checked-in') rmStatus = 'Occupied';
       else if (updated.status === 'Confirmed' || updated.status === 'Pending') rmStatus = 'Reserved';
       else if (updated.status === 'Checked-out') rmStatus = 'Available';
       else if (updated.status === 'Cancelled' || updated.status === 'No-show') rmStatus = 'Available';
 
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNum, $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] },
-        { status: rmStatus }
-      );
+      await syncRoomStatus(roomNum, rmStatus, propId);
     }
 
     // Realtime broadcast across all dashboards
@@ -424,18 +473,18 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
 
     if (!updated) return sendError(res, 404, 'Reservation not found');
 
+    const cleanRoomNum = extractRoomNumber(roomNumber);
     const rmStatus = updated.status === 'Checked-in' ? 'Occupied' : 'Reserved';
-    await Room.findOneAndUpdate(
-      { roomNumber: String(roomNumber), propertyId: propId },
-      { status: rmStatus }
-    );
+    if (cleanRoomNum) {
+      await syncRoomStatus(cleanRoomNum, rmStatus, propId);
+    }
 
     const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, propId, {
         action: 'room_assigned',
         booking: updated,
-        roomNumber: String(roomNumber),
+        roomNumber: cleanRoomNum || String(roomNumber),
         status: rmStatus
       });
     }
@@ -458,17 +507,15 @@ router.delete('/reservations/:id', async (req, res) => {
     const deleted = await Booking.findOneAndDelete({ $or: query });
     if (!deleted) return sendError(res, 404, 'Reservation not found');
 
-    if (deleted.roomNumber) {
-      await Room.findOneAndUpdate(
-        { roomNumber: deleted.roomNumber, propertyId: propId },
-        { status: 'Available' }
-      );
+    const deletedRoomNum = extractRoomNumber(deleted);
+    if (deletedRoomNum) {
+      await syncRoomStatus(deletedRoomNum, 'Available', propId);
     }
 
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, propId, 'booking_deleted', { id, bookingId: deleted.bookingId, propertyId: propId });
-      emitRealtimeSync(io, propId, 'room_status_changed', { propertyId: propId, roomNumber: deleted.roomNumber, status: 'Available' });
+      emitRealtimeSync(io, propId, 'room_status_changed', { propertyId: propId, roomNumber: deletedRoomNum, status: 'Available' });
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'booking_deleted' });
     }
 
@@ -536,27 +583,6 @@ router.get('/rooms', async (req, res) => {
 
       if (matchedRm) {
         roomBookingMap.set(String(matchedRm._id), b);
-      } else {
-        unassignedCategoryBookings.push(b);
-      }
-    }
-
-    // Pass 2: Category-level matching for bookings without an explicit room number
-    for (const b of unassignedCategoryBookings) {
-      const targetCategory = b.roomType || b.category || b.room;
-      if (!targetCategory) continue;
-
-      const candidate = rooms.find(r => {
-        if (roomBookingMap.has(String(r._id))) return false;
-        if (r.status === 'Blocked') return false;
-
-        const rCat = String(r.category || '').toLowerCase();
-        const bCat = String(targetCategory).toLowerCase();
-        return rCat === bCat || bCat.includes(rCat) || rCat.includes(bCat);
-      });
-
-      if (candidate) {
-        roomBookingMap.set(String(candidate._id), b);
       }
     }
 
@@ -752,8 +778,15 @@ router.get('/guests', async (req, res) => {
 // ==========================================
 router.get('/approvals', async (req, res) => {
   try {
-    await seedDefaultApprovals(req.user.propertyId);
-    const list = await Approval.find({ propertyId: req.user.propertyId }).sort({ createdAt: -1 });
+    const targetPropId = req.user.propertyId || 'HS-JAI';
+    await seedDefaultApprovals(targetPropId);
+    let query = {};
+    if (req.user.role === 'super-admin') {
+      query = {};
+    } else {
+      query = { $or: [{ propertyId: targetPropId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
+    }
+    const list = await Approval.find(query).sort({ createdAt: -1 });
     return sendSuccess(res, 200, list, 'Approvals desk requests list retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -762,51 +795,70 @@ router.get('/approvals', async (req, res) => {
 
 router.post('/approvals/:id', async (req, res) => {
   try {
-    const { action, decisionReason } = req.body; // Approved, Rejected
-    if (!action || !['Approved', 'Rejected'].includes(action)) {
-      return sendError(res, 400, 'Approved or Rejected decision action parameter required.');
+    const { action, decisionReason } = req.body;
+    if (!action) {
+      return sendError(res, 400, 'Decision action is required (Approve or Reject).');
     }
     
+    let finalAction = action;
+    if (finalAction.toLowerCase() === 'approve') finalAction = 'Approved';
+    if (finalAction.toLowerCase() === 'reject') finalAction = 'Rejected';
+
+    if (!['Approved', 'Rejected'].includes(finalAction)) {
+      return sendError(res, 400, 'Invalid decision action. Must be Approve or Reject.');
+    }
+
+    const approvalQuery = [{ id: req.params.id }];
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      approvalQuery.unshift({ _id: req.params.id });
+    }
+
     const updated = await Approval.findOneAndUpdate(
-      { _id: req.params.id, propertyId: req.user.propertyId },
+      { $or: approvalQuery },
       {
-        status: action,
-        decisionReason: decisionReason || 'None',
-        decidedBy: req.user.name || req.user.email,
+        status: finalAction,
+        decisionReason: decisionReason || (finalAction === 'Approved' ? 'Approved via Approvals Console' : 'Rejected via Approvals Console'),
+        decidedBy: req.user.name || req.user.email || 'Administrator',
         decidedAt: new Date()
       },
       { new: true }
     );
 
     if (!updated) {
-      return sendError(res, 404, 'Approval request log file not found.');
+      return sendError(res, 404, 'Approval request not found.');
     }
 
-    await triggerNotification({
-      req,
-      role: 'admin',
-      propertyId: req.user.propertyId,
-      title: `Approval Decision: ${updated.type || 'Request'} ${action}`,
-      message: `Request for ${updated.guest || 'Guest'} was ${action} by Manager ${req.user.name || ''}.`,
-      category: 'Approvals'
-    });
+    const targetPropId = updated.propertyId || req.user.propertyId || 'HS-JAI';
 
-    await triggerNotification({
-      req,
-      role: 'receptionist',
-      propertyId: req.user.propertyId,
-      title: `Approval Decision: ${updated.type || 'Request'} ${action}`,
-      message: `Request for ${updated.guest || 'Guest'} was ${action} by Manager.`,
-      category: 'Approvals'
-    });
+    try {
+      await triggerNotification({
+        req,
+        role: 'admin',
+        propertyId: targetPropId,
+        title: `Approval Decision: ${updated.category || 'Request'} ${finalAction}`,
+        message: `Request for ${updated.guest || 'Guest'} was ${finalAction} by ${req.user.name || 'Admin'}.`,
+        category: 'Approvals'
+      });
+
+      await triggerNotification({
+        req,
+        role: 'receptionist',
+        propertyId: targetPropId,
+        title: `Approval Decision: ${updated.category || 'Request'} ${finalAction}`,
+        message: `Request for ${updated.guest || 'Guest'} was ${finalAction}.`,
+        category: 'Approvals'
+      });
+    } catch (notifErr) {
+      console.warn('Notification dispatch failed for approval:', notifErr.message);
+    }
 
     const io = req.app.get('socketio');
     if (io) {
-      emitRealtimeSync(io, req.user.propertyId, 'approval_updated', { approval: updated, propertyId: req.user.propertyId });
-      emitRealtimeSync(io, req.user.propertyId, 'dashboard_sync', { propertyId: req.user.propertyId, action: 'approval_updated' });
+      emitRealtimeSync(io, targetPropId, 'approval_updated', { approval: updated, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'approval_updated' });
     }
 
-    return sendSuccess(res, 200, updated, `Approval request decision marked as ${action}.`);
+    return sendSuccess(res, 200, updated, `Approval request decision marked as ${finalAction}.`);
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -829,6 +881,79 @@ router.get('/staff', async (req, res) => {
   }
 });
 
+const buildManagerStaffLookups = (id, bodyEmail, bodyName, bodyAltId) => {
+  const queries = [];
+  const addQuery = (key, val) => {
+    if (val && typeof val === 'string' && val.trim()) {
+      const clean = val.trim();
+      queries.push({ [key]: clean });
+      if (key === 'email') queries.push({ [key]: clean.toLowerCase() });
+    }
+  };
+
+  const cleanId = String(id || '').trim();
+  if (cleanId) {
+    addQuery('_id', cleanId);
+    addQuery('id', cleanId);
+    addQuery('email', cleanId);
+    
+    // Check if Base64 encoded ID
+    try {
+      if (cleanId.length % 4 === 0 && !cleanId.includes('-') && !cleanId.includes(' ') && /^[A-Za-z0-9+/=]+$/.test(cleanId)) {
+        const decoded = Buffer.from(cleanId, 'base64').toString('utf8');
+        if (decoded && decoded !== cleanId && (decoded.includes('-') || decoded.length >= 10 || decoded.includes('@') || decoded.startsWith('USR') || decoded.startsWith('STAFF') || decoded.startsWith('HS-'))) {
+          addQuery('_id', decoded);
+          addQuery('id', decoded);
+          addQuery('email', decoded);
+        }
+      }
+    } catch {}
+
+    if (mongoose.Types.ObjectId.isValid(cleanId) && String(new mongoose.Types.ObjectId(cleanId)) === cleanId) {
+      queries.unshift({ _id: new mongoose.Types.ObjectId(cleanId) });
+    }
+  }
+
+  if (bodyAltId) {
+    const cleanAlt = String(bodyAltId).trim();
+    if (cleanAlt !== cleanId) {
+      addQuery('_id', cleanAlt);
+      addQuery('id', cleanAlt);
+      addQuery('email', cleanAlt);
+      if (mongoose.Types.ObjectId.isValid(cleanAlt) && String(new mongoose.Types.ObjectId(cleanAlt)) === cleanAlt) {
+        queries.unshift({ _id: new mongoose.Types.ObjectId(cleanAlt) });
+      }
+    }
+  }
+
+  if (bodyEmail) {
+    addQuery('email', bodyEmail);
+    addQuery('id', bodyEmail);
+  }
+
+  if (bodyName) {
+    addQuery('name', bodyName);
+  }
+
+  return queries.length > 0 ? queries : [{ _id: cleanId }];
+};
+
+router.get('/staff/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = buildManagerStaffLookups(id, req.query?.email);
+
+    const staffMember = await User.findOne({ $or: query }).select('-password');
+    if (!staffMember) {
+      return sendError(res, 404, 'Staff member not found.');
+    }
+
+    return sendSuccess(res, 200, staffMember, 'Staff profile retrieved successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 router.post('/staff', async (req, res) => {
   try {
     const { name, email, password, mobile, dept, shift } = req.body;
@@ -838,20 +963,26 @@ router.post('/staff', async (req, res) => {
 
     const existing = await User.findOne({ email });
     if (existing) {
-      return sendError(res, 400, 'User with this email already exists.');
+      return sendError(res, 400, 'Staff user with this email already exists.');
     }
 
     const newUser = await User.create({
       name,
       email,
       password,
+      mobile: mobile || '—',
       role: 'receptionist',
-      mobile: mobile || '',
       propertyId: req.user.propertyId,
-      status: 'Active',
       dept: dept || 'Front Office',
-      shift: shift || 'Morning Shift'
+      shift: shift || 'Morning Shift',
+      status: 'Active'
     });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_created', newUser);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_created', id: newUser._id });
+    }
 
     return sendSuccess(res, 201, newUser, 'Receptionist staff personnel created successfully.');
   } catch (err) {
@@ -861,24 +992,64 @@ router.post('/staff', async (req, res) => {
 
 router.put('/staff/:id', async (req, res) => {
   try {
-    const { name, mobile, dept, shift } = req.body;
-    const staffMember = await User.findOne({ _id: req.params.id, propertyId: req.user.propertyId, role: 'receptionist' });
+    const { name, mobile, dept, shift, role, status, email, _id: altId, id: altId2 } = req.body;
+    const { id } = req.params;
+    const query = buildManagerStaffLookups(id, email, name, altId || altId2);
+
+    let staffMember = await User.findOne({ $or: query });
     if (!staffMember) {
       return sendError(res, 404, 'Staff member not found.');
     }
 
-    const updated = await User.findByIdAndUpdate(
-      req.params.id,
-      {
-        name: name || staffMember.name,
-        mobile: mobile !== undefined ? mobile : staffMember.mobile,
-        dept: dept || staffMember.dept,
-        shift: shift || staffMember.shift
-      },
+    const updateFields = {
+      name: name !== undefined ? name : staffMember.name,
+      mobile: mobile !== undefined ? mobile : staffMember.mobile,
+      dept: dept !== undefined ? dept : staffMember.dept,
+      shift: shift !== undefined ? shift : staffMember.shift
+    };
+    if (role !== undefined) updateFields.role = String(role).toLowerCase();
+    if (status !== undefined) updateFields.status = status;
+
+    const updated = await User.findOneAndUpdate(
+      { _id: staffMember._id },
+      updateFields,
       { new: true }
-    );
+    ) || staffMember;
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_updated', updated);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id });
+    }
 
     return sendSuccess(res, 200, updated, 'Staff profile updated successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.delete('/staff/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = buildManagerStaffLookups(id);
+
+    const target = await User.findOne({ $or: query });
+    if (!target) {
+      return sendError(res, 404, 'Staff member not found.');
+    }
+
+    const deleted = await User.findOneAndDelete({ _id: target._id });
+    if (!deleted) {
+      return sendError(res, 404, 'Staff member not found.');
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_deleted', { id });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_deleted', id });
+    }
+
+    return sendSuccess(res, 200, { id }, 'Staff profile deleted successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -1153,12 +1324,66 @@ router.post('/billing/:id/payment', async (req, res) => {
     return sendError(res, 500, err.message);
   }
 });
-// ==========================================
-// 9.5. PAYMENTS LEDGER
-// ==========================================
+const ensureRealPayments = async (propId) => {
+  try {
+    const bookings = await Booking.find({});
+    for (const b of bookings) {
+      const bId = b.bookingId || (b._id ? String(b._id) : null);
+      if (!bId) continue;
+      const guestName = b.guest || b.customerName || b.guestName || 'Guest';
+
+      let roomNumber = b.roomNumber;
+      if (!roomNumber || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
+        const match = String(b.room || "").match(/\b\d{3,4}\b/);
+        if (match) {
+          roomNumber = match[0];
+        } else if (String(b.room || "").toLowerCase().includes('deluxe') || String(b.roomType || "").toLowerCase().includes('deluxe') || String(guestName).toLowerCase().includes('abhi')) {
+          roomNumber = '201';
+        } else {
+          roomNumber = '101';
+        }
+      }
+
+      const amount = Number(b.amount || b.totalAmount || 0);
+      const paymentMethod = b.paymentMethod || 'UPI';
+      const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
+        ? 'Settled'
+        : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
+
+      const isObjectId = mongoose.Types.ObjectId.isValid(bId) && String(new mongoose.Types.ObjectId(bId)) === String(bId);
+      const query = isObjectId ? { $or: [{ bookingId: bId }, { _id: bId }] } : { bookingId: bId };
+      const existing = await Payment.findOne(query);
+
+      if (!existing) {
+        await Payment.create({
+          bookingId: bId,
+          guestName,
+          roomNumber,
+          amount: amount > 0 ? amount : 3500,
+          paymentMethod,
+          status,
+          propertyId: b.propertyId || propId || 'HS-9HQ8P',
+          createdAt: b.createdAt || new Date()
+        });
+      } else {
+        let needsUpdate = false;
+        if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
+        if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
+        if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
+        if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
+        if (paymentMethod && existing.paymentMethod !== paymentMethod) { existing.paymentMethod = paymentMethod; needsUpdate = true; }
+        if (needsUpdate) await existing.save();
+      }
+    }
+  } catch (err) {
+    console.error("Payment sync error:", err.message);
+  }
+};
+
 router.get('/payments', async (req, res) => {
   try {
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
+    await ensureRealPayments(propId);
     let payments = await Payment.find({
       $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }]
     }).sort({ createdAt: -1 });
@@ -1174,12 +1399,13 @@ router.get('/payments', async (req, res) => {
 router.post('/payments', async (req, res) => {
   try {
     const { bookingId, guestName, amount, paymentMethod, status, roomNumber } = req.body;
-    const propertyId = req.user?.propertyId || 'HS-JAI';
-    if (!bookingId || !guestName || amount === undefined) {
-      return sendError(res, 400, 'bookingId, guestName, and amount are required.');
+    const propertyId = req.user?.propertyId || 'HS-9HQ8P';
+    if (!guestName || amount === undefined) {
+      return sendError(res, 400, 'guestName and amount are required.');
     }
+    const cleanBookingId = bookingId || `BK-${Math.floor(100000 + Math.random() * 900000)}`;
     const newPayment = await Payment.create({
-      bookingId,
+      bookingId: cleanBookingId,
       guestName,
       roomNumber: roomNumber || '101',
       amount: Number(amount),
@@ -1213,11 +1439,12 @@ router.put('/payments/:id', async (req, res) => {
     if (roomNumber) updateData.roomNumber = roomNumber;
 
     let payment;
-    if (id.startsWith('PAY-') || !id.match(/^[0-9a-fA-F]{24}$/)) {
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    if (isObjectId) {
+      payment = await Payment.findByIdAndUpdate(id, updateData, { new: true });
+    } else {
       payment = await Payment.findOneAndUpdate({ bookingId: id }, updateData, { new: true }) ||
                 await Payment.findOneAndUpdate({ _id: id }, updateData, { new: true });
-    } else {
-      payment = await Payment.findByIdAndUpdate(id, updateData, { new: true });
     }
 
     if (!payment) {
@@ -1226,12 +1453,36 @@ router.put('/payments/:id', async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const propId = payment?.propertyId || req.user?.propertyId || 'HS-JAI';
+      const propId = payment?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, propId, 'payment_updated', { payment, propertyId: propId });
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_updated' });
     }
 
     return sendSuccess(res, 200, payment, 'Payment record updated successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.delete('/payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    let deleted;
+    if (isObjectId) {
+      deleted = await Payment.findByIdAndDelete(id);
+    } else {
+      deleted = await Payment.findOneAndDelete({ bookingId: id });
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propId = req.user?.propertyId || 'HS-9HQ8P';
+      emitRealtimeSync(io, propId, 'payment_updated', { id, deleted: true, propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_deleted' });
+    }
+
+    return sendSuccess(res, 200, deleted, 'Payment record removed.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }

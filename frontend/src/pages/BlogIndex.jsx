@@ -178,14 +178,14 @@ function BlogList() {
                         {featuredArticle.title}
                       </Link>
                     </h2>
-                    <p className="mt-2 text-xs sm:text-sm text-muted-foreground font-ui leading-relaxed line-clamp-3">
+                    <p className="mt-2 text-xs sm:text-sm text-[#4A4F58] font-ui leading-relaxed line-clamp-3">
                       {featuredArticle.excerpt}
                     </p>
                   </div>
                   <div className="pt-4 border-t border-navy/5 flex items-center justify-between">
                     <div className="text-[11px] font-ui">
                       <p className="font-bold text-navy">{featuredArticle.author}</p>
-                      <p className="text-muted-foreground mt-0.5">{featuredArticle.date} · {featuredArticle.readTime}</p>
+                      <p className="text-[#4A4F58] mt-0.5">{featuredArticle.date} · {featuredArticle.readTime}</p>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="text-purple font-semibold hover:bg-purple/5 h-8 px-3 text-xs">
                       <Link to="/blog/$slug" params={{ slug: featuredArticle.slug }}>
@@ -204,7 +204,7 @@ function BlogList() {
             {/* 4. Latest Articles Grid */}
             <div className="space-y-8">
               <div className="text-left border-b border-navy/5 pb-4">
-                <h3 className="font-display text-xl font-bold text-navy">
+                <h3 className="font-display text-2xl font-bold text-navy">
                   {selectedCategory === "All" ? "Latest Articles" : `${selectedCategory} Articles`}
                 </h3>
               </div>
@@ -234,12 +234,12 @@ function BlogList() {
                               {post.title}
                             </Link>
                           </h4>
-                          <p className="text-xs text-muted-foreground font-ui leading-relaxed line-clamp-3 mt-3 flex-grow">
+                          <p className="text-xs text-[#4A4F58] font-ui leading-relaxed line-clamp-3 mt-3 flex-grow">
                             {post.excerpt}
                           </p>
                         </div>
                       </div>
-                      <div className="p-5 pt-0 border-t border-navy/5 mt-4 flex items-center justify-between text-[11px] text-muted-foreground font-ui shrink-0">
+                      <div className="p-5 pt-0 border-t border-navy/5 mt-4 flex items-center justify-between text-[11px] text-[#4A4F58] font-ui shrink-0">
                         <span>{post.date} · {post.readTime}</span>
                         <Link to="/blog/$slug" params={{ slug: post.slug }} className="text-purple font-semibold hover:underline flex items-center gap-1">
                           Read More <ArrowRight className="size-3" />
@@ -250,7 +250,7 @@ function BlogList() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-navy/15 p-12 text-center">
-                  <p className="text-muted-foreground text-sm font-ui">No articles found in this category.</p>
+                  <p className="text-[#4A4F58] text-sm font-ui">No articles found in this category.</p>
                 </div>
               )}
             </div>
@@ -322,10 +322,10 @@ function BlogList() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(91,33,182,0.04),transparent_60%)]" />
         </div>
         <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6">
-          <h2 className="font-display text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
             Build a smarter hotel with Hour Stay.
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-sm text-muted-foreground font-ui">
+          <p className="mx-auto mt-4 max-w-lg text-base text-[#4A4F58] font-ui leading-relaxed">
             Explore the calm operating system engineered to save hours and sync reservations.
           </p>
           <div className="mt-8 flex justify-center">

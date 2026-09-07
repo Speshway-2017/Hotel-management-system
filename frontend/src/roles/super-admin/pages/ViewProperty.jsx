@@ -5,7 +5,7 @@ import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, Crumbs } from 
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
-import { Building2, Bed, TrendingUp, Users, ArrowLeft } from "lucide-react";
+import { Building2, Bed, TrendingUp, Users } from "lucide-react";
 
 function ViewProperty() {
   const { id } = useParams();
@@ -18,25 +18,33 @@ function ViewProperty() {
   const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
+    const loadDetails = async () => {
       try {
-        const [propRes, usersRes, reservationsRes] = await Promise.all([
-          superAdminService.getProperty(id),
+        setLoading(true);
+        setError(null);
+        const [propsRes, usersRes, resRes] = await Promise.all([
+          superAdminService.getProperties(),
           superAdminService.getUsers(),
           superAdminService.getReservations()
         ]);
-        if (propRes.success) setProperty(propRes.data);
-        if (usersRes.success) setUsers(usersRes.data);
-        if (reservationsRes.success) setReservations(reservationsRes.data);
+
+        const found = (propsRes.data || []).find(p => p._id === id || p.id === id);
+        if (found) {
+          setProperty(found);
+        } else {
+          setError("Property not found.");
+        }
+
+        setUsers(usersRes.data || []);
+        setReservations(resRes.data || []);
       } catch (err) {
-        setError(err.message || "Failed to load property operational data");
+        setError(err.message || "Failed to load property details");
       } finally {
         setLoading(false);
       }
     };
-    if (id) loadData();
+
+    if (id) loadDetails();
   }, [id]);
 
   const assignedUsers = property
@@ -56,6 +64,12 @@ function ViewProperty() {
 
   return (
     <div className="space-y-6">
+      <Crumbs
+        items={[
+          { label: "Properties", to: "/super-admin/properties" },
+          { label: property ? property.name : "Property Overview" }
+        ]}
+      />
 
       <PageHeader
         title={property ? property.name : "Property Overview"}
@@ -272,13 +286,6 @@ function ViewProperty() {
                   className="w-full bg-navy text-white rounded-full font-semibold h-10 text-xs"
                 >
                   Edit Configuration
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate({ to: "/super-admin/properties" })}
-                  className="w-full text-navy hover:bg-muted rounded-full font-semibold h-10 text-xs border"
-                >
-                  Back to Portfolio
                 </Button>
               </div>
             </Panel>

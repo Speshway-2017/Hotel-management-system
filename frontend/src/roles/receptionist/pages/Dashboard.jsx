@@ -16,6 +16,7 @@ import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
 
 const FrontDeskDashboardRoute = {
   head: () => ({
@@ -97,7 +98,7 @@ function FrontDeskDashboard() {
           id: b.bookingId || b.id || b._id,
           _id: b._id || b.id || b.bookingId,
           name: b.guest || b.name || 'Guest',
-          room: b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101'),
+          room: extractRoomNumber(b) || '101',
           type: b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room')),
           time: formatDisplayDate(b.checkIn) || 'Today',
           checkIn: b.checkIn || 'Today',
@@ -113,7 +114,7 @@ function FrontDeskDashboard() {
           id: b.bookingId || b.id || b._id,
           _id: b._id || b.id || b.bookingId,
           name: b.guest || b.name || 'Guest',
-          room: b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101'),
+          room: extractRoomNumber(b) || '101',
           time: formatDisplayDate(b.checkOut) || 'Today',
           checkIn: b.checkIn || 'Today',
           checkOut: b.checkOut || 'Today',
@@ -121,15 +122,10 @@ function FrontDeskDashboard() {
           status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
         }));
 
-      // 3. Dynamic In-Stay count (currently checked-in guests)
-      const inStayCount = allBookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying').length;
+      // Dynamic Room metrics using shared helper
+      const roomKPIs = calculateRoomKPIs(allRooms, allBookings);
 
-      // 4. Dynamic Room metrics
-      const totalRoomsCount = allRooms.length > 0 ? allRooms.length : 12;
-      const occupiedRoomsCount = allRooms.filter(r => r.status === 'Occupied').length || inStayCount;
-      const availableRoomsCount = Math.max(0, totalRoomsCount - occupiedRoomsCount);
-
-      // 5. Dynamic Total Revenue
+      // Dynamic Total Revenue
       const revenue = allBookings
         .filter(b => b.status !== 'Cancelled')
         .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0) || dashRes?.data?.stats?.totalRevenue || 0;
@@ -138,12 +134,14 @@ function FrontDeskDashboard() {
       setDepartures(finalDepartures);
 
       setStats({
-        available: availableRoomsCount,
-        occupied: occupiedRoomsCount,
-        inStay: inStayCount,
-        dirty: allRooms.filter(r => r.status === 'Dirty').length,
-        cleaning: allRooms.filter(r => r.status === 'Cleaning').length,
-        ooo: allRooms.filter(r => r.status === 'Out of Order').length,
+        available: roomKPIs.availableRooms,
+        occupied: roomKPIs.occupiedRooms,
+        inStay: roomKPIs.occupiedRooms,
+        reserved: roomKPIs.reservedRooms,
+        total: roomKPIs.totalRooms,
+        dirty: roomKPIs.dirtyRooms,
+        cleaning: roomKPIs.cleaningRooms,
+        ooo: roomKPIs.outOfOrderRooms,
         blocked: allRooms.filter(r => r.status === 'Blocked').length,
         totalRevenue: revenue
       });
@@ -257,8 +255,8 @@ function FrontDeskDashboard() {
       <div className="grid gap-4 grid-cols-2 md:grid-cols-6">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked').length} Pre-checked, ${arrivals.filter(a => a.status === 'Pending').length} Pending`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
-        <PremiumStatCard label="In-Stay" value={stats.inStay ?? 1} hint={`${stats.occupied ?? 1} Room occupied`} icon={Users} accentColor="#10b981" />
-        <PremiumStatCard label="Available Rooms" value={stats.available ?? 13} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
+        <PremiumStatCard label="In-Stay" value={stats.inStay || 0} hint={`${stats.occupied || 0} Room occupied`} icon={Users} accentColor="#10b981" />
+        <PremiumStatCard label="Available Rooms" value={stats.available || 0} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
         <PremiumStatCard label="Total Revenue" value={`₹${Number(stats.totalRevenue || 0).toLocaleString('en-IN')}`} hint="Real-time ledger collection" icon={IndianRupee} accentColor="#10b981" />
         <PremiumStatCard label="Guest Feedback" value={`${feedbackStats.average} ★`} hint={`${feedbackStats.count} stay records logged`} icon={MessageSquareHeart} accentColor="#f59e0b" />
       </div>

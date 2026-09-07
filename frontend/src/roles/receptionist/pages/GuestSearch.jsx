@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, ExtendActionButton, DetailsActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { receptionistService } from "@/services/receptionist";
 import { 
@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 
 import { subscribeRealtimeSync } from "@/services/socket";
-import { ExtendStayModal } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 export const Route = createFileRoute("/reception/guest-search")({
   head: () => ({
@@ -294,9 +294,9 @@ function InHouseGuestsPage() {
       {/* In-House Guests Table */}
       <Panel title="In-House Occupancy Ledger" description="Real-time listing of guests currently checked in, duration configurations, and incidentals balances.">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs min-w-[950px]">
+          <table className="w-full text-left text-xs min-w-[1100px]">
             <thead>
-              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
+              <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none whitespace-nowrap">
                 <th className="py-3.5 px-4">Guest Info</th>
                 <th className="py-3.5 px-4">Booking ID</th>
                 <th className="py-3.5 px-4">Room Type / No</th>
@@ -305,7 +305,7 @@ function InHouseGuestsPage() {
                 <th className="py-3.5 px-4">Folio Balance</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Stay Status</th>
-                <th className="py-3.5 px-4">Actions</th>
+                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -359,41 +359,26 @@ function InHouseGuestsPage() {
                         {g.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap select-none">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
+                      <ActionGroup align="right">
                         {(g.status === "Staying" || g.status === "Extended Stay" || g.status === "Checked-in" || g.status === "Checked In") && (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => navigate(`/reception/reservations/extend/${g.id || g._id}`)}
-                            className="text-brand border-brand/30 hover:bg-brand/10 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
+                          <ExtendActionButton
+                            onClick={() => navigate({ to: `/reception/reservations/extend/${g.id || g._id}` })}
                             title="Extend Stay Duration"
-                          >
-                            Extend
-                          </Button>
+                          />
                         )}
 
-                        <Button
-                          asChild
-                          size="xs"
-                          variant="outline"
-                          className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                        >
-                          <Link to={`/reception/guest-search/${g.id || g._id}`}>Details</Link>
-                        </Button>
+                        <DetailsActionButton
+                          onClick={() => navigate({ to: `/reception/guest-search/${g.id || g._id}` })}
+                          title="View Guest Details"
+                        />
 
-                        <Button
-                          asChild
-                          size="icon"
-                          variant="ghost"
-                          className="size-7 text-navy/70 hover:text-brand hover:bg-brand/10 rounded-lg cursor-pointer transition-colors"
+                        <ViewActionButton
+                          label="Folio"
+                          onClick={() => navigate({ to: `/reception/folio/FOL-${g.id || g._id}` })}
                           title="View Guest Folio"
-                        >
-                          <Link to={`/reception/folio/FOL-${g.id || g._id}`}>
-                            <Eye className="size-3.5" />
-                          </Link>
-                        </Button>
-                      </div>
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))
@@ -402,15 +387,6 @@ function InHouseGuestsPage() {
           </table>
         </div>
       </Panel>
-
-      {/* Reusable Extend Stay Modal */}
-      <ExtendStayModal
-        booking={extendingBooking}
-        isOpen={!!extendingBooking}
-        onClose={() => setExtendingBooking(null)}
-        onSuccess={() => loadGuests(false)}
-        userRole="receptionist"
-      />
 
     </div>
   );

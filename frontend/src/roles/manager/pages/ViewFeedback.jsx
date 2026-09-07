@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows, Panel } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Panel, Crumbs } from "@/components/hs/kit";
 import { FormField, Textarea } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -12,7 +12,6 @@ import {
   Calendar,
   User,
   Star,
-  ChevronLeft,
   Sparkles,
   MessageSquareText,
   Activity
@@ -153,15 +152,18 @@ function ManagerViewFeedback() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view feedback for this property. Scoped hotel access only.
         </Notice>
-        <Link to="/manager/feedback" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Feedback Hub
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans">
+      <Crumbs
+        items={[
+          { label: "Guest Feedback", to: "/manager/feedback" },
+          { label: feedback ? `${feedback.guest}'s Review` : "Feedback Details" }
+        ]}
+      />
 
       <PageHeader
         title={feedback ? `${feedback.guest}'s Review` : "Feedback Details"}

@@ -310,3 +310,44 @@ export function HorizontalRouteTabs({ tabs }) {
     </div>
   );
 }
+
+/**
+ * Standardized responsive table container to prevent column clipping,
+ * overlaps, and enable smooth horizontal scrolling on mobile/smaller screens.
+ */
+export function TableContainer({ children, className = "" }) {
+  return (
+    <div className={cn("w-full overflow-x-auto scrollbar-thin scrollbar-thumb-muted-foreground/20", className)}>
+      {children}
+    </div>
+  );
+}
+
+export {
+  ActionIcon,
+  ActionButton,
+  ActionGroup,
+  ViewActionIcon,
+  ViewActionButton,
+  EditActionIcon,
+  EditActionButton,
+  DeleteActionIcon,
+  DeleteActionButton,
+  CheckInActionIcon,
+  CheckInActionButton,
+  CheckOutActionIcon,
+  CheckOutActionButton,
+  ExtendActionIcon,
+  ExtendActionButton,
+  ApproveActionIcon,
+  ApproveActionButton,
+  RejectActionIcon,
+  RejectActionButton,
+  DetailsActionIcon,
+  DetailsActionButton,
+  AssignActionIcon,
+  AssignActionButton,
+  DownloadActionIcon,
+  DownloadActionButton
+} from "./ActionButtons";
+

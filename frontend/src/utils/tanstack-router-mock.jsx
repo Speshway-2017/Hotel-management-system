@@ -45,14 +45,23 @@ export function useRouterState(config) {
 
 export function useNavigate() {
   const navigate = useRouterNavigate();
-  return ({ to, params }) => {
-    let path = to;
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        path = path.replace(`$${k}`, v);
-      });
+  return (toOrObj, options) => {
+    if (typeof toOrObj === 'string') {
+      navigate(toOrObj, options);
+      return;
     }
-    navigate(path);
+    if (toOrObj && toOrObj.to) {
+      let path = toOrObj.to;
+      if (toOrObj.params) {
+        Object.entries(toOrObj.params).forEach(([k, v]) => {
+          path = path.replace(`$${k}`, v);
+        });
+      }
+      const mergedOptions = { ...options, ...(toOrObj.state ? { state: toOrObj.state } : {}) };
+      navigate(path, mergedOptions);
+      return;
+    }
+    navigate(toOrObj, options);
   };
 }
 

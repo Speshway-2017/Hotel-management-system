@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
@@ -8,8 +8,8 @@ import { receptionistService } from "@/services/receptionist";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
 import {
-  CreditCard, ChevronLeft, Download, Printer, CheckCircle2,
-  Clock, Undo2, ArrowLeft, Building2, User, Receipt, IndianRupee,
+  CreditCard, Download, Printer, CheckCircle2,
+  Clock, Undo2, Building2, User, Receipt, IndianRupee,
   Calendar, Check, ShieldCheck, FileText, Sparkles
 } from "lucide-react";
 
@@ -39,21 +39,7 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
       // Find by _id or bookingId or match ID
       let found = list.find(p => String(p._id) === String(id) || String(p.id) === String(id) || String(p.bookingId) === String(id));
 
-      if (!found) {
-        // Fallback default
-        found = {
-          _id: id || "PAY-10301",
-          bookingId: "BK-10301",
-          guestName: "Surya",
-          roomNumber: "103",
-          amount: 8500,
-          paymentMethod: "UPI",
-          status: "Settled",
-          createdAt: new Date().toISOString()
-        };
-      }
-
-      setPayment(found);
+      setPayment(found || null);
     } catch (err) {
       console.error("Failed to load payment details:", err);
     } finally {
@@ -117,11 +103,16 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
 
   if (!payment) {
     return (
-      <div className="p-8 text-center space-y-4">
-        <p className="text-sm font-bold text-navy">Payment record not found.</p>
-        <Button asChild variant="outline" size="sm">
-          <Link to={`/${role}/payments`}>Back to Payments</Link>
-        </Button>
+      <div className="space-y-6 text-left">
+        <Crumbs
+          items={[
+            { label: "Payments", to: `/${role}/payments` },
+            { label: `Payment Details` }
+          ]}
+        />
+        <div className="p-8 text-center space-y-4">
+          <p className="text-sm font-bold text-navy">Payment record not found.</p>
+        </div>
       </div>
     );
   }
@@ -130,29 +121,23 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
+      <Crumbs
+        items={[
+          { label: "Payments", to: `/${role}/payments` },
+          { label: `Payment #${payment._id || id}` }
+        ]}
+      />
       
-      {/* Top Bar with Back Link & Actions */}
+      {/* Top Bar with Actions */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-muted pb-4">
-        <div className="flex items-center gap-3">
-          <Button
-            asChild
-            variant="outline"
-            size="icon"
-            className="size-9 rounded-xl border-muted hover:bg-muted/50 cursor-pointer"
-          >
-            <Link to={`/${role}/payments`} title="Back to Payments">
-              <ChevronLeft className="size-4 text-navy" />
-            </Link>
-          </Button>
-          <div>
-            <h2 className="text-lg font-black text-navy font-display flex items-center gap-2">
-              Payment #{payment._id || id}
-              <Tag tone={tone}>{payment.status}</Tag>
-            </h2>
-            <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">
-              Booking Ref: <span className="font-mono text-indigo">{payment.bookingId}</span> • {new Date(payment.createdAt).toLocaleString()}
-            </p>
-          </div>
+        <div>
+          <h2 className="text-lg font-black text-navy font-display flex items-center gap-2">
+            Payment #{payment._id || id}
+            <Tag tone={tone}>{payment.status}</Tag>
+          </h2>
+          <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">
+            Booking Ref: <span className="font-mono text-indigo">{payment.bookingId}</span> • {new Date(payment.createdAt).toLocaleString()}
+          </p>
         </div>
 
         {/* Download & Print Buttons */}

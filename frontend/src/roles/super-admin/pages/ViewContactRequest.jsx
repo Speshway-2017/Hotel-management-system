@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   Mail,
   Phone,
-  ArrowLeft,
   Building,
   Calendar,
   MessageSquare,
@@ -91,22 +90,17 @@ export function ViewContactRequest() {
 
   return (
     <div className="space-y-6 text-left font-ui">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <PageHeader
-          title={contact ? `Inquiry: ${contact.subject || "Contact Submission"}` : "Contact Inquiry Details"}
-          subtitle="Full message content, contact coordinates, and status management."
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate({ to: "/super-admin/contacts" })}
-          className="rounded-full text-xs font-semibold cursor-pointer"
-        >
-          <ArrowLeft className="size-3.5 mr-1.5" />
-          Back to Inquiries
-        </Button>
-      </div>
+      <Crumbs
+        items={[
+          { label: "Contact Inquiries", to: "/super-admin/contacts" },
+          { label: contact ? (contact.subject || "Inquiry Details") : "Contact Inquiry Details" }
+        ]}
+      />
+
+      <PageHeader
+        title={contact ? `Inquiry: ${contact.subject || "Contact Submission"}` : "Contact Inquiry Details"}
+        subtitle="Full message content, contact coordinates, and status management."
+      />
 
       {error && <Notice tone="error" title="Inquiry Notice">{error}</Notice>}
 

@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import {
   User,
   Clock,
   Briefcase,
-  ChevronLeft,
   Mail,
   Phone,
   ShieldCheck,
@@ -46,30 +45,56 @@ function ManagerViewStaff() {
       setLoading(true);
       setError(null);
       try {
-        const decodedId = atob(id);
+        let resolvedId = id;
+        try {
+          if (id && id.length % 4 === 0 && !id.includes('-') && /^[A-Za-z0-9+/=]+$/.test(id)) {
+            const decoded = atob(id);
+            if (decoded && (decoded.includes('-') || decoded.length === 24 || decoded.includes('@'))) {
+              resolvedId = decoded;
+            }
+          }
+        } catch (e) {
+          resolvedId = id;
+        }
+
         const [staffRes, shiftsRes] = await Promise.all([
-          managerService.getStaff(),
-          managerService.getShifts()
+          managerService.getStaff().catch(() => ({ data: [] })),
+          managerService.getShifts().catch(() => ({ data: [] }))
         ]);
         
         let matched = null;
-        if (staffRes.success && staffRes.data) {
-          matched = staffRes.data.find(u => u._id === decodedId || u.id === decodedId);
+        const list = Array.isArray(staffRes) ? staffRes : (staffRes?.data || []);
+        matched = list.find(u => 
+          String(u._id) === String(resolvedId) || 
+          String(u.id) === String(resolvedId) ||
+          String(u._id) === String(id) || 
+          String(u.id) === String(id) ||
+          String(u.email).toLowerCase() === String(resolvedId).toLowerCase()
+        );
+
+        if (!matched) {
+          try {
+            const singleRes = await managerService.getStaffMember(resolvedId || id);
+            if (singleRes && (singleRes.success || singleRes.data)) {
+              matched = singleRes.data || singleRes;
+            }
+          } catch {}
         }
 
         if (matched) {
-          // Verify property scope
-          if (matched.propertyId !== user.propertyId) {
+          // Verify property scope if assigned
+          if (matched.propertyId && user.propertyId && matched.propertyId !== user.propertyId) {
             setIsAuthorized(false);
           } else {
             // Find matched shift from database records
-            const matchedShiftObj = (shiftsRes.success && shiftsRes.data) ? shiftsRes.data.find(sh => sh.userId === matched._id) : null;
-            const assignedShift = matchedShiftObj ? matchedShiftObj.shiftType : "Morning Shift";
+            const shiftsList = Array.isArray(shiftsRes) ? shiftsRes : (shiftsRes?.data || []);
+            const matchedShiftObj = shiftsList.find(sh => sh.userId === (matched._id || matched.id));
+            const assignedShift = matchedShiftObj ? matchedShiftObj.shiftType : (matched.shift || "Morning Shift");
 
             setStaff({
               ...matched,
-              employeeId: `EMP-${(user.propertyId || "JAI").substring(3)}-102`,
-              department: "Front Office",
+              employeeId: matched.id || matched._id || `EMP-${(user.propertyId || "JAI").substring(3)}-102`,
+              department: matched.dept || "Front Office",
               assignedShift,
               shiftTiming: SHIFT_TIMINGS[assignedShift] || SHIFT_TIMINGS["Morning Shift"]
             });
@@ -94,15 +119,23 @@ function ManagerViewStaff() {
         <Notice tone="error" title="Unauthorized Access">
           You are not authorized to view personnel files for this property branch. Access is strictly scoped.
         </Notice>
-        <Link to="/manager/shifts" className="inline-flex items-center gap-1.5 text-xs text-navy font-bold hover:underline">
-          <ChevronLeft className="size-3.5" /> Back to Staff Shifts
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
+      <Crumbs
+        items={[
+          { label: "Staff & Shifts", to: "/manager/shifts" },
+          { label: staff ? staff.name : "Staff Profile" }
+        ]}
+      />
+
+      <PageHeader
+        title={staff ? `${staff.name}'s Profile` : "Staff Profile"}
+        subtitle="Employee coordinates, assigned shift timing, and operational status."
+      />
 
       {error && <Notice tone="error" title="Personnel Sync Error">{error}</Notice>}
 

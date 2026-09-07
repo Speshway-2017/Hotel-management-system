@@ -11,7 +11,6 @@ import {
   Building2,
   Calendar,
   Clock,
-  ArrowLeft,
   CheckCircle2,
   Upload,
   FileText,
@@ -62,17 +61,12 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
   // Return navigation path based on role
   const returnUrl =
     role === "admin"
-      ? "/admin/front-desk"
+      ? "/admin/reservations"
       : role === "manager"
-      ? "/manager/arrivals"
-      : "/reception/check-in";
+      ? "/manager/reservations"
+      : "/reception/reservations";
 
-  const returnLabel =
-    role === "admin"
-      ? "Front Desk"
-      : role === "manager"
-      ? "Arrivals Ledger"
-      : "Check-In Desk";
+  const returnLabel = "Reservations";
 
   useEffect(() => {
     async function loadData() {
@@ -288,12 +282,10 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
   if (!booking) {
     return (
       <div className="p-8 max-w-2xl mx-auto font-ui text-left space-y-4">
+        <Crumbs items={[{ label: returnLabel, to: returnUrl }, { label: "Verification Record Missing" }]} />
         <Notice tone="error" title="Reservation Record Missing">
           The requested booking details could not be retrieved. Please check the reservation ledger.
         </Notice>
-        <Button onClick={() => navigate(returnUrl)} variant="outline" className="text-xs font-bold">
-          <ArrowLeft className="size-3.5 mr-1.5" /> Back to {returnLabel}
-        </Button>
       </div>
     );
   }
@@ -309,14 +301,13 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
     <div className="space-y-6 text-left font-ui animate-fade-in max-w-6xl mx-auto pb-12">
       {/* Header & Breadcrumb */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-navy/10 pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-1">
-            <Link to={returnUrl} className="hover:text-purple transition-colors flex items-center gap-1">
-              <ArrowLeft className="size-3" /> {returnLabel}
-            </Link>
-            <span>/</span>
-            <span className="text-navy font-bold">Website Booking ID Verification & Check-In</span>
-          </div>
+        <div className="space-y-2">
+          <Crumbs
+            items={[
+              { label: returnLabel, to: returnUrl },
+              { label: "Website Booking ID Verification & Check-In" }
+            ]}
+          />
           <h1 className="font-display text-2xl font-black text-navy flex items-center gap-2.5">
             <ShieldCheck className="size-6 text-emerald-600 shrink-0" />
             Guest Verification & Check-In
@@ -330,14 +321,6 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
           <Tag tone={isVerified ? "success" : "warning"} className="px-3 py-1 text-xs font-bold uppercase tracking-wider">
             {isVerified ? "✓ ID Verified" : "⚠ ID Verification Pending"}
           </Tag>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(returnUrl)}
-            className="text-xs font-bold border-navy/20 hover:bg-navy/5 text-navy h-9 px-3 rounded-xl cursor-pointer"
-          >
-            <ArrowLeft className="size-3.5 mr-1" /> Exit
-          </Button>
         </div>
       </div>
 

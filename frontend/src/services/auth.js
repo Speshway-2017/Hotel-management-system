@@ -39,8 +39,10 @@ export const authService = {
   // Get profile details
   getProfile: async () => {
     const res = await apiClient.get('/auth/profile');
-    if (res.success && res.data) {
-      localStorage.setItem('hms_user', JSON.stringify(res.data));
+    if (res && res.success && res.data) {
+      const current = authService.getCurrentUser() || {};
+      const merged = { ...current, ...res.data };
+      localStorage.setItem('hms_user', JSON.stringify(merged));
       window.dispatchEvent(new Event('user-profile-updated'));
     }
     return res;
@@ -49,8 +51,10 @@ export const authService = {
   // Update profile details and upload avatar
   updateProfile: async (formData) => {
     const res = await apiClient.put('/auth/profile', formData);
-    if (res.success && res.data) {
-      localStorage.setItem('hms_user', JSON.stringify(res.data));
+    if (res && res.success && res.data) {
+      const current = authService.getCurrentUser() || {};
+      const merged = { ...current, ...res.data };
+      localStorage.setItem('hms_user', JSON.stringify(merged));
       window.dispatchEvent(new Event('user-profile-updated'));
     }
     return res;

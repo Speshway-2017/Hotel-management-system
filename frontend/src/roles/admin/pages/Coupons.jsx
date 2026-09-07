@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, EditActionButton, DeleteActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { adminService } from "@/services/admin";
@@ -297,7 +297,7 @@ export function AdminCouponsPage() {
                   <th className="py-3 px-4">Validity Window</th>
                   <th className="py-3 px-4">Usage & Limit</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted/60">
@@ -380,36 +380,18 @@ export function AdminCouponsPage() {
                           )}
                         </button>
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
+                      <td className="py-3 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
+                        <ActionGroup align="left">
+                          <ViewActionButton
                             onClick={() => navigate({ to: `/admin/coupons/view/${couponId}` })}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-navy hover:bg-navy/5 cursor-pointer"
-                            title="View Coupon"
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
-                          <Button
+                          />
+                          <EditActionButton
                             onClick={() => navigate({ to: `/admin/coupons/edit/${couponId}` })}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-navy hover:bg-navy/5 cursor-pointer"
-                            title="Edit Coupon"
-                          >
-                            <Edit2 className="size-3.5" />
-                          </Button>
-                          <Button
+                          />
+                          <DeleteActionButton
                             onClick={() => setDeleteTarget(c)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
-                            title="Delete Coupon"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );
