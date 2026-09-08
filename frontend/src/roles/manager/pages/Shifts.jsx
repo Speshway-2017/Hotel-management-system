@@ -42,12 +42,45 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
   );
 }
 
-// Fixed Shift Timing Configs
-const SHIFT_TIMINGS = {
+// Fixed Shift Timing Configs & Resolvers
+export const SHIFT_TIMINGS = {
   "Morning Shift": "06:00 AM - 02:00 PM",
   "Afternoon Shift": "02:00 PM - 10:00 PM",
   "Night Shift": "10:00 PM - 06:00 AM",
-  "General Shift": "09:00 AM - 05:00 PM"
+  "General Shift": "09:00 AM - 05:00 PM",
+  "Morning": "06:00 AM - 02:00 PM",
+  "Evening": "02:00 PM - 10:00 PM",
+  "Afternoon": "02:00 PM - 10:00 PM",
+  "Night": "10:00 PM - 06:00 AM",
+  "General": "09:00 AM - 05:00 PM",
+  "Morning (06:00 - 14:00)": "06:00 AM - 02:00 PM",
+  "Evening (14:00 - 22:00)": "02:00 PM - 10:00 PM",
+  "Night (22:00 - 06:00)": "10:00 PM - 06:00 AM",
+  "General (09:00 - 17:00)": "09:00 AM - 05:00 PM"
+};
+
+export const getShiftTiming = (shiftStr) => {
+  if (!shiftStr) return "06:00 AM - 02:00 PM";
+  if (SHIFT_TIMINGS[shiftStr]) return SHIFT_TIMINGS[shiftStr];
+  const timeMatch = shiftStr.match(/\((.*?)\)/);
+  if (timeMatch && timeMatch[1]) return timeMatch[1];
+  const lower = shiftStr.toLowerCase();
+  if (lower.includes("morn")) return "06:00 AM - 02:00 PM";
+  if (lower.includes("after") || lower.includes("even")) return "02:00 PM - 10:00 PM";
+  if (lower.includes("night")) return "10:00 PM - 06:00 AM";
+  if (lower.includes("gen")) return "09:00 AM - 05:00 PM";
+  return shiftStr;
+};
+
+export const normalizeShiftName = (shiftStr) => {
+  if (!shiftStr) return "Morning Shift";
+  if (["Morning Shift", "Afternoon Shift", "Night Shift", "General Shift"].includes(shiftStr)) return shiftStr;
+  const lower = shiftStr.toLowerCase();
+  if (lower.includes("morn")) return "Morning Shift";
+  if (lower.includes("after") || lower.includes("even")) return "Afternoon Shift";
+  if (lower.includes("night")) return "Night Shift";
+  if (lower.includes("gen")) return "General Shift";
+  return shiftStr;
 };
 
 function ManagerShiftsPage() {
@@ -95,13 +128,18 @@ function ManagerShiftsPage() {
       const realShifts = shiftsRes.success && shiftsRes.data ? shiftsRes.data : [];
 
       const compiled = realUsers.map((st, idx) => {
-        const sid = st._id || st.id;
-        const employeeId = `EMP-${(user.propertyId || "JAI").substring(3)}-10${idx + 1}`;
-        const department = "Front Office";
+        const sid = String(st._id || st.id);
+        const employeeId = st.employeeId || `EMP-${(user.propertyId || "JAI").substring(3)}-10${idx + 1}`;
+        const department = st.dept || st.department || "Front Office";
         
         // Assigned shift details
-        const matchedShiftObj = realShifts.find(sh => sh.userId === sid);
-        const assignedShift = matchedShiftObj ? matchedShiftObj.shiftType : (idx % 2 === 0 ? "Morning Shift" : "Afternoon Shift");
+        const matchedShiftObj = realShifts.find(sh => 
+          String(sh.userId) === sid || 
+          (sh.username && st.name && String(sh.username).toLowerCase() === String(st.name).toLowerCase())
+        );
+        const rawShift = st.shift || matchedShiftObj?.shiftType || (idx % 2 === 0 ? "Morning Shift" : "Afternoon Shift");
+        const assignedShift = normalizeShiftName(rawShift);
+        const shiftTiming = getShiftTiming(st.shift || matchedShiftObj?.shiftType || assignedShift);
         const status = st.status || "Active";
 
         return {
@@ -109,7 +147,8 @@ function ManagerShiftsPage() {
           employeeId,
           department,
           assignedShift,
-          shiftTiming: SHIFT_TIMINGS[assignedShift] || SHIFT_TIMINGS["Morning Shift"],
+          shift: rawShift,
+          shiftTiming,
           status
         };
       });
@@ -126,28 +165,55 @@ function ManagerShiftsPage() {
   useEffect(() => {
     loadData();
 
-    const handleFocus = () => loadData();
+    const handleFocus = () => loadData();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData();
     });
 
-    return () => {
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
   const handleShiftChange = async (sid, newShift) => {
     try {
-      const staffMember = staffList.find(s => (s._id || s.id) === sid);
-      const res = await managerService.assignShift(sid, staffMember?.name || "Roster Staff", newShift);
-      if (res.success) {
+      const cleanSid = String(sid);
+      const staffMember = staffList.find(s => String(s._id || s.id) === cleanSid);
+      
+      // Update UI optimistically
+      const normalized = normalizeShiftName(newShift);
+      const newTiming = getShiftTiming(newShift);
+      setStaffList(prev => prev.map(s => {
+        if (String(s._id || s.id) === cleanSid) {
+          return {
+            ...s,
+            assignedShift: normalized,
+            shift: newShift,
+            shiftTiming: newTiming
+          };
+        }
+        return s;
+      }));
+
+      // Dual-sync to both assignShift and updateStaff endpoints
+      const [assignRes, updateRes] = await Promise.all([
+        managerService.assignShift(cleanSid, staffMember?.name || "Roster Staff", newShift),
+        managerService.updateStaff(cleanSid, {
+          _id: cleanSid,
+          id: cleanSid,
+          name: staffMember?.name,
+          shift: newShift
+        }).catch(() => null)
+      ]);
+
+      if (assignRes?.success || updateRes?.success || updateRes?.data) {
         toast.success("Roster shift reassigned successfully.");
-        // Reload details dynamically
         loadData();
       }
     } catch (err) {
       toast.error(err.message || "Failed to assign shift");
+      loadData();
     }
   };
 
@@ -283,7 +349,7 @@ function ManagerShiftsPage() {
                   <th className="py-4.5 px-4">Assigned Shift</th>
                   <th className="py-4.5 px-4">Shift Timing</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-6 text-right min-w-[240px]">Actions</th>
+                  <th className="py-4.5 px-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -322,8 +388,8 @@ function ManagerShiftsPage() {
                           {s.status}
                         </Tag>
                       </td>
-                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[240px]">
-                        <ActionGroup align="right">
+                      <td className="py-4 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
+                        <ActionGroup align="left">
                           <ViewActionButton
                             onClick={() => navigate({ to: `/manager/staff/view/${targetId}`, state: { member: s } })}
                             title="View Staff Profile"

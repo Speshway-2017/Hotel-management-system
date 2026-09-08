@@ -68,7 +68,7 @@ function InHouseGuestsPage() {
             const mapped = allBookings
               .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying')
               .map(b => {
-                const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
+                const rmNum = extractRoomNumber(b) || b.roomNumber || (b.room ? b.room.split(' ')[0] : '—');
                 const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
                 const bal = Number(b.balance || 0);
                 return {
@@ -305,7 +305,7 @@ function InHouseGuestsPage() {
                 <th className="py-3.5 px-4">Folio Balance</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Stay Status</th>
-                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
+                <th className="py-3.5 px-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -359,8 +359,8 @@ function InHouseGuestsPage() {
                         {g.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
-                      <ActionGroup align="right">
+                    <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
+                      <ActionGroup align="left">
                         {(g.status === "Staying" || g.status === "Extended Stay" || g.status === "Checked-in" || g.status === "Checked In") && (
                           <ExtendActionButton
                             onClick={() => navigate({ to: `/reception/reservations/extend/${g.id || g._id}` })}

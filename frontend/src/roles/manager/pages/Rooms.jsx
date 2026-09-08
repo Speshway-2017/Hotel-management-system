@@ -93,35 +93,37 @@ function ManagerRoomsPage() {
 
       let dbRooms = (roomsRes.success && roomsRes.data) ? roomsRes.data : [];
 
-      // Merge room types assigned room numbers from MongoDB property settings & localStorage
-      const settingsTypes = propRes?.data?.settings?.roomTypes || [];
-      let savedTypes = [];
-      try {
-        const saved = localStorage.getItem("hms_room_types_list_v2");
-        if (saved) savedTypes = JSON.parse(saved);
-      } catch (e) {}
+      if (dbRooms.length === 0) {
+        // Fallback merge room types assigned room numbers from MongoDB property settings & localStorage
+        const settingsTypes = propRes?.data?.settings?.roomTypes || [];
+        let savedTypes = [];
+        try {
+          const saved = localStorage.getItem("hms_room_types_list_v2");
+          if (saved) savedTypes = JSON.parse(saved);
+        } catch (e) {}
 
-      const allTypes = [...settingsTypes, ...savedTypes];
-      const existingRoomNums = new Set(dbRooms.map(r => String(r.roomNumber || r.room)));
+        const allTypes = [...settingsTypes, ...savedTypes];
+        const existingRoomNums = new Set(dbRooms.map(r => String(r.roomNumber || r.room)));
 
-      allTypes.forEach(t => {
-        const assigned = Array.isArray(t.rooms) ? t.rooms : [];
-        assigned.forEach(num => {
-          if (num && !existingRoomNums.has(String(num))) {
-            existingRoomNums.add(String(num));
-            dbRooms.push({
-              _id: `R-${num}`,
-              roomNumber: String(num),
-              room: String(num),
-              category: t.category,
-              roomType: t.category,
-              floor: `Floor ${String(num)[0] || '1'}`,
-              status: "Available",
-              baseRate: t.baseRate || 3500
-            });
-          }
+        allTypes.forEach(t => {
+          const assigned = Array.isArray(t.rooms) ? t.rooms : [];
+          assigned.forEach(num => {
+            if (num && !existingRoomNums.has(String(num))) {
+              existingRoomNums.add(String(num));
+              dbRooms.push({
+                _id: `R-${num}`,
+                roomNumber: String(num),
+                room: String(num),
+                category: t.category,
+                roomType: t.category,
+                floor: `Floor ${String(num)[0] || '1'}`,
+                status: "Available",
+                baseRate: t.baseRate || 3500
+              });
+            }
+          });
         });
-      });
+      }
 
       setRooms(dbRooms);
     } catch (err) {
@@ -174,17 +176,22 @@ function ManagerRoomsPage() {
     let matchedRm = null;
 
     if (b.roomId) {
-      matchedRm = rooms.find(r => String(r._id || r.id) === String(b.roomId));
+      matchedRm = rooms.find(r => String(r._id || r.id) === String(b.roomId) || String(r.roomNumber || r.room).trim() === String(b.roomId).trim());
     }
     if (!matchedRm && bRoomNum) {
-      matchedRm = rooms.find(r => extractRoomNumber(r) === bRoomNum);
+      matchedRm = rooms.find(r => extractRoomNumber(r) === bRoomNum || String(r.roomNumber || r.room).trim() === bRoomNum);
+    }
+    if (!matchedRm && b.room) {
+      matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber || r.room)));
     }
 
     if (matchedRm) {
       const k1 = String(matchedRm._id || matchedRm.id || '');
       const k2 = String(matchedRm.roomNumber || matchedRm.room || '');
+      const k3 = extractRoomNumber(matchedRm);
       if (k1) roomBookingMap.set(k1, b);
       if (k2) roomBookingMap.set(k2, b);
+      if (k3) roomBookingMap.set(k3, b);
     }
   }
 
@@ -193,16 +200,19 @@ function ManagerRoomsPage() {
   const compiledRooms = normalizedRooms.map(r => {
     const k1 = String(r._id || r.id || '');
     const k2 = String(r.roomNumber || r.room || '');
-    const activeBooking = roomBookingMap.get(k1) || roomBookingMap.get(k2);
+    const k3 = extractRoomNumber(r);
+    const activeBooking = roomBookingMap.get(k1) || roomBookingMap.get(k2) || roomBookingMap.get(k3);
 
     let currentStatus = r.status || "Available";
     if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying")) {
       currentStatus = "Occupied";
+    } else if (activeBooking && (activeBooking.status === "Confirmed" || activeBooking.status === "Paid" || activeBooking.status === "Pending" || activeBooking.status === "Pre-checked")) {
+      currentStatus = "Reserved";
     }
 
     return {
       _id: r._id || r.id,
-      room: r.roomNumber || r.room,
+      room: extractRoomNumber(r) || r.roomNumber || r.room,
       roomType: r.category || r.roomType || "Standard Room",
       floor: r.floor || `Floor ${String(r.roomNumber || r.room || '1')[0]}`,
       activeBooking: activeBooking ? {
@@ -377,7 +387,7 @@ function ManagerRoomsPage() {
                   <th className="py-4.5 px-4 text-left">Check-In</th>
                   <th className="py-4.5 px-4 text-left">Check-Out</th>
                   <th className="py-4.5 px-4 text-left">Current Booking</th>
-                  <th className="py-4.5 px-6 text-right min-w-[170px]">Actions</th>
+                  <th className="py-4.5 px-4 text-left min-w-[170px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -424,8 +434,8 @@ function ManagerRoomsPage() {
                           <span className="text-muted-foreground/45">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[170px]">
-                        <ActionGroup align="right">
+                      <td className="py-4 px-4 text-left align-middle whitespace-nowrap min-w-[170px]">
+                        <ActionGroup align="left">
                           {active && (
                             <>
                               <ViewActionButton

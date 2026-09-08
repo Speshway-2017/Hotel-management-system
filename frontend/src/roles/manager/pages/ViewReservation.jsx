@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, User, Home, CreditCard, ShieldAlert, CheckCircle, Edit2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 function ManagerViewReservation() {
   const { id } = useParams();
@@ -154,7 +155,15 @@ function ManagerViewReservation() {
             <div className="space-y-2.5 text-xs text-navy">
               <div>
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">Assigned Room</span>
-                <p className="font-semibold mt-0.5">{booking.room ? `Room ${booking.room}` : "Not Assigned"}</p>
+                <p className="font-semibold mt-0.5">
+                  {extractRoomNumber(booking) ? `Room ${extractRoomNumber(booking)}` : (booking.roomNumber ? `Room ${booking.roomNumber}` : (booking.room || "Not Assigned"))}
+                </p>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Room Category</span>
+                <p className="font-semibold mt-0.5">
+                  {booking.roomType || (booking.room && booking.room.includes('·') ? booking.room.split('·')[1]?.trim() : "Standard Room")}
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>

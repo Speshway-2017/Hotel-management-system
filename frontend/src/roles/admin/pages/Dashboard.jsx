@@ -47,7 +47,7 @@ import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
-import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
+import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 
 const AdminDashboardRoute = {
   head: () => ({
@@ -190,7 +190,8 @@ function AdminDashboard() {
         }
       });
 
-      setRooms(uniqueRooms);
+      const normalized = normalizeRoomList(uniqueRooms, (reservationsRes && reservationsRes.data) || []);
+      setRooms(normalized);
 
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to load dashboard statistics.");

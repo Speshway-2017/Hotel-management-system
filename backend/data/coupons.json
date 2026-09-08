@@ -17,7 +17,10 @@
     "propertyId": "all",
     "applicableSource": "website",
     "createdAt": "2026-09-04T07:14:36.870Z",
-    "updatedAt": "2026-09-04T07:14:36.870Z"
+    "updatedAt": "2026-09-08T05:44:40.124Z",
+    "$inc": {
+      "usedCount": 1
+    }
   },
   {
     "id": "CPN-WELCOME",

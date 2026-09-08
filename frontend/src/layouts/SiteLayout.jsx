@@ -342,7 +342,9 @@ export function SiteLayout({ children }) {
     publicService.getBranding()
       .then(res => {
         if (res.success && res.data) {
-          const b = res.data;
+          const b = Array.isArray(res.data) 
+            ? (res.data.find(c => c.type === 'branding') || {}) 
+            : res.data;
 
           // Apply colors dynamically to Tailwind variables
           if (b.author && /^#[0-9A-F]{6}$/i.test(b.author)) {
@@ -354,14 +356,15 @@ export function SiteLayout({ children }) {
           }
 
           // Apply Favicon dynamically
-          if (b.readTime) {
+          const favUrl = b.faviconUrl || (b.readTime && !b.readTime.includes('min read') ? b.readTime : '/logo.png');
+          if (favUrl) {
             let faviconLink = document.querySelector("link[rel~='icon']");
             if (!faviconLink) {
               faviconLink = document.createElement('link');
               faviconLink.rel = 'icon';
               document.getElementsByTagName('head')[0].appendChild(faviconLink);
             }
-            faviconLink.href = b.readTime;
+            faviconLink.href = favUrl;
           }
         }
       })

@@ -19,7 +19,40 @@ const SHIFT_TIMINGS = {
   "Morning Shift": "06:00 AM - 02:00 PM",
   "Afternoon Shift": "02:00 PM - 10:00 PM",
   "Night Shift": "10:00 PM - 06:00 AM",
-  "General Shift": "09:00 AM - 05:00 PM"
+  "General Shift": "09:00 AM - 05:00 PM",
+  "Morning": "06:00 AM - 02:00 PM",
+  "Evening": "02:00 PM - 10:00 PM",
+  "Afternoon": "02:00 PM - 10:00 PM",
+  "Night": "10:00 PM - 06:00 AM",
+  "General": "09:00 AM - 05:00 PM",
+  "Morning (06:00 - 14:00)": "06:00 AM - 02:00 PM",
+  "Evening (14:00 - 22:00)": "02:00 PM - 10:00 PM",
+  "Night (22:00 - 06:00)": "10:00 PM - 06:00 AM",
+  "General (09:00 - 17:00)": "09:00 AM - 05:00 PM"
+};
+
+const getShiftTiming = (shiftStr) => {
+  if (!shiftStr) return "06:00 AM - 02:00 PM";
+  if (SHIFT_TIMINGS[shiftStr]) return SHIFT_TIMINGS[shiftStr];
+  const timeMatch = shiftStr.match(/\((.*?)\)/);
+  if (timeMatch && timeMatch[1]) return timeMatch[1];
+  const lower = shiftStr.toLowerCase();
+  if (lower.includes("morn")) return "06:00 AM - 02:00 PM";
+  if (lower.includes("after") || lower.includes("even")) return "02:00 PM - 10:00 PM";
+  if (lower.includes("night")) return "10:00 PM - 06:00 AM";
+  if (lower.includes("gen")) return "09:00 AM - 05:00 PM";
+  return shiftStr;
+};
+
+const normalizeShiftName = (shiftStr) => {
+  if (!shiftStr) return "Morning Shift";
+  if (["Morning Shift", "Afternoon Shift", "Night Shift", "General Shift"].includes(shiftStr)) return shiftStr;
+  const lower = shiftStr.toLowerCase();
+  if (lower.includes("morn")) return "Morning Shift";
+  if (lower.includes("after") || lower.includes("even")) return "Afternoon Shift";
+  if (lower.includes("night")) return "Night Shift";
+  if (lower.includes("gen")) return "General Shift";
+  return shiftStr;
 };
 
 function ManagerViewStaff() {
@@ -86,17 +119,23 @@ function ManagerViewStaff() {
           if (matched.propertyId && user.propertyId && matched.propertyId !== user.propertyId) {
             setIsAuthorized(false);
           } else {
-            // Find matched shift from database records
+            // Find matched shift from database records or user document
             const shiftsList = Array.isArray(shiftsRes) ? shiftsRes : (shiftsRes?.data || []);
-            const matchedShiftObj = shiftsList.find(sh => sh.userId === (matched._id || matched.id));
-            const assignedShift = matchedShiftObj ? matchedShiftObj.shiftType : (matched.shift || "Morning Shift");
+            const matchedShiftObj = shiftsList.find(sh => 
+              String(sh.userId) === String(matched._id || matched.id) ||
+              (sh.username && matched.name && String(sh.username).toLowerCase() === String(matched.name).toLowerCase())
+            );
+            const rawShift = matched.shift || matchedShiftObj?.shiftType || "Morning Shift";
+            const assignedShift = normalizeShiftName(rawShift);
+            const shiftTiming = getShiftTiming(matched.shift || matchedShiftObj?.shiftType || assignedShift);
 
             setStaff({
               ...matched,
               employeeId: matched.id || matched._id || `EMP-${(user.propertyId || "JAI").substring(3)}-102`,
               department: matched.dept || "Front Office",
               assignedShift,
-              shiftTiming: SHIFT_TIMINGS[assignedShift] || SHIFT_TIMINGS["Morning Shift"]
+              shift: rawShift,
+              shiftTiming
             });
           }
         } else {

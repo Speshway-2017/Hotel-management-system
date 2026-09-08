@@ -38,7 +38,7 @@ function ReservationsPage() {
   const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadReservations = (isSilent = false) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && reservations.length === 0) setLoading(true);
     receptionistService.getReservations()
       .then(res => {
         if (res.success && res.data) {
@@ -58,21 +58,18 @@ function ReservationsPage() {
       })
       .catch(err => console.error("Failed to load reservations ledger:", err))
       .finally(() => {
-        if (!isSilent) setLoading(false);
+        setLoading(false);
       });
   };
 
   useEffect(() => {
     loadReservations(false);
-    const interval = setInterval(() => loadReservations(true), 10000);
-    const handleFocus = () => loadReservations(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadReservations(true);
     });
 
     return () => {
-      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -301,7 +298,7 @@ function ReservationsPage() {
                 <th className="py-3.5 px-4">Channel</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
+                <th className="py-3.5 px-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -325,10 +322,10 @@ function ReservationsPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <span className="font-mono text-xs font-bold text-navy block">
-                          {res.room && res.room !== "Unassigned" ? (String(res.room).startsWith('Room') ? res.room : `Room ${res.room}`) : "Unassigned"}
+                          {extractRoomNumber(res) ? `Room ${extractRoomNumber(res)}` : (res.roomNumber ? `Room ${res.roomNumber}` : (res.room && res.room !== "Unassigned" ? res.room : "Unassigned"))}
                         </span>
                         <span className="text-[11px] text-muted-foreground font-medium block">
-                          {res.roomType || "Standard Room"}
+                          {res.roomType || (res.room && res.room.includes('·') ? res.room.split('·')[1]?.trim() : "Standard Room")}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 font-semibold text-navy">{formatDisplayDate(res.checkIn)}</td>
@@ -348,8 +345,8 @@ function ReservationsPage() {
                       <td className="py-3.5 px-4">
                         <Tag tone={meta.tone}>{meta.label}</Tag>
                       </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
-                        <ActionGroup align="right">
+                      <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
+                        <ActionGroup align="left">
                           {/* Check-In Button */}
                           {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
                             <CheckInActionButton

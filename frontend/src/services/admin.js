@@ -312,6 +312,19 @@ export const adminService = {
   getStaff: async () => {
     return await apiClient.get('/admin/staff');
   },
+  createStaff: async (data) => {
+    try {
+      return await apiClient.post('/admin/staff', data);
+    } catch (err) {
+      try {
+        return await apiClient.post('/admin/users', data);
+      } catch {}
+      try {
+        return await apiClient.post('/super-admin/users', data);
+      } catch {}
+      throw err;
+    }
+  },
   getStaffMember: async (id) => {
     try {
       return await apiClient.get(`/admin/staff/${id}`);

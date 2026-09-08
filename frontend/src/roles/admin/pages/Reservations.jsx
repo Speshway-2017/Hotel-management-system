@@ -171,10 +171,9 @@ function ReservationsPage() {
       setError(null);      const res = await superAdminService.getReservations();
       if (res.success && Array.isArray(res.data)) {
         const mapped = res.data.map(b => {
-          const isAbhi = String(b.guest || '').toLowerCase().includes('abhi');
-          const cleanRoomNum = extractRoomNumber(b) || (isAbhi ? '201' : '');
+          const cleanRoomNum = extractRoomNumber(b) || (b.roomNumber ? String(b.roomNumber) : "");
           const roomNum = cleanRoomNum || "Unassigned";
-          const roomType = b.roomType || (cleanRoomNum === '201' ? 'Deluxe Room' : (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room && !b.room.match(/\b\d{3,4}\b/) ? b.room : (cleanRoomNum?.startsWith('2') ? 'Deluxe Room' : cleanRoomNum?.startsWith('3') ? 'Executive Suite' : cleanRoomNum?.startsWith('4') ? 'Presidential Suite' : 'Standard Room'))));
+          const roomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room && !b.room.match(/\b\d{3,4}\b/) ? b.room : (cleanRoomNum?.startsWith('5') ? 'Penthouse Suite' : cleanRoomNum?.startsWith('4') ? 'Presidential Suite' : cleanRoomNum?.startsWith('3') ? 'Executive Suite' : cleanRoomNum?.startsWith('2') ? 'Deluxe Room' : 'Standard Room')));
 
           let checkInDate = b.checkIn || b.checkInDate || "";
           if (checkInDate.includes('T')) checkInDate = checkInDate.split('T')[0];
@@ -253,22 +252,13 @@ function ReservationsPage() {
   };
 
   useEffect(() => {
-    loadReservations(false);
-
-    const interval = setInterval(() => {
-      loadReservations(false);
-    }, 10000); // 10s poll fallback
-
-    const handleFocus = () => loadReservations(false);
-    window.addEventListener("focus", handleFocus);
+    loadReservations(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadReservations(false);
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -608,10 +598,10 @@ function ReservationsPage() {
                           </td>
                           <td className="py-3.5 px-2 align-middle truncate">
                             <div className="font-mono text-xs font-bold text-navy">
-                              {res.room && res.room !== "Unassigned" ? (String(res.room).startsWith('Room') ? res.room : `Room ${res.room}`) : "Unassigned"}
+                              {extractRoomNumber(res) ? `Room ${extractRoomNumber(res)}` : (res.roomNumber ? `Room ${res.roomNumber}` : (res.room && res.room !== "Unassigned" ? res.room : "Unassigned"))}
                             </div>
                             <div className="text-[11px] text-muted-foreground font-medium truncate">
-                              {res.roomType || "Standard Room"}
+                              {res.roomType || (res.room && res.room.includes('·') ? res.room.split('·')[1]?.trim() : "Standard Room")}
                             </div>
                           </td>
                           <td className="py-3.5 px-3 align-middle">

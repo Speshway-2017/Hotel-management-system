@@ -68,8 +68,8 @@ function SuperAdminBranding() {
     id: "",
     name: "Hour Stay",
     tagline: "Hospitality software from Jaipur",
-    logoUrl: "/assets/logo-Bk15F6S5.png",
-    faviconUrl: "/favicon.ico",
+    logoUrl: "/logo.png",
+    faviconUrl: "/logo.png",
     primaryColor: "#0D1B2A",
     secondaryColor: "#5B21B6"
   });

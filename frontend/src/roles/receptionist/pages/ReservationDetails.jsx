@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 function ReceptionReservationDetailsPage() {
   const { id } = useParams();
@@ -209,9 +210,17 @@ function ReceptionReservationDetailsPage() {
                   <span className="text-muted-foreground">Payment Status:</span>
                   <Tag tone={booking.paymentStatus === "Paid" ? "success" : "warning"}>{booking.paymentStatus}</Tag>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Room Assignment:</span>
-                  <span className="font-bold text-indigo">Room #{booking.room}</span>
+                  <span className="font-bold text-indigo">
+                    {extractRoomNumber(booking) ? `Room ${extractRoomNumber(booking)}` : (booking.roomNumber ? `Room ${booking.roomNumber}` : (booking.room || "Unassigned"))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Room Category:</span>
+                  <span className="font-bold text-navy">
+                    {booking.roomType || (booking.room && booking.room.includes('·') ? booking.room.split('·')[1]?.trim() : "Standard Room")}
+                  </span>
                 </div>
               </div>
               

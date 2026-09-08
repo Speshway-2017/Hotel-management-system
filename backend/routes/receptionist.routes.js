@@ -110,8 +110,8 @@ router.get('/dashboard', async (req, res) => {
     const arrivals = bookings.filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked'));
     const arrivalsList = arrivals.map(b => {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
-      const rmNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? b.roomId : null) || (match ? match[0] : (String(b.room || "").toLowerCase().includes('deluxe') ? '201' : '101'));
-      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (String(b.room || "").toLowerCase().includes('deluxe') ? 'Deluxe Room' : 'Standard Room'));
+      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : 'Unassigned'));
+      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
       return {
         id: b.bookingId || b.id || b._id,
         _id: b._id || b.id || b.bookingId,
@@ -138,8 +138,8 @@ router.get('/dashboard', async (req, res) => {
     const departures = bookings.filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'));
     const departuresList = departures.map(b => {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
-      const rmNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? b.roomId : null) || (match ? match[0] : (String(b.room || "").toLowerCase().includes('deluxe') ? '201' : '101'));
-      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (String(b.room || "").toLowerCase().includes('deluxe') ? 'Deluxe Room' : 'Standard Room'));
+      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : 'Unassigned'));
+      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
       return {
         id: b.bookingId || b.id || b._id,
         _id: b._id || b.id || b.bookingId,
@@ -154,25 +154,32 @@ router.get('/dashboard', async (req, res) => {
         roomType: rmType,
         time: b.checkOut || 'Today',
         checkOut: b.checkOut || 'Today',
+        checkIn: b.checkIn || 'Today',
         balance: b.balance !== undefined ? Number(b.balance) : 0,
         amount: Number(b.amount || b.totalAmount || 0),
-        status: b.status === 'Checked-out' ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+        status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
       };
     });
 
     const inStayCount = bookings.filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying').length;
     const occupiedCount = inStayCount;
+    const reservedCount = bookings.filter(b => (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked') && b.status !== 'Checked-in' && b.status !== 'Checked-out' && b.status !== 'Cancelled').length;
+    const dirtyCount = rooms.filter(r => r.status === 'Dirty').length;
+    const cleaningCount = rooms.filter(r => r.status === 'Cleaning').length;
+    const oooCount = rooms.filter(r => r.status === 'Out of Order').length;
+    const blockedCount = rooms.filter(r => r.status === 'Blocked').length;
     const totalRoomsCount = rooms.length > 0 ? rooms.length : 14;
-    const availableCount = Math.max(0, totalRoomsCount - occupiedCount);
+    const availableCount = Math.max(0, totalRoomsCount - occupiedCount - reservedCount - oooCount - blockedCount);
 
     const stats = {
       available: availableCount,
       occupied: occupiedCount,
+      reserved: reservedCount,
       inStay: inStayCount,
-      dirty: rooms.filter(r => r.status === 'Dirty').length,
-      cleaning: rooms.filter(r => r.status === 'Cleaning').length,
-      ooo: rooms.filter(r => r.status === 'Out of Order').length,
-      blocked: rooms.filter(r => r.status === 'Blocked').length,
+      dirty: dirtyCount,
+      cleaning: cleaningCount,
+      ooo: oooCount,
+      blocked: blockedCount,
       totalRevenue: totalRevenue
     };
 
@@ -200,8 +207,8 @@ router.get('/guests', async (req, res) => {
     
     const guestList = bookings.map(b => {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
-      const rmNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? b.roomId : null) || (match ? match[0] : (String(b.room || "").toLowerCase().includes('deluxe') ? '201' : '101'));
-      const rmCategory = b.roomType || b.category || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (String(b.room || "").toLowerCase().includes('deluxe') ? 'Deluxe Room' : 'Standard Room'));
+      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : 'Unassigned'));
+      const rmCategory = b.roomType || b.category || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
       const guestName = b.guest || b.guestName || 'Guest';
 
       return {
@@ -215,9 +222,9 @@ router.get('/guests', async (req, res) => {
         room: rmNum,
         roomNumber: rmNum,
         roomType: rmCategory,
-        checkIn: b.checkIn || '2026-09-02',
-        checkOut: b.checkOut || '2026-09-05',
-        duration: `${b.nights || 2} Nights`,
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        duration: `${b.nights || 1} Nights`,
         pax: b.pax || `${b.adults || 2} Adults`,
         balance: b.balance !== undefined ? Number(b.balance) : 0,
         amount: Number(b.amount || b.totalAmount || 0),
@@ -337,7 +344,10 @@ router.get('/rooms', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
     const { checkIn, checkOut } = req.query;
-    const rooms = await Room.find({ propertyId }).sort({ roomNumber: 1 });
+    let rooms = await Room.find({ $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] }).sort({ roomNumber: 1 });
+    if (!rooms || rooms.length === 0) {
+      rooms = await Room.find().sort({ roomNumber: 1 });
+    }
     
     // Fetch all active bookings across propertyId or global
     const bookings = await Booking.find({
@@ -355,7 +365,12 @@ router.get('/rooms', async (req, res) => {
     const reqOut = parseTime(checkOut);
 
     const roomsList = rooms.map(r => {
-      const activeCheckIn = bookings.find(b => b.status === 'Checked-in' && b.room && (b.room.includes(r.roomNumber) || String(b.roomId) === String(r._id)));
+      const activeCheckIn = bookings.find(b => (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying') && (
+        (b.roomId && (String(b.roomId) === String(r._id) || String(b.roomId) === String(r.roomNumber))) ||
+        (b.roomNumber && String(b.roomNumber).trim() === String(r.roomNumber).trim()) ||
+        (b.room && String(b.room).match(/\b\d{3,4}\b/)?.[0] === String(r.roomNumber).trim()) ||
+        (b.room && String(b.room).includes(String(r.roomNumber)))
+      ));
       
       let isReservedForDates = false;
       let reservedBooking = null;
@@ -364,10 +379,10 @@ router.get('/rooms', async (req, res) => {
       reservedBooking = bookings.find(b => {
         if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') return false;
         
-        const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
+        const bRoomNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : null) || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
         const matchesRoom = (b.roomId && String(b.roomId) === String(r._id)) || 
-                            (bRoomNum && bRoomNum === r.roomNumber) ||
-                            (b.room && b.room.includes(r.roomNumber));
+                            (bRoomNum && String(bRoomNum).trim() === String(r.roomNumber).trim()) ||
+                            (b.room && String(b.room).includes(String(r.roomNumber)));
         if (!matchesRoom) return false;
 
         const bIn = parseTime(b.checkIn);
@@ -377,18 +392,18 @@ router.get('/rooms', async (req, res) => {
           return (reqIn < bOut && reqOut > bIn);
         }
 
-        // If no query date, check if active reservation exists for current timeframe
         return true;
       });
 
-      if (reservedBooking) {
+      if (reservedBooking && !activeCheckIn) {
         isReservedForDates = true;
-        console.log(`🔍 [Room Availability Audit] Room ${r.roomNumber} -> RESERVED for Booking ${reservedBooking.bookingId || reservedBooking._id} (${reservedBooking.guest})`);
       }
 
       // Compute display status
-      let displayStatus = r.status;
-      if ((r.status === 'Available' || !r.status) && isReservedForDates) {
+      let displayStatus = r.status || 'Available';
+      if (activeCheckIn) {
+        displayStatus = 'Occupied';
+      } else if (isReservedForDates || r.status === 'Reserved' || (reservedBooking && ['Confirmed', 'Paid', 'Pending', 'Pre-checked'].includes(reservedBooking.status))) {
         displayStatus = 'Reserved';
       }
 
@@ -403,13 +418,13 @@ router.get('/rooms', async (req, res) => {
         status: displayStatus,
         operationalStatus: r.status || 'Available',
         isReserved: isReservedForDates,
-        isAvailable: (r.status === 'Available' || !r.status) && !isReservedForDates,
+        isAvailable: (r.status === 'Available' || !r.status) && !isReservedForDates && !activeCheckIn,
         housekeeping: r.status === 'Dirty' ? 'Dirty' : 'Inspected',
         guest: activeCheckIn ? activeCheckIn.guest : (reservedBooking ? reservedBooking.guest : ''),
         checkIn: activeCheckIn ? activeCheckIn.checkIn : (reservedBooking ? reservedBooking.checkIn : ''),
         checkOut: activeCheckIn ? activeCheckIn.checkOut : (reservedBooking ? reservedBooking.checkOut : ''),
         bookingRef: activeCheckIn ? (activeCheckIn.bookingId || activeCheckIn._id) : (reservedBooking ? (reservedBooking.bookingId || reservedBooking._id) : null),
-        notes: isReservedForDates ? `Reserved for guest ${reservedBooking?.guest} (${reservedBooking?.checkIn} → ${reservedBooking?.checkOut}).` : 'No special alerts.'
+        notes: activeCheckIn ? `Occupied by guest ${activeCheckIn.guest} (Checkout: ${activeCheckIn.checkOut}).` : (isReservedForDates ? `Reserved for guest ${reservedBooking?.guest} (${reservedBooking?.checkIn} → ${reservedBooking?.checkOut}).` : 'No special alerts.')
       };
     });
 
@@ -528,7 +543,10 @@ router.post('/reservations', async (req, res) => {
     const newCheckOut = new Date(checkOut).getTime();
 
     let assignedRoomId = roomId || null;
-    let roomNum = room ? room.split(' ')[0] : null;
+    const roomNum = req.body.roomNumber || (room ? String(room).match(/\b\d{3,4}\b/)?.[0] : null);
+    const roomType = req.body.roomType || (room && room.includes('·') ? room.split('·')[1]?.trim() : (room || 'Standard Room'));
+    const roomString = roomNum ? `${roomNum} · ${roomType}` : (room || `${roomType}`);
+    const bookingStatus = req.body.status || (source === 'Walk-in' && isToday(checkIn) ? 'Checked-in' : 'Confirmed');
 
     if (roomNum || assignedRoomId) {
       const existingBookings = await Booking.find({
@@ -572,34 +590,40 @@ router.post('/reservations', async (req, res) => {
       guestId,
       phone: cleanPhone,
       email: cleanEmail,
-      room: room || '',
+      room: roomString,
+      roomNumber: roomNum,
+      roomType: roomType,
       roomId: assignedRoomId,
       checkIn,
       checkOut,
       nights: calculateStayNights(checkIn, checkOut),
       pax: pax || '2 Adults',
       source: source || 'Walk-in',
-      status: 'Confirmed',
+      status: bookingStatus,
       amount: Number(amount),
       balance: Number(balance !== undefined ? balance : amount),
       propertyId
     });
 
-    // NOTE: Per Phase 1 spec, room operational status stays unchanged at booking time.
+    // Update assigned room status in MongoDB
+    if (roomNum) {
+      const rmStatus = (bookingStatus === 'Checked-in' || bookingStatus === 'Checked In') ? 'Occupied' : 'Reserved';
+      await syncRoomStatus(roomNum, rmStatus, propertyId);
+    }
 
     // Trigger notifications
     await triggerNotification({
       role: 'manager',
       propertyId,
       title: 'New Reservation Booking',
-      message: `Reservation created for ${guest} in Room ${room || 'unassigned'} (Amount: ₹${amount}).`,
+      message: `Reservation created for ${guest} in Room ${roomNum ? `Room ${roomNum}` : (room || 'unassigned')} (Amount: ₹${amount}).`,
       category: 'Operations'
     });
     await triggerNotification({
       role: 'receptionist',
       propertyId,
       title: 'New Reservation Booking',
-      message: `Reservation created for ${guest} in Room ${room || 'unassigned'} (Amount: ₹${amount}).`,
+      message: `Reservation created for ${guest} in Room ${roomNum ? `Room ${roomNum}` : (room || 'unassigned')} (Amount: ₹${amount}).`,
       category: 'Operations'
     });
 
@@ -608,7 +632,10 @@ router.post('/reservations', async (req, res) => {
     if (io) {
       emitRealtimeSync(io, propertyId, 'booking_created', { booking: newBooking, propertyId });
       emitRealtimeSync(io, propertyId, 'booking_updated', { type: 'CREATED', booking: newBooking, propertyId });
-      emitRealtimeSync(io, propertyId, 'availability_changed', { propertyId, roomId: assignedRoomId });
+      if (roomNum) {
+        emitRealtimeSync(io, propertyId, 'room_status_changed', { propertyId, roomNumber: roomNum, status: (bookingStatus === 'Checked-in' || bookingStatus === 'Checked In') ? 'Occupied' : 'Reserved' });
+        emitRealtimeSync(io, propertyId, 'availability_changed', { propertyId, roomNumber: roomNum });
+      }
       emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'booking_created' });
     }
 
@@ -949,19 +976,8 @@ const ensureRealPayments = async (propId) => {
       if (!bId) continue;
       const guestName = b.guest || b.customerName || b.guestName || 'Guest';
 
-      let roomNumber = b.roomNumber;
-      if (!roomNumber || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
-        const match = String(b.room || "").match(/\b\d{3,4}\b/);
-        if (match) {
-          roomNumber = match[0];
-        } else if (String(b.room || "").toLowerCase().includes('deluxe') || String(b.roomType || "").toLowerCase().includes('deluxe') || String(guestName).toLowerCase().includes('abhi')) {
-          roomNumber = '201';
-        } else {
-          roomNumber = '101';
-        }
-      }
-
-      const amount = Number(b.amount || b.totalAmount || 0);
+      let roomNumber = extractRoomNumber(b) || '101';
+      const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
       const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
         ? 'Settled'

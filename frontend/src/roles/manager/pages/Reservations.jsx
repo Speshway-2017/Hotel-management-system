@@ -73,9 +73,9 @@ function ManagerReservationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  async function loadData() {
+  async function loadData(showSpinner = true) {
     try {
-      setLoading(true);
+      if (showSpinner && reservations.length === 0) setLoading(true);
       setError(null);
       const user = authService.getCurrentUser();
       setCurrentUser(user);
@@ -115,22 +115,13 @@ function ManagerReservationsPage() {
   };
 
   useEffect(() => {
-    loadData();
-
-    const interval = setInterval(() => {
-      loadData();
-    }, 10000); // 10s poll fallback
-
-    const handleFocus = () => loadData();
-    window.addEventListener("focus", handleFocus);
+    loadData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
-      loadData();
+      loadData(false);
     });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -474,8 +465,8 @@ function ManagerReservationsPage() {
                           {res.status}
                         </Tag>
                       </td>
-                      <td className="py-3.5 pl-3 pr-4 text-right align-middle min-w-[280px] whitespace-nowrap">
-                        <ActionGroup>
+                      <td className="py-3.5 pl-3 pr-4 text-left align-middle min-w-[280px] whitespace-nowrap">
+                        <ActionGroup align="left">
                           {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
                             <CheckInActionButton
                               onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}

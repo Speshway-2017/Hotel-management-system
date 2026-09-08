@@ -42,6 +42,7 @@ function EditStaff() {
   const [loading, setLoading] = useState(!stateMember);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Form States (pre-filled from stateMember if available)
   const [name, setName] = useState(stateMember?.name || stateMember?.fullName || stateMember?.username || "");
@@ -61,7 +62,7 @@ function EditStaff() {
     stateMember?.dept || stateMember?.department || "Front Desk"
   );
   const [shift, setShift] = useState(
-    stateMember?.shift || stateMember?.shiftTiming || "Morning (06:00 - 14:00)"
+    stateMember?.shift || stateMember?.shiftTiming || stateMember?.assignedShift || "Morning (06:00 - 14:00)"
   );
 
   const populateFromObject = (match) => {
@@ -97,7 +98,7 @@ function EditStaff() {
     let memberDept = match.dept || match.department || match.division || "Front Desk";
     
     // Normalize Shift
-    let memberShift = match.shift || match.shiftTiming || match.preferredShift || "Morning (06:00 - 14:00)";
+    let memberShift = match.shift || match.shiftTiming || match.assignedShift || match.preferredShift || "Morning (06:00 - 14:00)";
 
     setName(memberName);
     setEmail(memberEmail);
@@ -210,15 +211,21 @@ function EditStaff() {
         }
 
         if (match && isMounted) {
-          populateFromObject(match);
+          if (!isDirty) {
+            populateFromObject(match);
+          } else {
+            setTargetId(match._id || match.id || targetId);
+          }
         } else if (stateMember && isMounted) {
-          populateFromObject(stateMember);
-        } else if (isMounted) {
+          if (!isDirty) {
+            populateFromObject(stateMember);
+          }
+        } else if (isMounted && !stateMember) {
           setError("Staff member not found.");
         }
       } catch (err) {
         if (stateMember && isMounted) {
-          populateFromObject(stateMember);
+          if (!isDirty) populateFromObject(stateMember);
         } else if (isMounted) {
           setError(err.message || "Failed to load staff profile.");
         }
@@ -302,7 +309,10 @@ function EditStaff() {
                   type="text"
                   required
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setIsDirty(true);
+                  }}
                   placeholder="Enter employee full name"
                 />
               </FormField>
@@ -322,7 +332,10 @@ function EditStaff() {
                     type="text"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setIsDirty(true);
+                    }}
                     placeholder="+91 98765 43210"
                   />
                 </FormField>
@@ -333,7 +346,10 @@ function EditStaff() {
                   <Select
                     id="role"
                     value={role}
-                    onChange={(e) => setRole(e.target.value)}
+                    onChange={(e) => {
+                      setRole(e.target.value);
+                      setIsDirty(true);
+                    }}
                   >
                     {role && !["receptionist", "manager", "operator", "admin"].includes(role) && (
                       <option value={role}>{role}</option>
@@ -348,7 +364,10 @@ function EditStaff() {
                   <Select
                     id="status"
                     value={status}
-                    onChange={(e) => setStatus(e.target.value)}
+                    onChange={(e) => {
+                      setStatus(e.target.value);
+                      setIsDirty(true);
+                    }}
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -361,7 +380,10 @@ function EditStaff() {
                   <Select
                     id="dept"
                     value={dept}
-                    onChange={(e) => setDept(e.target.value)}
+                    onChange={(e) => {
+                      setDept(e.target.value);
+                      setIsDirty(true);
+                    }}
                   >
                     {dept && !["Front Desk", "Management", "Operations", "Front Office", "Reception Desk", "Housekeeping", "Food & Beverage", "Security"].includes(dept) && (
                       <option value={dept}>{dept}</option>
@@ -380,7 +402,10 @@ function EditStaff() {
                   <Select
                     id="shift"
                     value={shift}
-                    onChange={(e) => setShift(e.target.value)}
+                    onChange={(e) => {
+                      setShift(e.target.value);
+                      setIsDirty(true);
+                    }}
                   >
                     {shift && !["Morning (06:00 - 14:00)", "Evening (14:00 - 22:00)", "Night (22:00 - 06:00)", "General (09:00 - 17:00)", "Morning Shift", "Afternoon Shift", "Night Shift", "General Shift"].includes(shift) && (
                       <option value={shift}>{shift}</option>

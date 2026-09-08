@@ -6,6 +6,7 @@ import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 function AddReservation() {
   const navigate = useNavigate();
@@ -162,12 +163,16 @@ function AddReservation() {
     e.preventDefault();
     setLoading(true);
     try {
+      const roomNum = extractRoomNumber(room);
+      const roomType = room && room.includes('·') ? room.split('·')[1]?.trim() : (room || "Standard Room");
       const payload = {
         guest,
         phone,
         idProofType,
         idProofNumber,
-        room,
+        room: roomNum ? `${roomNum} · ${roomType}` : room,
+        roomNumber: roomNum,
+        roomType: roomType,
         checkIn,
         checkOut,
         nights: Number(nights),

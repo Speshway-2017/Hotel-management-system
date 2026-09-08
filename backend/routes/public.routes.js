@@ -20,8 +20,25 @@ const router = express.Router();
 // GET /api/v1/public/branding
 router.get('/branding', async (req, res) => {
   try {
-    const cms = await CMS.find();
-    return sendSuccess(res, 200, cms, 'CMS data fetched successfully');
+    const branding = await CMS.findOne({ type: 'branding' });
+    if (branding) {
+      const data = branding.toObject ? branding.toObject() : { ...branding };
+      if (!data.content || data.content.includes('Bk15F6S5') || data.content.includes('favicon.ico')) {
+        data.content = '/logo.png';
+      }
+      if (!data.readTime || data.readTime === '/favicon.ico' || data.readTime.includes('min read')) {
+        data.readTime = '/logo.png';
+      }
+      return sendSuccess(res, 200, data, 'Branding fetched successfully');
+    }
+    return sendSuccess(res, 200, {
+      type: 'branding',
+      name: 'Hour Stay',
+      content: '/logo.png',
+      readTime: '/logo.png',
+      author: '#0D1B2A',
+      role: '#5B21B6'
+    }, 'Default branding fetched');
   } catch (error) {
     return sendError(res, 500, 'Failed to fetch CMS data');
   }
@@ -452,12 +469,14 @@ router.post('/bookings', async (req, res) => {
     }
 
     const bookingId = `BK${Date.now().toString().slice(-6)}`;
+    const formattedRoom = assignedRoomNumber ? `${assignedRoomNumber} · ${rType || 'Standard Room'}` : (rType || 'Standard Room');
 
     const newBooking = await Booking.create({
       bookingId,
       guestId,
       propertyId: targetPropId,
       roomId: assignedRoomId,
+      roomNumber: assignedRoomNumber ? String(assignedRoomNumber) : null,
       city: bookingCity || 'Hyderabad',
       guest: gName,
       email: cleanEmail,
@@ -465,7 +484,7 @@ router.post('/bookings', async (req, res) => {
       checkIn: cIn,
       checkOut: cOut,
       nights: nights,
-      room: assignedRoomNumber ? `${rType || 'Room'} (Room ${assignedRoomNumber})` : (rType || 'Standard Room'),
+      room: formattedRoom,
       roomType: rType || 'Standard Room',
       ratePlan: req.body.ratePlan || (rType?.toLowerCase().includes('deluxe') ? 'Deluxe Plan' : rType?.toLowerCase().includes('suite') ? 'Executive Suite Plan' : `${rType || 'Standard'} Plan`),
       rooms: Number(roomsCount) || 1,
@@ -496,6 +515,10 @@ router.post('/bookings', async (req, res) => {
         status: 'Confirmed'
       });
       emitRealtimeSync(io, targetPropId, 'booking_created', { booking: newBooking, propertyId: targetPropId });
+      if (assignedRoomNumber) {
+        emitRealtimeSync(io, targetPropId, 'room_status_changed', { propertyId: targetPropId, roomNumber: assignedRoomNumber, status: 'Reserved' });
+        emitRealtimeSync(io, targetPropId, 'availability_changed', { propertyId: targetPropId, roomNumber: assignedRoomNumber });
+      }
       emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'booking_created' });
     }
 
