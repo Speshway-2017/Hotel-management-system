@@ -312,6 +312,9 @@ class QueryWrapper {
           query = query.select(fields);
         }
         result = await query;
+        if (!result) {
+          result = await this.executor(false);
+        }
       } else {
         result = await this.executor(false);
       }

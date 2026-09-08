@@ -19,11 +19,11 @@
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
-    "idDocNumber": "",
+    "idDocNumber": "123456789009",
     "loyaltyPoints": 0,
     "notes": "",
     "createdAt": "2026-09-04T06:47:43.696Z",
-    "updatedAt": "2026-09-04T06:47:43.734Z"
+    "updatedAt": "2026-09-08T11:50:18.044Z"
   },
   {
     "id": "6a99315b257a3b6f61660170",
@@ -75,7 +75,7 @@
     "loyaltyPoints": 0,
     "notes": "",
     "createdAt": "2026-09-04T06:47:43.865Z",
-    "updatedAt": "2026-09-04T06:47:43.902Z"
+    "updatedAt": "2026-09-08T11:43:22.156Z"
   },
   {
     "id": "6a99315b257a3b6f61660172",
@@ -647,7 +647,7 @@
     "loyaltyPoints": 0,
     "notes": "",
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-08T06:09:53.261Z"
+    "updatedAt": "2026-09-08T11:48:46.241Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -784,7 +784,7 @@
     "_id": "nhb9td45vas",
     "name": "Sunny",
     "email": "sunny@gmail.com",
-    "password": "$2a$10$x6QnjZatpJVcvi0unnReV.FHEjQRJy15nTjgO5SQp6wJKsTtA/n9q",
+    "password": "$2a$10$39qxCJKiMR2l7HHCggQC6ePusAGJG5yZXjzBBxmDr0F2W0kkLhGMu",
     "role": "guest",
     "mobile": "4563536436",
     "propertyId": null,
@@ -803,7 +803,7 @@
     "loyaltyPoints": 0,
     "notes": "",
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-08T06:11:59.120Z"
+    "updatedAt": "2026-09-08T11:55:47.128Z"
   },
   {
     "id": "omk6dktv7lj",
@@ -855,6 +855,58 @@
     "loyaltyPoints": 0,
     "notes": "",
     "createdAt": "2026-09-07T05:58:33.215Z",
-    "updatedAt": "2026-09-08T06:27:14.940Z"
+    "updatedAt": "2026-09-08T11:50:18.209Z"
+  },
+  {
+    "id": "roetf6hsy6c4218o9trtx9",
+    "_id": "roetf6hsy6c4218o9trtx9",
+    "name": "Rajesh Sharma",
+    "email": "manager@hourstay.com",
+    "password": "$2a$10$Xnyy.qjCAK7wC1HYODewieFEWUqDXIh3wzjOLqQBGplUa2VZ.fhq.",
+    "role": "manager",
+    "mobile": "9876543210",
+    "propertyId": "HS-JAI",
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "createdAt": "2026-09-08T05:16:33.982Z",
+    "updatedAt": "2026-09-08T11:50:17.881Z"
+  },
+  {
+    "id": "yl9oyu10cs",
+    "_id": "yl9oyu10cs",
+    "name": "Test User",
+    "email": "authtest_1788868218220@example.com",
+    "password": "$2a$10$43UFeCltjdhrJYgpsCZZfeDLvTKovWnnnNcuuQJ26wiu.iCaZMjSW",
+    "role": "guest",
+    "mobile": "9988776655",
+    "propertyId": null,
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "createdAt": "2026-09-08T11:50:18.244Z",
+    "updatedAt": "2026-09-08T11:50:18.382Z"
   }
 ]

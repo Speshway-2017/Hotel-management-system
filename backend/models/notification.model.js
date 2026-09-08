@@ -164,8 +164,10 @@ class QueryWrapper {
   constructor(executor) {
     this.executor = executor;
     this.selectFields = [];
+    this.sortFields = null;
   }
   select(fields) { this.selectFields.push(fields); return this; }
+  sort(fields) { this.sortFields = fields; return this; }
   lean() { return this; }
   populate() { return this; }
   async then(onFulfilled, onRejected) {
@@ -175,6 +177,9 @@ class QueryWrapper {
         let query = this.executor(true);
         for (const fields of this.selectFields) {
           query = query.select(fields);
+        }
+        if (this.sortFields) {
+          query = query.sort(this.sortFields);
         }
         result = await query;
       } else {
@@ -191,7 +196,7 @@ class QueryWrapper {
 const Notification = {
   find: (query) => {
     return new QueryWrapper((isMongoose) => {
-      if (isMongoose) return MongooseNotification.find(query).sort({ createdAt: -1 });
+      if (isMongoose) return MongooseNotification.find(query);
       return MockNotification.find(query);
     });
   },
@@ -212,6 +217,16 @@ const Notification = {
       return await MongooseNotification.create(data);
     }
     return await MockNotification.create(data);
+  },
+  insertMany: async (items) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.insertMany(items);
+    }
+    const created = [];
+    for (const it of items) {
+      created.push(await MockNotification.create(it));
+    }
+    return created;
   },
   findByIdAndUpdate: async (id, update, options) => {
     if (mongoose.connection.readyState === 1) {

@@ -6,7 +6,7 @@ import Booking from '../models/booking.model.js';
 import Property from '../models/property.model.js';
 import Review from '../models/review.model.js';
 import Notification from '../models/notification.model.js';
-import { Feedback } from '../models/managerData.model.js';
+import { Room, Feedback } from '../models/managerData.model.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { notifyFeedbackEvent } from '../utils/notification.helper.js';
 import { calculateStayNights } from '../utils/dateUtils.js';
@@ -30,6 +30,19 @@ const guestAuth = async (req, res, next) => {
 };
 
 router.use(guestAuth);
+
+router.get('/rooms', async (req, res) => {
+  try {
+    const targetPropId = req.user?.propertyId || 'HS-JAI';
+    let dbRooms = await Room.find({ propertyId: targetPropId }).sort({ roomNumber: 1 });
+    if (!dbRooms || dbRooms.length === 0) {
+      dbRooms = await Room.find().sort({ roomNumber: 1 });
+    }
+    return sendSuccess(res, 200, dbRooms, 'Guest available rooms retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to load rooms');
+  }
+});
 
 router.get('/bookings', async (req, res) => {
   try {
@@ -463,7 +476,11 @@ router.get('/notifications', async (req, res) => {
         { role: 'guest' },
         { userId: userId }
       ]
-    }).sort({ createdAt: -1 });
+    });
+
+    if (Array.isArray(list)) {
+      list = list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    }
 
     if (list.length === 0) {
       const defaultNotifications = [
