@@ -1,0 +1,100 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+
+class ApiEndpoints {
+  static String baseUrl = getDefaultBaseUrl();
+
+  static void setBaseUrl(String url) {
+    baseUrl = url;
+  }
+
+  static String getDefaultBaseUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:5000/api';
+    } else if (Platform.isAndroid) {
+      // 127.0.0.1 is forwarded via adb reverse; 192.168.1.14 on Wi-Fi; 10.0.2.2 for emulator
+      return 'http://127.0.0.1:5000/api';
+    } else {
+      // iOS Simulator / Desktop
+      return 'http://localhost:5000/api';
+    }
+  }
+
+  static List<String> getCandidateBaseUrls() {
+    if (kIsWeb) {
+      return const ['http://localhost:5000/api'];
+    } else if (Platform.isAndroid) {
+      return const [
+        'http://127.0.0.1:5000/api',
+        'http://192.168.1.14:5000/api',
+        'http://10.0.2.2:5000/api',
+        'http://localhost:5000/api',
+      ];
+    } else {
+      return const [
+        'http://localhost:5000/api',
+        'http://127.0.0.1:5000/api',
+        'http://192.168.1.14:5000/api',
+      ];
+    }
+  }
+
+  static String getDefaultSocketUrl([String? explicitBaseUrl]) {
+    final activeBase = explicitBaseUrl ?? baseUrl;
+    if (activeBase.endsWith('/api')) {
+      return activeBase.substring(0, activeBase.length - 4);
+    }
+    if (kIsWeb) {
+      return 'http://localhost:5000';
+    } else if (Platform.isAndroid) {
+      return 'http://127.0.0.1:5000';
+    } else {
+      return 'http://localhost:5000';
+    }
+  }
+
+  // Auth Routes
+  static const String login = '/auth/login';
+  static const String register = '/auth/register';
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String verifyOtp = '/auth/verify-otp';
+  static const String resetPassword = '/auth/reset-password';
+  static const String profile = '/auth/profile';
+  static const String logout = '/auth/logout';
+
+  // Manager Routes
+  static const String property = '/manager/property';
+  static const String managerReservations = '/manager/reservations';
+  static const String reservations = '/manager/reservations';
+  static const String managerRooms = '/manager/rooms';
+  static const String rooms = '/manager/rooms';
+  static const String managerApprovals = '/manager/approvals';
+  static const String approvals = '/manager/approvals';
+  static const String managerStaff = '/manager/staff';
+  static const String staff = '/manager/staff';
+  static const String managerShifts = '/manager/shifts';
+  static const String managerAttendance = '/manager/attendance';
+  static const String managerFeedback = '/manager/feedback';
+  static const String feedback = '/manager/feedback';
+  static const String managerPayments = '/manager/payments';
+  static const String payments = '/manager/payments';
+  static const String managerBilling = '/manager/billing';
+  static const String managerNotifications = '/manager/notifications';
+  static const String notifications = '/manager/notifications';
+  static const String managerGuests = '/manager/guests';
+
+  // Guest Routes
+  static const String guestDashboard = '/guest/dashboard';
+  static const String guestBookings = '/guest/bookings';
+  static const String myBookings = '/guest/bookings';
+  static const String guestFolio = '/guest/folio';
+  static const String folios = '/guest/folio';
+  static const String guestFeedback = '/guest/feedback';
+  static const String myFeedback = '/guest/feedback';
+  static const String guestProfile = '/guest/profile';
+  static const String guestNotifications = '/guest/notifications';
+  static const String guestNotificationsReadAll = '/guest/notifications/read-all';
+  static const String guestChangePassword = '/guest/change-password';
+  static const String guestRooms = '/guest/rooms';
+  static const String publicProperties = '/public/properties';
+}
