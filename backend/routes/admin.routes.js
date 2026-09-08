@@ -5,7 +5,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import Booking from '../models/booking.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
-import { Payment, Feedback } from '../models/managerData.model.js';
+import { Payment, Feedback, Shift } from '../models/managerData.model.js';
 import User from '../models/user.model.js';
 import Coupon from '../models/coupon.model.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
@@ -298,19 +298,8 @@ const ensureRealPayments = async (propId) => {
       if (!bId) continue;
       const guestName = b.guest || b.customerName || b.guestName || 'Guest';
 
-      let roomNumber = b.roomNumber;
-      if (!roomNumber || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
-        const match = String(b.room || "").match(/\b\d{3,4}\b/);
-        if (match) {
-          roomNumber = match[0];
-        } else if (String(b.room || "").toLowerCase().includes('deluxe') || String(b.roomType || "").toLowerCase().includes('deluxe') || String(guestName).toLowerCase().includes('abhi')) {
-          roomNumber = '201';
-        } else {
-          roomNumber = '101';
-        }
-      }
-
-      const amount = Number(b.amount || b.totalAmount || 0);
+      let roomNumber = extractRoomNumber(b) || '101';
+      const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
       const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
         ? 'Settled'
@@ -873,7 +862,10 @@ const handleGetUsersOrStaff = async (req, res) => {
       propertyId: u.propertyId || null,
       dept: u.dept || 'Front Desk',
       shift: u.shift || 'Morning (06:00 - 14:00)',
-      lastLogin: u.lastLogin || '—',
+      lastLogin: u.lastLogin || u.lastActive || u.updatedAt || u.createdAt || '—',
+      lastActive: u.lastActive || u.lastLogin || u.updatedAt || u.createdAt || '—',
+      updatedAt: u.updatedAt,
+      createdAt: u.createdAt,
       city: u.city || '',
       state: u.state || '',
       country: u.country || 'India',
@@ -972,6 +964,60 @@ const handleGetUserOrStaffById = async (req, res) => {
   }
 };
 
+const handleCreateUserOrStaff = async (req, res) => {
+  try {
+    const { name, email, password, role, mobile, propertyId, status, dept, shift } = req.body;
+    if (!name || !email) {
+      return sendError(res, 400, 'Name and email are required');
+    }
+    const propId = propertyId || req.user?.propertyId || 'HS-JAI';
+    const existing = await User.findOne({ email });
+    if (existing) return sendError(res, 400, 'User with this email already exists');
+
+    const newUser = await User.create({
+      name,
+      email,
+      password: password || 'password123',
+      role: role ? String(role).toLowerCase() : 'receptionist',
+      mobile: mobile || '',
+      propertyId: propId,
+      status: status || 'Active',
+      dept: dept || 'Front Desk',
+      shift: shift || 'Morning (06:00 - 14:00)'
+    });
+
+    try {
+      await Shift.findOneAndUpdate(
+        { userId: newUser._id ? String(newUser._id) : (newUser.id || newUser.email) },
+        { shiftType: shift || 'Morning (06:00 - 14:00)', username: newUser.name, propertyId: propId },
+        { upsert: true, new: true }
+      );
+    } catch {}
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_created', newUser);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_created', id: newUser._id || newUser.id });
+    }
+
+    return sendSuccess(res, 201, {
+      id: newUser.id || newUser._id,
+      _id: newUser.id || newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      mobile: newUser.mobile,
+      propertyId: newUser.propertyId,
+      status: newUser.status,
+      dept: newUser.dept,
+      shift: newUser.shift,
+      lastLogin: '—'
+    }, 'Staff created successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to create staff');
+  }
+};
+
 const handleUpdateUserOrStaff = async (req, res) => {
   try {
     const { id } = req.params;
@@ -991,10 +1037,24 @@ const handleUpdateUserOrStaff = async (req, res) => {
     if (propertyId !== undefined) updateFields.propertyId = propertyId || null;
 
     const updated = await User.findOneAndUpdate(
-      { _id: targetUser._id },
+      { $or: userQuery },
       updateFields,
       { new: true }
     ) || targetUser;
+
+    // Synchronize Shift model for roster consistency
+    try {
+      if (shift !== undefined) {
+        const uId = String(updated._id || updated.id || targetUser._id || targetUser.id || id);
+        await Shift.findOneAndUpdate(
+          { $or: [{ userId: uId }, { username: updated.name }] },
+          { shiftType: shift, username: updated.name, propertyId: updated.propertyId || req.user?.propertyId || 'HS-JAI' },
+          { upsert: true, new: true }
+        );
+      }
+    } catch (shiftErr) {
+      console.warn('Shift sync warning:', shiftErr.message);
+    }
 
     const io = req.app.get('socketio');
     if (io) {
@@ -1027,7 +1087,7 @@ const handleDeleteUserOrStaff = async (req, res) => {
     const targetUser = await User.findOne({ $or: userQuery });
     if (!targetUser) return sendError(res, 404, 'Staff not found');
 
-    const deleted = await User.findOneAndDelete({ _id: targetUser._id });
+    const deleted = await User.findOneAndDelete({ $or: userQuery });
     if (!deleted) return sendError(res, 404, 'Staff not found');
 
     const io = req.app.get('socketio');
@@ -1044,11 +1104,13 @@ const handleDeleteUserOrStaff = async (req, res) => {
 
 router.get('/users', handleGetUsersOrStaff);
 router.get('/users/:id', handleGetUserOrStaffById);
+router.post('/users', handleCreateUserOrStaff);
 router.put('/users/:id', handleUpdateUserOrStaff);
 router.delete('/users/:id', handleDeleteUserOrStaff);
 
 router.get('/staff', handleGetUsersOrStaff);
 router.get('/staff/:id', handleGetUserOrStaffById);
+router.post('/staff', handleCreateUserOrStaff);
 router.put('/staff/:id', handleUpdateUserOrStaff);
 router.delete('/staff/:id', handleDeleteUserOrStaff);
 

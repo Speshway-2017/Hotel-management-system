@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { calculateStayNights } from '../utils/dateUtils.js';
+import { extractRoomNumber } from '../utils/roomHelper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +16,8 @@ const bookingSchema = new mongoose.Schema({
   email: { type: String },
   phone: { type: String },
   room: { type: String },
+  roomId: { type: String },
+  roomNumber: { type: String },
   roomType: { type: String },
   checkIn: { type: String, required: true },
   checkOut: { type: String, required: true },
@@ -528,6 +531,9 @@ const Booking = {
     cleanData.nights = Number(cleanData.nights) || calculateStayNights(cleanData.checkIn, cleanData.checkOut);
     cleanData.propertyId = cleanData.propertyId || 'HS-9HQ8P';
     cleanData.city = cleanData.city || cleanData.hotelCity || 'Hyderabad';
+    if (!cleanData.roomNumber) {
+      cleanData.roomNumber = extractRoomNumber(cleanData.room) || extractRoomNumber(cleanData) || null;
+    }
 
     if (mongoose.connection.readyState === 1) {
       try {

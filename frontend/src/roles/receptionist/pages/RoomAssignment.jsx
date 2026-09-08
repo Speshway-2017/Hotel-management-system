@@ -1,36 +1,40 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, ActionGroup, ActionButton, DetailsActionButton } from "@/components/hs/kit";
+import { createFileRoute } from "@tanstack/react-router";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, EditActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { receptionistService } from "@/services/receptionist";
 import { toast } from "sonner";
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { 
-  Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
-  Clock, AlertTriangle, ClipboardCheck, Search, ChevronRight, X, 
-  ShieldAlert, Sparkles, FileText, CheckCircle2, AlertOctagon, HelpCircle,
-  Wrench, ShieldClose, Info
+  Search, X, Wrench, Shield, Check, Bed
 } from "lucide-react";
+import { formatDisplayDate } from "@/utils/dateUtils";
 
 export const Route = createFileRoute("/reception/room-assignment")({
   head: () => ({
     meta: [
       { title: "Room Status Grid — Hour Stay" },
-      { name: "description", content: "Property room status, clean/dirty indicator, and occupancy racks." }
+      { name: "description", content: "Property room status, inventory cards, and occupancy racks." }
     ]
   }),
   component: RoomStatusPage
 });
 
 function RoomStatusPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [housekeepingFilter, setHousekeepingFilter] = useState("all");
 
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState([]);
+
+  // Edit status modal state
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [newStatus, setNewStatus] = useState("Available");
+  const [savingStatus, setSavingStatus] = useState(false);
 
   const loadRooms = (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -52,20 +56,17 @@ function RoomStatusPage() {
     const interval = setInterval(() => {
       loadRooms(true);
     }, 10000);
-    const handleFocus = () => loadRooms(true);
+    const handleFocus = () => loadRooms(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadRooms(true);
     });
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
-
-  // Selected Room Details Modal
-  const [selectedRoom, setSelectedRoom] = useState(null);
 
   // Status mapping UI config
   const statusMeta = {
@@ -74,12 +75,6 @@ function RoomStatusPage() {
     Reserved: { tone: "info", label: "Reserved", color: "text-sky-700 bg-sky-50 border-sky-200" },
     "Out of Order": { tone: "error", label: "Out of Order", color: "text-red-700 bg-red-50 border-red-200" },
     "Out of Service": { tone: "neutral", label: "Out of Service", color: "text-slate-700 bg-slate-50 border-slate-200" }
-  };
-
-  const housekeepingMeta = {
-    Clean: { tone: "success", label: "Clean", color: "text-emerald-600 bg-emerald-50/50" },
-    Dirty: { tone: "error", label: "Dirty", color: "text-rose-600 bg-rose-50/50" },
-    Inspected: { tone: "info", label: "Inspected", color: "text-blue-600 bg-blue-50/50" }
   };
 
   if (loading) {
@@ -101,86 +96,37 @@ function RoomStatusPage() {
     const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
     const matchesType = typeFilter === "all" || rm.roomType === typeFilter || rm.category === typeFilter;
     const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
-    const matchesHousekeeping = housekeepingFilter === "all" || rm.housekeeping === housekeepingFilter;
 
-    return matchesSearch && matchesFloor && matchesType && matchesStatus && matchesHousekeeping;
+    return matchesSearch && matchesFloor && matchesType && matchesStatus;
   });
 
-  // Action methods
-  const handleMarkClean = (roomNum) => {
-    receptionistService.updateRoomStatus(roomNum, undefined, 'Clean')
-      .then(res => {
-        if (res.success) {
-          toast.success(`Room #${roomNum} marked as Clean!`);
-          loadRooms();
-        }
-      })
-      .catch(err => {
-        console.error("Failed to mark room clean:", err);
-        toast.error(err.message || "Failed to mark room clean.");
-      });
-  };
-
-  const handleMarkInspected = (roomNum) => {
-    receptionistService.updateRoomStatus(roomNum, undefined, 'Inspected')
-      .then(res => {
-        if (res.success) {
-          toast.success(`Room #${roomNum} marked as Inspected / Available!`);
-          loadRooms();
-        }
-      })
-      .catch(err => {
-        console.error("Failed to mark room inspected:", err);
-        toast.error(err.message || "Failed to mark room inspected.");
-      });
-  };
-
-  const handleMarkOutOfOrder = (roomNum) => {
-    receptionistService.updateRoomStatus(roomNum, 'Out of Order', 'Dirty')
-      .then(res => {
-        if (res.success) {
-          toast.success(`Room #${roomNum} marked as Out of Order.`);
-          loadRooms();
-        }
-      })
-      .catch(err => {
-        console.error("Failed to set OOO status:", err);
-        toast.error(err.message || "Failed to update room status.");
-      });
-  };
-
-  const handleChangeRoomStatus = (roomNum, newStatus) => {
-    receptionistService.updateRoomStatus(roomNum, newStatus, undefined)
-      .then(res => {
-        if (res.success) {
-          toast.success(`Room #${roomNum} status changed to ${newStatus}`);
-          loadRooms();
-        }
-      })
-      .catch(err => {
-        console.error("Failed to update status:", err);
-        toast.error(err.message || "Failed to update status.");
-      });
-  };
-
-  const handleChangeHousekeepingStatus = (roomNum, newStatus) => {
-    receptionistService.updateRoomStatus(roomNum, undefined, newStatus)
-      .then(res => {
-        if (res.success) {
-          toast.success(`Room #${roomNum} housekeeping set to ${newStatus}`);
-          loadRooms();
-        }
-      })
-      .catch(err => {
-        console.error("Failed to update housekeeping status:", err);
-        toast.error(err.message || "Failed to update housekeeping status.");
-      });
+  // Handle Save Status Change
+  const handleSaveStatusChange = async (e) => {
+    e.preventDefault();
+    if (!editingRoom) return;
+    const roomNum = editingRoom.room || editingRoom.roomNumber;
+    setSavingStatus(true);
+    try {
+      const res = await receptionistService.updateRoomStatus(roomNum, newStatus, undefined);
+      if (res.success) {
+        toast.success(`Room #${roomNum} status updated to ${newStatus}`);
+        emitRealtimeEvent('room_updated', { roomNumber: roomNum, status: newStatus });
+        setEditingRoom(null);
+        loadRooms(true);
+      } else {
+        toast.error(res.message || "Failed to update room status.");
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      toast.error(err.message || "Failed to update room status.");
+    } finally {
+      setSavingStatus(false);
+    }
   };
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
       
-
       {/* Controls: Search and Filters */}
       <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft space-y-4">
         
@@ -199,7 +145,7 @@ function RoomStatusPage() {
         </div>
 
         {/* Row 2: Select Filters */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-muted/50">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-muted/50">
           
           <div className="flex flex-col gap-1.5">
             <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Floor</span>
@@ -243,20 +189,7 @@ function RoomStatusPage() {
               <option value="Occupied">Occupied</option>
               <option value="Reserved">Reserved</option>
               <option value="Out of Order">Out of Order</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Housekeeping</span>
-            <select
-              value={housekeepingFilter}
-              onChange={(e) => setHousekeepingFilter(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Housekeeping</option>
-              <option value="Clean">Clean</option>
-              <option value="Dirty">Dirty</option>
-              <option value="Inspected">Inspected</option>
+              <option value="Out of Service">Out of Service</option>
             </select>
           </div>
 
@@ -267,16 +200,15 @@ function RoomStatusPage() {
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {filteredRooms.length === 0 ? (
           <div className="col-span-full bg-white border border-muted rounded-2xl p-16 text-center text-muted-foreground font-bold select-none">
-            No rooms matches current rack filter parameters.
+            No rooms match current rack filter parameters.
           </div>
         ) : (
           filteredRooms.map((rm) => {
             const meta = statusMeta[rm.status] || statusMeta.Available;
-            const hkMeta = housekeepingMeta[rm.housekeeping] || housekeepingMeta.Clean;
             return (
               <div 
                 key={rm.room}
-                className="bg-white border border-muted hover:border-muted-foreground/30 hover:shadow-soft rounded-2xl p-4 flex flex-col justify-between min-h-[190px] transition-all relative overflow-hidden text-left"
+                className="bg-white border border-muted hover:border-muted-foreground/30 hover:shadow-soft rounded-2xl p-4 flex flex-col justify-between min-h-[175px] transition-all relative overflow-hidden text-left"
               >
                 
                 {/* Room title row */}
@@ -291,23 +223,28 @@ function RoomStatusPage() {
                 </div>
 
                 {/* Occupancy details */}
-                <div className="my-3.5 border-t border-b border-muted/30 py-2.5 space-y-1.5 text-xs text-navy">
+                <div className="my-3 border-t border-b border-muted/30 py-2.5 space-y-1 text-xs text-navy">
                   {rm.status === "Occupied" ? (
                     <div>
                       <p className="text-[9px] uppercase text-muted-foreground font-bold tracking-wider">In-House Guest</p>
                       <p className="font-bold truncate mt-0.5">{rm.guest}</p>
-                      <p className="text-[9px] text-muted-foreground mt-0.5">Out: {rm.checkOut.split(",")[0]}</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">Out: {formatDisplayDate(rm.checkOut) || rm.checkOut || "—"}</p>
                     </div>
                   ) : rm.status === "Reserved" ? (
                     <div>
                       <p className="text-[9px] uppercase text-sky-600 font-bold tracking-wider">Expected Arrival</p>
                       <p className="font-bold truncate mt-0.5">{rm.guest}</p>
-                      <p className="text-[9px] text-sky-600 mt-0.5">{rm.checkOut}</p>
+                      <p className="text-[9px] text-sky-600 mt-0.5">Check-in: {formatDisplayDate(rm.checkIn) || rm.checkIn || "—"}</p>
                     </div>
                   ) : rm.status === "Out of Order" ? (
                     <div className="flex gap-1.5 text-rose-700 bg-rose-50/20 p-1.5 rounded-lg border border-rose-100/50">
                       <Wrench className="size-3.5 shrink-0 mt-0.5" />
-                      <p className="text-[10px] font-semibold leading-snug truncate">{rm.notes}</p>
+                      <p className="text-[10px] font-semibold leading-snug truncate">{rm.notes || "Out of Order"}</p>
+                    </div>
+                  ) : rm.status === "Out of Service" ? (
+                    <div className="flex gap-1.5 text-slate-700 bg-slate-50/50 p-1.5 rounded-lg border border-slate-200">
+                      <Shield className="size-3.5 shrink-0 mt-0.5 text-slate-500" />
+                      <p className="text-[10px] font-semibold leading-snug truncate">{rm.notes || "Out of Service"}</p>
                     </div>
                   ) : (
                     <div>
@@ -317,53 +254,25 @@ function RoomStatusPage() {
                   )}
                 </div>
 
-                {/* Bottom indicators and actions row */}
-                <div className="flex justify-between items-center gap-1">
-                  
-                  {/* Housekeeping tag */}
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full select-none ${hkMeta.color}`}>
-                    {hkMeta.label}
-                  </span>
-
-                  {/* Actions list */}
-                  <ActionGroup align="right">
-                    {rm.housekeeping === "Dirty" && (
-                      <ActionButton
-                        icon={Sparkles}
-                        label="Clean"
-                        variant="success"
-                        onClick={() => handleMarkClean(rm.room)}
-                        title="Mark Clean"
-                      />
-                    )}
-
-                    {rm.housekeeping === "Clean" && (
-                      <ActionButton
-                        icon={CheckCircle2}
-                        label="Inspect"
-                        variant="info"
-                        onClick={() => handleMarkInspected(rm.room)}
-                        title="Approve Inspection"
-                      />
-                    )}
-
-                    {rm.status !== "Out of Order" && rm.status !== "Occupied" && (
-                      <ActionButton
-                        icon={Wrench}
-                        label="OOO"
-                        variant="danger"
-                        onClick={() => handleMarkOutOfOrder(rm.room)}
-                        title="Mark Out of Order"
-                      />
-                    )}
-
-                    <DetailsActionButton
-                      asChild
-                    >
-                      <Link to={`/reception/room-assignment/${rm.room}`}>Details</Link>
-                    </DetailsActionButton>
+                {/* Bottom Actions Row: Left-aligned icon buttons */}
+                <div className="pt-2.5 border-t border-muted/30 flex items-center justify-between mt-auto">
+                  <ActionGroup align="left">
+                    <ViewActionButton
+                      onClick={() => navigate(`/reception/room-assignment/${rm.room}`)}
+                      title="View Room Details"
+                    />
+                    <EditActionButton
+                      onClick={() => {
+                        setEditingRoom(rm);
+                        setNewStatus(rm.status || "Available");
+                      }}
+                      title="Edit Room Status"
+                    />
                   </ActionGroup>
 
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground">
+                    {rm.floor}
+                  </span>
                 </div>
 
               </div>
@@ -371,6 +280,66 @@ function RoomStatusPage() {
           })
         )}
       </div>
+
+      {/* Edit Room Status Modal Dialog */}
+      {editingRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/40 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl border border-muted shadow-2xl w-full max-w-sm overflow-hidden text-left animate-scale-in">
+            <div className="p-4 bg-muted/15 border-b border-muted flex items-center justify-between">
+              <div>
+                <h3 className="font-display font-black text-navy text-sm">Edit Room Status</h3>
+                <p className="text-[10px] text-muted-foreground font-semibold">Room #{editingRoom.room} · {editingRoom.roomType}</p>
+              </div>
+              <button
+                onClick={() => setEditingRoom(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-navy hover:bg-muted/40 cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStatusChange} className="p-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider select-none">
+                  Select Status
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer"
+                >
+                  <option value="Available">Available</option>
+                  <option value="Occupied">Occupied</option>
+                  <option value="Reserved">Reserved</option>
+                  <option value="Out of Order">Out of Order</option>
+                  <option value="Out of Service">Out of Service</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-muted/30">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingRoom(null)}
+                  className="h-8 text-xs font-bold px-3 rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingStatus}
+                  size="sm"
+                  className="bg-navy hover:bg-navy-deep text-white font-bold h-8 px-4 text-xs rounded-lg cursor-pointer"
+                >
+                  {savingStatus ? "Saving..." : "Save Status"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

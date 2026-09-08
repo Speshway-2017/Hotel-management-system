@@ -202,13 +202,13 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
                 <tbody className="divide-y divide-muted/40 font-semibold">
                   <tr>
                     <td className="py-3 font-bold text-navy">Room Tariff & Accommodation Charges</td>
-                    <td className="py-3 text-muted-foreground">Standard Room Plan</td>
-                    <td className="py-3 text-right font-bold text-navy">₹{Math.round(payment.amount * 0.82).toLocaleString()}</td>
+                    <td className="py-3 text-muted-foreground">Room Plan Charges</td>
+                    <td className="py-3 text-right font-bold text-navy">₹{Math.round(payment.amount / 1.18).toLocaleString()}</td>
                   </tr>
                   <tr>
                     <td className="py-3 font-bold text-navy">Integrated Goods & Service Tax (IGST 18%)</td>
                     <td className="py-3 text-muted-foreground">Statutory GST Slab</td>
-                    <td className="py-3 text-right font-bold text-navy">₹{Math.round(payment.amount * 0.18).toLocaleString()}</td>
+                    <td className="py-3 text-right font-bold text-navy">₹{(payment.amount - Math.round(payment.amount / 1.18)).toLocaleString()}</td>
                   </tr>
                   <tr className="bg-muted/15 font-black text-sm">
                     <td className="py-3 px-2 text-navy" colSpan="2">Total Paid Amount</td>

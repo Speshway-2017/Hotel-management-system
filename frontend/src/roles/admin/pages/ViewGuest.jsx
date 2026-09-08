@@ -139,15 +139,15 @@ function ViewGuestPage() {
         const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn || y.createdAt || 0) - new Date(x.checkIn || x.createdAt || 0));
         let latest = sorted[0];
 
-        // If no specific booking found for user, link active stay or default Room 201 for Abhi
-        if (!latest && (mName.includes("abhi") || bookings.length > 0)) {
-          latest = bookings.find(b => String(b.guest || b.customerName || "").toLowerCase().includes("abhi")) || bookings[0];
+        // If no specific booking found for user, link active stay
+        if (!latest && bookings.length > 0) {
+          latest = bookings.find(b => String(b.guest || b.customerName || "").toLowerCase().includes(mName.toLowerCase())) || bookings[0];
         }
 
-        const rNum = extractRoomNumber(latest) || (latest?.roomNumber) || (mName.includes("abhi") ? "201" : "201");
-        const rType = latest?.roomType || (latest?.room && String(latest.room).includes("·") ? String(latest.room).split("·")[1]?.trim() : "Deluxe Room");
-        const roomDisplay = `Room ${rNum}`;
-        const roomFullDisplay = `${roomDisplay} · ${rType}`;
+        const rNum = extractRoomNumber(latest) || (latest?.roomNumber) || "";
+        const rType = latest?.roomType || (latest?.room && String(latest.room).includes("·") ? String(latest.room).split("·")[1]?.trim() : (rNum.startsWith('5') ? 'Penthouse Suite' : rNum.startsWith('3') ? 'Executive Suite' : rNum.startsWith('2') ? 'Deluxe Room' : 'Standard Room'));
+        const roomDisplay = rNum ? `Room ${rNum}` : 'Unassigned';
+        const roomFullDisplay = rNum ? `${roomDisplay} · ${rType}` : rType;
 
         const validHistory = guestBookings.length > 0 ? guestBookings : (latest ? [latest] : []);
         

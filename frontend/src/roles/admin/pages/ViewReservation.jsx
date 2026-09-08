@@ -123,8 +123,8 @@ function ViewReservation() {
 
   // Helper to format assigned room cleanly (always showing Room Number and Category)
   const formatAssignedRoom = (roomVal) => {
-    const num = extractRoomNumber(roomVal) || extractRoomNumber(booking) || (String(booking?.guest || '').toLowerCase().includes('abhi') ? '201' : '');
-    const category = booking?.roomType || (booking?.room && String(booking.room).includes('·') ? String(booking.room).split('·')[1]?.trim() : (num === '201' ? 'Deluxe Room' : (num?.startsWith('2') ? 'Deluxe Room' : num?.startsWith('3') ? 'Executive Suite' : num?.startsWith('4') ? 'Presidential Suite' : 'Standard Room')));
+    const num = extractRoomNumber(roomVal) || extractRoomNumber(booking) || booking?.roomNumber || '';
+    const category = booking?.roomType || (booking?.room && String(booking.room).includes('·') ? String(booking.room).split('·')[1]?.trim() : (num?.startsWith('2') ? 'Deluxe Room' : num?.startsWith('3') ? 'Executive Suite' : num?.startsWith('4') ? 'Presidential Suite' : 'Standard Room'));
     if (num) {
       return `Room ${num} · ${category}`;
     }

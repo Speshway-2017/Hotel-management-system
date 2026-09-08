@@ -31,6 +31,7 @@ import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -219,6 +220,8 @@ function ManagerOperationsPage() {
 
   // Helper for room number & category resolution
   const getRoomNumber = (r) => {
+    const extracted = extractRoomNumber(r);
+    if (extracted) return extracted;
     if (r.roomNumber) return String(r.roomNumber);
     if (!r.room) return "Unassigned";
     const str = String(r.room).split("·")[0].split("-")[0].replace(/room/i, "").trim();
@@ -411,7 +414,7 @@ function ManagerOperationsPage() {
                   <th className="py-3 px-4 text-left align-middle">Source</th>
                   <th className="py-3 px-4 text-left align-middle">Payment</th>
                   <th className="py-3 px-4 text-center align-middle">Status</th>
-                  <th className="py-3 px-4 text-right align-middle min-w-[220px]">Actions</th>
+                  <th className="py-3 px-4 text-left align-middle min-w-[220px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted/45 font-medium text-navy bg-white whitespace-nowrap">
@@ -448,8 +451,8 @@ function ManagerOperationsPage() {
                         {r.status || "Confirmed"}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4 text-right align-middle whitespace-nowrap min-w-[220px]">
-                      <ActionGroup align="right">
+                    <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[220px]">
+                      <ActionGroup align="left">
                         {/* View Details */}
                         <ViewActionButton
                           onClick={() => navigate({ to: `/manager/reservations/view/${r._id || r.id}` })}

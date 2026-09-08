@@ -271,7 +271,7 @@ function ManagerApprovalsPage() {
                   <th className="py-4.5 px-4">Reason</th>
                   <th className="py-4.5 px-4">Requested Date</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-6 text-right min-w-[220px] whitespace-nowrap">Actions</th>
+                  <th className="py-4.5 px-4 text-left min-w-[180px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -308,8 +308,8 @@ function ManagerApprovalsPage() {
                           {r.status}
                         </Tag>
                       </td>
-                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[200px]">
-                        <ActionGroup align="right">
+                      <td className="py-4 px-4 text-left align-middle whitespace-nowrap min-w-[180px]">
+                        <ActionGroup align="left">
                           <ViewActionButton
                             onClick={() => navigate({ to: `/manager/approvals/view/${r.id}` })}
                             title="View Request Details"

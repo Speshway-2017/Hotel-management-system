@@ -15,6 +15,7 @@ import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 export const Route = createFileRoute("/reception/check-out")({
   head: () => ({
@@ -66,27 +67,31 @@ function DeparturesPage() {
         const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
         const list = allBookings
           .filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'))
-          .map(b => ({
-            id: b.bookingId || b.id || b._id,
-            _id: b._id || b.id || b.bookingId,
-            name: b.guest || b.name || 'Guest',
-            guest: b.guest || b.name || 'Guest',
-            phone: b.phone || '--',
-            room: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
-            roomNumber: b.roomNumber || (b.room ? b.room.split(' ')[0] : 'Unassigned'),
-            type: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
-            roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room'),
-            nights: Number(b.nights || 1),
-            duration: `${b.nights || 1} Nights`,
-            time: formatDisplayDate(b.checkOut) || 'Today',
-            checkOut: b.checkOut || 'Today',
-            isLate: false,
-            isCorporate: false,
-            corporateAccount: '',
-            balance: Number(b.balance || 0),
-            paymentStatus: Number(b.balance || 0) === 0 ? 'Paid' : 'Pending',
-            status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
-          }));
+          .map(b => {
+            const rmNum = extractRoomNumber(b) || b.roomNumber || (b.room ? b.room.split(' ')[0] : '—');
+            const rmType = b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room');
+            return {
+              id: b.bookingId || b.id || b._id,
+              _id: b._id || b.id || b.bookingId,
+              name: b.guest || b.name || 'Guest',
+              guest: b.guest || b.name || 'Guest',
+              phone: b.phone || '--',
+              room: rmNum,
+              roomNumber: rmNum,
+              type: rmType,
+              roomType: rmType,
+              nights: Number(b.nights || 1),
+              duration: `${b.nights || 1} Nights`,
+              time: formatDisplayDate(b.checkOut) || 'Today',
+              checkOut: b.checkOut || 'Today',
+              isLate: false,
+              isCorporate: false,
+              corporateAccount: '',
+              balance: Number(b.balance || 0),
+              paymentStatus: Number(b.balance || 0) === 0 ? 'Paid' : 'Pending',
+              status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+            };
+          });
         setDepartures(list);
       })
       .catch(err => console.error("Failed to load departures list:", err))
@@ -94,16 +99,13 @@ function DeparturesPage() {
   };
 
   useEffect(() => {
-    loadDepartures();
-    const interval = setInterval(loadDepartures, 10000);
-    const handleFocus = () => loadDepartures();
+    loadDepartures(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
-      loadDepartures();
+      loadDepartures(false);
     });
 
     return () => {
-      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -223,7 +225,7 @@ function DeparturesPage() {
                 <th className="py-3.5 px-4">Folio Balance</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Release Status</th>
-                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
+                <th className="py-3.5 px-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -269,8 +271,8 @@ function DeparturesPage() {
                         {guest.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
-                      <ActionGroup align="right">
+                    <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
+                      <ActionGroup align="left">
                         {guest.status !== "Checked Out" && guest.status !== "Checked-out" && (
                           <>
                             <ExtendStayButton

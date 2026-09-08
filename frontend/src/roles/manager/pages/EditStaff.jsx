@@ -41,6 +41,7 @@ function ManagerEditStaff() {
   const [loading, setLoading] = useState(!stateMember);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Form States
   const [name, setName] = useState(stateMember?.name || stateMember?.fullName || stateMember?.username || "");
@@ -148,15 +149,21 @@ function ManagerEditStaff() {
         }
 
         if (match && isMounted) {
-          populateFromObject(match);
+          if (!isDirty) {
+            populateFromObject(match);
+          } else {
+            setTargetId(match._id || match.id || targetId);
+          }
         } else if (stateMember && isMounted) {
-          populateFromObject(stateMember);
-        } else if (isMounted) {
+          if (!isDirty) {
+            populateFromObject(stateMember);
+          }
+        } else if (isMounted && !stateMember) {
           setError("Employee not found.");
         }
       } catch (err) {
         if (stateMember && isMounted) {
-          populateFromObject(stateMember);
+          if (!isDirty) populateFromObject(stateMember);
         } else if (isMounted) {
           setError(err.message || "Failed to load employee profile.");
         }
@@ -192,7 +199,10 @@ function ManagerEditStaff() {
         dept,
         shift
       };
-      const res = await managerService.updateStaff(effectiveId, payload);
+      const [res] = await Promise.all([
+        managerService.updateStaff(effectiveId, payload),
+        managerService.assignShift(effectiveId, name.trim(), shift).catch(() => null)
+      ]);
       if (res && (res.success || res.status === 200 || res.data)) {
         toast.success("Staff profile updated successfully.");
         emitRealtimeEvent('dashboard_sync', { action: 'staff_updated', id: effectiveId });
@@ -226,7 +236,10 @@ function ManagerEditStaff() {
                   type="text"
                   required
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setIsDirty(true);
+                  }}
                   placeholder="Enter full name"
                   className="text-xs font-semibold text-navy bg-cream/5 border-muted h-9"
                 />
@@ -248,7 +261,10 @@ function ManagerEditStaff() {
                     id="phone"
                     type="text"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setIsDirty(true);
+                    }}
                     placeholder="+91 99999 88888"
                     className="text-xs font-semibold text-navy bg-cream/5 border-muted h-9"
                   />
@@ -257,7 +273,10 @@ function ManagerEditStaff() {
                   <Select
                     id="dept"
                     value={dept}
-                    onChange={(e) => setDept(e.target.value)}
+                    onChange={(e) => {
+                      setDept(e.target.value);
+                      setIsDirty(true);
+                    }}
                     className="text-xs font-semibold text-navy bg-[#FDFCFA]/20 border-muted h-9"
                   >
                     {dept && !["Front Office", "Front Desk", "Housekeeping", "Food & Beverage", "Security", "Management", "Operations"].includes(dept) && (
@@ -278,7 +297,10 @@ function ManagerEditStaff() {
                 <Select
                   id="shift"
                   value={shift}
-                  onChange={(e) => setShift(e.target.value)}
+                  onChange={(e) => {
+                    setShift(e.target.value);
+                    setIsDirty(true);
+                  }}
                   className="text-xs font-semibold text-navy bg-[#FDFCFA]/20 border-muted h-9"
                 >
                   {shift && !["Morning Shift", "Afternoon Shift", "Night Shift", "General Shift", "Morning (06:00 - 14:00)", "Evening (14:00 - 22:00)", "Night (22:00 - 06:00)", "General (09:00 - 17:00)"].includes(shift) && (

@@ -347,7 +347,7 @@ function ManagerGuestsPage() {
                   <th className="w-[10%] py-3.5 px-4 text-left align-middle">Check-Out</th>
                   <th className="w-[9%] py-3.5 px-4 text-center align-middle">Stay Status</th>
                   <th className="w-[9%] py-3.5 px-4 text-left align-middle">Payment</th>
-                  <th className="py-3.5 px-4 text-right align-middle min-w-[120px] whitespace-nowrap">Actions</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[120px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-xs text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -412,8 +412,8 @@ function ManagerGuestsPage() {
                           </Tag>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-right align-middle min-w-[120px] whitespace-nowrap">
-                        <ActionGroup>
+                      <td className="py-3.5 px-4 text-left align-middle min-w-[120px] whitespace-nowrap">
+                        <ActionGroup align="left">
                           <ViewActionButton
                             onClick={() => navigate({ to: `/manager/guests/view/${btoa(g.phone || g.name)}` })}
                           />

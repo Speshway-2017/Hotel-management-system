@@ -1,7 +1,19 @@
 import { io } from 'socket.io-client';
 import { invalidateApiCache } from './apiClient';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
+const getSocketUrl = () => {
+  const envUrl = import.meta.env.VITE_SOCKET_URL;
+  if (typeof window !== 'undefined') {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal && (!envUrl || envUrl.includes('speshway.site'))) {
+      return 'http://localhost:5000';
+    }
+    return envUrl || window.location.origin;
+  }
+  return envUrl || 'http://localhost:5000';
+};
+
+const SOCKET_URL = getSocketUrl();
 
 export const socket = io(SOCKET_URL, {
   transports: ['websocket', 'polling'],

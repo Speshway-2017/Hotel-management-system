@@ -123,6 +123,16 @@ class UserInstance {
 const MockUser = {
   find: async (query = {}) => {
     let list = readUsers();
+    if (query.$or) {
+      list = list.filter(u => query.$or.some(q => {
+        if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
+        if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
+        if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
+        if (q.role && u.role === q.role) return true;
+        if (q.propertyId && u.propertyId === q.propertyId) return true;
+        return false;
+      }));
+    }
     if (query.role) {
       list = list.filter(u => u.role === query.role);
     }
@@ -134,6 +144,15 @@ const MockUser = {
   findOne: async (query) => {
     const users = readUsers();
     const user = users.find(u => {
+      if (query.$or) {
+        return query.$or.some(q => {
+          if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
+          if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
+          if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
+          if (q.name && u.name && u.name.toLowerCase() === String(q.name).toLowerCase()) return true;
+          return false;
+        });
+      }
       if (query.email && query.otp) {
         return u.email === query.email.toLowerCase() && u.otp === query.otp && new Date(u.otpExpires) > new Date();
       }
@@ -142,7 +161,7 @@ const MockUser = {
       }
       const queryId = query._id || query.id;
       if (queryId) {
-        return u.id === queryId || u._id === queryId;
+        return String(u.id) === String(queryId) || String(u._id) === String(queryId);
       }
       return false;
     });
@@ -150,14 +169,14 @@ const MockUser = {
   },
   findById: async (id) => {
     const users = readUsers();
-    const user = users.find(u => u.id === id || u._id === id);
+    const user = users.find(u => String(u.id) === String(id) || String(u._id) === String(id));
     return user ? new UserInstance(user) : null;
   },
   create: async (data) => {
     const users = readUsers();
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(data.password, salt);
-    const id = Math.random().toString(36).substring(2, 15);
+    const id = data._id || data.id || Math.random().toString(36).substring(2, 15);
     const newUser = {
       id: id,
       _id: id,
@@ -190,7 +209,7 @@ const MockUser = {
   },
   findByIdAndUpdate: async (id, update, options = {}) => {
     const list = readUsers();
-    const idx = list.findIndex(u => u.id === id || u._id === id);
+    const idx = list.findIndex(u => String(u.id) === String(id) || String(u._id) === String(id));
     if (idx === -1) return null;
     const current = list[idx];
     const updated = {
@@ -204,7 +223,7 @@ const MockUser = {
   },
   findByIdAndDelete: async (id) => {
     const list = readUsers();
-    const idx = list.findIndex(u => u.id === id || u._id === id);
+    const idx = list.findIndex(u => String(u.id) === String(id) || String(u._id) === String(id));
     if (idx === -1) return null;
     const removed = list.splice(idx, 1)[0];
     writeUsers(list);
@@ -215,16 +234,17 @@ const MockUser = {
     let idx = -1;
     if (query.$or) {
       idx = list.findIndex(u => query.$or.some(q => {
-        if (q._id && (u._id === q._id || u.id === q._id)) return true;
-        if (q.id && (u.id === q.id || u._id === q.id)) return true;
-        if (q.email && u.email === q.email.toLowerCase()) return true;
+        if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
+        if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
+        if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
+        if (q.name && u.name && u.name.toLowerCase() === String(q.name).toLowerCase()) return true;
         return false;
       }));
     } else {
       idx = list.findIndex(u => {
         if (query.email && u.email === query.email.toLowerCase()) return true;
         const qId = query._id || query.id;
-        if (qId && (u.id === qId || u._id === qId)) return true;
+        if (qId && (String(u.id) === String(qId) || String(u._id) === String(qId))) return true;
         return false;
       });
     }
@@ -244,16 +264,16 @@ const MockUser = {
     let idx = -1;
     if (query.$or) {
       idx = list.findIndex(u => query.$or.some(q => {
-        if (q._id && (u._id === q._id || u.id === q._id)) return true;
-        if (q.id && (u.id === q.id || u._id === q.id)) return true;
-        if (q.email && u.email === q.email.toLowerCase()) return true;
+        if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
+        if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
+        if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
         return false;
       }));
     } else {
       idx = list.findIndex(u => {
         if (query.email && u.email === query.email.toLowerCase()) return true;
         const qId = query._id || query.id;
-        if (qId && (u.id === qId || u._id === qId)) return true;
+        if (qId && (String(u.id) === String(qId) || String(u._id) === String(qId))) return true;
         return false;
       });
     }

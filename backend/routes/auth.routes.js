@@ -78,6 +78,11 @@ router.post('/login', async (req, res) => {
       return sendError(res, 403, 'Your account is suspended. Please contact administrator.');
     }
 
+    const nowIso = new Date().toISOString();
+    try {
+      await User.findOneAndUpdate({ _id: user._id }, { lastLogin: nowIso, lastActive: nowIso });
+    } catch {}
+
     return sendSuccess(res, 200, {
       token: generateToken(user._id, user.email),
       user: {
@@ -87,6 +92,8 @@ router.post('/login', async (req, res) => {
         role: user.role,
         mobile: user.mobile,
         status: user.status,
+        lastLogin: nowIso,
+        lastActive: nowIso,
         propertyId: user.propertyId || null
       }
     }, 'Logged in successfully');

@@ -291,7 +291,7 @@ function ManagerAttendancePage() {
                   <th className="py-4.5 px-4">Check-out Time</th>
                   <th className="py-4.5 px-4">Working Hours</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-6 text-right min-w-[120px]">Actions</th>
+                  <th className="py-4.5 px-4 text-left min-w-[120px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -335,8 +335,8 @@ function ManagerAttendancePage() {
                           {a.attendanceStatus}
                         </Tag>
                       </td>
-                      <td className="py-4 px-6 text-right whitespace-nowrap min-w-[120px]">
-                        <ActionGroup align="right">
+                      <td className="py-4 px-4 text-left align-middle whitespace-nowrap min-w-[120px]">
+                        <ActionGroup align="left">
                           <ViewActionButton
                             onClick={() => navigate({ to: `/manager/attendance/view/${btoa(a.id + "|" + selectedDate)}` })}
                             title="View Attendance Details"

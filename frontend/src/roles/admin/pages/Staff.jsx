@@ -46,6 +46,39 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
   );
 }
 
+const formatLastActive = (dateString, status) => {
+  if (!dateString || dateString === '—' || dateString === '-') {
+    return status === 'Active' ? 'Active recently' : 'Inactive';
+  }
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) {
+      return dateString;
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) {
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+      const isToday = d.toDateString() === now.toDateString();
+      return isToday ? `Today, ${timeStr}` : `Yesterday, ${timeStr}`;
+    }
+    if (diffDays === 1) {
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `Yesterday, ${timeStr}`;
+    }
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateString;
+  }
+};
+
 function AdminStaffPage() {
   const navigate = useNavigate();
   const [staff, setStaff] = useState([]);
@@ -78,12 +111,13 @@ function AdminStaffPage() {
       const staffList = rawList.map(member => {
         const matchedProp = properties.find(p => p._id === member.propertyId || p.id === member.propertyId);
         const propName = matchedProp ? matchedProp.name : "Speshway Luxury Hotel";
+        const activeRaw = member.lastLogin || member.lastActive || member.updatedAt || member.createdAt;
 
         return {
           ...member,
           department: member.dept || (member.role === "manager" ? "Front Office" : member.role === "receptionist" ? "Reception Desk" : "Housekeeping"),
           property: propName,
-          lastActive: member.status === "Active" ? "Today, 11:20 AM" : "3 days ago"
+          lastActive: formatLastActive(activeRaw, member.status)
         };
       });
       setStaff(staffList);
@@ -110,10 +144,11 @@ function AdminStaffPage() {
     try {
       const nextStatus = member.status === "Active" ? "Inactive" : "Active";
       const targetMemberId = member._id || member.id;
+      const nowIso = new Date().toISOString();
       try {
-        await adminService.updateStaff(targetMemberId, { status: nextStatus });
+        await adminService.updateStaff(targetMemberId, { status: nextStatus, lastActive: nowIso });
       } catch {
-        await superAdminService.updateUser(targetMemberId, { status: nextStatus });
+        await superAdminService.updateUser(targetMemberId, { status: nextStatus, lastActive: nowIso });
       }
       toast.success(`Staff status updated to ${nextStatus}`);
       notifySocketEvents('toggle_status');
@@ -258,12 +293,13 @@ function AdminStaffPage() {
             <div className="p-8 text-center text-xs text-muted-foreground select-none">No staff members found matching query parameters.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[700px]">
+              <table className="w-full text-left text-xs min-w-[750px]">
                 <thead>
                   <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
                     <th className="py-3 px-4 text-left">Employee</th>
                     <th className="py-3 px-4 text-left">Role Profile</th>
                     <th className="py-3 px-4 text-left">Department</th>
+                    <th className="py-3 px-4 text-left">Shift Timing</th>
                     <th className="py-3 px-4 text-left">Property Assignment</th>
                     <th className="py-3 px-4 text-left">Account Status</th>
                     <th className="py-3 px-4 text-left">Last Active</th>
@@ -286,6 +322,12 @@ function AdminStaffPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 font-semibold text-navy">{member.department}</td>
+                      <td className="py-3 px-4 font-medium text-navy">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-navy bg-muted/30 px-2 py-0.5 rounded-md border border-muted/50">
+                          <Clock className="size-3 text-brand shrink-0" />
+                          <span>{member.shift || "Morning (06:00 - 14:00)"}</span>
+                        </span>
+                      </td>
                       <td className="py-3 px-4 font-medium text-navy">{member.property}</td>
                       <td className="py-3 px-4">
                         <span

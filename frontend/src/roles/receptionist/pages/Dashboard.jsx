@@ -98,7 +98,7 @@ function FrontDeskDashboard() {
           id: b.bookingId || b.id || b._id,
           _id: b._id || b.id || b.bookingId,
           name: b.guest || b.name || 'Guest',
-          room: extractRoomNumber(b) || '101',
+          room: extractRoomNumber(b) || b.roomNumber || '—',
           type: b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room')),
           time: formatDisplayDate(b.checkIn) || 'Today',
           checkIn: b.checkIn || 'Today',
@@ -114,7 +114,7 @@ function FrontDeskDashboard() {
           id: b.bookingId || b.id || b._id,
           _id: b._id || b.id || b.bookingId,
           name: b.guest || b.name || 'Guest',
-          room: extractRoomNumber(b) || '101',
+          room: extractRoomNumber(b) || b.roomNumber || '—',
           time: formatDisplayDate(b.checkOut) || 'Today',
           checkIn: b.checkIn || 'Today',
           checkOut: b.checkOut || 'Today',
@@ -277,7 +277,7 @@ function FrontDeskDashboard() {
                     <th className="py-3 px-4">ETA</th>
                     <th className="py-3 px-4">Source</th>
                     <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <th className="py-3 px-4 text-left min-w-[140px] whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -301,8 +301,8 @@ function FrontDeskDashboard() {
                         <td className="py-3.5 px-4">
                           <Tag tone={arr.status === "Pre-checked" ? "success" : "warning"}>{arr.status}</Tag>
                         </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[140px]">
+                          <div className="flex items-center justify-start gap-1.5">
                             <Button
                               size="xs"
                               variant="outline"
@@ -342,7 +342,7 @@ function FrontDeskDashboard() {
                     <th className="py-3 px-4">Departure Time</th>
                     <th className="py-3 px-4">Folio Balance</th>
                     <th className="py-3 px-4">Payment Status</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <th className="py-3 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -364,8 +364,8 @@ function FrontDeskDashboard() {
                             {dep.status === "Ready" ? "Checked-in" : dep.status}
                           </Tag>
                         </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[160px]">
+                          <div className="flex items-center justify-start gap-1.5">
                             {dep.status !== "Checked-out" && dep.status !== "Checked Out" && (
                               <>
                                 <ExtendStayButton

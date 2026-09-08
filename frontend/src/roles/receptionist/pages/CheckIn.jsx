@@ -15,6 +15,7 @@ import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { extractRoomNumber } from "@/utils/roomUtils";
 
 export const Route = createFileRoute("/reception/check-in")({
   head: () => ({
@@ -59,15 +60,17 @@ function ArrivalsPage() {
   const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadArrivals = (isSilent = false) => {
-    if (!isSilent) setLoading(true);
-    receptionistService.getReservations()
+    if (!isSilent && arrivals.length === 0) setLoading(true);
+    receptionistService.getArrivals()
       .then(res => {
-        const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
-        const list = allBookings
-          .filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked' || b.status === 'Checked-in' || b.status === 'Checked-In'))
+        if (!res || !res.data) return;
+        const raw = Array.isArray(res.data) ? res.data : [];
+        const list = raw
+          .filter(b => b.status !== 'Checked-out' && b.status !== 'Checked Out' && b.status !== 'Cancelled')
           .map(b => {
-            const rmNum = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
-            const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
+            const cleanRoom = extractRoomNumber(b) || '101';
+            const cleanRoomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (cleanRoom.startsWith('2') ? 'Deluxe Room' : cleanRoom.startsWith('3') ? 'Executive Suite' : cleanRoom.startsWith('4') ? 'Presidential Suite' : 'Standard Room'));
+
             return {
               id: b.bookingId || b.id || b._id,
               _id: b._id || b.id || b.bookingId,
@@ -298,7 +301,7 @@ function ArrivalsPage() {
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">ID Status</th>
                 <th className="py-3.5 px-4">Check-in Status</th>
-                <th className="py-3.5 px-4 text-right min-w-[240px]">Actions</th>
+                <th className="py-3.5 px-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -353,8 +356,8 @@ function ArrivalsPage() {
                         {guest.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[240px]">
-                      <ActionGroup align="right">
+                    <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
+                      <ActionGroup align="left">
                         {guest.status !== "Checked-In" && guest.status !== "Checked-in" && guest.status !== "No-Show" && guest.status !== "No-show" && (
                           <CheckInActionButton
                             onClick={() => handleCheckIn(guest.id || guest._id, guest.roomNumber || guest.room)}

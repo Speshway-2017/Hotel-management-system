@@ -98,8 +98,8 @@ function ReceptionGuestDetailsPage() {
       }
 
       if (found) {
-        const cleanRmNum = extractRoomNumber(found) || (found.roomNumber && String(found.roomNumber).match(/\b\d{3,4}\b/)?.[0]) || (String(found.name || "").toLowerCase().includes("abhi") ? "201" : "201");
-        const cleanRmType = (found.roomType && !found.roomType.startsWith("Room")) ? found.roomType : (found.room && String(found.room).includes('·') ? String(found.room).split('·')[1]?.trim() : "Deluxe Room");
+        const cleanRmNum = extractRoomNumber(found) || (found.roomNumber && String(found.roomNumber).match(/\b\d{3,4}\b/)?.[0]) || "—";
+        const cleanRmType = (found.roomType && !found.roomType.startsWith("Room")) ? found.roomType : (found.room && String(found.room).includes('·') ? String(found.room).split('·')[1]?.trim() : (cleanRmNum?.startsWith('5') ? 'Penthouse Suite' : cleanRmNum?.startsWith('3') ? 'Executive Suite' : cleanRmNum?.startsWith('2') ? 'Deluxe Room' : 'Standard Room'));
         setGuest({
           ...found,
           room: cleanRmNum,

@@ -12,17 +12,42 @@
 export function extractRoomNumber(val) {
   if (!val) return "";
   if (typeof val === "object") {
-    const raw = val.roomNumber || val.roomId || val.room || val.num || "";
-    return extractRoomNumber(raw);
+    if (val.roomNumber && String(val.roomNumber).trim()) {
+      const parsed = extractRoomNumber(String(val.roomNumber));
+      if (parsed) return parsed;
+    }
+    if (val.room && String(val.room).trim()) {
+      const parsed = extractRoomNumber(String(val.room));
+      if (parsed) return parsed;
+    }
+    if (val.num && String(val.num).trim()) {
+      const parsed = extractRoomNumber(String(val.num));
+      if (parsed) return parsed;
+    }
+    if (val.roomId && typeof val.roomId === "string" && /^\d{3,4}$/.test(val.roomId.trim())) {
+      return val.roomId.trim();
+    }
+    return "";
   }
   const str = String(val).trim();
   if (!str) return "";
 
-  const match = str.match(/\b\d{3,4}\b/);
-  if (match) return match[0];
+  // Ignore 24-character hex ObjectIds
+  if (/^[0-9a-f]{24}$/i.test(str)) {
+    return "";
+  }
 
-  const fallbackMatch = str.match(/\d{1,4}/);
-  if (fallbackMatch) return fallbackMatch[0];
+  // 1. Explicit Room prefix: "Room 501", "(Room 501)", "Rm 301", "#501"
+  const prefixMatch = str.match(/(?:room|rm|#)\s*(\d{1,4})\b/i);
+  if (prefixMatch) return prefixMatch[1];
+
+  // 2. Standard 3-4 digit hotel room number with word boundary: 101, 201, 301, 501
+  const match34 = str.match(/\b\d{3,4}\b/);
+  if (match34) return match34[0];
+
+  // 3. Standalone 1-2 digit room number at the start: "6 · Deluxe", "6"
+  const standaloneMatch = str.match(/^(\d{1,4})(?:\s*·|\s+|$)/);
+  if (standaloneMatch) return standaloneMatch[1];
 
   return "";
 }
@@ -65,7 +90,7 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
 
   const occupiedRooms = occupiedRoomNums.size;
   const reservedRooms = reservedRoomNums.size;
-  const availableRooms = Math.max(0, totalRooms - occupiedRooms);
+  const availableRooms = Math.max(0, totalRooms - occupiedRooms - reservedRooms);
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 
   const dirtyRooms = Array.isArray(rooms) ? rooms.filter(r => r.status === "Dirty" || r.housekeeping === "Dirty").length : 0;
@@ -98,7 +123,9 @@ export function normalizeRoomList(rooms = [], reservations = []) {
 
     if (occupiedRoomNums.has(num)) {
       status = "Occupied";
-    } else if (status === "Blocked" || status === "Maintenance" || status === "Out of Order") {
+    } else if (reservedRoomNums.has(num) || status === "Reserved") {
+      status = "Reserved";
+    } else if (status === "Blocked" || status === "Maintenance" || status === "Out of Order" || status === "Dirty" || status === "Cleaning") {
       // Retain manual maintenance / blocked status
     } else {
       status = "Available";

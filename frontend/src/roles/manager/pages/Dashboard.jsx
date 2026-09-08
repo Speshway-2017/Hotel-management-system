@@ -18,7 +18,7 @@ import {
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
-import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
+import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -116,7 +116,8 @@ function ManagerDashboard() {
         setBookings(bookingsRes.data);
       }
       if (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) {
-        setRooms(roomsRes.data);
+        const normalized = normalizeRoomList(roomsRes.data, (bookingsRes && bookingsRes.data) || []);
+        setRooms(normalized);
       }
       if (staffRes && staffRes.success && Array.isArray(staffRes.data)) {
         setStaff(staffRes.data);
@@ -563,7 +564,7 @@ function ManagerDashboard() {
                       {booking.guest || booking.guestName || "Guest"}
                     </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-navy-deep">
-                      Room #{booking.room || booking.roomNumber || "101"}
+                      Room #{extractRoomNumber(booking) || booking.roomNumber || "—"}
                     </td>
                     <td className="py-3.5 px-4 text-muted-foreground">{booking.checkIn}</td>
                     <td className="py-3.5 px-4 font-semibold text-navy">{booking.checkOut}</td>

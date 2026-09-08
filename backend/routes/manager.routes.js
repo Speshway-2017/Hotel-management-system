@@ -112,12 +112,12 @@ const seedDefaultApprovals = async (propertyId) => {
         id: "APR-9102",
         category: "Refund Request",
         requestedBy: "Sunita Rao (Receptionist)",
-        guest: "Sunny",
+        guest: "Ramesh",
         bookingId: "BKG-4491",
-        room: "201",
-        amount: 4900,
-        value: "₹4,900 Refund",
-        reason: "AC malfunctioning in Room 201 during stay.",
+        room: "103",
+        amount: 3500,
+        value: "₹3,500 Refund",
+        reason: "AC malfunctioning in Room 103 during stay.",
         description: "Front desk processed room swap; guest requested refund waiver for first night inconvenience.",
         status: "Pending",
         propertyId: propertyId || "HS-JAI"
@@ -538,7 +538,11 @@ router.get('/rooms', async (req, res) => {
       { $set: { category: "Standard Room", baseRate: 3000, currentRate: 3000, dailyRate: 3000, ratePlan: "Standard Plan" } }
     );
 
-    let rooms = await Room.find({ propertyId: req.user.propertyId }).sort({ roomNumber: 1 });
+    const propId = req.user?.propertyId || 'HS-JAI';
+    let rooms = await Room.find({ $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] }).sort({ roomNumber: 1 });
+    if (!rooms || rooms.length === 0) {
+      rooms = await Room.find().sort({ roomNumber: 1 });
+    }
     const { checkIn, checkOut } = req.query;
 
     // Fetch active bookings across property and global collections
@@ -568,33 +572,34 @@ router.get('/rooms', async (req, res) => {
         continue;
       }
 
-      const bRoomNum = b.roomId || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
+      const bRoomNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : null) || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
       let matchedRm = null;
 
       if (b.roomId) {
-        matchedRm = rooms.find(r => String(r._id) === String(b.roomId) || String(r.id) === String(b.roomId));
+        matchedRm = rooms.find(r => String(r._id) === String(b.roomId) || String(r.id) === String(b.roomId) || String(r.roomNumber).trim() === String(b.roomId).trim());
       }
       if (!matchedRm && bRoomNum) {
         matchedRm = rooms.find(r => String(r.roomNumber).trim() === String(bRoomNum).trim());
       }
-      if (!matchedRm && b.room && !b.room.includes("Standard Room") && !b.room.includes("Deluxe Room") && !b.room.includes("Executive Suite") && !b.room.includes("Villa Suite")) {
+      if (!matchedRm && b.room) {
         matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber)));
       }
 
       if (matchedRm) {
         roomBookingMap.set(String(matchedRm._id), b);
+        roomBookingMap.set(String(matchedRm.roomNumber), b);
       }
     }
 
     const mappedRooms = rooms.map(rm => {
-      const matchedBooking = roomBookingMap.get(String(rm._id));
+      const matchedBooking = roomBookingMap.get(String(rm._id)) || roomBookingMap.get(String(rm.roomNumber));
       const isReserved = !!matchedBooking;
 
-      let displayStatus = rm.status;
+      let displayStatus = rm.status || 'Available';
       if (rm.status !== 'Blocked' && matchedBooking) {
-        if (matchedBooking.status === 'Checked-in') {
+        if (matchedBooking.status === 'Checked-in' || matchedBooking.status === 'Checked In' || matchedBooking.status === 'Staying') {
           displayStatus = 'Occupied';
-        } else if (['Confirmed', 'Paid', 'Pending'].includes(matchedBooking.status)) {
+        } else if (['Confirmed', 'Paid', 'Pending', 'Pre-checked'].includes(matchedBooking.status)) {
           displayStatus = 'Reserved';
         }
       }
@@ -602,10 +607,12 @@ router.get('/rooms', async (req, res) => {
       return {
         ...rm.toObject(),
         status: displayStatus,
-        operationalStatus: rm.status,
+        operationalStatus: rm.status || 'Available',
         isReserved,
         isAvailable: displayStatus === 'Available',
-        guest: matchedBooking ? matchedBooking.guest : ''
+        guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : '',
+        checkIn: matchedBooking ? matchedBooking.checkIn : '',
+        checkOut: matchedBooking ? matchedBooking.checkOut : ''
       };
     });
 
@@ -1016,6 +1023,33 @@ router.put('/staff/:id', async (req, res) => {
       { new: true }
     ) || staffMember;
 
+    // Dual-sync to Shift collection if shift was updated or provided
+    const effectiveShift = shift !== undefined ? shift : updateFields.shift;
+    if (effectiveShift) {
+      try {
+        await Shift.findOneAndUpdate(
+          {
+            $or: [
+              { userId: String(staffMember._id) },
+              { userId: String(staffMember.id || '') },
+              { username: staffMember.name },
+              { username: updated.name }
+            ],
+            propertyId: req.user.propertyId
+          },
+          {
+            shiftType: effectiveShift,
+            username: updated.name,
+            userId: String(staffMember._id),
+            propertyId: req.user.propertyId
+          },
+          { upsert: true, new: true }
+        );
+      } catch (shiftErr) {
+        console.warn('Could not sync Shift model in manager PUT /staff/:id', shiftErr.message);
+      }
+    }
+
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, 'all', 'user_updated', updated);
@@ -1078,10 +1112,30 @@ router.post('/shifts/assign', async (req, res) => {
     }
 
     const updated = await Shift.findOneAndUpdate(
-      { userId, propertyId: req.user.propertyId },
-      { shiftType, username },
+      {
+        $or: [
+          { userId: String(userId) },
+          { username: username }
+        ],
+        propertyId: req.user.propertyId
+      },
+      { shiftType, username, userId: String(userId), propertyId: req.user.propertyId },
       { new: true, upsert: true }
     );
+
+    // Synchronize the User document's shift field
+    const userQuery = buildManagerStaffLookups(userId, null, username);
+    const updatedUser = await User.findOneAndUpdate(
+      { $or: userQuery },
+      { shift: shiftType },
+      { new: true }
+    );
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_updated', updatedUser || { _id: userId, shift: shiftType });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id: userId, shift: shiftType });
+    }
 
     return sendSuccess(res, 200, updated, 'Staff schedule shift reassigned.');
   } catch (err) {
@@ -1332,19 +1386,8 @@ const ensureRealPayments = async (propId) => {
       if (!bId) continue;
       const guestName = b.guest || b.customerName || b.guestName || 'Guest';
 
-      let roomNumber = b.roomNumber;
-      if (!roomNumber || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
-        const match = String(b.room || "").match(/\b\d{3,4}\b/);
-        if (match) {
-          roomNumber = match[0];
-        } else if (String(b.room || "").toLowerCase().includes('deluxe') || String(b.roomType || "").toLowerCase().includes('deluxe') || String(guestName).toLowerCase().includes('abhi')) {
-          roomNumber = '201';
-        } else {
-          roomNumber = '101';
-        }
-      }
-
-      const amount = Number(b.amount || b.totalAmount || 0);
+      let roomNumber = extractRoomNumber(b) || '101';
+      const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
       const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
         ? 'Settled'

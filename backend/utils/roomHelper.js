@@ -15,19 +15,42 @@ import { emitRealtimeSync, broadcastCheckinCheckout } from './socketEmitter.js';
 export const extractRoomNumber = (val) => {
   if (!val) return null;
   if (typeof val === 'object') {
-    const raw = val.roomNumber || val.roomId || val.room || val.num || '';
-    return extractRoomNumber(raw);
+    if (val.roomNumber && String(val.roomNumber).trim()) {
+      const parsed = extractRoomNumber(String(val.roomNumber));
+      if (parsed) return parsed;
+    }
+    if (val.room && String(val.room).trim()) {
+      const parsed = extractRoomNumber(String(val.room));
+      if (parsed) return parsed;
+    }
+    if (val.num && String(val.num).trim()) {
+      const parsed = extractRoomNumber(String(val.num));
+      if (parsed) return parsed;
+    }
+    if (val.roomId && typeof val.roomId === 'string' && /^\d{3,4}$/.test(val.roomId.trim())) {
+      return val.roomId.trim();
+    }
+    return null;
   }
   const str = String(val).trim();
   if (!str) return null;
 
-  // Match 3-4 digit sequence (e.g. 101, 102, 203, 301, 502)
-  const match = str.match(/\b\d{3,4}\b/);
-  if (match) return match[0];
+  // Ignore 24-character hex ObjectIds
+  if (/^[0-9a-f]{24}$/i.test(str)) {
+    return null;
+  }
 
-  // Match any 1-4 digit sequence
-  const fallbackMatch = str.match(/\d{1,4}/);
-  if (fallbackMatch) return fallbackMatch[0];
+  // 1. Explicit Room prefix: "Room 501", "(Room 501)", "Rm 301", "#501"
+  const prefixMatch = str.match(/(?:room|rm|#)\s*(\d{1,4})\b/i);
+  if (prefixMatch) return prefixMatch[1];
+
+  // 2. Standard 3-4 digit hotel room number with word boundary: 101, 201, 301, 501
+  const match34 = str.match(/\b\d{3,4}\b/);
+  if (match34) return match34[0];
+
+  // 3. Standalone 1-2 digit room number at the start: "6 · Deluxe", "6"
+  const standaloneMatch = str.match(/^(\d{1,4})(?:\s*·|\s+|$)/);
+  if (standaloneMatch) return standaloneMatch[1];
 
   return null;
 };
@@ -50,11 +73,19 @@ export const syncRoomStatus = async (roomNumber, newStatus, propertyId, io = nul
     query.$or = [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }];
   }
 
-  const updatedRoom = await Room.findOneAndUpdate(
+  let updatedRoom = await Room.findOneAndUpdate(
     query,
     { status: targetStatus },
     { new: true }
   );
+
+  if (!updatedRoom) {
+    updatedRoom = await Room.findOneAndUpdate(
+      { roomNumber: cleanRoomNum },
+      { status: targetStatus },
+      { new: true }
+    );
+  }
 
   if (io && propertyId) {
     emitRealtimeSync(io, propertyId, 'room_status_changed', {
