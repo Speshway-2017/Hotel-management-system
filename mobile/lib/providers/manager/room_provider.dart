@@ -64,10 +64,7 @@ class RoomProvider with ChangeNotifier {
     }
 
     try {
-      var response = await ApiService.get(ApiEndpoints.guestRooms);
-      if (!response.success) {
-        response = await ApiService.get(ApiEndpoints.managerRooms);
-      }
+      final response = await ApiService.get(ApiEndpoints.managerRooms);
       if (response.success && response.data != null) {
         if (response.data is List<dynamic>) {
           final list = response.data as List<dynamic>;
@@ -116,6 +113,50 @@ class RoomProvider with ChangeNotifier {
         );
         notifyListeners();
       }
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> createRoom(Map<String, dynamic> data) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.post(ApiEndpoints.managerRooms, data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchRooms(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateRoom(String id, Map<String, dynamic> data) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.put('${ApiEndpoints.managerRooms}/$id', data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchRooms(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteRoom(String id) async {
+    final response = await ApiService.delete('${ApiEndpoints.managerRooms}/$id');
+    if (response.success) {
+      _rooms.removeWhere((r) => r.id == id || r.roomNumber == id);
+      notifyListeners();
       return true;
     }
     return false;

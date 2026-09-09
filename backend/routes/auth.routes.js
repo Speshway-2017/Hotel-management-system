@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 import { protect } from '../middleware/auth.middleware.js';
@@ -270,6 +271,81 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
   } catch (error) {
     console.error('Update Profile Error:', error);
     return sendError(res, 500, error.message || 'Failed to update profile');
+  }
+});
+
+// @desc    Register or update FCM device token for authenticated user
+// @route   POST /api/auth/fcm-token
+// @access  Private
+router.post('/fcm-token', protect, async (req, res) => {
+  const { token, platform, deviceType } = req.body;
+  if (!token || typeof token !== 'string') {
+    return sendError(res, 400, 'Valid FCM token string is required');
+  }
+
+  try {
+    const userId = req.user.id || req.user._id;
+    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { $or: query },
+      {
+        $set: { fcmToken: token },
+        $addToSet: { fcmTokens: token }
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    console.log(`📲 [FCM BACKEND] Registered FCM token for user: ${req.user.email} (${req.user.role}) [platform: ${platform || 'unknown'}]`);
+
+    return sendSuccess(res, 200, {
+      success: true,
+      token,
+      userId: updatedUser.id || updatedUser._id
+    }, 'FCM device token registered successfully');
+  } catch (error) {
+    console.error('FCM Token Registration Error:', error);
+    return sendError(res, 500, error.message || 'Failed to register FCM token');
+  }
+});
+
+// @desc    Remove FCM device token upon logout
+// @route   DELETE /api/auth/fcm-token
+// @access  Private
+router.delete('/fcm-token', protect, async (req, res) => {
+  const { token } = req.body || {};
+
+  try {
+    const userId = req.user.id || req.user._id;
+    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    const update = {};
+    if (token) {
+      update.$pull = { fcmTokens: token };
+      if (req.user.fcmToken === token) {
+        update.$set = { fcmToken: null };
+      }
+    } else {
+      update.$set = { fcmToken: null };
+    }
+
+    await User.findOneAndUpdate({ $or: query }, update, { new: true });
+    console.log(`📲 [FCM BACKEND] Unregistered FCM token for user: ${req.user.email}`);
+
+    return sendSuccess(res, 200, {}, 'FCM device token unregistered successfully');
+  } catch (error) {
+    console.error('FCM Token De-registration Error:', error);
+    return sendError(res, 500, error.message || 'Failed to unregister FCM token');
   }
 });
 

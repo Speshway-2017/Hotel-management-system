@@ -152,14 +152,62 @@ router.post('/read-all', protect, async (req, res) => {
   }
 });
 
-// 5. Delete notification
-router.delete('/:id', protect, async (req, res) => {
+import User from '../models/user.model.js';
+import mongoose from 'mongoose';
+
+// 6. Register FCM device token
+router.post('/fcm-token', protect, async (req, res) => {
+  const { token, platform } = req.body;
+  if (!token) {
+    return res.status(400).json({ success: false, message: 'Valid FCM token is required' });
+  }
+
   try {
-    const deleted = await Notification.findByIdAndDelete(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: 'Notification not found' });
+    const userId = req.user.id || req.user._id;
+    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
     }
-    return res.status(200).json({ success: true, data: deleted });
+
+    const updatedUser = await User.findOneAndUpdate(
+      { $or: query },
+      {
+        $set: { fcmToken: token },
+        $addToSet: { fcmTokens: token }
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'FCM device token registered successfully',
+      data: { token, userId: updatedUser ? (updatedUser.id || updatedUser._id) : userId }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 7. Unregister FCM device token
+router.delete('/fcm-token', protect, async (req, res) => {
+  const { token } = req.body || {};
+  try {
+    const userId = req.user.id || req.user._id;
+    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    const update = {};
+    if (token) {
+      update.$pull = { fcmTokens: token };
+      if (req.user.fcmToken === token) update.$set = { fcmToken: null };
+    } else {
+      update.$set = { fcmToken: null };
+    }
+
+    await User.findOneAndUpdate({ $or: query }, update, { new: true });
+    return res.status(200).json({ success: true, message: 'FCM device token unregistered successfully' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

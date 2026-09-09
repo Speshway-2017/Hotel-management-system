@@ -32,7 +32,9 @@ const userSchema = new mongoose.Schema({
   idDocType: { type: String, default: "Aadhaar Card" },
   idDocNumber: { type: String, trim: true },
   loyaltyPoints: { type: Number, default: 0 },
-  notes: { type: String, trim: true }
+  notes: { type: String, trim: true },
+  fcmToken: { type: String, default: null },
+  fcmTokens: [{ type: String }]
 }, {
   timestamps: true
 });
@@ -200,6 +202,8 @@ const MockUser = {
       idDocNumber: data.idDocNumber || '',
       loyaltyPoints: Number(data.loyaltyPoints) || 0,
       notes: data.notes || '',
+      fcmToken: data.fcmToken || null,
+      fcmTokens: Array.isArray(data.fcmTokens) ? data.fcmTokens : (data.fcmToken ? [data.fcmToken] : []),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -208,18 +212,7 @@ const MockUser = {
     return new UserInstance(newUser);
   },
   findByIdAndUpdate: async (id, update, options = {}) => {
-    const list = readUsers();
-    const idx = list.findIndex(u => String(u.id) === String(id) || String(u._id) === String(id));
-    if (idx === -1) return null;
-    const current = list[idx];
-    const updated = {
-      ...current,
-      ...update,
-      updatedAt: new Date().toISOString()
-    };
-    list[idx] = updated;
-    writeUsers(list);
-    return new UserInstance(updated);
+    return MockUser.findOneAndUpdate({ _id: id }, update, options);
   },
   findByIdAndDelete: async (id) => {
     const list = readUsers();
@@ -250,9 +243,32 @@ const MockUser = {
     }
     if (idx === -1) return null;
     const current = list[idx];
+    let updateFields = { ...update };
+    if (update.$addToSet) {
+      for (const key of Object.keys(update.$addToSet)) {
+        const val = update.$addToSet[key];
+        const existing = Array.isArray(current[key]) ? current[key] : [];
+        if (!existing.includes(val)) {
+          updateFields[key] = [...existing, val];
+        }
+      }
+      delete updateFields.$addToSet;
+    }
+    if (update.$pull) {
+      for (const key of Object.keys(update.$pull)) {
+        const val = update.$pull[key];
+        const existing = Array.isArray(current[key]) ? current[key] : [];
+        updateFields[key] = existing.filter(item => item !== val);
+      }
+      delete updateFields.$pull;
+    }
+    if (update.$set) {
+      Object.assign(updateFields, update.$set);
+      delete updateFields.$set;
+    }
     const updated = {
       ...current,
-      ...update,
+      ...updateFields,
       updatedAt: new Date().toISOString()
     };
     list[idx] = updated;
@@ -381,6 +397,8 @@ const User = {
           idDocNumber: created.idDocNumber || '',
           loyaltyPoints: created.loyaltyPoints || 0,
           notes: created.notes || '',
+          fcmToken: created.fcmToken || null,
+          fcmTokens: created.fcmTokens || [],
           createdAt: created.createdAt || new Date().toISOString(),
           updatedAt: created.updatedAt || new Date().toISOString()
         });
@@ -426,6 +444,8 @@ const User = {
             idDocNumber: updated.idDocNumber || '',
             loyaltyPoints: updated.loyaltyPoints || 0,
             notes: updated.notes || '',
+            fcmToken: updated.fcmToken || null,
+            fcmTokens: updated.fcmTokens || [],
             createdAt: updated.createdAt,
             updatedAt: updated.updatedAt
           });

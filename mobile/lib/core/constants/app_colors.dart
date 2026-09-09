@@ -33,6 +33,7 @@ class AppColors {
   static const Color textSecondary = Color(0xFF667085);
   static const Color textMuted = Color(0xFF98A2B3);
   static const Color textTertiary = Color(0xFF94A3B8);
+  static const Color mutedGray = Color(0xFF8A8F98);
 
   // Status & Badges
   static const Color success = Color(0xFF2E7D32);

@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/manager/approval_provider.dart';
+import '../../providers/manager/guest_provider.dart';
+import '../../providers/manager/manager_feedback_provider.dart';
 import '../../providers/manager/manager_notification_provider.dart';
 import '../../providers/manager/payment_provider.dart';
 import '../../providers/manager/reservation_provider.dart';
 import '../../providers/manager/room_provider.dart';
-import '../../widgets/server_config_dialog.dart';
+import '../../providers/manager/staff_provider.dart';
+import '../../widgets/manager_floating_nav_bar.dart';
 import 'approvals/manager_approvals_screen.dart';
 import 'dashboard/manager_dashboard_screen.dart';
-import 'feedback/manager_feedback_screen.dart';
 import 'notifications/manager_notifications_screen.dart';
 import 'payments/manager_payments_screen.dart';
 import 'profile/manager_profile_screen.dart';
 import 'reservations/manager_reservations_screen.dart';
 import 'rooms/manager_rooms_screen.dart';
-import 'staff/manager_staff_screen.dart';
 
 class ManagerLayout extends StatefulWidget {
   const ManagerLayout({super.key});
@@ -42,6 +42,9 @@ class _ManagerLayoutState extends State<ManagerLayout> {
     context.read<ApprovalProvider>().fetchAll();
     context.read<PaymentProvider>().fetchAll();
     context.read<ManagerNotificationProvider>().fetchNotifications();
+    context.read<GuestProvider>().fetchGuests();
+    context.read<ManagerFeedbackProvider>().fetchAll();
+    context.read<StaffProvider>().fetchAll();
   }
 
   final List<Widget> _bottomNavScreens = const [
@@ -49,7 +52,7 @@ class _ManagerLayoutState extends State<ManagerLayout> {
     ManagerReservationsScreen(),
     ManagerRoomsScreen(),
     ManagerApprovalsScreen(),
-    ManagerProfileScreen(),
+    ManagerPaymentsScreen(isEmbedded: true),
   ];
 
   @override
@@ -60,45 +63,114 @@ class _ManagerLayoutState extends State<ManagerLayout> {
     final pendingApprovals = approvalProvider.pendingCount;
     final unreadNotifs = notificationProvider.unreadCount;
 
+    final propertyTitle = (user?.propertyName != null && user!.propertyName!.isNotEmpty)
+        ? user.propertyName!
+        : 'Speshway Luxury Hotel';
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0D1B2A),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        automaticallyImplyLeading: false,
+        titleSpacing: 16,
         title: Row(
           children: [
+            // White rounded container with logo
             Container(
-              width: 32,
-              height: 32,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: AppColors.secondary.withAlpha(40),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(50),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(5),
               child: Image.asset(
                 'assets/logo.png',
-                errorBuilder: (_, _, _) => const Icon(Icons.hotel, size: 20, color: AppColors.secondary),
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.hotel_rounded,
+                  size: 22,
+                  color: Color(0xFF0D1B2A),
+                ),
               ),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Hour Stay',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Manager Portal • ${user?.name ?? ""}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Hour(Cream) Stay(Gold)
+                  RichText(
+                    text: const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Hour',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFFFF7E6),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' ',
+                        ),
+                        TextSpan(
+                          text: 'Stay',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFF5C06A),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    propertyTitle,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xB3FFF7E6),
+                      letterSpacing: -0.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
+          // Notification Icon with Badge
           IconButton(
             icon: Badge(
               isLabelVisible: unreadNotifs > 0,
-              label: Text('$unreadNotifs'),
-              child: const Icon(Icons.notifications_outlined),
+              backgroundColor: const Color(0xFFE53935),
+              textColor: Colors.white,
+              label: Text(
+                unreadNotifs > 99 ? '99+' : '$unreadNotifs',
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+              ),
+              child: const Icon(
+                Icons.notifications_outlined,
+                color: Color(0xFFFFF7E6),
+                size: 24,
+              ),
             ),
             tooltip: 'Notifications',
             onPressed: () {
@@ -107,174 +179,291 @@ class _ManagerLayoutState extends State<ManagerLayout> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.dns_outlined),
-            tooltip: 'Server Config',
-            onPressed: () => ServerConfigDialog.show(context),
+          // Profile Avatar Icon with Dropdown Menu
+          Padding(
+            padding: const EdgeInsets.only(right: 14, left: 4),
+            child: PopupMenuButton<String>(
+              offset: const Offset(0, 48),
+              elevation: 8,
+              shadowColor: Colors.black.withAlpha(80),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              color: Colors.white,
+              icon: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFF7E6),
+                  border: Border.all(
+                    color: const Color(0xFFF5C06A),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(50),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: user?.avatar != null &&
+                          user!.avatar!.isNotEmpty &&
+                          user.avatar!.startsWith('http')
+                      ? Image.network(
+                          user.avatar!,
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Center(
+                            child: Text(
+                              user.name.isNotEmpty == true
+                                  ? user.name[0].toUpperCase()
+                                  : 'M',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0D1B2A),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            user?.name.isNotEmpty == true
+                                ? user!.name[0].toUpperCase()
+                                : 'M',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0D1B2A),
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              onSelected: (value) {
+                if (value == 'profile') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ManagerProfileScreen(),
+                    ),
+                  );
+                } else if (value == 'signout') {
+                  _showSignOutConfirmation(context);
+                }
+              },
+              itemBuilder: (context) => [
+                // 1. User Header
+                PopupMenuItem<String>(
+                  enabled: false,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFFFF7E6),
+                            border: Border.all(
+                              color: const Color(0xFFF5C06A),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: user?.avatar != null &&
+                                    user!.avatar!.isNotEmpty &&
+                                    user.avatar!.startsWith('http')
+                                ? Image.network(
+                                    user.avatar!,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Center(
+                                      child: Text(
+                                        user.name.isNotEmpty == true
+                                            ? user.name[0].toUpperCase()
+                                            : 'M',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0D1B2A),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      user?.name.isNotEmpty == true
+                                          ? user!.name[0].toUpperCase()
+                                          : 'M',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0D1B2A),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user?.name.isNotEmpty == true
+                                    ? user!.name
+                                    : 'Hotel Manager',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0D1B2A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                user?.email.isNotEmpty == true
+                                    ? user!.email
+                                    : 'manager@hourstay.com',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Color(0xFF8A8F98),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const PopupMenuDivider(height: 1),
+                // 2. Profile Action
+                const PopupMenuItem<String>(
+                  value: 'profile',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded,
+                          size: 19, color: Color(0xFF0D1B2A)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Profile',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0D1B2A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(height: 1),
+                // 3. Sign Out Action
+                const PopupMenuItem<String>(
+                  value: 'signout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout_rounded,
+                          size: 19, color: Color(0xFFE53935)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Sign Out',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFE53935),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _bottomNavScreens,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ManagerFloatingNavBar(
+              currentIndex: _currentIndex,
+              onTap: (index) => setState(() => _currentIndex = index),
+              pendingApprovals: pendingApprovals,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSignOutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
           children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+            Icon(Icons.logout_rounded, color: Color(0xFFE53935), size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Sign Out',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0D1B2A),
               ),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Text(
-                  user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'M',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
-                ),
-              ),
-              accountName: Text(
-                user?.name ?? 'Hotel Manager',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              accountEmail: Text(user?.email ?? 'manager@hotel.com'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.dashboard_outlined),
-              title: const Text('Dashboard'),
-              selected: _currentIndex == 0,
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _currentIndex = 0);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.book_online_outlined),
-              title: const Text('Reservations'),
-              selected: _currentIndex == 1,
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _currentIndex = 1);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.meeting_room_outlined),
-              title: const Text('Rooms & Rates'),
-              selected: _currentIndex == 2,
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _currentIndex = 2);
-              },
-            ),
-            ListTile(
-              leading: Badge(
-                isLabelVisible: pendingApprovals > 0,
-                label: Text('$pendingApprovals'),
-                child: const Icon(Icons.verified_outlined),
-              ),
-              title: const Text('Hourly Approvals'),
-              selected: _currentIndex == 3,
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _currentIndex = 3);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Staff & Shifts'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ManagerStaffScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.payments_outlined),
-              title: const Text('Payments & Revenue'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ManagerPaymentsScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.reviews_outlined),
-              title: const Text('Guest Reviews'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ManagerFeedbackScreen()),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('My Profile'),
-              selected: _currentIndex == 4,
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _currentIndex = 4);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.error),
-              title: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                Navigator.pop(context);
-                context.read<AuthProvider>().logout();
-              },
             ),
           ],
         ),
-      ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _bottomNavScreens,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textTertiary,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.book_online_outlined),
-            activeIcon: Icon(Icons.book_online),
-            label: 'Bookings',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.meeting_room_outlined),
-            activeIcon: Icon(Icons.meeting_room),
-            label: 'Rooms',
-          ),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: pendingApprovals > 0,
-              label: Text('$pendingApprovals'),
-              child: const Icon(Icons.verified_outlined),
+        content: const Text(
+          'Are you sure you want to sign out from your Manager account?',
+          style: TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF8A8F98),
+              ),
             ),
-            activeIcon: Badge(
-              isLabelVisible: pendingApprovals > 0,
-              label: Text('$pendingApprovals'),
-              child: const Icon(Icons.verified),
-            ),
-            label: 'Approvals',
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<AuthProvider>().logout();
+            },
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

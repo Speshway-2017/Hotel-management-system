@@ -24,16 +24,25 @@ class ApiService {
   static String? _resolvedBaseUrl;
 
   static Future<String> getBaseUrl() async {
-    if (_resolvedBaseUrl != null) return _resolvedBaseUrl!;
+    if (_resolvedBaseUrl != null &&
+        _resolvedBaseUrl!.isNotEmpty &&
+        !_resolvedBaseUrl!.contains('192.168.1.14')) {
+      return _resolvedBaseUrl!;
+    }
 
     final customUrl = await StorageService.getBaseUrl();
-    if (customUrl != null && customUrl.trim().isNotEmpty) {
+    if (customUrl != null &&
+        customUrl.trim().isNotEmpty &&
+        !customUrl.contains('192.168.1.14')) {
       _resolvedBaseUrl = customUrl.trim();
       ApiEndpoints.setBaseUrl(_resolvedBaseUrl!);
       return _resolvedBaseUrl!;
     }
 
     _resolvedBaseUrl = ApiEndpoints.getDefaultBaseUrl();
+    ApiEndpoints.setBaseUrl(_resolvedBaseUrl!);
+    await StorageService.saveBaseUrl(_resolvedBaseUrl!);
+    await StorageService.saveSocketUrl(ApiEndpoints.getDefaultSocketUrl(_resolvedBaseUrl!));
     return _resolvedBaseUrl!;
   }
 
@@ -88,7 +97,7 @@ class ApiService {
         success: false,
         statusCode: 500,
         message: e is SocketException || e is TimeoutException
-            ? 'Unable to connect to HMS server. Please ensure the backend is running.'
+            ? 'Unable to connect to HMS server ($currentBase). Please ensure your PC and phone are on the same Wi-Fi network (IP: 192.168.88.17).'
             : 'Connection error: ${e.toString()}',
       );
     }
@@ -134,11 +143,64 @@ class ApiService {
     });
   }
 
-  static Future<ApiResponse<dynamic>> delete(String endpoint) async {
+  static Future<ApiResponse<dynamic>> delete(String endpoint, [Map<String, dynamic>? body]) async {
     return _executeWithFallback((baseUrl, headers) {
       final uri = Uri.parse('$baseUrl$endpoint');
-      return http.delete(uri, headers: headers);
+      return http.delete(
+        uri,
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
     });
+  }
+
+  static Future<ApiResponse<dynamic>> uploadFile(
+    String endpoint, {
+    required String fieldName,
+    required String filePath,
+    Uint8List? fileBytes,
+    String? fileName,
+    Map<String, String>? fields,
+    String method = 'PUT',
+  }) async {
+    final token = await StorageService.getToken();
+    final baseUrl = await getBaseUrl();
+    final uri = Uri.parse('$baseUrl$endpoint');
+
+    try {
+      final request = http.MultipartRequest(method, uri);
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
+
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+
+      if (fileBytes != null && fileName != null) {
+        request.files.add(http.MultipartFile.fromBytes(
+          fieldName,
+          fileBytes,
+          filename: fileName,
+        ));
+      } else if (filePath.isNotEmpty) {
+        request.files.add(await http.MultipartFile.fromPath(
+          fieldName,
+          filePath,
+        ));
+      }
+
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 20));
+      final response = await http.Response.fromStream(streamedResponse);
+      return _handleResponse(response);
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        statusCode: 500,
+        message: 'Failed to upload file: ${e.toString()}',
+      );
+    }
   }
 
   static ApiResponse<dynamic> _handleResponse(http.Response response) {

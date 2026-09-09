@@ -107,8 +107,8 @@ const startServer = async () => {
     }
   });
 
-  server.listen(PORT, () => {
-    console.log(`🏨 Hour Stay HMS Backend Server running on port ${PORT} with Socket.io real-time updates enabled`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🏨 Hour Stay HMS Backend Server running on 0.0.0.0:${PORT} (LAN IP: 192.168.1.14:${PORT}) with Socket.io real-time updates enabled`);
   });
 
   const gracefulShutdown = (signal) => {

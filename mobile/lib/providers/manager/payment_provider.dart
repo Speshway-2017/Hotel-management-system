@@ -15,6 +15,16 @@ class PaymentProvider with ChangeNotifier {
   String? get error => _errorMessage;
 
   double get totalRevenue => _payments.fold(0.0, (acc, p) => p.isCompleted ? acc + p.amount : acc);
+  double get totalPaymentsAmount => _payments.fold(0.0, (acc, p) => acc + p.amount);
+
+  double get settledTotal => _payments.fold(0.0, (acc, p) => (p.isCompleted || p.status.toLowerCase() == 'settled' || p.status.toLowerCase() == 'paid') ? acc + p.amount : acc);
+  int get settledCount => _payments.where((p) => p.isCompleted || p.status.toLowerCase() == 'settled' || p.status.toLowerCase() == 'paid').length;
+
+  double get pendingTotal => _payments.fold(0.0, (acc, p) => p.status.toLowerCase() == 'pending' ? acc + p.amount : acc);
+  int get pendingCount => _payments.where((p) => p.status.toLowerCase() == 'pending').length;
+
+  double get refundedTotal => _payments.fold(0.0, (acc, p) => (p.status.toLowerCase() == 'refunded' || p.status.toLowerCase() == 'refund') ? acc + p.amount : acc);
+  int get refundedCount => _payments.where((p) => p.status.toLowerCase() == 'refunded' || p.status.toLowerCase() == 'refund').length;
 
   PaymentProvider() {
     _registerSocketListeners();
@@ -61,6 +71,81 @@ class PaymentProvider with ChangeNotifier {
     notifyListeners();
 
     final response = await ApiService.post(ApiEndpoints.managerPayments, data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchPayments(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updatePaymentStatus(String id, String status) async {
+    // Optimistic update
+    final idx = _payments.indexWhere((p) => p.id == id);
+    if (idx != -1) {
+      final old = _payments[idx];
+      _payments[idx] = PaymentModel(
+        id: old.id,
+        bookingId: old.bookingId,
+        guestName: old.guestName,
+        roomNumber: old.roomNumber,
+        amount: old.amount,
+        paymentMethod: old.paymentMethod,
+        status: status,
+        propertyId: old.propertyId,
+        createdAt: old.createdAt,
+      );
+      notifyListeners();
+    }
+
+    try {
+      final response = await ApiService.put('${ApiEndpoints.managerPayments}/$id', {
+        'status': status,
+      });
+
+      if (response.success) {
+        fetchPayments(silent: true);
+        return true;
+      } else {
+        _errorMessage = response.message;
+        fetchPayments(silent: true);
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+      fetchPayments(silent: true);
+      return false;
+    }
+  }
+
+  Future<bool> settleFolio(String bookingId, double amountPaid) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.post('${ApiEndpoints.managerBilling}/$bookingId/payment', {
+      'amountPaid': amountPaid,
+    });
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchPayments(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deletePayment(String id) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.delete('${ApiEndpoints.managerPayments}/$id');
     _isLoading = false;
 
     if (response.success) {

@@ -71,7 +71,15 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Staff Member'),
+        backgroundColor: const Color(0xFF0D1B2A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

@@ -28,7 +28,9 @@ class SocketService {
 
     try {
       final customSocketUrl = await StorageService.getSocketUrl();
-      final socketUrl = customSocketUrl != null && customSocketUrl.trim().isNotEmpty
+      final socketUrl = (customSocketUrl != null &&
+              customSocketUrl.trim().isNotEmpty &&
+              !customSocketUrl.contains('192.168.1.14'))
           ? customSocketUrl.trim()
           : ApiEndpoints.getDefaultSocketUrl();
 
