@@ -38,6 +38,7 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
     final newUrl = _urlController.text.trim();
     if (newUrl.isNotEmpty) {
       await _storageService.saveServerUrl(newUrl);
+      await StorageService.saveSocketUrl(ApiEndpoints.getDefaultSocketUrl(newUrl));
       ApiEndpoints.setBaseUrl(newUrl);
       SocketService().reconnect();
       if (mounted) {
@@ -74,7 +75,7 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Set the backend base URL. For Android Emulator, use 10.0.2.2:5000.',
+              'Set the backend base URL. For physical devices on Wi-Fi, use your PC IP 192.168.88.17:5000.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -82,7 +83,7 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
               controller: _urlController,
               decoration: const InputDecoration(
                 labelText: 'Base URL',
-                hintText: 'http://10.0.2.2:5000/api',
+                hintText: 'http://192.168.88.17:5000/api',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -97,16 +98,20 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
               runSpacing: 8,
               children: [
                 ActionChip(
+                  label: const Text('PC Wi-Fi (192.168.88.17)', style: TextStyle(fontSize: 12)),
+                  onPressed: () => _applyPreset('http://192.168.88.17:5000/api'),
+                ),
+                ActionChip(
+                  label: const Text('Local (127.0.0.1)', style: TextStyle(fontSize: 12)),
+                  onPressed: () => _applyPreset('http://127.0.0.1:5000/api'),
+                ),
+                ActionChip(
                   label: const Text('Emulator (10.0.2.2)', style: TextStyle(fontSize: 12)),
                   onPressed: () => _applyPreset('http://10.0.2.2:5000/api'),
                 ),
                 ActionChip(
                   label: const Text('Localhost (5000)', style: TextStyle(fontSize: 12)),
                   onPressed: () => _applyPreset('http://localhost:5000/api'),
-                ),
-                ActionChip(
-                  label: const Text('LAN (192.168.1.x)', style: TextStyle(fontSize: 12)),
-                  onPressed: () => _applyPreset('http://192.168.1.100:5000/api'),
                 ),
               ],
             ),

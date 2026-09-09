@@ -79,4 +79,57 @@ class ManagerFeedbackProvider with ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> updateFeedbackStatus(String id, String status) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.put('${ApiEndpoints.managerFeedback}/$id/status', {
+      'status': status,
+    });
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchFeedbacks(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteFeedback(String id) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.delete('${ApiEndpoints.managerFeedback}/$id');
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchFeedbacks(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> createFeedback(Map<String, dynamic> data) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.post(ApiEndpoints.managerFeedback, data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchFeedbacks(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
 }

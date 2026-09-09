@@ -86,6 +86,40 @@ class StaffProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> updateStaff(String id, Map<String, dynamic> data) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.put('${ApiEndpoints.managerStaff}/$id', data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchAll(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteStaff(String id) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.delete('${ApiEndpoints.managerStaff}/$id');
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchAll(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> assignShift(String userId, String username, String shiftType) async {
     final response = await ApiService.post('${ApiEndpoints.managerShifts}/assign', {
       'userId': userId,

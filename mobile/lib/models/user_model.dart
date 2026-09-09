@@ -6,6 +6,7 @@ class UserModel {
   final String mobile;
   final String status;
   final String? propertyId;
+  final String? propertyName;
   final String? avatar;
   final String dept;
   final String shift;
@@ -22,6 +23,7 @@ class UserModel {
     this.mobile = '',
     this.status = 'Active',
     this.propertyId,
+    this.propertyName,
     this.avatar,
     this.dept = 'Management',
     this.shift = 'Morning (06:00 - 14:00)',
@@ -45,6 +47,9 @@ class UserModel {
       mobile: json['mobile'] ?? json['phone'] ?? '',
       status: json['status'] ?? 'Active',
       propertyId: json['propertyId']?.toString(),
+      propertyName: json['propertyName']?.toString() ??
+          (json['property'] is Map ? json['property']['name']?.toString() : null) ??
+          json['property_name']?.toString(),
       avatar: json['avatar'],
       dept: json['dept'] ?? 'Management',
       shift: json['shift'] ?? 'Morning (06:00 - 14:00)',
@@ -64,6 +69,7 @@ class UserModel {
       'mobile': mobile,
       'status': status,
       'propertyId': propertyId,
+      'propertyName': propertyName,
       'avatar': avatar,
       'dept': dept,
       'shift': shift,

@@ -32,7 +32,7 @@ class AuthProvider with ChangeNotifier {
         if (savedUser != null) {
           _user = savedUser;
           await SocketService.connect(_user?.propertyId);
-          _refreshProfile();
+          refreshProfile();
         }
       }
     } catch (_) {
@@ -42,7 +42,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _refreshProfile() async {
+  Future<void> refreshProfile() async {
     final res = await AuthService.getProfile();
     if (res.success && res.data != null) {
       _user = res.data;
@@ -103,6 +103,32 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     final res = await AuthService.updateProfile(data);
+    _isLoading = false;
+
+    if (res.success && res.data != null) {
+      _user = res.data;
+      notifyListeners();
+      return true;
+    } else {
+      _errorMessage = res.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> uploadProfilePicture({
+    required String filePath,
+    dynamic fileBytes,
+    String? fileName,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final res = await AuthService.uploadProfileAvatar(
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName,
+    );
     _isLoading = false;
 
     if (res.success && res.data != null) {

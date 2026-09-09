@@ -1,6 +1,8 @@
+import 'dart:async';
 import '../core/constants/api_endpoints.dart';
 import '../models/user_model.dart';
 import 'api_service.dart';
+import 'notification_service.dart';
 import 'storage_service.dart';
 import 'socket_service.dart';
 
@@ -23,6 +25,9 @@ class AuthService {
         
         // Connect Socket.IO
         await SocketService.connect(user.propertyId);
+
+        // Sync FCM device token with backend
+        unawaited(NotificationService.syncTokenWithBackend());
 
         return ApiResponse(
           success: true,
@@ -65,6 +70,9 @@ class AuthService {
         await StorageService.saveUser(user);
         await SocketService.connect();
 
+        // Sync FCM device token with backend
+        unawaited(NotificationService.syncTokenWithBackend());
+
         return ApiResponse(
           success: true,
           statusCode: response.statusCode,
@@ -86,6 +94,7 @@ class AuthService {
     if (response.success && response.data != null) {
       final user = UserModel.fromJson(response.data as Map<String, dynamic>);
       await StorageService.saveUser(user);
+      unawaited(NotificationService.syncTokenWithBackend());
       return ApiResponse(
         success: true,
         statusCode: response.statusCode,
@@ -119,6 +128,37 @@ class AuthService {
     );
   }
 
+  static Future<ApiResponse<UserModel>> uploadProfileAvatar({
+    required String filePath,
+    dynamic fileBytes,
+    String? fileName,
+  }) async {
+    final response = await ApiService.uploadFile(
+      ApiEndpoints.profile,
+      fieldName: 'avatar',
+      filePath: filePath,
+      fileBytes: fileBytes,
+      fileName: fileName ?? 'avatar.jpg',
+      method: 'PUT',
+    );
+
+    if (response.success && response.data != null) {
+      final user = UserModel.fromJson(response.data as Map<String, dynamic>);
+      await StorageService.saveUser(user);
+      return ApiResponse(
+        success: true,
+        statusCode: response.statusCode,
+        data: user,
+        message: response.message,
+      );
+    }
+    return ApiResponse(
+      success: false,
+      statusCode: response.statusCode,
+      message: response.message ?? 'Failed to upload profile picture',
+    );
+  }
+
   static Future<ApiResponse<dynamic>> forgotPassword(String email) async {
     return await ApiService.post(ApiEndpoints.forgotPassword, {'email': email.trim()});
   }
@@ -139,6 +179,9 @@ class AuthService {
   }
 
   static Future<void> logout() async {
+    try {
+      await NotificationService.removeTokenFromBackend();
+    } catch (_) {}
     try {
       await ApiService.post(ApiEndpoints.logout);
     } catch (_) {}

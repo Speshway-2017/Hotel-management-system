@@ -155,6 +155,27 @@ class ReservationProvider with ChangeNotifier {
     return false;
   }
 
+  Future<bool> extendReservation(String id, String newCheckOut, int additionalNights, double additionalAmount) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.post('${ApiEndpoints.managerReservations}/$id/extend', {
+      'newCheckOut': newCheckOut,
+      'additionalNights': additionalNights,
+      'additionalAmount': additionalAmount,
+    });
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchReservations(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> deleteReservation(String id) async {
     final response = await ApiService.delete('${ApiEndpoints.managerReservations}/$id');
     if (response.success) {

@@ -37,6 +37,8 @@ class ApprovalProvider with ChangeNotifier {
   void _registerSocketListeners() {
     SocketService.on('approval_updated', (_) => fetchApprovals(silent: true));
     SocketService.on('dashboard_sync', (_) => fetchApprovals(silent: true));
+    SocketService.on('new_approval', (_) => fetchApprovals(silent: true));
+    SocketService.on('approval_received', (_) => fetchApprovals(silent: true));
   }
 
   Future<void> fetchAll({bool silent = false}) => fetchApprovals(silent: silent);
@@ -77,21 +79,49 @@ class ApprovalProvider with ChangeNotifier {
   }
 
   Future<bool> decideApproval(String id, String action, String reason) async {
-    _isLoading = true;
-    notifyListeners();
-
-    final response = await ApiService.post('${ApiEndpoints.managerApprovals}/$id', {
-      'action': action,
-      'decisionReason': reason,
-    });
-    _isLoading = false;
-
-    if (response.success) {
-      await fetchApprovals(silent: true);
-      return true;
-    } else {
-      _errorMessage = response.message;
+    // Optimistic update
+    final finalStatus = action.toLowerCase() == 'approved' || action.toLowerCase() == 'approve' ? 'Approved' : 'Rejected';
+    final idx = _approvals.indexWhere((a) => a.id == id);
+    if (idx != -1) {
+      final old = _approvals[idx];
+      _approvals[idx] = ApprovalModel(
+        id: old.id,
+        category: old.category,
+        requestedBy: old.requestedBy,
+        guest: old.guest,
+        bookingId: old.bookingId,
+        room: old.room,
+        amount: old.amount,
+        value: old.value,
+        reason: old.reason,
+        description: old.description,
+        status: finalStatus,
+        propertyId: old.propertyId,
+        decisionReason: reason.isNotEmpty ? reason : (finalStatus == 'Approved' ? 'Approved via Mobile App' : 'Rejected via Mobile App'),
+        decidedBy: 'Manager',
+        decidedAt: DateTime.now().toIso8601String(),
+        createdAt: old.createdAt,
+      );
       notifyListeners();
+    }
+
+    try {
+      final response = await ApiService.post('${ApiEndpoints.managerApprovals}/$id', {
+        'action': finalStatus,
+        'decisionReason': reason,
+      });
+
+      if (response.success) {
+        fetchApprovals(silent: true);
+        return true;
+      } else {
+        _errorMessage = response.message;
+        fetchApprovals(silent: true);
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+      fetchApprovals(silent: true);
       return false;
     }
   }

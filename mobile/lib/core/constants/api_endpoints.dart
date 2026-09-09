@@ -2,6 +2,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class ApiEndpoints {
+  // Local PC network configuration for physical device testing
+  static const String localHostIp = '192.168.88.17';
+  static const String localPort = '5000';
+
+  // Production configuration switch
+  static const bool useProduction = false;
+  static const String productionBaseUrl = 'https://api.hourstay.com/api';
+
   static String baseUrl = getDefaultBaseUrl();
 
   static void setBaseUrl(String url) {
@@ -9,34 +17,35 @@ class ApiEndpoints {
   }
 
   static String getDefaultBaseUrl() {
+    if (useProduction) {
+      return productionBaseUrl;
+    }
     if (kIsWeb) {
-      return 'http://localhost:5000/api';
+      return 'http://localhost:$localPort/api';
     } else if (Platform.isAndroid) {
-      // 127.0.0.1 is forwarded via adb reverse; 192.168.1.14 on Wi-Fi; 10.0.2.2 for emulator
-      return 'http://127.0.0.1:5000/api';
+      // Physical Android devices connect via local Wi-Fi IP (192.168.88.17:5000)
+      return 'http://$localHostIp:$localPort/api';
+    } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return 'http://127.0.0.1:$localPort/api';
     } else {
-      // iOS Simulator / Desktop
-      return 'http://localhost:5000/api';
+      return 'http://$localHostIp:$localPort/api';
     }
   }
 
   static List<String> getCandidateBaseUrls() {
-    if (kIsWeb) {
-      return const ['http://localhost:5000/api'];
-    } else if (Platform.isAndroid) {
-      return const [
-        'http://127.0.0.1:5000/api',
-        'http://192.168.1.14:5000/api',
-        'http://10.0.2.2:5000/api',
-        'http://localhost:5000/api',
-      ];
-    } else {
-      return const [
-        'http://localhost:5000/api',
-        'http://127.0.0.1:5000/api',
-        'http://192.168.1.14:5000/api',
-      ];
+    if (useProduction) {
+      return const [productionBaseUrl];
     }
+    if (kIsWeb) {
+      return const ['http://localhost:$localPort/api'];
+    }
+    return const [
+      'http://$localHostIp:$localPort/api',
+      'http://127.0.0.1:$localPort/api',
+      'http://localhost:$localPort/api',
+      'http://10.0.2.2:$localPort/api',
+      'http://192.168.1.14:$localPort/api',
+    ];
   }
 
   static String getDefaultSocketUrl([String? explicitBaseUrl]) {
@@ -44,12 +53,17 @@ class ApiEndpoints {
     if (activeBase.endsWith('/api')) {
       return activeBase.substring(0, activeBase.length - 4);
     }
+    if (useProduction) {
+      return productionBaseUrl.replaceAll('/api', '');
+    }
     if (kIsWeb) {
-      return 'http://localhost:5000';
+      return 'http://localhost:$localPort';
     } else if (Platform.isAndroid) {
-      return 'http://127.0.0.1:5000';
+      return 'http://$localHostIp:$localPort';
+    } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return 'http://127.0.0.1:$localPort';
     } else {
-      return 'http://localhost:5000';
+      return 'http://$localHostIp:$localPort';
     }
   }
 
@@ -61,6 +75,7 @@ class ApiEndpoints {
   static const String resetPassword = '/auth/reset-password';
   static const String profile = '/auth/profile';
   static const String logout = '/auth/logout';
+  static const String fcmToken = '/auth/fcm-token';
 
   // Manager Routes
   static const String property = '/manager/property';

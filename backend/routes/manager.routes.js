@@ -1560,6 +1560,34 @@ router.post('/notifications/:id/read', async (req, res) => {
   }
 });
 
+router.post('/notifications/:id/unread', async (req, res) => {
+  try {
+    const updated = await ManagerNotification.findOneAndUpdate(
+      { _id: req.params.id, propertyId: req.user.propertyId },
+      { isRead: false },
+      { new: true }
+    );
+    if (!updated) {
+      return sendError(res, 404, 'Alert message not found.');
+    }
+    return sendSuccess(res, 200, updated, 'Notification marked as unread.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/notifications/read-all', async (req, res) => {
+  try {
+    await ManagerNotification.updateMany(
+      { propertyId: req.user.propertyId, isRead: false },
+      { isRead: true }
+    );
+    return sendSuccess(res, 200, null, 'All notifications marked as read.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 const handleExtendReservation = async (req, res) => {
   try {
     const { newCheckOut, additionalNights, additionalAmount } = req.body;
