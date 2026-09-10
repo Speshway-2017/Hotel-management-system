@@ -392,30 +392,18 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          tooltip: 'Back to Reservations',
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFFF5C06A), size: 20),
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Booking #${_reservation.reservationNumber}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              _reservation.guestName,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFFF5C06A),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        title: Text(
+          'Booking #${_reservation.reservationNumber}',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.2,
+          ),
         ),
         actions: [
           IconButton(

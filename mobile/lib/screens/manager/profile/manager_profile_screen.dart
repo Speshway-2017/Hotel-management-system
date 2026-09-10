@@ -114,25 +114,16 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       scrolledUnderElevation: 0,
       centerTitle: false,
       leading: IconButton(
-        icon: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: white.withAlpha(20),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: white.withAlpha(30)),
-          ),
-          child: const Icon(Icons.arrow_back_ios_new_rounded, color: white, size: 16),
-        ),
-        onPressed: () => Navigator.of(context).pop(),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+        onPressed: () => Navigator.of(context).maybePop(),
       ),
       title: const Text(
         'Manager Profile',
         style: TextStyle(
           color: white,
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.3,
+          letterSpacing: -0.2,
         ),
       ),
     );

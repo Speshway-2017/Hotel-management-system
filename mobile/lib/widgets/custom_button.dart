@@ -63,15 +63,21 @@ class CustomButton extends StatelessWidget {
       );
     }
 
+    final effectiveBg = backgroundColor ?? AppColors.primary;
+    final isPrimaryNavy = effectiveBg == AppColors.primary || effectiveBg == const Color(0xFF0D1B2A);
+
     return ElevatedButton(
       onPressed: isLoading ? null : onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor ?? AppColors.primary,
+        backgroundColor: effectiveBg,
         foregroundColor: textColor ?? Colors.white,
         minimumSize: Size.fromHeight(height),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
+          side: isPrimaryNavy
+              ? const BorderSide(color: Color(0xFFF5C06A), width: 1.5)
+              : BorderSide.none,
         ),
       ),
       child: isLoading
@@ -87,7 +93,11 @@ class CustomButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 18, color: textColor ?? Colors.white),
+                  Icon(
+                    icon,
+                    size: 18,
+                    color: textColor ?? (isPrimaryNavy ? const Color(0xFFF5C06A) : Colors.white),
+                  ),
                   const SizedBox(width: 8),
                 ],
                 Text(
@@ -95,7 +105,7 @@ class CustomButton extends StatelessWidget {
                   style: TextStyle(
                     color: textColor ?? Colors.white,
                     fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],

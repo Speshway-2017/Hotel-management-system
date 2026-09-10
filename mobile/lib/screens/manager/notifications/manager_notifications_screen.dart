@@ -4,6 +4,10 @@ import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/notification_model.dart';
 import 'package:hour_stay_mobile/providers/manager/manager_notification_provider.dart';
 import 'package:hour_stay_mobile/widgets/server_config_dialog.dart';
+import '../approvals/manager_approvals_screen.dart';
+import '../feedback/manager_feedback_screen.dart';
+import '../reservations/manager_reservations_screen.dart';
+import '../payments/manager_payments_screen.dart';
 
 class ManagerNotificationsScreen extends StatefulWidget {
   const ManagerNotificationsScreen({super.key});
@@ -124,53 +128,17 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
       scrolledUnderElevation: 0,
       centerTitle: false,
       leading: IconButton(
-        icon: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: white.withAlpha(20),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: white.withAlpha(30)),
-          ),
-          child: const Icon(Icons.arrow_back_ios_new_rounded, color: white, size: 16),
-        ),
-        onPressed: () => Navigator.of(context).pop(),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+        onPressed: () => Navigator.of(context).maybePop(),
       ),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Notifications',
-            style: TextStyle(
-              color: white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: unreadCount > 0 ? gold : emerald,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                unreadCount > 0 ? '$unreadCount unread alerts' : 'All caught up',
-                style: TextStyle(
-                  color: cream.withAlpha(200),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
+      title: const Text(
+        'Notifications',
+        style: TextStyle(
+          color: white,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.2,
+        ),
       ),
       actions: [
         if (unreadCount > 0)
@@ -199,11 +167,6 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
               );
             },
           ),
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: white, size: 22),
-          tooltip: 'Refresh',
-          onPressed: () => provider.fetchNotifications(),
-        ),
         const SizedBox(width: 4),
       ],
     );
@@ -713,7 +676,12 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // Contextual Deep Link Action (if matching operational domain)
+                  _buildContextualActionButton(context, ctx, updatedNotif),
+
+                  const SizedBox(height: 12),
 
                   // Actions: Toggle Read State & Close
                   Row(
@@ -723,9 +691,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                           style: OutlinedButton.styleFrom(
                             foregroundColor: navy,
                             side: const BorderSide(color: cardBorder, width: 1.5),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           icon: Icon(
@@ -734,7 +702,7 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                             color: isUnread ? emerald : purple,
                           ),
                           label: Text(
-                            isUnread ? 'Mark as Read' : 'Mark as Unread',
+                            isUnread ? 'Mark Read' : 'Mark Unread',
                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                           ),
                           onPressed: () {
@@ -742,16 +710,15 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                           },
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: navy,
-                            foregroundColor: white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF64748B),
+                            side: const BorderSide(color: cardBorder),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           onPressed: () => Navigator.of(ctx).pop(),
@@ -769,6 +736,80 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
           },
         );
       },
+    );
+  }
+
+  Widget _buildContextualActionButton(BuildContext rootContext, BuildContext sheetContext, NotificationModel notif) {
+    final cat = notif.category.toLowerCase();
+    final msg = notif.message.toLowerCase();
+    final title = notif.title.toLowerCase();
+
+    String label = '';
+    IconData icon = Icons.arrow_forward_rounded;
+    VoidCallback? onNavigate;
+
+    if (cat.contains('approval') || msg.contains('approval') || title.contains('approval')) {
+      label = 'View Approvals Desk';
+      icon = Icons.verified_user_rounded;
+      onNavigate = () {
+        Navigator.of(sheetContext).pop();
+        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerApprovalsScreen()));
+      };
+    } else if (cat.contains('guest') || cat.contains('feedback') || msg.contains('feedback') || msg.contains('review')) {
+      label = 'View Guest Feedback';
+      icon = Icons.hotel_class_rounded;
+      onNavigate = () {
+        Navigator.of(sheetContext).pop();
+        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerFeedbackScreen()));
+      };
+    } else if (cat.contains('pay') || cat.contains('bill') || msg.contains('payment') || msg.contains('folio') || msg.contains('refund')) {
+      label = 'View Payments & Folios';
+      icon = Icons.account_balance_wallet_rounded;
+      onNavigate = () {
+        Navigator.of(sheetContext).pop();
+        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerPaymentsScreen(isEmbedded: false)));
+      };
+    } else if (cat.contains('reserv') || msg.contains('booking') || msg.contains('check-in') || msg.contains('check-out') || title.contains('booking')) {
+      label = 'View Reservations';
+      icon = Icons.calendar_today_rounded;
+      onNavigate = () {
+        Navigator.of(sheetContext).pop();
+        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerReservationsScreen()));
+      };
+    }
+
+    if (label.isEmpty || onNavigate == null) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: navy,
+          foregroundColor: white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: gold, width: 1.5),
+          ),
+        ),
+        onPressed: onNavigate,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: gold),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, letterSpacing: 0.3),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
+          ],
+        ),
+      ),
     );
   }
 
@@ -919,14 +960,14 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: gold, width: 1.2),
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: gold, width: 1.5),
                 ),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 18, color: gold),
               label: const Text(
                 'Refresh Feed',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
               ),
               onPressed: () => provider.fetchNotifications(),
             ),
@@ -983,11 +1024,15 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: navy,
                     foregroundColor: white,
+                    elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(color: gold, width: 1.5),
+                    ),
                   ),
                   icon: const Icon(Icons.refresh_rounded, size: 16, color: gold),
-                  label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w700)),
+                  label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                   onPressed: () => provider.fetchNotifications(),
                 ),
                 const SizedBox(width: 10),

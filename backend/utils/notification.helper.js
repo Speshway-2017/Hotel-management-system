@@ -1,45 +1,227 @@
 import Notification from '../models/notification.model.js';
+import { ManagerNotification } from '../models/managerData.model.js';
+import User from '../models/user.model.js';
 import app from '../app.js';
 import { emitRealtimeSync } from './socketEmitter.js';
 
 /**
  * Centrally triggers/logs a user, role, or property scoped system alert
- * and broadcasts it instantly via Socket.io.
+ * and broadcasts it instantly via Socket.io and Firebase Cloud Messaging (FCM).
  */
-export const triggerNotification = async ({ req, io, userId, role, propertyId, title, message, category }) => {
+export const triggerNotification = async ({ req, io, userId, role, propertyId, title, message, category, data = {} }) => {
   try {
     const socketIo = io || (req && req.app ? req.app.get('socketio') : null) || app.get('socketio');
+    const targetPropId = propertyId || null;
+
     const notif = await Notification.create({
       userId: userId || null,
       role: role || null,
-      propertyId: propertyId || null,
+      propertyId: targetPropId,
       title,
       message,
       category: category || 'General',
       isRead: false
     });
-    console.log(`🔔 Notification generated: "${title}" for role: ${role}, user: ${userId}`);
+
+    // Also persist to ManagerNotification for property/manager scoped notifications
+    if (role === 'manager' || role === 'admin' || !role) {
+      try {
+        await ManagerNotification.create({
+          title,
+          message,
+          category: category || 'General',
+          isRead: false,
+          propertyId: targetPropId || 'HS-JAI'
+        });
+      } catch (_) {}
+    }
+
+    console.log(`🔔 Notification generated: "${title}" [${category || 'General'}] for role: ${role || 'all'}, property: ${targetPropId || 'all'}, user: ${userId || 'none'}`);
 
     if (socketIo) {
-      emitRealtimeSync(socketIo, propertyId, 'notification_created', {
+      // Standard events
+      emitRealtimeSync(socketIo, targetPropId, 'notification_created', {
         notification: notif,
         role,
         userId,
-        propertyId
+        propertyId: targetPropId,
+        data
       });
-      emitRealtimeSync(socketIo, propertyId, 'unread_notifications_count_updated', {
+      emitRealtimeSync(socketIo, targetPropId, 'notification_received', notif);
+      emitRealtimeSync(socketIo, targetPropId, 'new_notification', notif);
+      emitRealtimeSync(socketIo, targetPropId, 'manager_notification', notif);
+      emitRealtimeSync(socketIo, targetPropId, 'unread_notifications_count_updated', {
         role,
         userId,
-        propertyId
+        propertyId: targetPropId
       });
-      emitRealtimeSync(socketIo, propertyId, 'dashboard_sync', {
+      emitRealtimeSync(socketIo, targetPropId, 'dashboard_sync', {
         action: 'notification_created',
-        propertyId
+        propertyId: targetPropId
       });
     }
+
+    // Lookup recipient FCM device tokens and log/dispatch
+    try {
+      const userQuery = [];
+      if (userId) userQuery.push({ _id: userId }, { id: userId });
+      if (role && targetPropId) {
+        userQuery.push({ role, propertyId: targetPropId }, { role });
+      } else if (role) {
+        userQuery.push({ role });
+      } else if (targetPropId) {
+        userQuery.push({ propertyId: targetPropId }, { role: 'manager' }, { role: 'admin' });
+      } else {
+        userQuery.push({ role: 'manager' }, { role: 'admin' });
+      }
+
+      if (userQuery.length > 0) {
+        const targetUsers = await User.find({ $or: userQuery });
+        const tokens = [];
+        for (const u of targetUsers) {
+          if (u.fcmToken) tokens.push(u.fcmToken);
+          if (Array.isArray(u.fcmTokens)) {
+            for (const t of u.fcmTokens) {
+              if (t && !tokens.includes(t)) tokens.push(t);
+            }
+          }
+        }
+
+        if (tokens.length > 0) {
+          console.log(`📱 [FCM PUSH] Dispatching notification to ${tokens.length} device tokens: "${title}"`);
+        }
+      }
+    } catch (fcmErr) {
+      console.warn("⚠️ FCM lookup notice:", fcmErr.message);
+    }
+
     return notif;
   } catch (err) {
     console.error("❌ Failed to automatically trigger notification:", err.message);
+  }
+};
+
+/**
+ * Universal helper for booking/reservation events:
+ * Dispatches database notifications and emits realtime socket synchronization
+ * across Admin, Super Admin, Manager, Receptionist, and Guest consoles.
+ */
+export const notifyBookingEvent = async ({ req, io, action = 'created', booking, guestUser = null, property = null }) => {
+  try {
+    const socketIo = io || (req && req.app ? req.app.get('socketio') : null) || app.get('socketio');
+    const propId = booking.propertyId || 'HS-JAI';
+    const guestName = booking.guest || booking.guestName || 'A Guest';
+    const roomInfo = booking.room || booking.roomType || 'Standard Room';
+    const bookingId = booking.bookingId || booking._id || booking.id || '';
+    const checkIn = booking.checkIn || booking.checkInDate || 'Today';
+    const checkOut = booking.checkOut || booking.checkOutDate || 'Tomorrow';
+    const amount = booking.totalAmount || booking.amount || 0;
+
+    let title = 'New Reservation Booking';
+    let msg = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bookingId}]`;
+    let category = 'New Reservation';
+
+    if (action === 'created' || action === 'booked') {
+      title = 'New Online Reservation';
+      msg = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bookingId}]`;
+      category = 'New Reservation';
+    } else if (action === 'cancelled') {
+      title = 'Reservation Cancelled';
+      msg = `Booking #${bookingId} for guest ${guestName} (${roomInfo}) was cancelled.`;
+      category = 'Alerts';
+    } else if (action === 'checkin') {
+      title = 'Guest Checked In';
+      msg = `Guest ${guestName} checked into ${roomInfo} (Ref: #${bookingId}).`;
+      category = 'Operations';
+    } else if (action === 'checkout') {
+      title = 'Guest Checked Out';
+      msg = `Guest ${guestName} checked out from ${roomInfo} (Ref: #${bookingId}).`;
+      category = 'Operations';
+    }
+
+    // 1. Notify Super Admin & Admin (Global)
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'super-admin',
+      title,
+      message: msg,
+      category,
+      data: { bookingId, guestName, room: roomInfo, action }
+    });
+
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'admin',
+      title,
+      message: msg,
+      category,
+      data: { bookingId, guestName, room: roomInfo, action }
+    });
+
+    // 2. Notify Manager (target property and default fallback)
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'manager',
+      propertyId: propId,
+      title,
+      message: msg,
+      category,
+      data: { bookingId, guestName, room: roomInfo, action }
+    });
+
+    if (propId !== 'HS-JAI') {
+      await triggerNotification({
+        req,
+        io: socketIo,
+        role: 'manager',
+        propertyId: 'HS-JAI',
+        title,
+        message: msg,
+        category,
+        data: { bookingId, guestName, room: roomInfo, action }
+      });
+    }
+
+    // 3. Notify Receptionist
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'receptionist',
+      propertyId: propId,
+      title,
+      message: msg,
+      category,
+      data: { bookingId, guestName, room: roomInfo, action }
+    });
+
+    // 4. Notify Guest
+    const targetGuestId = booking.guestId || (guestUser ? (guestUser._id || guestUser.id) : null);
+    if (targetGuestId) {
+      await triggerNotification({
+        req,
+        io: socketIo,
+        userId: targetGuestId,
+        role: 'guest',
+        title: action === 'created' ? 'Booking Confirmed!' : title,
+        message: action === 'created'
+          ? `Your reservation is confirmed for ${checkIn} → ${checkOut}. Booking Reference: #${bookingId}.`
+          : msg,
+        category: 'Booking Confirmation',
+        data: { bookingId, guestName, room: roomInfo, action }
+      });
+    }
+
+    // 5. Realtime Socket.io Broadcast
+    if (socketIo) {
+      emitRealtimeSync(socketIo, propId, 'booking_created', { booking, propertyId: propId });
+      emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), booking, propertyId: propId });
+      emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: `booking_${action}`, bookingId });
+    }
+  } catch (err) {
+    console.error("❌ Failed to broadcast booking notification:", err.message);
   }
 };
 
@@ -66,6 +248,10 @@ export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = '
       // 2. Notify Property Manager & Receptionist
       await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: propId, title, message: msg, category: 'Guest Experience' });
       await triggerNotification({ req, io: socketIo, role: 'receptionist', propertyId: propId, title, message: msg, category: 'Guest Experience' });
+
+      if (propId !== 'HS-JAI') {
+        await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: 'HS-JAI', title, message: msg, category: 'Guest Experience' });
+      }
 
       if (socketIo) {
         emitRealtimeSync(socketIo, propId, 'feedback_received', feedback);
@@ -109,4 +295,3 @@ export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = '
     console.error("❌ Failed to broadcast feedback notification:", err.message);
   }
 };
-

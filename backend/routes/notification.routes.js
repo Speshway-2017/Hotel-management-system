@@ -74,18 +74,56 @@ router.get('/', protect, async (req, res) => {
   try {
     await seedNotificationsIfNeeded(req.user);
     
-    const query = {
-      $or: [
-        { userId: req.user.id || req.user._id },
-        { role: req.user.role }
-      ]
-    };
-    
-    if (req.user.propertyId) {
-      query.$or.push({ propertyId: req.user.propertyId });
+    const userRole = req.user.role;
+    const userId = req.user.id || req.user._id;
+    const propId = req.user.propertyId;
+
+    let query;
+    if (userRole === 'super-admin' || userRole === 'admin') {
+      query = {
+        $or: [
+          { userId },
+          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null] } },
+          { role: { $exists: false } }
+        ]
+      };
+    } else if (userRole === 'manager') {
+      query = {
+        $or: [
+          { userId },
+          { role: 'manager' },
+          { role: 'admin' },
+          { role: null },
+          { role: { $exists: false } },
+          { propertyId: propId },
+          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
+          { propertyId: null },
+          { propertyId: { $exists: false } }
+        ]
+      };
+    } else if (userRole === 'receptionist') {
+      query = {
+        $or: [
+          { userId },
+          { role: 'receptionist' },
+          { role: null },
+          { role: { $exists: false } },
+          { propertyId: propId },
+          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' }
+        ]
+      };
+    } else {
+      query = {
+        $or: [
+          { userId },
+          { role: userRole }
+        ]
+      };
     }
 
-    const list = await Notification.find(query);
+    const list = await Notification.find(query).sort({ createdAt: -1 });
     return res.status(200).json({ success: true, data: list });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -95,20 +133,61 @@ router.get('/', protect, async (req, res) => {
 // 2. Get unread count
 router.get('/unread-count', protect, async (req, res) => {
   try {
-    const query = {
-      isRead: false,
-      $or: [
-        { userId: req.user.id || req.user._id },
-        { role: req.user.role }
-      ]
-    };
-    
-    if (req.user.propertyId) {
-      query.$or.push({ propertyId: req.user.propertyId, isRead: false });
+    const userRole = req.user.role;
+    const userId = req.user.id || req.user._id;
+    const propId = req.user.propertyId;
+
+    let query;
+    if (userRole === 'super-admin' || userRole === 'admin') {
+      query = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null] } },
+          { role: { $exists: false } }
+        ]
+      };
+    } else if (userRole === 'manager') {
+      query = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: 'manager' },
+          { role: 'admin' },
+          { role: null },
+          { role: { $exists: false } },
+          { propertyId: propId },
+          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
+          { propertyId: null },
+          { propertyId: { $exists: false } }
+        ]
+      };
+    } else if (userRole === 'receptionist') {
+      query = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: 'receptionist' },
+          { role: null },
+          { role: { $exists: false } },
+          { propertyId: propId },
+          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' }
+        ]
+      };
+    } else {
+      query = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: userRole }
+        ]
+      };
     }
 
-    const list = await Notification.find(query);
-    return res.status(200).json({ success: true, unreadCount: list.length });
+    const count = await Notification.countDocuments(query);
+    return res.status(200).json({ success: true, unreadCount: count });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -119,7 +198,8 @@ router.post('/:id/read', protect, async (req, res) => {
   try {
     const updated = await Notification.findByIdAndUpdate(
       req.params.id,
-      { isRead: true }
+      { isRead: true },
+      { new: true }
     );
     if (!updated) {
       return res.status(404).json({ success: false, message: 'Notification not found' });
@@ -133,16 +213,35 @@ router.post('/:id/read', protect, async (req, res) => {
 // 4. Mark all as read
 router.post('/read-all', protect, async (req, res) => {
   try {
-    const filter = {
-      isRead: false,
-      $or: [
-        { userId: req.user.id || req.user._id },
-        { role: req.user.role }
-      ]
-    };
-    
-    if (req.user.propertyId) {
-      filter.$or.push({ propertyId: req.user.propertyId, isRead: false });
+    const userRole = req.user.role;
+    const userId = req.user.id || req.user._id;
+    const propId = req.user.propertyId;
+
+    let filter;
+    if (userRole === 'super-admin' || userRole === 'admin') {
+      filter = { isRead: false };
+    } else if (userRole === 'manager') {
+      filter = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: 'manager' },
+          { role: 'admin' },
+          { role: null },
+          { role: { $exists: false } },
+          { propertyId: propId },
+          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' }
+        ]
+      };
+    } else {
+      filter = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: userRole }
+        ]
+      };
     }
 
     await Notification.updateMany(filter, { isRead: true });

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/payment_model.dart';
 import 'package:hour_stay_mobile/providers/manager/payment_provider.dart';
+import 'manager_record_payment_screen.dart';
 
 class ManagerPaymentsScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -112,16 +113,48 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
       appBar: widget.isEmbedded ? null : _buildAppBar(paymentProvider),
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: widget.isEmbedded ? 76 : 0),
-        child: FloatingActionButton.extended(
-          backgroundColor: purple,
-          foregroundColor: white,
-          elevation: 4,
-          icon: const Icon(Icons.add_rounded, size: 22),
-          label: const Text(
-            'Record Payment',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, letterSpacing: 0.2),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(80),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          onPressed: _showRecordPaymentDialog,
+          child: FloatingActionButton.extended(
+            backgroundColor: navy,
+            foregroundColor: white,
+            elevation: 0,
+            highlightElevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: Color(0xFFF5C06A), width: 1.5),
+            ),
+            icon: const Icon(Icons.add_circle_rounded, size: 20, color: gold),
+            label: const Row(
+              children: [
+                Text(
+                  'Record Payment',
+                  style: TextStyle(
+                    color: white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
+              ],
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ManagerRecordPaymentScreen()),
+              );
+            },
+          ),
         ),
       ),
       body: RefreshIndicator(
@@ -133,41 +166,25 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
           slivers: [
             // Top embedded title if embedded
             if (widget.isEmbedded)
-              SliverToBoxAdapter(
+              const SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Payments & Folios',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: navy,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Real-time financial transactions ledger',
-                            style: TextStyle(fontSize: 13, color: muted.withAlpha(220)),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        onPressed: () => paymentProvider.fetchPayments(),
-                        icon: const Icon(Icons.refresh_rounded, color: navy),
-                        style: IconButton.styleFrom(
-                          backgroundColor: white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: cardBorder),
-                          ),
+                      Text(
+                        'Payments & Folios',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: navy,
+                          letterSpacing: -0.5,
                         ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Real-time financial transactions ledger',
+                        style: TextStyle(fontSize: 13, color: muted),
                       ),
                     ],
                   ),
@@ -264,187 +281,177 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
     return AppBar(
       backgroundColor: navy,
       elevation: 0,
-      title: const Text(
-        'Payments Ledger',
-        style: TextStyle(color: white, fontWeight: FontWeight.w700, fontSize: 18),
-      ),
+      scrolledUnderElevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: white, size: 20),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
         onPressed: () => Navigator.of(context).maybePop(),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: gold),
-          tooltip: 'Refresh Payments',
-          onPressed: () => provider.fetchPayments(),
+      title: const Text(
+        'Payments Ledger',
+        style: TextStyle(
+          color: white,
+          fontWeight: FontWeight.w800,
+          fontSize: 16,
+          letterSpacing: -0.2,
         ),
-        const SizedBox(width: 8),
-      ],
+      ),
     );
   }
 
-  // 4 Modern Summary Cards in a scrollable horizontal carousel
+  // 4 Modern Summary Cards in a single row across screen
   Widget _buildSummaryMetrics(PaymentProvider provider) {
     final totalAmount = provider.totalPaymentsAmount;
-    final totalCount = provider.payments.length;
-
     final settledAmount = provider.settledTotal;
-    final settledCount = provider.settledCount;
-
     final pendingAmount = provider.pendingTotal;
-    final pendingCount = provider.pendingCount;
-
     final refundedAmount = provider.refundedTotal;
-    final refundedCount = provider.refundedCount;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    String fmt(double amount) {
+      if (amount >= 100000) return '₹${(amount / 100000).toStringAsFixed(1)}L';
+      if (amount >= 1000) return '₹${(amount / 1000).toStringAsFixed(1)}k';
+      return '₹${amount.toStringAsFixed(0)}';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
         children: [
-          // 1. Total Payments Card (Deep Navy & Gold Accent)
-          _buildMetricCard(
-            title: 'Total Payments',
-            amount: totalAmount,
-            count: totalCount,
-            countLabel: 'transactions',
-            icon: Icons.account_balance_wallet_rounded,
-            primaryColor: navy,
-            secondaryColor: gold,
-            isDark: true,
+          // 1. Total Payments Card
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Total',
+              value: fmt(totalAmount),
+              subtitle: 'Revenue',
+              icon: Icons.account_balance_wallet_rounded,
+              color: navy,
+              bgColor: cream,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
 
           // 2. Successful / Settled (Emerald Green)
-          _buildMetricCard(
-            title: 'Successful',
-            amount: settledAmount,
-            count: settledCount,
-            countLabel: 'settled',
-            icon: Icons.check_circle_rounded,
-            primaryColor: emerald,
-            secondaryColor: emeraldBg,
-            isDark: false,
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Settled',
+              value: fmt(settledAmount),
+              subtitle: 'Paid',
+              icon: Icons.check_circle_rounded,
+              color: emerald,
+              bgColor: emeraldBg,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
 
           // 3. Pending (Amber / Gold)
-          _buildMetricCard(
-            title: 'Pending',
-            amount: pendingAmount,
-            count: pendingCount,
-            countLabel: 'awaiting',
-            icon: Icons.schedule_rounded,
-            primaryColor: amber,
-            secondaryColor: amberBg,
-            isDark: false,
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Pending',
+              value: fmt(pendingAmount),
+              subtitle: 'Due',
+              icon: Icons.schedule_rounded,
+              color: amber,
+              bgColor: amberBg,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
 
           // 4. Refunded (Ruby Red)
-          _buildMetricCard(
-            title: 'Refunded',
-            amount: refundedAmount,
-            count: refundedCount,
-            countLabel: 'refunds',
-            icon: Icons.replay_rounded,
-            primaryColor: ruby,
-            secondaryColor: rubyBg,
-            isDark: false,
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Refunds',
+              value: fmt(refundedAmount),
+              subtitle: 'Returned',
+              icon: Icons.replay_rounded,
+              color: ruby,
+              bgColor: rubyBg,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCard({
-    required String title,
-    required double amount,
-    required int count,
-    required String countLabel,
+  Widget _buildMiniMetric({
+    required String label,
+    required String value,
+    required String subtitle,
     required IconData icon,
-    required Color primaryColor,
-    required Color secondaryColor,
-    required bool isDark,
+    required Color color,
+    required Color bgColor,
   }) {
     return Container(
-      width: 200,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? navy : white,
-        borderRadius: BorderRadius.circular(16),
+        color: bgColor.withAlpha(120),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? navyLight : cardBorder,
-          width: 1.2,
+          color: color.withAlpha(60),
+          width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 25 : 8),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withAlpha(4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? white.withAlpha(210) : muted,
-                ),
-              ),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(3.5),
                 decoration: BoxDecoration(
-                  color: isDark ? navyLight : secondaryColor,
-                  borderRadius: BorderRadius.circular(8),
+                  color: white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: isDark ? gold : primaryColor,
+                child: Icon(icon, size: 11, color: color),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            Formatters.currency(amount),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: isDark ? gold : navy,
-              letterSpacing: -0.3,
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: color == navy ? navy : color,
+                letterSpacing: -0.3,
+                height: 1.0,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: isDark ? gold : primaryColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '$count $countLabel',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? white.withAlpha(180) : muted,
-                ),
-              ),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
           ),
         ],
       ),
@@ -460,7 +467,7 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(6),
-            blurRadius: 6,
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -468,11 +475,19 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (val) => setState(() => _searchQuery = val),
-        style: const TextStyle(fontSize: 14, color: navy),
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: navy,
+        ),
         decoration: InputDecoration(
           hintText: 'Search guest, booking ID, room...',
-          hintStyle: TextStyle(fontSize: 13, color: muted.withAlpha(180)),
-          prefixIcon: const Icon(Icons.search_rounded, color: muted, size: 20),
+          hintStyle: TextStyle(
+            fontSize: 12,
+            color: muted.withAlpha(180),
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 20),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18, color: muted),
@@ -885,13 +900,37 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: navy,
-                foregroundColor: gold,
+                foregroundColor: white,
+                elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: Color(0xFFF5C06A), width: 1.5),
+                ),
               ),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Record First Payment', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: _showRecordPaymentDialog,
+              icon: const Icon(Icons.add_circle_rounded, size: 18, color: gold),
+              label: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Record First Payment',
+                    style: TextStyle(
+                      color: white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
+                ],
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ManagerRecordPaymentScreen(),
+                ),
+              ),
             ),
           ],
         ),
@@ -1104,180 +1143,7 @@ class _ManagerPaymentsScreenState extends State<ManagerPaymentsScreen> {
     }
   }
 
-  void _showRecordPaymentDialog() {
-    final guestCtrl = TextEditingController();
-    final bookingCtrl = TextEditingController();
-    final roomCtrl = TextEditingController(text: '101');
-    final amountCtrl = TextEditingController();
-    String selectedMethod = 'UPI';
-    String selectedStatus = 'Settled';
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Row(
-                children: [
-                  Icon(Icons.add_card_rounded, color: purple),
-                  SizedBox(width: 10),
-                  Text(
-                    'Record Payment',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: navy),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: guestCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Guest Name *',
-                        labelStyle: const TextStyle(color: muted, fontSize: 13),
-                        prefixIcon: const Icon(Icons.person_outline_rounded, color: purple, size: 20),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: purple, width: 1.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: bookingCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Booking Reference (Optional)',
-                        labelStyle: const TextStyle(color: muted, fontSize: 13),
-                        prefixIcon: const Icon(Icons.bookmark_outline_rounded, color: purple, size: 20),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: purple, width: 1.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: roomCtrl,
-                            decoration: InputDecoration(
-                              labelText: 'Room No.',
-                              labelStyle: const TextStyle(color: muted, fontSize: 13),
-                              prefixIcon: const Icon(Icons.hotel_rounded, color: purple, size: 20),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: purple, width: 1.5)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: amountCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: InputDecoration(
-                              labelText: 'Amount (₹) *',
-                              labelStyle: const TextStyle(color: muted, fontSize: 13),
-                              prefixIcon: const Icon(Icons.currency_rupee_rounded, color: emerald, size: 20),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: purple, width: 1.5)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedMethod,
-                      decoration: InputDecoration(
-                        labelText: 'Payment Method',
-                        labelStyle: const TextStyle(color: muted, fontSize: 13),
-                        prefixIcon: const Icon(Icons.payment_rounded, color: purple, size: 20),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: purple, width: 1.5)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'UPI', child: Text('UPI / QR')),
-                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                        DropdownMenuItem(value: 'Credit Card', child: Text('Credit Card')),
-                        DropdownMenuItem(value: 'Debit Card', child: Text('Debit Card')),
-                        DropdownMenuItem(value: 'Net Banking', child: Text('Net Banking')),
-                      ],
-                      onChanged: (v) => setDialogState(() => selectedMethod = v ?? 'UPI'),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedStatus,
-                      decoration: InputDecoration(
-                        labelText: 'Status',
-                        labelStyle: const TextStyle(color: muted, fontSize: 13),
-                        prefixIcon: const Icon(Icons.flag_rounded, color: purple, size: 20),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: cardBorder)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: purple, width: 1.5)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Settled', child: Text('Settled / Completed')),
-                        DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                      ],
-                      onChanged: (v) => setDialogState(() => selectedStatus = v ?? 'Settled'),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel', style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: purple,
-                    foregroundColor: white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () async {
-                    final guest = guestCtrl.text.trim();
-                    final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
-                    final messenger = ScaffoldMessenger.of(context);
-                    if (guest.isEmpty || amount <= 0) {
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('Please enter a valid guest name and amount'), backgroundColor: ruby),
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(ctx);
-                    final payProvider = context.read<PaymentProvider>();
-                    final ok = await payProvider.logPayment({
-                      'guestName': guest,
-                      'bookingId': bookingCtrl.text.trim(),
-                      'roomNumber': roomCtrl.text.trim(),
-                      'amount': amount,
-                      'paymentMethod': selectedMethod,
-                      'status': selectedStatus,
-                    });
-
-                    if (ok && mounted) {
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('Payment transaction recorded successfully!'), backgroundColor: emerald),
-                      );
-                    }
-                  },
-                  child: const Text('Record Payment', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 
   void _confirmDeletePayment(PaymentModel p) async {
     final confirm = await showDialog<bool>(

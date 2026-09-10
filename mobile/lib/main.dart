@@ -19,6 +19,7 @@ import 'screens/role_gate.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/socket_service.dart';
 import 'services/storage_service.dart';
@@ -29,15 +30,20 @@ void main() async {
   // Initialize Firebase & Notification Service (FCM)
   await NotificationService.initialize();
 
-  // Load custom server URL if previously configured (ignore stale localhost/127.0.0.1)
-  final savedUrl = await StorageService.getBaseUrl();
-  if (savedUrl != null && savedUrl.isNotEmpty && !savedUrl.contains('127.0.0.1')) {
-    ApiEndpoints.setBaseUrl(savedUrl);
+  // Dynamically probe and connect to reachable HMS backend
+  final workingUrl = await ApiService.probeFastWorkingBaseUrl();
+  if (workingUrl != null) {
+    debugPrint('🚀 [APP LAUNCH] Connected to active HMS Backend: $workingUrl');
   } else {
-    final defaultApi = ApiEndpoints.getDefaultBaseUrl();
-    ApiEndpoints.setBaseUrl(defaultApi);
-    await StorageService.saveBaseUrl(defaultApi);
-    await StorageService.saveSocketUrl(ApiEndpoints.getDefaultSocketUrl(defaultApi));
+    final savedUrl = await StorageService.getBaseUrl();
+    if (savedUrl != null && savedUrl.isNotEmpty && !savedUrl.contains('192.168.1.14')) {
+      ApiEndpoints.setBaseUrl(savedUrl);
+    } else {
+      final defaultApi = ApiEndpoints.getDefaultBaseUrl();
+      ApiEndpoints.setBaseUrl(defaultApi);
+      await StorageService.saveBaseUrl(defaultApi);
+      await StorageService.saveSocketUrl(ApiEndpoints.getDefaultSocketUrl(defaultApi));
+    }
   }
 
   // Initialize socket
@@ -68,6 +74,7 @@ class HourStayApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GuestNotificationProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: rootNavigatorKey,
         title: 'Hour Stay',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,

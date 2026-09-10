@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/notification_model.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
+import '../../services/notification_service.dart';
 import '../../core/constants/api_endpoints.dart';
 
 class ManagerNotificationProvider with ChangeNotifier {
@@ -9,6 +11,8 @@ class ManagerNotificationProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String _selectedCategory = 'All';
+  StreamSubscription? _fcmForegroundSub;
+  StreamSubscription? _fcmTapSub;
 
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -31,13 +35,38 @@ class ManagerNotificationProvider with ChangeNotifier {
 
   ManagerNotificationProvider() {
     _registerSocketListeners();
+    _registerFcmListeners();
   }
 
   void _registerSocketListeners() {
     SocketService.on('notification_received', (_) => fetchNotifications(silent: true));
+    SocketService.on('notification_created', (_) => fetchNotifications(silent: true));
     SocketService.on('new_notification', (_) => fetchNotifications(silent: true));
-    SocketService.on('dashboard_sync', (_) => fetchNotifications(silent: true));
     SocketService.on('manager_notification', (_) => fetchNotifications(silent: true));
+    SocketService.on('unread_notifications_count_updated', (_) => fetchNotifications(silent: true));
+    SocketService.on('dashboard_sync', (_) => fetchNotifications(silent: true));
+    SocketService.on('feedback_received', (_) => fetchNotifications(silent: true));
+    SocketService.on('feedback_created', (_) => fetchNotifications(silent: true));
+    SocketService.on('approval_created', (_) => fetchNotifications(silent: true));
+    SocketService.on('booking_created', (_) => fetchNotifications(silent: true));
+    SocketService.on('booking_updated', (_) => fetchNotifications(silent: true));
+    SocketService.on('reservation_created', (_) => fetchNotifications(silent: true));
+  }
+
+  void _registerFcmListeners() {
+    _fcmForegroundSub = NotificationService.onForegroundMessage.listen((_) {
+      fetchNotifications(silent: true);
+    });
+    _fcmTapSub = NotificationService.onNotificationTap.listen((_) {
+      fetchNotifications(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _fcmForegroundSub?.cancel();
+    _fcmTapSub?.cancel();
+    super.dispose();
   }
 
   void setCategory(String category) {

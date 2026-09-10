@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import User from '../models/user.model.js';
 import Booking from '../models/booking.model.js';
 import Property from '../models/property.model.js';
+import Notification from '../models/notification.model.js';
 import {
   Room,
   Shift,
@@ -18,7 +19,7 @@ import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitt
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
-import { triggerNotification } from '../utils/notification.helper.js';
+import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -73,13 +74,32 @@ const seedDefaultAttendance = async (propertyId, staffMembers) => {
     
     dates.forEach(date => {
       staffMembers.forEach((s, idx) => {
+        const shiftStr = (s.shift || '').toLowerCase();
+        let checkIn = "09:00";
+        let checkOut = "18:00";
+        let workingHours = 9;
+
+        if (shiftStr.includes('morning')) {
+          checkIn = "06:00";
+          checkOut = "14:00";
+          workingHours = 8;
+        } else if (shiftStr.includes('afternoon') || shiftStr.includes('evening')) {
+          checkIn = "14:00";
+          checkOut = "22:00";
+          workingHours = 8;
+        } else if (shiftStr.includes('night')) {
+          checkIn = "22:00";
+          checkOut = "06:00";
+          workingHours = 8;
+        }
+
         defaultAttendance.push({
           userId: s._id || s.id,
           username: s.name,
           date,
-          checkIn: idx % 3 === 0 ? "06:00" : idx % 3 === 1 ? "14:00" : "22:00",
-          checkOut: idx % 3 === 0 ? "14:00" : idx % 3 === 1 ? "22:00" : "06:00",
-          workingHours: 8,
+          checkIn,
+          checkOut,
+          workingHours,
           status: idx % 4 === 3 ? 'Absent' : 'Present',
           propertyId
         });
@@ -239,7 +259,7 @@ router.get('/reservations', async (req, res) => {
     const propId = req.user?.propertyId;
     let query = {};
     if (req.user?.role !== 'super-admin' && propId) {
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] };
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
     }
     const bookings = await Booking.find(query).sort({ createdAt: -1 });
     return sendSuccess(res, 200, bookings, 'Property reservations retrieved.');
@@ -317,6 +337,14 @@ router.post('/reservations', async (req, res) => {
       }
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'booking_created' });
     }
+
+    // Trigger Unified Notifications across Web & Mobile consoles
+    await notifyBookingEvent({
+      req,
+      io,
+      action: 'created',
+      booking: newBooking
+    });
 
     return sendSuccess(res, 201, newBooking, 'Reservation created successfully');
   } catch (err) {
@@ -1161,6 +1189,69 @@ router.get('/attendance', async (req, res) => {
   }
 });
 
+router.post('/attendance', async (req, res) => {
+  try {
+    const { userId, username, date, checkIn, checkOut, workingHours, status } = req.body;
+    if (!userId || !date) {
+      return sendError(res, 400, 'userId and date are required.');
+    }
+    const propId = req.user?.propertyId || 'HS-JAI';
+    const record = await Attendance.create({
+      userId: String(userId),
+      username: username || 'Staff Member',
+      date,
+      checkIn: checkIn || '--:--',
+      checkOut: checkOut || '--:--',
+      workingHours: Number(workingHours) || 8,
+      status: status || 'Present',
+      propertyId: propId
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'attendance_updated', { record, propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'attendance_created' });
+    }
+
+    return sendSuccess(res, 201, record, 'Attendance record logged successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.put('/attendance/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { checkIn, checkOut, workingHours, status } = req.body;
+    const propId = req.user?.propertyId || 'HS-JAI';
+
+    const query = [{ id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+
+    const updated = await Attendance.findOneAndUpdate(
+      { $or: query, propertyId: propId },
+      { checkIn, checkOut, workingHours: Number(workingHours) || 8, status },
+      { new: true }
+    );
+
+    if (!updated) {
+      return sendError(res, 404, 'Attendance record not found.');
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'attendance_updated', { record: updated, propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'attendance_updated' });
+    }
+
+    return sendSuccess(res, 200, updated, 'Attendance record updated successfully.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 // ==========================================
 // 8. GUEST FEEDBACK / REVIEWS
 // ==========================================
@@ -1393,11 +1484,16 @@ const ensureRealPayments = async (propId) => {
         ? 'Settled'
         : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
 
-      const isObjectId = mongoose.Types.ObjectId.isValid(bId) && String(new mongoose.Types.ObjectId(bId)) === String(bId);
-      const query = isObjectId ? { $or: [{ bookingId: bId }, { _id: bId }] } : { bookingId: bId };
-      const existing = await Payment.findOne(query);
+      const query = {
+        $or: [
+          { bookingId: bId },
+          ...(b.bookingId ? [{ bookingId: b.bookingId }] : []),
+          { guestName: guestName, roomNumber: roomNumber }
+        ]
+      };
+      const existingList = await Payment.find(query);
 
-      if (!existing) {
+      if (!existingList || existingList.length === 0) {
         await Payment.create({
           bookingId: bId,
           guestName,
@@ -1409,12 +1505,22 @@ const ensureRealPayments = async (propId) => {
           createdAt: b.createdAt || new Date()
         });
       } else {
+        const existing = existingList[0];
+        // Clean up duplicate payment records if any
+        if (existingList.length > 1) {
+          for (let i = 1; i < existingList.length; i++) {
+            await Payment.findByIdAndDelete(existingList[i]._id);
+          }
+        }
         let needsUpdate = false;
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
-        if (paymentMethod && existing.paymentMethod !== paymentMethod) { existing.paymentMethod = paymentMethod; needsUpdate = true; }
+        if (b.createdAt && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(b.createdAt).getTime()) > 1000) {
+          existing.createdAt = b.createdAt;
+          needsUpdate = true;
+        }
         if (needsUpdate) await existing.save();
       }
     }
@@ -1428,7 +1534,7 @@ router.get('/payments', async (req, res) => {
     const propId = req.user?.propertyId || 'HS-9HQ8P';
     await ensureRealPayments(propId);
     let payments = await Payment.find({
-      $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }]
+      $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }]
     }).sort({ createdAt: -1 });
     if (!payments || payments.length === 0) {
       payments = await Payment.find({}).sort({ createdAt: -1 });
@@ -1536,9 +1642,71 @@ router.delete('/payments/:id', async (req, res) => {
 // ==========================================
 router.get('/notifications', async (req, res) => {
   try {
-    await seedDefaultNotifications(req.user.propertyId);
-    const list = await ManagerNotification.find({ propertyId: req.user.propertyId }).sort({ createdAt: -1 });
-    return sendSuccess(res, 200, list, 'Manager system alerts feed logs retrieved.');
+    const propertyId = req.user.propertyId || 'HS-JAI';
+    await seedDefaultNotifications(propertyId);
+
+    // Fetch from both Notification and ManagerNotification with fallback property coverage
+    const propQuery = [
+      { propertyId },
+      { propertyId: 'HS-JAI' },
+      { propertyId: 'HS-9HQ8P' },
+      { propertyId: { $exists: false } },
+      { propertyId: null },
+      { propertyId: '' },
+      { role: 'manager' },
+      { role: 'admin' },
+      { userId: req.user.id || req.user._id }
+    ];
+
+    const [standardList, managerList] = await Promise.all([
+      Notification.find({ $or: propQuery }),
+      ManagerNotification.find({
+        $or: [
+          { propertyId },
+          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
+          { propertyId: { $exists: false } },
+          { propertyId: null },
+          { propertyId: '' }
+        ]
+      })
+    ]);
+
+    // Map and merge
+    const itemsMap = new Map();
+    const normalize = (it) => {
+      const id = it._id ? String(it._id) : (it.id ? String(it.id) : '');
+      const key = `${it.title}_${it.message}_${it.createdAt ? new Date(it.createdAt).getTime() : ''}`;
+      return {
+        id,
+        _id: id,
+        title: it.title,
+        message: it.message,
+        category: it.category || 'General',
+        isRead: Boolean(it.isRead),
+        propertyId: it.propertyId || propertyId,
+        createdAt: it.createdAt || new Date().toISOString(),
+        updatedAt: it.updatedAt || new Date().toISOString(),
+        _dedupKey: key
+      };
+    };
+
+    for (const it of standardList || []) {
+      const norm = normalize(it);
+      itemsMap.set(norm.id || norm._dedupKey, norm);
+    }
+    for (const it of managerList || []) {
+      const norm = normalize(it);
+      if (!itemsMap.has(norm.id) && !itemsMap.has(norm._dedupKey)) {
+        itemsMap.set(norm.id || norm._dedupKey, norm);
+      }
+    }
+
+    const mergedList = Array.from(itemsMap.values()).sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return sendSuccess(res, 200, mergedList, 'Manager system alerts feed logs retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -1546,15 +1714,24 @@ router.get('/notifications', async (req, res) => {
 
 router.post('/notifications/:id/read', async (req, res) => {
   try {
-    const updated = await ManagerNotification.findOneAndUpdate(
-      { _id: req.params.id, propertyId: req.user.propertyId },
-      { isRead: true },
-      { new: true }
-    );
-    if (!updated) {
-      return sendError(res, 404, 'Alert message not found.');
-    }
-    return sendSuccess(res, 200, updated, 'Notification marked as read.');
+    const id = req.params.id;
+    const propertyId = req.user.propertyId || 'HS-JAI';
+
+    const [updated1, updated2] = await Promise.all([
+      ManagerNotification.findOneAndUpdate(
+        { _id: id, propertyId },
+        { isRead: true },
+        { new: true }
+      ).catch(() => null),
+      Notification.findByIdAndUpdate(
+        id,
+        { isRead: true },
+        { new: true }
+      ).catch(() => null)
+    ]);
+
+    const updated = updated1 || updated2;
+    return sendSuccess(res, 200, updated || { id, isRead: true }, 'Notification marked as read.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -1562,15 +1739,24 @@ router.post('/notifications/:id/read', async (req, res) => {
 
 router.post('/notifications/:id/unread', async (req, res) => {
   try {
-    const updated = await ManagerNotification.findOneAndUpdate(
-      { _id: req.params.id, propertyId: req.user.propertyId },
-      { isRead: false },
-      { new: true }
-    );
-    if (!updated) {
-      return sendError(res, 404, 'Alert message not found.');
-    }
-    return sendSuccess(res, 200, updated, 'Notification marked as unread.');
+    const id = req.params.id;
+    const propertyId = req.user.propertyId || 'HS-JAI';
+
+    const [updated1, updated2] = await Promise.all([
+      ManagerNotification.findOneAndUpdate(
+        { _id: id, propertyId },
+        { isRead: false },
+        { new: true }
+      ).catch(() => null),
+      Notification.findByIdAndUpdate(
+        id,
+        { isRead: false },
+        { new: true }
+      ).catch(() => null)
+    ]);
+
+    const updated = updated1 || updated2;
+    return sendSuccess(res, 200, updated || { id, isRead: false }, 'Notification marked as unread.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -1578,10 +1764,24 @@ router.post('/notifications/:id/unread', async (req, res) => {
 
 router.post('/notifications/read-all', async (req, res) => {
   try {
-    await ManagerNotification.updateMany(
-      { propertyId: req.user.propertyId, isRead: false },
-      { isRead: true }
-    );
+    const propertyId = req.user.propertyId || 'HS-JAI';
+    await Promise.all([
+      ManagerNotification.updateMany(
+        { propertyId, isRead: false },
+        { isRead: true }
+      ).catch(() => null),
+      Notification.updateMany(
+        {
+          isRead: false,
+          $or: [
+            { propertyId },
+            { role: 'manager', propertyId },
+            { userId: req.user.id || req.user._id }
+          ]
+        },
+        { isRead: true }
+      ).catch(() => null)
+    ]);
     return sendSuccess(res, 200, null, 'All notifications marked as read.');
   } catch (err) {
     return sendError(res, 500, err.message);

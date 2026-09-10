@@ -6,11 +6,11 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import Booking from '../models/booking.model.js';
 import User from '../models/user.model.js';
-import { Room, ContactMessage, Feedback } from '../models/managerData.model.js';
+import { Room, ContactMessage, Feedback, Payment } from '../models/managerData.model.js';
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import Coupon from '../models/coupon.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
-import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
+import { triggerNotification, notifyFeedbackEvent, notifyBookingEvent } from '../utils/notification.helper.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { calculateStayNights, parseDateSafe } from '../utils/dateUtils.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
@@ -490,15 +490,35 @@ router.post('/bookings', async (req, res) => {
       rooms: Number(roomsCount) || 1,
       adults: Number(adults) || 2,
       children: Number(children) || 0,
-      originalAmount: amt,
-      couponCode: appliedCoupon ? appliedCoupon.code : null,
-      discountAmount: discountAmount,
-      amount: finalAmount,
-      totalAmount: finalAmount,
+      originalAmount: Number(req.body.originalAmount || amt),
+      couponCode: appliedCoupon ? appliedCoupon.code : (req.body.couponCode || null),
+      discountAmount: discountAmount || Number(req.body.discountAmount || 0),
+      amount: Number(req.body.originalAmount || amt),
+      totalAmount: Number(req.body.originalAmount || amt),
+      netAmount: finalAmount,
+      paidAmount: Number(req.body.originalAmount || amt),
       specialRequests: specialRequests || '',
       source: 'Website Direct',
       status: 'Confirmed'
     });
+
+    // Automatically log verified payment in ledger for real-time manager/receptionist consoles
+    let newPayment = null;
+    try {
+      const paymentAmount = Number(newBooking.totalAmount || newBooking.amount || amt);
+      newPayment = await Payment.create({
+        bookingId: newBooking.bookingId,
+        guestName: gName,
+        roomNumber: assignedRoomNumber ? String(assignedRoomNumber) : '101',
+        amount: paymentAmount,
+        paymentMethod: req.body.paymentMethod || 'UPI',
+        status: 'Settled',
+        propertyId: targetPropId,
+        createdAt: newBooking.createdAt || new Date()
+      });
+    } catch (payErr) {
+      console.error('Error auto-creating payment ledger for booking:', payErr.message);
+    }
 
     // Mark assigned room as Reserved in MongoDB
     if (assignedRoomNumber) {
@@ -515,6 +535,10 @@ router.post('/bookings', async (req, res) => {
         status: 'Confirmed'
       });
       emitRealtimeSync(io, targetPropId, 'booking_created', { booking: newBooking, propertyId: targetPropId });
+      if (newPayment) {
+        emitRealtimeSync(io, targetPropId, 'payment_logged', { payment: newPayment, propertyId: targetPropId });
+        emitRealtimeSync(io, targetPropId, 'payment_added', { payment: newPayment, propertyId: targetPropId });
+      }
       if (assignedRoomNumber) {
         emitRealtimeSync(io, targetPropId, 'room_status_changed', { propertyId: targetPropId, roomNumber: assignedRoomNumber, status: 'Reserved' });
         emitRealtimeSync(io, targetPropId, 'availability_changed', { propertyId: targetPropId, roomNumber: assignedRoomNumber });
@@ -522,25 +546,15 @@ router.post('/bookings', async (req, res) => {
       emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'booking_created' });
     }
 
-    // Trigger Notifications
-    await triggerNotification({
+    // Trigger Unified Notifications across Web & Mobile consoles
+    await notifyBookingEvent({
       req,
-      propertyId: targetPropId,
-      title: 'New Online Reservation',
-      message: `Guest ${gName} booked ${rType || 'Room'} (${checkIn} → ${checkOut}) for ₹${amt}.`,
-      category: 'New Reservation'
+      io,
+      action: 'created',
+      booking: newBooking,
+      guestUser,
+      property: targetPropObj
     });
-
-    if (guestUser) {
-      await triggerNotification({
-        req,
-        userId: guestUser._id || guestUser.id,
-        role: 'guest',
-        title: 'Booking Confirmed!',
-        message: `Your reservation at ${targetPropObj?.settings?.hotelName || targetPropObj?.name || 'Speshway Luxury Hotel'} is confirmed for ${checkIn} - ${checkOut}. Ref: #${newBooking.bookingId || newBooking._id}`,
-        category: 'Booking Confirmation'
-      });
-    }
 
     // Generate JWT token for guest
     const token = guestUser ? jwt.sign({ id: guestUser._id || guestUser.id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' }) : null;

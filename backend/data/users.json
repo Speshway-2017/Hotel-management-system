@@ -45,11 +45,13 @@
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
-    "idDocNumber": "",
+    "idDocNumber": "2355 4563 7654",
     "loyaltyPoints": 0,
     "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-09-04T06:47:43.786Z",
-    "updatedAt": "2026-09-04T06:47:43.812Z"
+    "updatedAt": "2026-09-10T11:37:15.820Z"
   },
   {
     "id": "6a99315b257a3b6f61660171",
@@ -651,7 +653,7 @@
       "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
     ],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-09T12:11:31.893Z"
+    "updatedAt": "2026-09-10T12:04:40.686Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -806,8 +808,10 @@
     "idDocNumber": "4356 6777 8788",
     "loyaltyPoints": 0,
     "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-08T11:55:47.128Z"
+    "updatedAt": "2026-09-10T11:53:42.069Z"
   },
   {
     "id": "omk6dktv7lj",

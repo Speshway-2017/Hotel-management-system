@@ -19,7 +19,7 @@ const SHIFT_TIMINGS = {
   "Morning Shift": { start: "06:00 AM", end: "02:00 PM" },
   "Afternoon Shift": { start: "02:00 PM", end: "10:00 PM" },
   "Night Shift": { start: "10:00 PM", end: "06:00 AM" },
-  "General Shift": { start: "09:00 AM", end: "05:00 PM" }
+  "General Shift": { start: "09:00 AM", end: "06:00 PM" }
 };
 
 function ManagerViewAttendance() {

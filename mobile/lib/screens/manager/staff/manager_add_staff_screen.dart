@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:hour_stay_mobile/core/constants/app_colors.dart';
 import 'package:hour_stay_mobile/providers/manager/staff_provider.dart';
-import 'package:hour_stay_mobile/widgets/custom_button.dart';
 import 'package:hour_stay_mobile/widgets/custom_text_field.dart';
 
 class ManagerAddStaffScreen extends StatefulWidget {
@@ -13,19 +11,34 @@ class ManagerAddStaffScreen extends StatefulWidget {
 }
 
 class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
+  // Hour Stay Theme Tokens
+  static const Color navy = Color(0xFF0D1B2A);
+  static const Color gold = Color(0xFFF5C06A);
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color background = Color(0xFFF8FAFC);
+  static const Color cardBorder = Color(0xFFE2E8F0);
+  static const Color emerald = Color(0xFF10B981);
+  static const Color ruby = Color(0xFFEF4444);
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  String _selectedRole = 'housekeeping';
-  String _selectedDepartment = 'Housekeeping';
-  String _selectedShift = 'morning';
+  String _selectedRole = 'receptionist';
+  String _selectedDepartment = 'Front Desk';
+  String _selectedShift = 'General Shift';
 
   final List<String> _roles = ['manager', 'receptionist', 'housekeeping', 'maintenance', 'security', 'kitchen'];
-  final List<String> _departments = ['Management', 'Front Desk', 'Housekeeping', 'Maintenance', 'Security', 'Food & Beverage'];
-  final List<String> _shifts = ['morning', 'evening', 'night', 'rotational'];
+  final List<String> _departments = ['Front Desk', 'Housekeeping', 'Management', 'Maintenance', 'Security', 'Food & Beverage'];
+  final List<Map<String, String>> _shifts = [
+    {'value': 'General Shift', 'label': 'General Shift (09:00 AM – 06:00 PM)'},
+    {'value': 'Morning Shift', 'label': 'Morning Shift (06:00 AM – 02:00 PM)'},
+    {'value': 'Evening Shift', 'label': 'Evening Shift (02:00 PM – 10:00 PM)'},
+    {'value': 'Night Shift', 'label': 'Night Shift (10:00 PM – 06:00 AM)'},
+    {'value': 'Rotational Shift', 'label': 'Rotational Shift (Flexible Hours)'},
+  ];
 
   @override
   void dispose() {
@@ -55,12 +68,18 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
 
     if (success && mounted) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Staff member created successfully!'), backgroundColor: AppColors.success),
+        const SnackBar(
+          content: Text('Staff profile registered successfully!'),
+          backgroundColor: emerald,
+        ),
       );
       navigator.pop();
     } else if (mounted) {
       messenger.showSnackBar(
-        SnackBar(content: Text(provider.errorMessage ?? 'Failed to add staff member'), backgroundColor: AppColors.error),
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Failed to add staff member'),
+          backgroundColor: ruby,
+        ),
       );
     }
   }
@@ -70,16 +89,25 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
     final staffProvider = context.watch<StaffProvider>();
 
     return Scaffold(
+      backgroundColor: background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1B2A),
-        foregroundColor: Colors.white,
+        backgroundColor: navy,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
           tooltip: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text(
+          'Add Staff Member',
+          style: TextStyle(
+            color: white,
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            letterSpacing: -0.2,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -88,87 +116,165 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CustomTextField(
-                controller: _nameController,
-                label: 'Staff Full Name',
-                hint: 'e.g. Alex Morgan',
-                prefixIcon: Icons.person_outline,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Name required' : null,
-              ),
-              const SizedBox(height: 14),
-              CustomTextField(
-                controller: _emailController,
-                label: 'Email Address',
-                hint: 'alex@hotel.com',
-                prefixIcon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Email required' : null,
-              ),
-              const SizedBox(height: 14),
-              CustomTextField(
-                controller: _phoneController,
-                label: 'Phone Number',
-                hint: '+123456789',
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 14),
-              CustomTextField(
-                controller: _passwordController,
-                label: 'Initial Password',
-                hint: 'Min. 6 chars',
-                prefixIcon: Icons.lock_outline,
-                obscureText: true,
-                validator: (v) => v == null || v.length < 6 ? 'Password min 6 chars' : null,
+              // Personal Information Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Personal Information',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: navy),
+                    ),
+                    const SizedBox(height: 14),
+                    CustomTextField(
+                      controller: _nameController,
+                      label: 'Staff Full Name',
+                      hint: 'e.g. Rahul Sharma',
+                      prefixIcon: Icons.person_outline_rounded,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Full name is required' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    CustomTextField(
+                      controller: _emailController,
+                      label: 'Work / Login Email',
+                      hint: 'rahul@hourstay.com',
+                      prefixIcon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    CustomTextField(
+                      controller: _phoneController,
+                      label: 'Mobile Phone Number',
+                      hint: '+91 98765 43210',
+                      prefixIcon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 14),
+                    CustomTextField(
+                      controller: _passwordController,
+                      label: 'Initial Account Password',
+                      hint: 'Min. 6 characters',
+                      prefixIcon: Icons.lock_outline_rounded,
+                      obscureText: true,
+                      validator: (v) => v == null || v.length < 6 ? 'Password must be at least 6 characters' : null,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
 
-              // Role selector
-              const Text('System Role', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedRole,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              // Role & Shift Allocation Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cardBorder),
                 ),
-                items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r.toUpperCase()))).toList(),
-                onChanged: (val) => setState(() => _selectedRole = val!),
-              ),
-              const SizedBox(height: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Role & Shift Assignment',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: navy),
+                    ),
+                    const SizedBox(height: 14),
 
-              // Department selector
-              const Text('Department', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedDepartment,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    // Role selector
+                    const Text('System Role', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: navy)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedRole,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r.toUpperCase()))).toList(),
+                      onChanged: (val) => setState(() => _selectedRole = val!),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Department selector
+                    const Text('Department', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: navy)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedDepartment,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: _departments.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      onChanged: (val) => setState(() => _selectedDepartment = val!),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Shift selector
+                    const Text('Assigned Shift Slot', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: navy)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedShift,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      items: _shifts.map((s) => DropdownMenuItem(
+                        value: s['value']!,
+                        child: Text(s['label']!, style: const TextStyle(fontSize: 12.5), overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: (val) => setState(() => _selectedShift = val!),
+                    ),
+                  ],
                 ),
-                items: _departments.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                onChanged: (val) => setState(() => _selectedDepartment = val!),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              // Shift selector
-              const Text('Assigned Shift', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedShift,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: staffProvider.isLoading ? null : _handleSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: navy,
+                    foregroundColor: white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(color: Color(0xFFF5C06A), width: 1.5),
+                    ),
+                  ),
+                  child: staffProvider.isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: white),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_circle_rounded, size: 18, color: gold),
+                            SizedBox(width: 8),
+                            Text(
+                              'Register Staff Profile',
+                              style: TextStyle(
+                                color: white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
+                          ],
+                        ),
                 ),
-                items: _shifts.map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase()))).toList(),
-                onChanged: (val) => setState(() => _selectedShift = val!),
-              ),
-              const SizedBox(height: 28),
-
-              CustomButton(
-                text: 'Create Staff Profile',
-                isLoading: staffProvider.isLoading,
-                onPressed: _handleSave,
               ),
             ],
           ),

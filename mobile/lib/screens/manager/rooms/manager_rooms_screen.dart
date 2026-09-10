@@ -27,7 +27,11 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
   static const Color background = Color(0xFFF8FAFC);
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color emerald = Color(0xFF10B981);
+  static const Color emeraldBg = Color(0xFFECFDF5);
   static const Color blue = Color(0xFF2563EB);
+  static const Color blueBg = Color(0xFFEFF6FF);
+  static const Color purple = Color(0xFF5B21B6);
+  static const Color purpleBg = Color(0xFFF3E8FF);
   static const Color ruby = Color(0xFFEF4444);
 
   String _statusFilter = 'all';
@@ -275,7 +279,57 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Horizontal KPI Quick Filter Pills (Available, Occupied, Reserved)
+          // 4 Uniform KPI Summary Cards in a Single Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildMiniMetric(
+                  label: 'Total',
+                  value: '$totalCount',
+                  subtitle: 'Rooms',
+                  icon: Icons.hotel_rounded,
+                  color: navy,
+                  bgColor: cream,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildMiniMetric(
+                  label: 'Available',
+                  value: '$availableCount',
+                  subtitle: 'Clean',
+                  icon: Icons.check_circle_rounded,
+                  color: emerald,
+                  bgColor: emeraldBg,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildMiniMetric(
+                  label: 'Occupied',
+                  value: '$occupiedCount',
+                  subtitle: 'In-House',
+                  icon: Icons.meeting_room_rounded,
+                  color: purple,
+                  bgColor: purpleBg,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildMiniMetric(
+                  label: 'Reserved',
+                  value: '$reservedCount',
+                  subtitle: 'Booked',
+                  icon: Icons.bookmark_added_rounded,
+                  color: blue,
+                  bgColor: blueBg,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Horizontal Quick Filter Pills (Available, Occupied, Reserved)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -391,6 +445,94 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
                 ),
               ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniMetric({
+    required String label,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor.withAlpha(120),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withAlpha(60),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3.5),
+                decoration: BoxDecoration(
+                  color: white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, size: 11, color: color),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: color == navy ? navy : color,
+                letterSpacing: -0.3,
+                height: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
           ),
         ],
       ),
@@ -955,13 +1097,25 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
                 });
                 provider.fetchAll();
               },
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Reset All Filters', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.refresh_rounded, size: 16, color: gold),
+              label: const Text(
+                'Reset All Filters',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: white,
+                  letterSpacing: 0.3,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: navy,
                 foregroundColor: white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: Color(0xFFF5C06A), width: 1.5),
+                ),
               ),
             ),
           ],

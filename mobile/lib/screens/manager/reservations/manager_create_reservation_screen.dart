@@ -360,53 +360,19 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
         foregroundColor: white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: white, size: 20),
-          tooltip: 'Back to Reservations',
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'New Reservation',
-              style: TextStyle(
-                color: white,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.2,
-              ),
-            ),
-            Text(
-              _selectedSource == 'Walk-in' ? 'Walk-In Desk Registration' : 'Direct Booking Management',
-              style: TextStyle(
-                color: gold.withAlpha(220),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: white, size: 20),
-            tooltip: 'Reset Form',
-            onPressed: () {
-              setState(() {
-                _guestNameController.clear();
-                _guestPhoneController.clear();
-                _guestEmailController.clear();
-                _idDocNumberController.clear();
-                _notesController.clear();
-                _corporateNameController.clear();
-                _amountController.clear();
-                _balanceController.clear();
-                _selectedRoomNumber = null;
-                _isCorporate = false;
-                _isGroupBooking = false;
-              });
-            },
+        title: const Text(
+          'New Reservation',
+          style: TextStyle(
+            color: white,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
           ),
-        ],
+        ),
       ),
       body: Form(
         key: _formKey,
@@ -1106,11 +1072,11 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                   style: ElevatedButton.styleFrom(
                     backgroundColor: navy,
                     foregroundColor: white,
-                    elevation: 2,
+                    elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: gold, width: 1.2),
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(color: Color(0xFFF5C06A), width: 1.5),
                     ),
                   ),
                   child: _isSaving
@@ -1123,7 +1089,7 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              isWalkIn ? Icons.how_to_reg_rounded : Icons.check_circle_outline_rounded,
+                              isWalkIn ? Icons.how_to_reg_rounded : Icons.add_circle_rounded,
                               size: 16,
                               color: gold,
                             ),
@@ -1134,12 +1100,14 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.2,
+                                  letterSpacing: 0.3,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: gold),
                           ],
                         ),
                 ),

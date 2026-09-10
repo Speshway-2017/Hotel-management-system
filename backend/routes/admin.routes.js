@@ -305,11 +305,16 @@ const ensureRealPayments = async (propId) => {
         ? 'Settled'
         : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
 
-      const isObjectId = mongoose.Types.ObjectId.isValid(bId) && String(new mongoose.Types.ObjectId(bId)) === String(bId);
-      const query = isObjectId ? { $or: [{ bookingId: bId }, { _id: bId }] } : { bookingId: bId };
-      const existing = await Payment.findOne(query);
+      const query = {
+        $or: [
+          { bookingId: bId },
+          ...(b.bookingId ? [{ bookingId: b.bookingId }] : []),
+          { guestName: guestName, roomNumber: roomNumber }
+        ]
+      };
+      const existingList = await Payment.find(query);
 
-      if (!existing) {
+      if (!existingList || existingList.length === 0) {
         await Payment.create({
           bookingId: bId,
           guestName,
@@ -321,12 +326,22 @@ const ensureRealPayments = async (propId) => {
           createdAt: b.createdAt || new Date()
         });
       } else {
+        const existing = existingList[0];
+        // Clean up duplicate payment records if any
+        if (existingList.length > 1) {
+          for (let i = 1; i < existingList.length; i++) {
+            await Payment.findByIdAndDelete(existingList[i]._id);
+          }
+        }
         let needsUpdate = false;
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
-        if (paymentMethod && existing.paymentMethod !== paymentMethod) { existing.paymentMethod = paymentMethod; needsUpdate = true; }
+        if (b.createdAt && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(b.createdAt).getTime()) > 1000) {
+          existing.createdAt = b.createdAt;
+          needsUpdate = true;
+        }
         if (needsUpdate) await existing.save();
       }
     }
@@ -341,7 +356,7 @@ router.get('/payments', async (req, res) => {
     await ensureRealPayments(propId);
     let query = {};
     if (propId) {
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] };
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }] };
     }
     let payments = await Payment.find(query).sort({ createdAt: -1 });
     if (!payments || payments.length === 0) {

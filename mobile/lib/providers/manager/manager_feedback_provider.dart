@@ -2,17 +2,35 @@ import 'package:flutter/material.dart';
 import '../../models/feedback_model.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
+import '../../services/storage_service.dart';
 import '../../core/constants/api_endpoints.dart';
 
 class ManagerFeedbackProvider with ChangeNotifier {
   List<FeedbackModel> _feedbacks = [];
   bool _isLoading = false;
   String? _errorMessage;
+  DateTime? _lastViewedAt;
+  bool _isFeedbackOpen = false;
 
   List<FeedbackModel> get feedbacks => _feedbacks;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   String? get error => _errorMessage;
+  bool get isFeedbackOpen => _isFeedbackOpen;
+
+  int get unreadCount {
+    if (_isFeedbackOpen) return 0;
+    if (_feedbacks.isEmpty) return 0;
+    if (_lastViewedAt == null) {
+      return _feedbacks.where((f) => f.status.toLowerCase() == 'pending').length;
+    }
+    return _feedbacks.where((f) {
+      if (f.createdAt.isEmpty) return false;
+      final dt = DateTime.tryParse(f.createdAt);
+      if (dt == null) return false;
+      return dt.toUtc().isAfter(_lastViewedAt!.toUtc());
+    }).length;
+  }
 
   double get averageRating {
     if (_feedbacks.isEmpty) return 0.0;
@@ -22,6 +40,24 @@ class ManagerFeedbackProvider with ChangeNotifier {
 
   ManagerFeedbackProvider() {
     _registerSocketListeners();
+    _initLastViewed();
+  }
+
+  Future<void> _initLastViewed() async {
+    _lastViewedAt = await StorageService.getLastViewedFeedback();
+    notifyListeners();
+  }
+
+  Future<void> markAsViewed() async {
+    _isFeedbackOpen = true;
+    _lastViewedAt = DateTime.now().toUtc();
+    notifyListeners();
+    await StorageService.saveLastViewedFeedback(_lastViewedAt!);
+  }
+
+  void markAsClosed() {
+    _isFeedbackOpen = false;
+    notifyListeners();
   }
 
   void _registerSocketListeners() {
@@ -45,6 +81,10 @@ class ManagerFeedbackProvider with ChangeNotifier {
       if (response.success && response.data != null) {
         final list = response.data as List<dynamic>;
         _feedbacks = list.map((e) => FeedbackModel.fromJson(e as Map<String, dynamic>)).toList();
+        if (_isFeedbackOpen) {
+          _lastViewedAt = DateTime.now().toUtc();
+          StorageService.saveLastViewedFeedback(_lastViewedAt!);
+        }
       } else {
         if (!silent) _errorMessage = response.message;
       }

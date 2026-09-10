@@ -49,6 +49,12 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'hourstay-hms-backend' });
 });
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', service: 'hourstay-hms-backend' });
+});
+app.get('/api/v1/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', service: 'hourstay-hms-backend' });
+});
 
 // Mount Routes
 app.use('/api/auth', authRoutes);

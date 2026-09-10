@@ -7,6 +7,19 @@ class StorageService {
   static const String _keyUser = 'hms_mobile_user';
   static const String _keyBaseUrl = 'hms_mobile_base_url';
   static const String _keySocketUrl = 'hms_mobile_socket_url';
+  static const String _keyLastViewedFeedback = 'hms_last_viewed_feedback';
+
+  static Future<void> saveLastViewedFeedback(DateTime time) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLastViewedFeedback, time.toUtc().toIso8601String());
+  }
+
+  static Future<DateTime?> getLastViewedFeedback() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString(_keyLastViewedFeedback);
+    if (str == null) return null;
+    return DateTime.tryParse(str);
+  }
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import {
   Calendar,
   Search,
@@ -42,10 +43,8 @@ const SHIFT_TIMINGS = {
   "Morning Shift": { start: "06:00 AM", end: "02:00 PM" },
   "Afternoon Shift": { start: "02:00 PM", end: "10:00 PM" },
   "Night Shift": { start: "10:00 PM", end: "06:00 AM" },
-  "General Shift": { start: "09:00 AM", end: "05:00 PM" }
+  "General Shift": { start: "09:00 AM", end: "06:00 PM" }
 };
-
-import { subscribeRealtimeSync } from "@/services/socket";
 
 function ManagerAttendancePage() {
   const navigate = useNavigate();
@@ -99,13 +98,14 @@ function ManagerAttendancePage() {
       const sheet = realUsers.map((st, idx) => {
         const sid = st._id || st.id;
         const employeeId = `EMP-${(user.propertyId || "JAI").substring(3)}-10${idx + 1}`;
-        const department = "Front Office";
+        const department = st.dept || st.department || "Front Office";
         
         const matchedShiftObj = realShifts.find(sh => sh.userId === sid);
-        const assignedShift = matchedShiftObj ? matchedShiftObj.shiftType : "Morning Shift";
+        const assignedShift = st.shift || (matchedShiftObj ? matchedShiftObj.shiftType : "General Shift");
+        const timings = SHIFT_TIMINGS[assignedShift] || { start: "09:00 AM", end: "06:00 PM" };
 
         // Find attendance record for this staff and this selectedDate
-        const attRecord = realAttendance.find(att => att.userId === sid && att.date === selectedDate);
+        const attRecord = realAttendance.find(att => (att.userId === sid || att.username === st.name) && att.date === selectedDate);
         
         return {
           id: sid,
@@ -114,10 +114,10 @@ function ManagerAttendancePage() {
           employeeId,
           department,
           assignedShift,
-          checkIn: attRecord ? attRecord.checkIn : idx % 3 === 0 ? "09:00 AM" : "—",
-          checkOut: attRecord ? attRecord.checkOut : idx % 3 === 0 ? "05:00 PM" : "—",
-          workingHours: attRecord ? `${attRecord.workingHours}h` : idx % 3 === 0 ? "8h" : "—",
-          attendanceStatus: attRecord ? attRecord.status : idx % 3 === 0 ? "Present" : "Absent"
+          checkIn: attRecord ? attRecord.checkIn : (st.status === 'Active' || idx % 3 === 0) ? timings.start : "—",
+          checkOut: attRecord ? attRecord.checkOut : (st.status === 'Active' || idx % 3 === 0) ? timings.end : "—",
+          workingHours: attRecord ? `${attRecord.workingHours}h` : (st.status === 'Active' || idx % 3 === 0) ? (assignedShift === 'General Shift' ? "9h" : "8h") : "—",
+          attendanceStatus: attRecord ? attRecord.status : (st.status === 'Active' || idx % 3 === 0) ? "Present" : "Absent"
         };
       });
 

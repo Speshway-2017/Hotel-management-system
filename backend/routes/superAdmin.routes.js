@@ -17,6 +17,7 @@ import { Room, ContactMessage, Approval } from '../models/managerData.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { invalidatePropertyCache } from '../utils/propertyCache.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
+import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -644,6 +645,14 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
       }
       emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'booking_created' });
     }
+
+    // Trigger Unified Notifications across Web & Mobile consoles
+    await notifyBookingEvent({
+      req,
+      io,
+      action: 'created',
+      booking
+    });
 
     return sendSuccess(res, 201, booking, 'Booking created successfully');
   } catch (error) {

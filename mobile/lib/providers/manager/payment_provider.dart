@@ -50,7 +50,17 @@ class PaymentProvider with ChangeNotifier {
       final response = await ApiService.get(ApiEndpoints.managerPayments);
       if (response.success && response.data != null) {
         final list = response.data as List<dynamic>;
-        _payments = list.map((e) => PaymentModel.fromJson(e as Map<String, dynamic>)).toList();
+        final parsed = list.map((e) => PaymentModel.fromJson(e as Map<String, dynamic>)).toList();
+        final seen = <String>{};
+        final unique = <PaymentModel>[];
+        for (final p in parsed) {
+          final key = p.bookingId.isNotEmpty ? '${p.bookingId}_${p.guestName.toLowerCase().trim()}' : p.id;
+          if (!seen.contains(key)) {
+            seen.add(key);
+            unique.add(p);
+          }
+        }
+        _payments = unique;
       } else {
         if (!silent) _errorMessage = response.message;
       }
@@ -82,6 +92,8 @@ class PaymentProvider with ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> recordPayment(Map<String, dynamic> data) => logPayment(data);
 
   Future<bool> updatePaymentStatus(String id, String status) async {
     // Optimistic update

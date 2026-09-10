@@ -1,11 +1,16 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../core/constants/api_endpoints.dart';
 import '../firebase_options.dart';
+import '../screens/manager/notifications/manager_notifications_screen.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
+
+/// Global navigator key for notification tap deep linking across the app.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Top-level background message handler required by Firebase Cloud Messaging.
 @pragma('vm:entry-point')
@@ -27,6 +32,17 @@ class NotificationService {
   static bool _isInitialized = false;
   static String? _cachedToken;
 
+  static final StreamController<RemoteMessage> _foregroundMessageController =
+      StreamController<RemoteMessage>.broadcast();
+  static final StreamController<RemoteMessage> _notificationTapController =
+      StreamController<RemoteMessage>.broadcast();
+
+  /// Stream of foreground push notifications.
+  static Stream<RemoteMessage> get onForegroundMessage => _foregroundMessageController.stream;
+
+  /// Stream of notifications tapped by the user (from system tray or banner).
+  static Stream<RemoteMessage> get onNotificationTap => _notificationTapController.stream;
+
   /// Returns the latest cached FCM token, if available.
   static String? get cachedToken => _cachedToken;
 
@@ -47,7 +63,7 @@ class NotificationService {
 
       final messaging = FirebaseMessaging.instance;
 
-      // 2. Request Notification Permissions
+      // 2. Request Notification Permissions (Including Android 13+ & iOS)
       final settings = await messaging.requestPermission(
         alert: true,
         announcement: false,
@@ -77,6 +93,7 @@ class NotificationService {
         debugPrint('   Title: ${message.notification?.title}');
         debugPrint('   Body: ${message.notification?.body}');
         debugPrint('   Data: ${message.data}');
+        _foregroundMessageController.add(message);
       });
 
       // 6. Handle notification click when app is in background
@@ -84,6 +101,8 @@ class NotificationService {
         debugPrint('🚀 [FCM RESUMED] User tapped notification from background:');
         debugPrint('   Title: ${message.notification?.title}');
         debugPrint('   Data: ${message.data}');
+        _notificationTapController.add(message);
+        _handleNotificationTapRouting(message);
       });
 
       // 7. Handle notification click when app was launched from terminated state
@@ -92,6 +111,10 @@ class NotificationService {
         debugPrint('🎯 [FCM TERMINATED] App launched from terminated state via notification:');
         debugPrint('   Title: ${initialMessage.notification?.title}');
         debugPrint('   Data: ${initialMessage.data}');
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          _notificationTapController.add(initialMessage);
+          _handleNotificationTapRouting(initialMessage);
+        });
       }
 
       // 8. Handle Token Refresh
@@ -119,6 +142,20 @@ class NotificationService {
     } catch (e, stack) {
       debugPrint('❌ [FCM INIT ERROR] Failed to initialize NotificationService: $e');
       debugPrint(stack.toString());
+    }
+  }
+
+  static void _handleNotificationTapRouting(RemoteMessage message) {
+    try {
+      debugPrint('🎯 [FCM ROUTE] Routing notification tap with data: ${message.data}');
+      final navState = rootNavigatorKey.currentState;
+      if (navState != null) {
+        navState.push(
+          MaterialPageRoute(builder: (_) => const ManagerNotificationsScreen()),
+        );
+      }
+    } catch (err) {
+      debugPrint('⚠️ [FCM ROUTE ERROR] $err');
     }
   }
 
