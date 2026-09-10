@@ -23,7 +23,6 @@ class ApiEndpoints {
     if (kIsWeb) {
       return 'http://localhost:$localPort/api';
     } else if (Platform.isAndroid) {
-      // Physical Android devices connect via local Wi-Fi IP (192.168.88.17:5000)
       return 'http://$localHostIp:$localPort/api';
     } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       return 'http://127.0.0.1:$localPort/api';
@@ -40,11 +39,10 @@ class ApiEndpoints {
       return const ['http://localhost:$localPort/api'];
     }
     return const [
-      'http://$localHostIp:$localPort/api',
       'http://127.0.0.1:$localPort/api',
-      'http://localhost:$localPort/api',
+      'http://$localHostIp:$localPort/api',
       'http://10.0.2.2:$localPort/api',
-      'http://192.168.1.14:$localPort/api',
+      'http://localhost:$localPort/api',
     ];
   }
 

@@ -1,486 +1,1680 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:hour_stay_mobile/core/constants/app_colors.dart';
-import 'package:hour_stay_mobile/models/staff_model.dart';
-import 'package:hour_stay_mobile/providers/manager/staff_provider.dart';
-import 'package:hour_stay_mobile/widgets/empty_state.dart';
-import 'package:hour_stay_mobile/widgets/status_badge.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../models/staff_model.dart';
+import '../../../providers/manager/staff_provider.dart';
 import 'manager_add_staff_screen.dart';
+import 'manager_staff_detail_screen.dart';
+import 'manager_staff_attendance_detail_screen.dart';
+
 
 class ManagerStaffScreen extends StatefulWidget {
-  final int initialIndex;
-  const ManagerStaffScreen({super.key, this.initialIndex = 0});
+  final int initialTab;
+  const ManagerStaffScreen({super.key, int initialTab = 0, int? initialIndex})
+      : initialTab = initialIndex ?? initialTab;
 
   @override
   State<ManagerStaffScreen> createState() => _ManagerStaffScreenState();
 }
 
-class _ManagerStaffScreenState extends State<ManagerStaffScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  String _departmentFilter = 'all';
+class _AttendanceRosterItem {
+  final String id;
+  final String name;
+  final String email;
+  final String phone;
+  final String role;
+  final String department;
+  final String propertyId;
+  final String employeeId;
+  final String assignedShift;
+  final String checkIn;
+  final String checkOut;
+  final double workingHours;
+  final String attendanceStatus;
+  final String date;
+  final StaffModel? staff;
+
+  _AttendanceRosterItem({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.role,
+    required this.department,
+    required this.propertyId,
+    required this.employeeId,
+    required this.assignedShift,
+    required this.checkIn,
+    required this.checkOut,
+    required this.workingHours,
+    required this.attendanceStatus,
+    required this.date,
+    this.staff,
+  });
+}
+
+class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
+  late int _currentTabIndex;
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _staffStatusFilter = 'All';
+
+  // Hour Stay Theme Palette
+  static const Color navy = Color(0xFF0D1B2A);
+  static const Color gold = Color(0xFFF5C06A);
+  static const Color purple = Color(0xFF5B21B6);
+  static const Color cream = Color(0xFFFFF7E6);
+  static const Color background = Color(0xFFF8FAFC);
+  static const Color cardBorder = Color(0xFFE2E8F0);
+  static const Color white = Colors.white;
+  static const Color muted = Color(0xFF94A3B8);
+  static const Color emerald = Color(0xFF10B981);
+  static const Color emeraldBg = Color(0xFFECFDF5);
+  static const Color amber = Color(0xFFD97706);
+  static const Color amberBg = Color(0xFFFFFBEB);
+  static const Color ruby = Color(0xFFEF4444);
+  static const Color rubyBg = Color(0xFFFEF2F2);
+  static const Color purpleBg = Color(0xFFF5F3FF);
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: widget.initialIndex.clamp(0, 2),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StaffProvider>().fetchAll();
-    });
+    _currentTabIndex = widget.initialTab;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    await context.read<StaffProvider>().fetchAll();
+  }
+
+  String _getShiftTiming(String shiftName) {
+    final lower = shiftName.toLowerCase();
+    if (lower.contains('morning')) return '06:00 AM – 02:00 PM';
+    if (lower.contains('afternoon') || lower.contains('evening')) return '02:00 PM – 10:00 PM';
+    if (lower.contains('night')) return '10:00 PM – 06:00 AM';
+    if (lower.contains('general')) return '09:00 AM – 06:00 PM';
+    return '09:00 AM – 06:00 PM';
+  }
+
+  String _getDefaultCheckIn(String shiftName) {
+    final lower = shiftName.toLowerCase();
+    if (lower.contains('morning')) return '06:00 AM';
+    if (lower.contains('afternoon') || lower.contains('evening')) return '02:00 PM';
+    if (lower.contains('night')) return '10:00 PM';
+    return '09:00 AM';
+  }
+
+  String _getDefaultCheckOut(String shiftName) {
+    final lower = shiftName.toLowerCase();
+    if (lower.contains('morning')) return '02:00 PM';
+    if (lower.contains('afternoon') || lower.contains('evening')) return '10:00 PM';
+    if (lower.contains('night')) return '06:00 AM';
+    return '06:00 PM';
+  }
+
+  double _getDefaultWorkingHours(String shiftName) {
+    final lower = shiftName.toLowerCase();
+    if (lower.contains('general')) return 9.0;
+    return 8.0;
+  }
+
+  String _formatTime(String timeStr) {
+    if (timeStr.isEmpty || timeStr == '--' || timeStr == '--:--' || timeStr == '—') return '—:—';
+    if (timeStr.contains('AM') || timeStr.contains('PM')) return timeStr;
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        int hour = int.parse(parts[0].trim());
+        int minute = int.parse(parts[1].trim());
+        final ampm = hour >= 12 ? 'PM' : 'AM';
+        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        return '${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $ampm';
+      }
+    } catch (_) {}
+    return timeStr;
+  }
+
+  bool _isTimeConsistentWithShift(String timeStr, String shiftName) {
+    final lower = shiftName.toLowerCase();
+    final timeLower = timeStr.toLowerCase();
+    if (lower.contains('general')) {
+      return timeLower.contains('09:') || timeLower.contains('9:') || timeLower.contains('06:') || timeLower.contains('6:');
+    }
+    if (lower.contains('morning')) {
+      return timeLower.contains('06:') || timeLower.contains('6:') || timeLower.contains('02:') || timeLower.contains('2:');
+    }
+    if (lower.contains('afternoon') || lower.contains('evening')) {
+      return timeLower.contains('02:') || timeLower.contains('2:') || timeLower.contains('10:');
+    }
+    if (lower.contains('night')) {
+      return timeLower.contains('10:') || timeLower.contains('06:') || timeLower.contains('6:');
+    }
+    return true;
+  }
+
+  String _formatDateString(String dateStr) {
+    if (dateStr.isEmpty) return 'Today';
+    try {
+      final now = DateTime.now();
+      final todayStr =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      if (dateStr.startsWith(todayStr)) return 'Today';
+
+      final yesterday = now.subtract(const Duration(days: 1));
+      final yestStr =
+          "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
+      if (dateStr.startsWith(yestStr)) return 'Yesterday';
+
+      final dt = DateTime.parse(dateStr);
+      return Formatters.date(dt.toIso8601String());
+    } catch (_) {
+      return dateStr;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final staffProvider = context.watch<StaffProvider>();
+    final staffList = staffProvider.staffList;
+    final attendance = staffProvider.attendance;
+    final shifts = staffProvider.shifts;
+
+    final shiftMap = {for (var sh in shifts) sh.userId: sh};
+
+    // --- Build Web-Synchronized Attendance Roster ---
+    final List<_AttendanceRosterItem> attendanceSheet = [];
+    final Set<String> processedUserIds = {};
+
+    // 1. Map all staff members to attendance records (matching web implementation 1:1)
+    for (int idx = 0; idx < staffList.length; idx++) {
+      final s = staffList[idx];
+      processedUserIds.add(s.id);
+      if (s.name.isNotEmpty) {
+        processedUserIds.add(s.name.toLowerCase());
+      }
+
+      final prop = s.propertyId.isNotEmpty ? s.propertyId.replaceAll('HS-', '') : 'JAI';
+      final employeeId = 'EMP-$prop-10${idx + 1}';
+      final dept = s.dept.isNotEmpty
+          ? s.dept
+          : (s.department.isNotEmpty ? s.department : 'Front Office');
+      final matchedShift = s.shift.isNotEmpty
+          ? s.shift
+          : (shiftMap[s.id]?.shiftType ?? 'General Shift');
+
+      // Find matching attendance record in DB
+      AttendanceModel? attRecord;
+      for (final a in attendance) {
+        if (a.userId == s.id ||
+            (a.username.isNotEmpty && a.username.toLowerCase() == s.name.toLowerCase())) {
+          attRecord = a;
+          break;
+        }
+      }
+
+      final isStaffActive = s.status.toLowerCase() == 'active';
+      final isStaffLeave = s.status.toLowerCase().contains('leave');
+
+      String attStatus;
+      if (attRecord != null && attRecord.status.isNotEmpty) {
+        attStatus = attRecord.status;
+      } else if (isStaffActive) {
+        attStatus = 'Present';
+      } else if (isStaffLeave) {
+        attStatus = 'On Leave';
+      } else {
+        attStatus = 'Absent';
+      }
+
+      String checkInTime;
+      String checkOutTime;
+      double workingHours;
+
+      if (attStatus == 'Present') {
+        final shiftStart = _getDefaultCheckIn(matchedShift);
+        final shiftEnd = _getDefaultCheckOut(matchedShift);
+
+        // Verify if attRecord punch time matches the shift type; otherwise use shift standard
+        if (attRecord != null && attRecord.checkIn.isNotEmpty && attRecord.checkIn != '--:--' && attRecord.checkIn != '--') {
+          final formattedIn = _formatTime(attRecord.checkIn);
+          checkInTime = _isTimeConsistentWithShift(formattedIn, matchedShift) ? formattedIn : shiftStart;
+        } else {
+          checkInTime = shiftStart;
+        }
+
+        if (attRecord != null && attRecord.checkOut.isNotEmpty && attRecord.checkOut != '--:--' && attRecord.checkOut != '--') {
+          final formattedOut = _formatTime(attRecord.checkOut);
+          checkOutTime = _isTimeConsistentWithShift(formattedOut, matchedShift) ? formattedOut : shiftEnd;
+        } else {
+          checkOutTime = shiftEnd;
+        }
+
+        workingHours = (attRecord != null && attRecord.workingHours > 0)
+            ? attRecord.workingHours.toDouble()
+            : _getDefaultWorkingHours(matchedShift);
+      } else {
+        checkInTime = '—:—';
+        checkOutTime = '—:—';
+        workingHours = 0.0;
+      }
+
+      final dateStr = attRecord != null && attRecord.date.isNotEmpty ? attRecord.date : 'Today';
+
+      attendanceSheet.add(_AttendanceRosterItem(
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        phone: s.phone,
+        role: s.role.isNotEmpty ? s.role : 'Staff Member',
+        department: dept,
+        propertyId: s.propertyId,
+        employeeId: employeeId,
+        assignedShift: matchedShift,
+        checkIn: checkInTime,
+        checkOut: checkOutTime,
+        workingHours: workingHours,
+        attendanceStatus: attStatus,
+        date: dateStr,
+        staff: s,
+      ));
+    }
+
+    // 2. Include any standalone attendance records in DB not in staffList
+    for (final a in attendance) {
+      if (!processedUserIds.contains(a.userId) &&
+          !processedUserIds.contains(a.username.toLowerCase())) {
+        final assignedShift = 'General Shift';
+        attendanceSheet.add(_AttendanceRosterItem(
+          id: a.userId,
+          name: a.username.isNotEmpty ? a.username : 'Staff Member',
+          email: '',
+          phone: '',
+          role: 'Staff Member',
+          department: 'Front Office',
+          propertyId: a.propertyId,
+          employeeId: 'EMP-${a.propertyId.replaceAll('HS-', '')}-100',
+          assignedShift: assignedShift,
+          checkIn: a.checkIn.isNotEmpty ? _formatTime(a.checkIn) : '09:00 AM',
+          checkOut: a.checkOut.isNotEmpty ? _formatTime(a.checkOut) : '06:00 PM',
+          workingHours: a.workingHours > 0 ? a.workingHours.toDouble() : 9.0,
+          attendanceStatus: a.status.isNotEmpty ? a.status : 'Present',
+          date: a.date.isNotEmpty ? a.date : 'Today',
+        ));
+      }
+    }
+
+    // --- Unified Top KPI Metrics ---
+    final totalCount = staffList.isNotEmpty ? staffList.length : attendanceSheet.length;
+    final activeCount = staffList.where((s) => s.status.toLowerCase() == 'active').length;
+    final leaveCount = staffList.where((s) {
+      final st = s.status.toLowerCase();
+      return st.contains('leave') || st == 'inactive';
+    }).length;
+    final attendanceCount = attendanceSheet
+        .where((a) => a.attendanceStatus.toLowerCase() == 'present')
+        .length;
+
+    // --- Filter Staff Directory (Tab 0) ---
+    final filteredStaff = staffList.where((s) {
+      final q = _searchQuery.trim().toLowerCase();
+      final matchesSearch = q.isEmpty ||
+          s.name.toLowerCase().contains(q) ||
+          s.email.toLowerCase().contains(q) ||
+          s.role.toLowerCase().contains(q) ||
+          s.phone.contains(q) ||
+          s.department.toLowerCase().contains(q) ||
+          s.shift.toLowerCase().contains(q) ||
+          s.propertyId.toLowerCase().contains(q);
+
+      final statusStr = s.status.toLowerCase();
+      bool matchesStatus = true;
+      if (_staffStatusFilter == 'Active') {
+        matchesStatus = statusStr == 'active';
+      } else if (_staffStatusFilter == 'Leave') {
+        matchesStatus = statusStr.contains('leave') || statusStr == 'inactive';
+      } else if (_staffStatusFilter == 'Attendance') {
+        final hasAtt = attendanceSheet.any((a) =>
+            a.attendanceStatus.toLowerCase() == 'present' &&
+            (a.id == s.id || a.name.toLowerCase() == s.name.toLowerCase()));
+        matchesStatus = hasAtt;
+      }
+
+      return matchesSearch && matchesStatus;
+    }).toList();
+
+    // --- Filter Attendance Roster from DB (Tab 1) ---
+    final filteredAttendance = attendanceSheet.where((item) {
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.trim().toLowerCase();
+        final matches = item.name.toLowerCase().contains(q) ||
+            item.employeeId.toLowerCase().contains(q) ||
+            item.email.toLowerCase().contains(q) ||
+            item.role.toLowerCase().contains(q) ||
+            item.department.toLowerCase().contains(q) ||
+            item.assignedShift.toLowerCase().contains(q) ||
+            item.attendanceStatus.toLowerCase().contains(q) ||
+            item.date.toLowerCase().contains(q);
+
+        if (!matches) return false;
+      }
+
+      return true;
+    }).toList();
+
+    final isLoading = staffProvider.isLoading && staffList.isEmpty && attendance.isEmpty;
+    final hasError = staffProvider.errorMessage != null && staffList.isEmpty && attendance.isEmpty;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Staff & Workforce'),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          tabs: const [
-            Tab(icon: Icon(Icons.people_alt_outlined, size: 20), text: 'Roster'),
-            Tab(icon: Icon(Icons.schedule_outlined, size: 20), text: 'Shifts'),
-            Tab(icon: Icon(Icons.co_present_outlined, size: 20), text: 'Attendance'),
-          ],
+      backgroundColor: background,
+      appBar: _buildAppBar(context),
+      floatingActionButton: _currentTabIndex == 0
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: navy.withAlpha(80),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: FloatingActionButton.extended(
+                backgroundColor: navy,
+                foregroundColor: white,
+                elevation: 0,
+                highlightElevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: Color(0xFFF5C06A), width: 1.5),
+                ),
+                icon: const Icon(Icons.add_circle_rounded, size: 20, color: gold),
+                label: const Row(
+                  children: [
+                    Text(
+                      'Add Staff',
+                      style: TextStyle(
+                        color: white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
+                  ],
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ManagerAddStaffScreen()),
+                  );
+                },
+              ),
+            )
+          : null, // View-only on attendance tab (no log attendance button)
+      body: RefreshIndicator(
+        color: purple,
+        backgroundColor: white,
+        onRefresh: _loadData,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator(color: purple))
+            : hasError
+                ? _buildErrorView(staffProvider.errorMessage!)
+                : CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      // 1. Same Top KPI Cards Row for both tabs
+                      SliverToBoxAdapter(
+                        child: _buildStaffKpiSection(
+                          totalCount: totalCount,
+                          activeCount: activeCount,
+                          leaveCount: leaveCount,
+                          attendanceCount: attendanceCount,
+                        ),
+                      ),
+
+                      // 2. Exact same Search Bar design as all screens
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSearchBar(),
+                              const SizedBox(height: 10),
+                              _buildSegmentedTabBar(
+                                staffCount: staffList.length,
+                                attendanceCount: attendanceSheet.length,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // --- TAB 0: Staff & Shifts ---
+                      if (_currentTabIndex == 0) ...[
+                        // Status Filter Chips
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+                            child: _buildStaffStatusFilterChips(),
+                          ),
+                        ),
+
+                        // Directory Count Header
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Staff Directory (${filteredStaff.length})',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: navy,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                if (_searchQuery.isNotEmpty || _staffStatusFilter != 'All')
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _searchQuery = '';
+                                        _staffStatusFilter = 'All';
+                                        _searchController.clear();
+                                      });
+                                    },
+                                    child: const Text(
+                                      'Reset Filters',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: purple,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Staff Directory Cards List
+                        if (filteredStaff.isEmpty)
+                          SliverToBoxAdapter(
+                            child: _buildEmptyStaffState(),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 80),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) => _buildStaffCard(filteredStaff[index]),
+                                childCount: filteredStaff.length,
+                              ),
+                            ),
+                          ),
+                      ]
+
+                      // --- TAB 1: Attendance ---
+                      else ...[
+                        // Attendance Header Count (No filter chips)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Attendance Records (${filteredAttendance.length})',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: navy,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                if (_searchQuery.isNotEmpty)
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _searchQuery = '';
+                                        _searchController.clear();
+                                      });
+                                    },
+                                    child: const Text(
+                                      'Reset Search',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: purple,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Attendance Items List from DB
+                        if (filteredAttendance.isEmpty)
+                          SliverToBoxAdapter(
+                            child: _buildEmptyAttendanceState(),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 80),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) => _buildAttendanceRosterCard(filteredAttendance[index]),
+                                childCount: filteredAttendance.length,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  // --- AppBar ---
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: navy,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+        onPressed: () => Navigator.of(context).maybePop(),
+      ),
+      title: const Text(
+        'Staff & Workforce',
+        style: TextStyle(
+          color: white,
+          fontWeight: FontWeight.w800,
+          fontSize: 16,
+          letterSpacing: -0.2,
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.person_add, color: Colors.white),
-        label: const Text('Add Staff', style: TextStyle(color: Colors.white)),
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ManagerAddStaffScreen()),
-          );
-        },
+    );
+  }
+
+  // --- Segmented Navigation Tabs (Below Search Bar) ---
+  Widget _buildSegmentedTabBar({required int staffCount, required int attendanceCount}) {
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cardBorder),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      child: Row(
         children: [
-          _buildRosterTab(staffProvider),
-          _buildShiftsTab(staffProvider),
-          _buildAttendanceTab(staffProvider),
+          // Tab 0: Staff & Shifts
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_currentTabIndex != 0) {
+                  setState(() {
+                    _currentTabIndex = 0;
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                decoration: BoxDecoration(
+                  color: _currentTabIndex == 0 ? white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: _currentTabIndex == 0
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(12),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.people_alt_rounded,
+                        size: 14,
+                        color: _currentTabIndex == 0 ? purple : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Staff & Shifts ($staffCount)',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: _currentTabIndex == 0
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: _currentTabIndex == 0
+                              ? navy
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Tab 1: Attendance
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_currentTabIndex != 1) {
+                  setState(() {
+                    _currentTabIndex = 1;
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                decoration: BoxDecoration(
+                  color: _currentTabIndex == 1 ? white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: _currentTabIndex == 1
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(12),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.how_to_reg_rounded,
+                        size: 14,
+                        color: _currentTabIndex == 1 ? emerald : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Attendance ($attendanceCount)',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: _currentTabIndex == 1
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: _currentTabIndex == 1
+                              ? navy
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ==========================================
-  // TAB 1: STAFF ROSTER
-  // ==========================================
-  Widget _buildRosterTab(StaffProvider staffProvider) {
-    var list = staffProvider.staffList;
+  // --- Same Top KPI Row for both tabs ---
+  Widget _buildStaffKpiSection({
+    required int totalCount,
+    required int activeCount,
+    required int leaveCount,
+    required int attendanceCount,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Total',
+              value: '$totalCount',
+              subtitle: 'Staff',
+              icon: Icons.people_alt_rounded,
+              color: navy,
+              bgColor: cream,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Active',
+              value: '$activeCount',
+              subtitle: 'On Duty',
+              icon: Icons.check_circle_outline_rounded,
+              color: emerald,
+              bgColor: emeraldBg,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Leave',
+              value: '$leaveCount',
+              subtitle: 'Off Duty',
+              icon: Icons.event_busy_rounded,
+              color: amber,
+              bgColor: amberBg,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildMiniMetric(
+              label: 'Attendance',
+              value: '$attendanceCount',
+              subtitle: 'Present',
+              icon: Icons.how_to_reg_rounded,
+              color: purple,
+              bgColor: purpleBg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    if (_departmentFilter != 'all') {
-      list = list.where((s) => s.department.toLowerCase() == _departmentFilter.toLowerCase()).toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      list = list.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase()) || s.email.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    }
+  // --- Exact same Search Bar design as all screens ---
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        style: const TextStyle(fontSize: 13, color: navy),
+        decoration: InputDecoration(
+          hintText: _currentTabIndex == 0
+              ? "Search staff by name, role, dept, shift, phone..."
+              : "Search attendance by staff name, employee ID, role, shift...",
+          hintStyle: TextStyle(fontSize: 12, color: muted.withAlpha(180)),
+          prefixIcon: const Icon(Icons.search_rounded, color: muted, size: 18),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 16, color: muted),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+      ),
+    );
+  }
 
-    return Column(
-      children: [
-        // Search & Filter
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: AppColors.surface,
-          child: Column(
-            children: [
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search staff by name or email...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  // --- Staff Status Filter Chips ---
+  Widget _buildStaffStatusFilterChips() {
+    final filters = ['All', 'Active', 'Leave', 'Attendance'];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters.map((st) {
+          final isSelected = _staffStatusFilter == st;
+          Color c = purple;
+          if (st == 'Active') c = emerald;
+          if (st == 'Leave') c = amber;
+          if (st == 'Attendance') c = purple;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: InkWell(
+              onTap: () => setState(() => _staffStatusFilter = st),
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isSelected ? c : white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? c : cardBorder,
+                    width: 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: c.withAlpha(60),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
                 ),
-                onChanged: (v) => setState(() => _searchQuery = v),
+                child: Text(
+                  st,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? white : navy,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // --- Staff Directory Card (Tab 0) ---
+  Widget _buildStaffCard(StaffModel staff) {
+    Color statusColor;
+    Color statusBg;
+    final st = staff.status.toLowerCase();
+    if (st == 'active') {
+      statusColor = emerald;
+      statusBg = emeraldBg;
+    } else if (st.contains('leave')) {
+      statusColor = amber;
+      statusBg = amberBg;
+    } else {
+      statusColor = ruby;
+      statusBg = rubyBg;
+    }
+
+    final shiftTiming = _getShiftTiming(staff.shift);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: navy.withAlpha(4),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ManagerStaffDetailScreen(staff: staff),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Avatar + Name + Status
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [purple, navy],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        staff.name.isNotEmpty ? staff.name[0].toUpperCase() : 'S',
+                        style: const TextStyle(
+                          color: white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                staff.name,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: navy,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusBg,
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(color: statusColor.withAlpha(60)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 4.5,
+                                    height: 4.5,
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3.5),
+                                  Text(
+                                    staff.status.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: purpleBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                staff.role.isNotEmpty ? staff.role.toUpperCase() : 'STAFF',
+                                style: const TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: purple,
+                                ),
+                              ),
+                            ),
+                            if (staff.dept.isNotEmpty) ...[
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  staff.dept,
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+
+              // Shift and Timing Banner
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cardBorder),
+                ),
                 child: Row(
                   children: [
-                    _buildFilterChip('All Staff', 'all'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Front Desk', 'front desk'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Housekeeping', 'housekeeping'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Maintenance', 'maintenance'),
+                    const Icon(Icons.schedule_rounded, size: 13, color: purple),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${staff.shift.isNotEmpty ? staff.shift : 'General Shift'}: ',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: navy,
+                              ),
+                            ),
+                            TextSpan(
+                              text: shiftTiming,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (staff.propertyId.isNotEmpty && staff.propertyId != 'all')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: cream,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: gold.withAlpha(100)),
+                        ),
+                        child: Text(
+                          staff.propertyId,
+                          style: const TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            color: navy,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 6),
+
+              // Footer: Contact Details & Tap Hint
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      if (staff.phone.isNotEmpty) ...[
+                        const Icon(Icons.phone_outlined, size: 11, color: muted),
+                        const SizedBox(width: 3),
+                        Text(
+                          staff.phone,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (staff.email.isNotEmpty) ...[
+                        const Icon(Icons.mail_outline_rounded, size: 11, color: muted),
+                        const SizedBox(width: 3),
+                        Text(
+                          staff.email,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const Row(
+                    children: [
+                      Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: purple,
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, size: 13, color: purple),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+      ),
+    );
+  }
 
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => staffProvider.fetchAll(),
-            child: staffProvider.isLoading && staffProvider.staffList.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : list.isEmpty
-                    ? EmptyState(
-                        icon: Icons.people_outline,
-                        title: 'No Staff Found',
-                        message: 'No staff profiles match the current filter.',
-                        actionText: 'Refresh',
-                        onAction: () => staffProvider.fetchAll(),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: list.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final staff = list[index];
-                          return _buildStaffCard(staff);
-                        },
-                      ),
+  // --- Attendance Roster Card (Web-Synchronized) ---
+  Widget _buildAttendanceRosterCard(_AttendanceRosterItem item) {
+    final shiftTiming = _getShiftTiming(item.assignedShift);
+    final dateDisplay = _formatDateString(item.date);
+
+    Color statusColor;
+    Color statusBg;
+    final st = item.attendanceStatus.toLowerCase();
+    if (st == 'present') {
+      statusColor = emerald;
+      statusBg = emeraldBg;
+    } else if (st == 'absent') {
+      statusColor = ruby;
+      statusBg = rubyBg;
+    } else {
+      statusColor = amber;
+      statusBg = amberBg;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: statusColor.withAlpha(40),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: navy.withAlpha(4),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStaffCard(StaffModel staff) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.primary.withAlpha(30),
-                  radius: 22,
-                  child: Text(
-                    staff.name.isNotEmpty ? staff.name[0].toUpperCase() : 'S',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 16),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        staff.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${staff.department} • Shift: ${staff.shift}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        staff.email,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                StatusBadge(
-                  status: staff.status,
-                  fontSize: 10,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                ),
-              ],
-            ),
-            const Divider(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  icon: const Icon(Icons.schedule, size: 16),
-                  label: const Text('Assign Shift'),
-                  onPressed: () => _showAssignShiftDialog(staff.id, staff.name),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                  tooltip: 'Delete Staff Profile',
-                  onPressed: () => _confirmDeleteStaff(staff),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
-    );
-  }
-
-  // ==========================================
-  // TAB 2: SHIFT SCHEDULE
-  // ==========================================
-  Widget _buildShiftsTab(StaffProvider staffProvider) {
-    final shifts = staffProvider.shifts;
-
-    if (shifts.isEmpty) {
-      return EmptyState(
-        icon: Icons.schedule_outlined,
-        title: 'No Shifts Assigned',
-        message: 'Assign shifts to receptionist staff members.',
-        actionText: 'Refresh',
-        onAction: () => staffProvider.fetchAll(),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _buildShiftGroupCard('Morning Shift (06:00 - 14:00)', shifts.where((s) => s.shiftType.toLowerCase().contains('morning')).toList(), AppColors.secondary),
-        const SizedBox(height: 14),
-        _buildShiftGroupCard('Evening Shift (14:00 - 22:00)', shifts.where((s) => s.shiftType.toLowerCase().contains('evening')).toList(), AppColors.primary),
-        const SizedBox(height: 14),
-        _buildShiftGroupCard('Night Shift (22:00 - 06:00)', shifts.where((s) => s.shiftType.toLowerCase().contains('night')).toList(), Colors.indigo),
-      ],
-    );
-  }
-
-  Widget _buildShiftGroupCard(String title, List<ShiftModel> shiftList, Color color) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                const Spacer(),
-                Text(
-                  '${shiftList.length} Assigned',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
-                ),
-              ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ManagerStaffAttendanceDetailScreen(
+                staffId: item.id,
+                staffName: item.name,
+                email: item.email,
+                phone: item.phone,
+                role: item.role,
+                department: item.department,
+                propertyId: item.propertyId,
+                employeeId: item.employeeId,
+                assignedShift: item.assignedShift,
+                currentStatus: item.attendanceStatus,
+                staff: item.staff,
+              ),
             ),
-            const Divider(height: 16),
-            if (shiftList.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('No staff allocated to this shift slot', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              )
-            else
-              ...shiftList.map((s) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(s.username, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      TextButton(
-                        child: const Text('Reassign', style: TextStyle(fontSize: 11)),
-                        onPressed: () => _showAssignShiftDialog(s.userId, s.username),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Avatar + Name + Employee ID + Status Badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [statusColor, navy],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                );
-              }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==========================================
-  // TAB 3: DAILY ATTENDANCE LOG
-  // ==========================================
-  Widget _buildAttendanceTab(StaffProvider staffProvider) {
-    final attendance = staffProvider.attendance;
-
-    if (attendance.isEmpty) {
-      return EmptyState(
-        icon: Icons.co_present_outlined,
-        title: 'No Attendance Records',
-        message: 'Daily attendance logs will appear here.',
-        actionText: 'Refresh',
-        onAction: () => staffProvider.fetchAll(),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: attendance.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final att = attendance[index];
-        final isPresent = att.status.toLowerCase() == 'present';
-
-        return Card(
-          elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: isPresent ? AppColors.success.withAlpha(20) : AppColors.error.withAlpha(20),
-                  child: Icon(
-                    isPresent ? Icons.check : Icons.close,
-                    color: isPresent ? AppColors.success : AppColors.error,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        att.username,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        item.name.isNotEmpty ? item.name[0].toUpperCase() : 'A',
+                        style: const TextStyle(
+                          color: white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Date: ${att.date} • ${att.workingHours} hrs',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'In: ${att.checkIn} | Out: ${att.checkOut}',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isPresent ? AppColors.success.withAlpha(20) : AppColors.error.withAlpha(20),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    att.status,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isPresent ? AppColors.success : AppColors.error,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showAssignShiftDialog(String userId, String username) {
-    String selectedShift = 'Morning';
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text('Assign Shift to $username'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedShift,
-                    decoration: const InputDecoration(labelText: 'Shift Slot', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'Morning', child: Text('Morning Shift (06:00 - 14:00)')),
-                      DropdownMenuItem(value: 'Evening', child: Text('Evening Shift (14:00 - 22:00)')),
-                      DropdownMenuItem(value: 'Night', child: Text('Night Shift (22:00 - 06:00)')),
-                    ],
-                    onChanged: (v) => setDialogState(() => selectedShift = v ?? 'Morning'),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                item.name,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: navy,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusBg,
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(color: statusColor.withAlpha(60)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 4.5,
+                                    height: 4.5,
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3.5),
+                                  Text(
+                                    item.attendanceStatus.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: purpleBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                item.role.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: purple,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: background,
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: cardBorder),
+                              ),
+                              child: Text(
+                                item.employeeId,
+                                style: const TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                item.department,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    final messenger = ScaffoldMessenger.of(context);
-                    final ok = await context.read<StaffProvider>().assignShift(userId, username, selectedShift);
-                    if (ok && mounted) {
-                      messenger.showSnackBar(
-                        SnackBar(content: Text('Shift reassigned to $selectedShift for $username'), backgroundColor: AppColors.success),
-                      );
-                    }
-                  },
-                  child: const Text('Assign'),
+              const SizedBox(height: 8),
+
+              // Date & Assigned Shift Row
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5.5),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cardBorder),
                 ),
-              ],
-            );
-          },
-        );
-      },
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_note_rounded, size: 12, color: navy),
+                    const SizedBox(width: 4),
+                    Text(
+                      dateDisplay,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: navy,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.schedule_rounded, size: 12, color: purple),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '${item.assignedShift} ($shiftTiming)',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 7),
+
+              // Check-in, Check-out & Hours Details
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTimeDetailBox(
+                      label: 'Check In',
+                      time: item.checkIn,
+                      icon: Icons.login_rounded,
+                      color: emerald,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildTimeDetailBox(
+                      label: 'Check Out',
+                      time: item.checkOut,
+                      icon: Icons.logout_rounded,
+                      color: ruby,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildTimeDetailBox(
+                      label: 'Working Hrs',
+                      time: item.workingHours > 0
+                          ? '${item.workingHours.toStringAsFixed(1)} hrs'
+                          : '—',
+                      icon: Icons.timelapse_rounded,
+                      color: purple,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  void _confirmDeleteStaff(StaffModel staff) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Staff Profile'),
-        content: Text('Are you sure you want to delete profile for ${staff.name}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+  Widget _buildTimeDetailBox({
+    required String label,
+    required String time,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 10, color: color),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: color == ruby && (time == '—:—' || time == '—') ? muted : navy,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
-
-    if (confirm == true && mounted) {
-      final ok = await context.read<StaffProvider>().deleteStaff(staff.id);
-      if (ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Staff member profile deleted')),
-        );
-      }
-    }
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _departmentFilter == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => setState(() => _departmentFilter = value),
-      selectedColor: AppColors.primary.withAlpha(40),
-      labelStyle: TextStyle(
-        color: isSelected ? AppColors.primary : AppColors.textSecondary,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        fontSize: 12,
+  // --- Shared Mini Metric Component ---
+  Widget _buildMiniMetric({
+    required String label,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor.withAlpha(120),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withAlpha(60),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3.5),
+                decoration: BoxDecoration(
+                  color: white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, size: 11, color: color),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: color == navy ? navy : color,
+                letterSpacing: -0.3,
+                height: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Empty States ---
+  Widget _buildEmptyStaffState() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.people_outline_rounded, size: 44, color: muted),
+          const SizedBox(height: 10),
+          const Text(
+            'No Staff Found',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: navy,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Try adjusting your search criteria or add new staff personnel.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyAttendanceState() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.how_to_reg_outlined, size: 44, color: muted),
+          const SizedBox(height: 10),
+          const Text(
+            'No Attendance Records',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: navy,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'No attendance records found for this property.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorView(String msg) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 44, color: ruby),
+            const SizedBox(height: 10),
+            Text(
+              msg,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: navy,
+                foregroundColor: white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

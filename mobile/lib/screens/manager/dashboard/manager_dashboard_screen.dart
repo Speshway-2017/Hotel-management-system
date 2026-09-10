@@ -5,15 +5,16 @@ import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/manager/approval_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/guest_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/manager_feedback_provider.dart';
+import 'package:hour_stay_mobile/providers/manager/manager_notification_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/payment_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/staff_provider.dart';
 import 'package:hour_stay_mobile/widgets/server_config_dialog.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
-import '../approvals/manager_approvals_screen.dart';
 import '../feedback/manager_feedback_screen.dart';
 import '../guests/manager_guests_screen.dart';
+import '../operations/manager_today_operations_screen.dart';
 import '../reservations/manager_create_reservation_screen.dart';
 import '../reservations/manager_reservation_detail_screen.dart';
 import '../staff/manager_staff_screen.dart';
@@ -33,7 +34,6 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
   static const Color cream = Color(0xFFFFF7E6);
   static const Color white = Color(0xFFFFFFFF);
   static const Color muted = Color(0xFF8A8F98);
-  static const Color slate = Color(0xFF1E293B);
   static const Color background = Color(0xFFF8FAFC);
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color emerald = Color(0xFF10B981);
@@ -47,34 +47,13 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
   }
 
   void _ensureDataLoaded() {
-    final res = context.read<ReservationProvider>();
-    if (res.reservations.isEmpty && !res.isLoading) {
-      res.fetchAll();
-    }
-    final rooms = context.read<RoomProvider>();
-    if (rooms.rooms.isEmpty && !rooms.isLoading) {
-      rooms.fetchAll();
-    }
-    final approvals = context.read<ApprovalProvider>();
-    if (approvals.approvals.isEmpty && !approvals.isLoading) {
-      approvals.fetchAll();
-    }
-    final payments = context.read<PaymentProvider>();
-    if (payments.payments.isEmpty && !payments.isLoading) {
-      payments.fetchAll();
-    }
-    final feedback = context.read<ManagerFeedbackProvider>();
-    if (feedback.feedbacks.isEmpty && !feedback.isLoading) {
-      feedback.fetchAll();
-    }
-    final guests = context.read<GuestProvider>();
-    if (guests.guests.isEmpty && !guests.isLoading) {
-      guests.fetchGuests();
-    }
-    final staff = context.read<StaffProvider>();
-    if (staff.staffList.isEmpty && !staff.isLoading) {
-      staff.fetchAll();
-    }
+    context.read<ReservationProvider>().fetchAll(silent: true);
+    context.read<RoomProvider>().fetchAll(silent: true);
+    context.read<ApprovalProvider>().fetchAll(silent: true);
+    context.read<PaymentProvider>().fetchAll(silent: true);
+    context.read<ManagerFeedbackProvider>().fetchAll(silent: true);
+    context.read<GuestProvider>().fetchGuests(silent: true);
+    context.read<StaffProvider>().fetchAll(silent: true);
   }
 
   @override
@@ -89,21 +68,6 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
 
     final pendingApprovals = approvalProvider.pendingCount;
 
-    // Helper for checking if a date string represents today
-    final now = DateTime.now();
-    final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-
-    bool isDateToday(String? dateStr) {
-      if (dateStr == null || dateStr.isEmpty) return false;
-      if (dateStr.startsWith(todayStr)) return true;
-      try {
-        final dt = DateTime.parse(dateStr);
-        return dt.year == now.year && dt.month == now.month && dt.day == now.day;
-      } catch (_) {
-        return false;
-      }
-    }
-
     // Active in-house stays
     final inHouseReservations = resProvider.reservations.where((r) {
       final st = r.status.toLowerCase();
@@ -115,36 +79,42 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
     // Today's operational metrics (Today's Arrivals, Departures & Revenue strictly for today)
     final todayArrivals = resProvider.reservations.where((r) {
       final st = r.status.toLowerCase();
-      final isArrivalStatus = ['confirmed', 'pending', 'upcoming', 'booked', 'reserved'].contains(st);
-      return isArrivalStatus && isDateToday(r.checkIn);
+      final isArrivalStatus = [
+        'confirmed',
+        'pending',
+        'upcoming',
+        'booked',
+        'reserved',
+        'pre-checked',
+        'pre_checked',
+        'paid',
+      ].contains(st);
+      return isArrivalStatus && Formatters.isToday(r.checkIn);
     }).length;
 
     final todayDepartures = resProvider.reservations.where((r) {
       final st = r.status.toLowerCase();
       final isDepartureStatus = ['completed', 'checked-out', 'checked_out'].contains(st);
-      return isDepartureStatus && isDateToday(r.checkOut);
+      return isDepartureStatus && Formatters.isToday(r.checkOut);
     }).length;
 
     // Calculate today's revenue (from completed payments today or today's checked-in/settled stays)
     double todayRevenue = paymentProvider.payments
-        .where((p) => p.isCompleted && isDateToday(p.createdAt))
+        .where((p) => p.isCompleted && Formatters.isToday(p.createdAt))
         .fold(0.0, (acc, p) => acc + p.amount);
 
     if (todayRevenue == 0.0) {
       todayRevenue = resProvider.reservations
-          .where((r) => (isDateToday(r.checkIn) || isDateToday(r.createdAt)) && ['paid', 'checked-in', 'checked_in', 'completed'].contains(r.status.toLowerCase()))
+          .where((r) => (Formatters.isToday(r.checkIn) || Formatters.isToday(r.createdAt)) && ['paid', 'checked-in', 'checked_in', 'completed', 'confirmed'].contains(r.status.toLowerCase()))
           .fold(0.0, (acc, r) => acc + r.totalAmount);
     }
 
-    // Active / Latest Spotlight Reservation for the top card
-    ReservationModel? spotlightReservation;
-    if (inHouseReservations.isNotEmpty) {
-      spotlightReservation = inHouseReservations.first;
-    } else if (resProvider.reservations.isNotEmpty) {
-      spotlightReservation = resProvider.reservations.first;
-    }
+    // Active Spotlight Reservation for the top card (Spotlights latest/active reservation)
+    final ReservationModel? spotlightReservation = resProvider.reservations.isNotEmpty
+        ? resProvider.reservations.first
+        : (inHouseReservations.isNotEmpty ? inHouseReservations.first : null);
 
-    final feedbackCount = feedbackProvider.feedbacks.length;
+    final feedbackCount = feedbackProvider.unreadCount;
     final recentReservations = resProvider.reservations.take(6).toList();
     final isInitialLoading = resProvider.isLoading && resProvider.reservations.isEmpty;
 
@@ -162,6 +132,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
             guestProvider.fetchGuests(),
             feedbackProvider.fetchAll(),
             staffProvider.fetchAll(),
+            context.read<ManagerNotificationProvider>().fetchNotifications(),
           ]);
         },
         child: ListView(
@@ -178,34 +149,44 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
             _buildSectionHeader(
               title: "Today's Operations",
               subtitle: 'Live daily operational pulse & turns',
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: emerald.withAlpha(20),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: emerald.withAlpha(60)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 5.5,
-                      height: 5.5,
-                      decoration: const BoxDecoration(
-                        color: emerald,
-                        shape: BoxShape.circle,
-                      ),
+              trailing: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ManagerTodayOperationsScreen(),
                     ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Live Sync',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: emerald,
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: emerald.withAlpha(20),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: emerald.withAlpha(60)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5.5,
+                        height: 5.5,
+                        decoration: const BoxDecoration(
+                          color: emerald,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      const Text(
+                        'View All',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: emerald,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -333,77 +314,80 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Badge row: Active stay indicator + Room number
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: (activeReservation.status.toLowerCase().contains('in') || activeReservation.status.toLowerCase() == 'active')
-                                ? emerald.withAlpha(30)
-                                : purple.withAlpha(40),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: (activeReservation.status.toLowerCase().contains('in') || activeReservation.status.toLowerCase() == 'active')
-                                  ? emerald.withAlpha(120)
-                                  : gold.withAlpha(100),
-                              width: 0.9,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: (activeReservation.status.toLowerCase().contains('in') || activeReservation.status.toLowerCase() == 'active')
-                                      ? emerald
-                                      : gold,
-                                  shape: BoxShape.circle,
+                    Builder(
+                      builder: (context) {
+                        final stUpper = activeReservation.status.toUpperCase();
+                        final bool isInHouse = ['CHECKED-IN', 'CHECKED_IN', 'ACTIVE', 'STAYING'].contains(stUpper);
+                        final String badgeText = isInHouse
+                            ? 'ACTIVE IN-HOUSE GUEST'
+                            : (stUpper == 'CONFIRMED' ? 'LATEST RESERVATION' : '$stUpper RESERVATION');
+                        final Color badgeTone = isInHouse
+                            ? emerald
+                            : (stUpper == 'CONFIRMED' ? const Color(0xFF38BDF8) : gold);
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: badgeTone.withAlpha(30),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: badgeTone.withAlpha(120),
+                                  width: 0.9,
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                (activeReservation.status.toLowerCase().contains('in') || activeReservation.status.toLowerCase() == 'active')
-                                    ? 'ACTIVE IN-HOUSE GUEST'
-                                    : 'LATEST RESERVATION',
-                                style: TextStyle(
-                                  color: (activeReservation.status.toLowerCase().contains('in') || activeReservation.status.toLowerCase() == 'active')
-                                      ? emerald
-                                      : gold,
-                                  fontSize: 8.5,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      color: badgeTone,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    badgeText,
+                                    style: TextStyle(
+                                      color: badgeTone,
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: cream,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: gold, width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gold.withAlpha(40),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'Room ${activeReservation.roomNumber.isNotEmpty ? activeReservation.roomNumber : (activeReservation.room.isNotEmpty ? activeReservation.room : '101')}',
+                                style: const TextStyle(
+                                  color: navy,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.4,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: cream,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: gold, width: 1),
-                            boxShadow: [
-                              BoxShadow(
-                                color: gold.withAlpha(40),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            'Room ${activeReservation.roomNumber.isNotEmpty ? activeReservation.roomNumber : (activeReservation.room.isNotEmpty ? activeReservation.room : '101')}',
-                            style: const TextStyle(
-                              color: navy,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
                             ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
 
@@ -621,155 +605,160 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
     );
   }
 
-  // --- 4 KPI Cards in a Single Row (No Scrolling) ---
+  // --- 4 KPI Cards in a Single Row (Uniform Mini Metrics) ---
   Widget _buildKpiRow({
     required int arrivals,
     required int departures,
     required int inHouse,
     required double todayRevenue,
   }) {
+    String revFormatted;
+    if (todayRevenue >= 100000) {
+      revFormatted = '₹${(todayRevenue / 100000).toStringAsFixed(1)}L';
+    } else if (todayRevenue >= 1000) {
+      revFormatted = '₹${(todayRevenue / 1000).toStringAsFixed(1)}k';
+    } else {
+      revFormatted = '₹${todayRevenue.toStringAsFixed(0)}';
+    }
+
     return Row(
       children: [
         Expanded(
-          child: _buildKpiCard(
-            title: 'Arrivals',
+          child: _buildMiniMetric(
+            label: 'Arrivals',
             value: '$arrivals',
-            subtitle: "Today",
+            subtitle: 'Today',
             icon: Icons.login_rounded,
-            iconBg: const Color(0xFFF3E8FF),
-            accentColor: purple,
+            color: purple,
+            bgColor: const Color(0xFFF3E8FF),
           ),
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: _buildKpiCard(
-            title: 'Departures',
+          child: _buildMiniMetric(
+            label: 'Departures',
             value: '$departures',
-            subtitle: "Today",
+            subtitle: 'Today',
             icon: Icons.logout_rounded,
-            iconBg: const Color(0xFFFEF3C7),
-            accentColor: const Color(0xFFD97706),
+            color: const Color(0xFFD97706),
+            bgColor: const Color(0xFFFEF3C7),
           ),
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: _buildKpiCard(
-            title: 'In-House',
+          child: _buildMiniMetric(
+            label: 'In-House',
             value: '$inHouse',
             subtitle: 'Active',
             icon: Icons.hotel_rounded,
-            iconBg: const Color(0xFFFFF7E6),
-            accentColor: navy,
+            color: navy,
+            bgColor: cream,
           ),
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: _buildKpiCard(
-            title: 'Today Rev',
-            value: Formatters.currency(todayRevenue),
-            subtitle: "Today",
+          child: _buildMiniMetric(
+            label: 'Today Rev',
+            value: revFormatted,
+            subtitle: 'Sales',
             icon: Icons.account_balance_wallet_rounded,
-            iconBg: const Color(0xFFEFF6FF),
-            accentColor: const Color(0xFF2563EB),
+            color: const Color(0xFF2563EB),
+            bgColor: const Color(0xFFEFF6FF),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildKpiCard({
-    required String title,
+  Widget _buildMiniMetric({
+    required String label,
     required String value,
     required String subtitle,
     required IconData icon,
-    required Color iconBg,
-    required Color accentColor,
+    required Color color,
+    required Color bgColor,
   }) {
     return Container(
-      height: 78,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
       decoration: BoxDecoration(
-        color: white,
+        color: bgColor.withAlpha(120),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardBorder, width: 1.0),
+        border: Border.all(
+          color: color.withAlpha(60),
+          width: 1.0,
+        ),
         boxShadow: [
           BoxShadow(
-            color: navy.withAlpha(5),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+            color: Colors.black.withAlpha(4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 21,
-                height: 21,
+                padding: const EdgeInsets.all(3.5),
                 decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(5.5),
-                  border: Border.all(
-                    color: accentColor.withAlpha(40),
-                    width: 1,
-                  ),
+                  color: white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
-                child: Center(
-                  child: Icon(icon, color: accentColor, size: 11.5),
-                ),
-              ),
-              Flexible(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF334155),
-                    letterSpacing: -0.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: accentColor == navy ? navy : accentColor,
-                  letterSpacing: -0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                child: Icon(icon, size: 11, color: color),
               ),
               Text(
                 subtitle,
                 style: const TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w600,
                   color: Color(0xFF64748B),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
+          ),
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: color == navy ? navy : color,
+                letterSpacing: -0.3,
+                height: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // --- Redesigned Compact Quick Actions Grid (3 Cards Per Row, 2 Rows) ---
+  // --- 4 Quick Action Cards in a Single Row (4 Cards Per Row) ---
   Widget _buildQuickActionsSection({
     required BuildContext context,
     required int pendingApprovals,
@@ -784,7 +773,13 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
         icon: Icons.speed_rounded,
         iconColor: navy,
         bgColor: const Color(0xFFFFF7E6),
-        onTap: () => _showOperationsSheet(context, resProvider, roomProvider, pendingApprovals),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const ManagerTodayOperationsScreen(),
+            ),
+          );
+        },
       ),
       _QuickActionItem(
         label: 'Guests',
@@ -809,18 +804,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
         },
       ),
       _QuickActionItem(
-        label: 'Attendance',
-        icon: Icons.how_to_reg_rounded,
-        iconColor: emerald,
-        bgColor: const Color(0xFFECFDF5),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ManagerStaffScreen(initialIndex: 2)),
-          );
-        },
-      ),
-      _QuickActionItem(
-        label: 'Guest Feedback',
+        label: 'Feedback',
         icon: Icons.star_rounded,
         iconColor: const Color(0xFFD97706),
         bgColor: const Color(0xFFFEF3C7),
@@ -831,47 +815,39 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
           );
         },
       ),
-      _QuickActionItem(
-        label: 'Settings',
-        icon: Icons.tune_rounded,
-        iconColor: slate,
-        bgColor: const Color(0xFFF1F5F9),
-        onTap: () => ServerConfigDialog.show(context),
-      ),
     ];
 
-    return GridView.count(
-      crossAxisCount: 3,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.42,
-      children: actions.map((act) => _buildQuickActionButton(act)).toList(),
+    return Row(
+      children: actions
+          .map(
+            (act) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: _buildQuickActionButton(act),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 
   Widget _buildQuickActionButton(_QuickActionItem action) {
     return InkWell(
       onTap: action.onTap,
-      borderRadius: BorderRadius.circular(13),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+        height: 60,
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
         decoration: BoxDecoration(
           color: white,
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: action.iconColor.withAlpha(32),
-            width: 1.1,
+            color: action.iconColor.withAlpha(30),
+            width: 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: navy.withAlpha(6),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-            BoxShadow(
-              color: action.iconColor.withAlpha(12),
+              color: Colors.black.withAlpha(4),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -885,34 +861,24 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
               backgroundColor: const Color(0xFFE53935),
               label: Text(
                 '${action.badgeCount}',
-                style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
               ),
               child: Container(
-                width: 27,
-                height: 27,
+                width: 22,
+                height: 22,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      action.iconColor.withAlpha(220),
-                      action.iconColor,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                  color: action.bgColor,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: action.iconColor.withAlpha(35),
+                    width: 1.0,
                   ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: action.iconColor.withAlpha(50),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1.5),
-                    ),
-                  ],
                 ),
                 child: Center(
                   child: Icon(
                     action.icon,
-                    color: white,
-                    size: 14,
+                    color: action.iconColor,
+                    size: 12,
                   ),
                 ),
               ),
@@ -925,10 +891,10 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
                 fontWeight: FontWeight.w700,
                 color: navy,
                 letterSpacing: -0.2,
-                height: 1.1,
+                height: 1.0,
               ),
               textAlign: TextAlign.center,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -1179,82 +1145,6 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  // --- Bottom Sheets for Operations & Reports ---
-  void _showOperationsSheet(
-    BuildContext context,
-    ReservationProvider resProvider,
-    RoomProvider roomProvider,
-    int pendingApprovals,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final reservations = resProvider.reservations;
-        final totalRooms = roomProvider.rooms.length;
-        final occupiedRooms = roomProvider.rooms.where((r) => r.status.toLowerCase() == 'occupied').length;
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 26),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: muted.withAlpha(60),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "Today's Operations Breakdown",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: navy),
-              ),
-              const SizedBox(height: 3),
-              const Text(
-                'Live overview of current shifts and room turns.',
-                style: TextStyle(fontSize: 11, color: muted),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(backgroundColor: Color(0xFFF3E8FF), child: Icon(Icons.hotel, color: purple, size: 18)),
-                title: const Text('Occupied Rooms', style: TextStyle(fontWeight: FontWeight.w700, color: navy, fontSize: 13)),
-                trailing: Text('$occupiedRooms / $totalRooms', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(backgroundColor: Color(0xFFFEF3C7), child: Icon(Icons.verified, color: gold, size: 18)),
-                title: const Text('Pending Hourly Approvals', style: TextStyle(fontWeight: FontWeight.w700, color: navy, fontSize: 13)),
-                trailing: Text('$pendingApprovals', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFFE53935))),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManagerApprovalsScreen()));
-                },
-              ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.book_online, color: Color(0xFF2563EB), size: 18)),
-                title: const Text('Total Active Bookings', style: TextStyle(fontWeight: FontWeight.w700, color: navy, fontSize: 13)),
-                trailing: Text('${reservations.length}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

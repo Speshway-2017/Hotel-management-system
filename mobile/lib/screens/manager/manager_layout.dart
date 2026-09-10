@@ -405,7 +405,22 @@ class _ManagerLayoutState extends State<ManagerLayout> {
             bottom: 0,
             child: ManagerFloatingNavBar(
               currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
+              onTap: (index) {
+                setState(() => _currentIndex = index);
+                if (index == 0) {
+                  context.read<ReservationProvider>().fetchAll(silent: true);
+                  context.read<PaymentProvider>().fetchAll(silent: true);
+                  context.read<RoomProvider>().fetchAll(silent: true);
+                } else if (index == 1) {
+                  context.read<ReservationProvider>().fetchAll(silent: true);
+                } else if (index == 2) {
+                  context.read<RoomProvider>().fetchAll(silent: true);
+                } else if (index == 3) {
+                  context.read<ApprovalProvider>().fetchAll(silent: true);
+                } else if (index == 4) {
+                  context.read<PaymentProvider>().fetchAll(silent: true);
+                }
+              },
               pendingApprovals: pendingApprovals,
             ),
           ),

@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/socket_service.dart';
+import '../services/notification_service.dart';
 
 class AuthProvider with ChangeNotifier {
   UserModel? _user;
@@ -33,6 +34,7 @@ class AuthProvider with ChangeNotifier {
           _user = savedUser;
           await SocketService.connect(_user?.propertyId);
           refreshProfile();
+          NotificationService.syncTokenWithBackend();
         }
       }
     } catch (_) {

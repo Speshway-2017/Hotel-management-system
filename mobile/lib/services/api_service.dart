@@ -23,6 +23,31 @@ class ApiResponse<T> {
 class ApiService {
   static String? _resolvedBaseUrl;
 
+  /// Fast active probe to dynamically discover reachable backend host.
+  static Future<String?> probeFastWorkingBaseUrl() async {
+    final customUrl = await StorageService.getBaseUrl();
+    final candidates = <String>[
+      if (customUrl != null && customUrl.trim().isNotEmpty && !customUrl.contains('192.168.1.14'))
+        customUrl.trim(),
+      ...ApiEndpoints.getCandidateBaseUrls(),
+    ];
+
+    for (final url in candidates) {
+      try {
+        final uri = Uri.parse('$url/health');
+        final res = await http.get(uri).timeout(const Duration(milliseconds: 1500));
+        if (res.statusCode == 200) {
+          debugPrint('🎯 [NETWORK PROBE] Connected to HMS Backend at $url');
+          await _updateWorkingBaseUrl(url);
+          return url;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
   static Future<String> getBaseUrl() async {
     if (_resolvedBaseUrl != null &&
         _resolvedBaseUrl!.isNotEmpty &&

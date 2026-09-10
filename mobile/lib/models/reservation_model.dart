@@ -22,6 +22,9 @@ class ReservationModel {
   final String idDocType;
   final String idDocNumber;
   final String idVerification;
+  final double? originalAmount;
+  final double? discountAmount;
+  final String? couponCode;
   final String specialRequests;
   final String createdAt;
 
@@ -30,7 +33,7 @@ class ReservationModel {
   String get guestEmail => email;
   String get guestPhone => phone;
   String get reservationNumber => bookingId;
-  double get totalAmount => amount;
+  double get totalAmount => (originalAmount != null && originalAmount! > 0) ? originalAmount! : amount;
 
   ReservationModel({
     required this.id,
@@ -47,6 +50,9 @@ class ReservationModel {
     this.stayType = 'hourly',
     this.hours,
     this.amount = 0.0,
+    this.originalAmount,
+    this.discountAmount,
+    this.couponCode,
     this.balance = 0.0,
     this.status = 'Confirmed',
     this.paymentStatus = 'Pending',
@@ -142,7 +148,10 @@ class ReservationModel {
       nights: int.tryParse(json['nights']?.toString() ?? '1') ?? 1,
       stayType: sType,
       hours: hrs,
-      amount: double.tryParse(json['amount']?.toString() ?? json['totalAmount']?.toString() ?? '0') ?? 0.0,
+      amount: double.tryParse(json['originalAmount']?.toString() ?? json['amount']?.toString() ?? json['totalAmount']?.toString() ?? '0') ?? 0.0,
+      originalAmount: double.tryParse(json['originalAmount']?.toString() ?? ''),
+      discountAmount: double.tryParse(json['discountAmount']?.toString() ?? ''),
+      couponCode: json['couponCode']?.toString(),
       balance: double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0,
       status: json['status'] ?? 'Confirmed',
       paymentStatus: json['paymentStatus'] ?? 'Pending',

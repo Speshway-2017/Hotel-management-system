@@ -26,10 +26,12 @@ class StaffProvider with ChangeNotifier {
     SocketService.on('user_created', (_) => fetchAll(silent: true));
     SocketService.on('user_updated', (_) => fetchAll(silent: true));
     SocketService.on('user_deleted', (_) => fetchAll(silent: true));
+    SocketService.on('attendance_updated', (_) => fetchAll(silent: true));
     SocketService.on('dashboard_sync', (_) => fetchAll(silent: true));
   }
 
   Future<void> fetchStaff({bool silent = false}) => fetchAll(silent: silent);
+  Future<void> fetchAttendance({bool silent = false}) => fetchAll(silent: silent);
 
   Future<void> fetchAll({bool silent = false}) async {
     if (!silent) {
@@ -132,5 +134,39 @@ class StaffProvider with ChangeNotifier {
       return true;
     }
     return false;
+  }
+
+  Future<bool> markAttendance(Map<String, dynamic> data) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.post(ApiEndpoints.managerAttendance, data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchAll(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateAttendance(String id, Map<String, dynamic> data) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await ApiService.put('${ApiEndpoints.managerAttendance}/$id', data);
+    _isLoading = false;
+
+    if (response.success) {
+      await fetchAll(silent: true);
+      return true;
+    } else {
+      _errorMessage = response.message;
+      notifyListeners();
+      return false;
+    }
   }
 }
