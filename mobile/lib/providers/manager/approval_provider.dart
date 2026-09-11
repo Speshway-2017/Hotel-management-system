@@ -23,6 +23,8 @@ class ApprovalProvider with ChangeNotifier {
 
   int get pendingCount => _approvals.where((a) => a.status.toLowerCase() == 'pending').length;
   int get approvedCount => _approvals.where((a) => a.status.toLowerCase() == 'approved').length;
+  int get processingCount => _approvals.where((a) => a.status.toLowerCase() == 'processing').length;
+  int get refundedCount => _approvals.where((a) => a.status.toLowerCase() == 'refunded').length;
   int get rejectedCount => _approvals.where((a) => a.status.toLowerCase() == 'rejected').length;
 
   ApprovalProvider() {
@@ -79,8 +81,19 @@ class ApprovalProvider with ChangeNotifier {
   }
 
   Future<bool> decideApproval(String id, String action, String reason) async {
-    // Optimistic update
-    final finalStatus = action.toLowerCase() == 'approved' || action.toLowerCase() == 'approve' ? 'Approved' : 'Rejected';
+    // Normalize status
+    String finalStatus = action;
+    final actLower = action.toLowerCase();
+    if (actLower == 'approved' || actLower == 'approve') {
+      finalStatus = 'Approved';
+    } else if (actLower == 'rejected' || actLower == 'reject') {
+      finalStatus = 'Rejected';
+    } else if (actLower == 'processing' || actLower == 'process') {
+      finalStatus = 'Processing';
+    } else if (actLower == 'refunded' || actLower == 'refund') {
+      finalStatus = 'Refunded';
+    }
+
     final idx = _approvals.indexWhere((a) => a.id == id);
     if (idx != -1) {
       final old = _approvals[idx];
@@ -97,7 +110,12 @@ class ApprovalProvider with ChangeNotifier {
         description: old.description,
         status: finalStatus,
         propertyId: old.propertyId,
-        decisionReason: reason.isNotEmpty ? reason : (finalStatus == 'Approved' ? 'Approved via Mobile App' : 'Rejected via Mobile App'),
+        decisionReason: reason.isNotEmpty ? reason : (
+          finalStatus == 'Approved' ? 'Approved via Mobile App' :
+          finalStatus == 'Processing' ? 'Processing Payout via Mobile App' :
+          finalStatus == 'Refunded' ? 'Refund Completed via Mobile App' :
+          'Rejected via Mobile App'
+        ),
         decidedBy: 'Manager',
         decidedAt: DateTime.now().toIso8601String(),
         createdAt: old.createdAt,

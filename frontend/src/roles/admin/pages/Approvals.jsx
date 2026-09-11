@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton } from "@/components/hs/kit";
+import { Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton, ProcessActionButton, MarkRefundedActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -128,6 +128,38 @@ function AdminApprovalsPage() {
       }
     } catch (err) {
       toast.error(err.message || "Approval decision failed.");
+    }
+  };
+
+  const handleMoveProcessing = async (id) => {
+    try {
+      const target = requests.find(r => r.id === id || r._id === id);
+      const targetId = target?._id || target?.id || id;
+      await managerService.updateApproval(targetId, 'Processing', 'Disbursement initiated via payment gateway');
+      toast.success(`Request ${id} moved to Processing status!`);
+      emitRealtimeEvent('dashboard_sync', { action: 'approval_updated', id: targetId });
+      loadApprovals(true);
+      if (selectedReq && (selectedReq.id === id || selectedReq._id === id)) {
+        setSelectedReq({ ...selectedReq, status: "Processing", approvedBy: "Administrator" });
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to update refund status.");
+    }
+  };
+
+  const handleMarkRefunded = async (id) => {
+    try {
+      const target = requests.find(r => r.id === id || r._id === id);
+      const targetId = target?._id || target?.id || id;
+      await managerService.updateApproval(targetId, 'Refunded', 'Refund payment successfully disbursed and settled');
+      toast.success(`Request ${id} marked as Refunded!`);
+      emitRealtimeEvent('dashboard_sync', { action: 'approval_updated', id: targetId });
+      loadApprovals(true);
+      if (selectedReq && (selectedReq.id === id || selectedReq._id === id)) {
+        setSelectedReq({ ...selectedReq, status: "Refunded", approvedBy: "Administrator" });
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to complete refund.");
     }
   };
 
@@ -296,22 +328,50 @@ function AdminApprovalsPage() {
                     <td className="py-3 px-4 font-black text-navy">{r.value}</td>
                     <td className="py-3 px-4 text-muted-foreground font-semibold">{r.requestedBy}</td>
                     <td className="py-3 px-4">
-                      <Tag tone={r.status === "Approved" ? "success" : r.status === "Pending" ? "warning" : "danger"}>
+                      <Tag tone={
+                        r.status === "Approved" ? "success" :
+                        r.status === "Processing" ? "brand" :
+                        r.status === "Refunded" ? "success" :
+                        r.status === "Rejected" ? "error" : "warning"
+                      }>
                         {r.status}
                       </Tag>
                     </td>
-                    <td className="py-3 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
+                    <td className="py-3 px-4 text-left align-middle min-w-[200px] whitespace-nowrap">
                       <ActionGroup align="left">
                         {r.status === "Pending" && (
                           <>
                             <ApproveActionButton
                               onClick={() => handleApprove(r.id)}
+                              title="Approve Request"
                             />
                             <RejectActionButton
                               onClick={() => handleReject(r.id)}
+                              title="Reject Request"
                             />
                           </>
                         )}
+
+                        {r.status === "Approved" && (
+                          <>
+                            <ProcessActionButton
+                              onClick={() => handleMoveProcessing(r.id)}
+                              title="Initiate Payout / Mark as Processing"
+                            />
+                            <RejectActionButton
+                              onClick={() => handleReject(r.id)}
+                              title="Revoke / Reject"
+                            />
+                          </>
+                        )}
+
+                        {r.status === "Processing" && (
+                          <MarkRefundedActionButton
+                            onClick={() => handleMarkRefunded(r.id)}
+                            title="Complete Refund / Mark as Refunded"
+                          />
+                        )}
+
                         <ViewActionButton
                           onClick={() => setSelectedReq(r)}
                         />
@@ -366,7 +426,12 @@ function AdminApprovalsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground font-semibold">Status:</span>
-                  <Tag tone={selectedReq.status === "Approved" ? "success" : selectedReq.status === "Pending" ? "warning" : "danger"}>
+                  <Tag tone={
+                    selectedReq.status === "Approved" ? "success" :
+                    selectedReq.status === "Processing" ? "brand" :
+                    selectedReq.status === "Refunded" ? "success" :
+                    selectedReq.status === "Rejected" ? "error" : "warning"
+                  }>
                     {selectedReq.status}
                   </Tag>
                 </div>
@@ -381,15 +446,39 @@ function AdminApprovalsPage() {
                 <div className="pt-2 border-t border-muted/50 flex gap-2">
                   <Button
                     onClick={() => handleApprove(selectedReq.id)}
-                    className="flex-1 bg-success hover:bg-success/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5"
+                    className="flex-1 bg-success hover:bg-success/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <CheckCircle className="size-3.5" /> Approve Request
+                    <CheckCircle className="size-3.5" /> Approve
                   </Button>
                   <Button
                     onClick={() => handleReject(selectedReq.id)}
-                    className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5"
+                    className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <XCircle className="size-3.5" /> Reject Request
+                    <XCircle className="size-3.5" /> Reject
+                  </Button>
+                </div>
+              ) : selectedReq.status === "Approved" ? (
+                <div className="pt-2 border-t border-muted/50 flex gap-2">
+                  <Button
+                    onClick={() => handleMoveProcessing(selectedReq.id)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Clock className="size-3.5" /> Move to Processing
+                  </Button>
+                  <Button
+                    onClick={() => handleReject(selectedReq.id)}
+                    className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <XCircle className="size-3.5" /> Reject
+                  </Button>
+                </div>
+              ) : selectedReq.status === "Processing" ? (
+                <div className="pt-2 border-t border-muted/50">
+                  <Button
+                    onClick={() => handleMarkRefunded(selectedReq.id)}
+                    className="w-full bg-purple hover:bg-purple/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle className="size-3.5" /> Mark as Refunded (Settled)
                   </Button>
                 </div>
               ) : (

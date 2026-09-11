@@ -54,16 +54,7 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
     final selectedFilter = provider.selectedCategory;
 
     // Apply category / status filter
-    List<NotificationModel> filtered = allNotifications;
-    if (selectedFilter == 'Unread') {
-      filtered = filtered.where((n) => !n.isRead).toList();
-    } else if (selectedFilter == 'Read') {
-      filtered = filtered.where((n) => n.isRead).toList();
-    } else if (selectedFilter != 'All') {
-      filtered = filtered.where((n) =>
-          n.category.trim().toLowerCase() == selectedFilter.trim().toLowerCase() ||
-          n.type.trim().toLowerCase() == selectedFilter.trim().toLowerCase()).toList();
-    }
+    List<NotificationModel> filtered = provider.filteredNotifications;
 
     // Apply search query
     if (_searchQuery.trim().isNotEmpty) {
@@ -183,15 +174,33 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
     final readCount = allNotifications.length - unreadCount;
 
     // Available categories from actual data or standard hotel operations
-    final categories = ['All', 'Unread', 'Approvals', 'Guest Experience', 'Operations', 'Payments', 'Read'];
+    final categories = ['All', 'Unread', 'Approvals', 'Reservations', 'Guest Experience', 'Operations', 'Payments', 'Read'];
 
     int getCategoryCount(String cat) {
       if (cat == 'All') return allNotifications.length;
       if (cat == 'Unread') return unreadCount;
       if (cat == 'Read') return readCount;
-      return allNotifications.where((n) =>
-          n.category.trim().toLowerCase() == cat.trim().toLowerCase() ||
-          n.type.trim().toLowerCase() == cat.trim().toLowerCase()).length;
+      final target = cat.trim().toLowerCase();
+      return allNotifications.where((n) {
+        final c = n.category.trim().toLowerCase();
+        final t = n.type.trim().toLowerCase();
+        if (target == 'reservations' && (c.contains('reserv') || c.contains('book') || t.contains('reserv') || t.contains('book'))) {
+          return true;
+        }
+        if (target == 'approvals' && (c.contains('approval') || t.contains('approval'))) {
+          return true;
+        }
+        if (target == 'payments' && (c.contains('pay') || c.contains('bill') || t.contains('pay'))) {
+          return true;
+        }
+        if (target == 'guest experience' && (c.contains('guest') || c.contains('feedback') || c.contains('review'))) {
+          return true;
+        }
+        if (target == 'operations' && (c.contains('operat') || c.contains('room') || c.contains('shift') || c.contains('staff'))) {
+          return true;
+        }
+        return c == target || t == target;
+      }).length;
     }
 
     return Container(
@@ -1060,7 +1069,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
   // ==========================================
   IconData _getCategoryIcon(String category) {
     final cat = category.toLowerCase();
-    if (cat.contains('approval')) {
+    if (cat.contains('reserv') || cat.contains('book')) {
+      return Icons.calendar_month_rounded;
+    } else if (cat.contains('approval')) {
       return Icons.verified_user_rounded;
     } else if (cat.contains('pay') || cat.contains('bill') || cat.contains('finance')) {
       return Icons.account_balance_wallet_rounded;
@@ -1078,7 +1089,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
 
   Color _getCategoryAccentColor(String category) {
     final cat = category.toLowerCase();
-    if (cat.contains('approval')) {
+    if (cat.contains('reserv') || cat.contains('book')) {
+      return const Color(0xFF0284C7); // Sky blue
+    } else if (cat.contains('approval')) {
       return purple;
     } else if (cat.contains('pay') || cat.contains('bill')) {
       return emerald;
@@ -1094,7 +1107,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
 
   Color _getCategoryBgColor(String category) {
     final cat = category.toLowerCase();
-    if (cat.contains('approval')) {
+    if (cat.contains('reserv') || cat.contains('book')) {
+      return const Color(0xFFE0F2FE);
+    } else if (cat.contains('approval')) {
       return const Color(0xFFEDE9FE);
     } else if (cat.contains('pay') || cat.contains('bill')) {
       return const Color(0xFFDCFCE7);

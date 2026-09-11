@@ -1,8 +1,10 @@
 import Notification from '../models/notification.model.js';
 import { ManagerNotification } from '../models/managerData.model.js';
 import User from '../models/user.model.js';
-import app from '../app.js';
 import { emitRealtimeSync } from './socketEmitter.js';
+
+// In-memory 60-second duplicate suppression cache
+const recentNotificationCache = new Map();
 
 /**
  * Centrally triggers/logs a user, role, or property scoped system alert
@@ -10,33 +12,86 @@ import { emitRealtimeSync } from './socketEmitter.js';
  */
 export const triggerNotification = async ({ req, io, userId, role, propertyId, title, message, category, data = {} }) => {
   try {
-    const socketIo = io || (req && req.app ? req.app.get('socketio') : null) || app.get('socketio');
+    const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
     const targetPropId = propertyId || null;
+
+    const cleanTitle = (title || '').trim();
+    const cleanMsg = (message || '').trim();
+    const dedupKey = `${role || 'all'}:::${targetPropId || 'all'}:::${userId || 'none'}:::${cleanTitle.toLowerCase()}:::${cleanMsg.toLowerCase()}`;
+
+    // 1. In-memory check (60-second duplicate suppression)
+    const now = Date.now();
+    if (recentNotificationCache.has(dedupKey)) {
+      const cachedTime = recentNotificationCache.get(dedupKey);
+      if (now - cachedTime < 60000) {
+        return null; // Suppress duplicate trigger immediately
+      }
+    }
+    recentNotificationCache.set(dedupKey, now);
+
+    // Clean up cache older than 2 minutes
+    if (recentNotificationCache.size > 200) {
+      for (const [k, v] of recentNotificationCache.entries()) {
+        if (now - v > 120000) recentNotificationCache.delete(k);
+      }
+    }
+
+    // 2. Database deduplication check (60 seconds)
+    const sixtySecondsAgo = new Date(now - 60000);
+    const duplicateQuery = {
+      title: cleanTitle,
+      message: cleanMsg,
+      createdAt: { $gte: sixtySecondsAgo }
+    };
+    if (role) duplicateQuery.role = role;
+    if (targetPropId) duplicateQuery.propertyId = targetPropId;
+    if (userId) duplicateQuery.userId = userId;
+
+    let existing = null;
+    try {
+      existing = await Notification.findOne(duplicateQuery);
+    } catch (_) {}
+
+    if (existing) {
+      return existing;
+    }
 
     const notif = await Notification.create({
       userId: userId || null,
       role: role || null,
       propertyId: targetPropId,
-      title,
-      message,
+      title: cleanTitle,
+      message: cleanMsg,
       category: category || 'General',
       isRead: false
     });
 
-    // Also persist to ManagerNotification for property/manager scoped notifications
-    if (role === 'manager' || role === 'admin' || !role) {
+    // Only persist to ManagerNotification for manager scoped notifications
+    if (role === 'manager') {
       try {
-        await ManagerNotification.create({
-          title,
-          message,
-          category: category || 'General',
-          isRead: false,
-          propertyId: targetPropId || 'HS-JAI'
-        });
+        let existingMn = null;
+        try {
+          existingMn = await ManagerNotification.findOne({
+            title: cleanTitle,
+            message: cleanMsg,
+            propertyId: targetPropId || 'HS-JAI',
+            createdAt: { $gte: sixtySecondsAgo }
+          });
+        } catch (_) {}
+
+        if (!existingMn) {
+          await ManagerNotification.create({
+            title: cleanTitle,
+            message: cleanMsg,
+            category: category || 'General',
+            isRead: false,
+            propertyId: targetPropId || 'HS-JAI'
+          });
+        }
       } catch (_) {}
     }
 
-    console.log(`🔔 Notification generated: "${title}" [${category || 'General'}] for role: ${role || 'all'}, property: ${targetPropId || 'all'}, user: ${userId || 'none'}`);
+    console.log(`🔔 Notification generated (Single): "${cleanTitle}" [${category || 'General'}] for role: ${role || 'all'}, property: ${targetPropId || 'all'}, user: ${userId || 'none'}`);
 
     if (socketIo) {
       // Standard events
@@ -49,7 +104,9 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       });
       emitRealtimeSync(socketIo, targetPropId, 'notification_received', notif);
       emitRealtimeSync(socketIo, targetPropId, 'new_notification', notif);
-      emitRealtimeSync(socketIo, targetPropId, 'manager_notification', notif);
+      if (role === 'manager') {
+        emitRealtimeSync(socketIo, targetPropId, 'manager_notification', notif);
+      }
       emitRealtimeSync(socketIo, targetPropId, 'unread_notifications_count_updated', {
         role,
         userId,
@@ -61,34 +118,35 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       });
     }
 
-    // Lookup recipient FCM device tokens and log/dispatch
+    // Lookup recipient FCM device tokens and dispatch once
     try {
       const userQuery = [];
-      if (userId) userQuery.push({ _id: userId }, { id: userId });
-      if (role && targetPropId) {
-        userQuery.push({ role, propertyId: targetPropId }, { role });
+      if (userId) {
+        userQuery.push({ _id: userId }, { id: userId });
+      } else if (role && targetPropId) {
+        userQuery.push({ role, propertyId: targetPropId });
       } else if (role) {
         userQuery.push({ role });
       } else if (targetPropId) {
-        userQuery.push({ propertyId: targetPropId }, { role: 'manager' }, { role: 'admin' });
+        userQuery.push({ propertyId: targetPropId, role: 'manager' });
       } else {
-        userQuery.push({ role: 'manager' }, { role: 'admin' });
+        userQuery.push({ role: 'manager' });
       }
 
       if (userQuery.length > 0) {
         const targetUsers = await User.find({ $or: userQuery });
-        const tokens = [];
+        const tokens = new Set();
         for (const u of targetUsers) {
-          if (u.fcmToken) tokens.push(u.fcmToken);
+          if (u.fcmToken) tokens.add(u.fcmToken);
           if (Array.isArray(u.fcmTokens)) {
             for (const t of u.fcmTokens) {
-              if (t && !tokens.includes(t)) tokens.push(t);
+              if (t) tokens.add(t);
             }
           }
         }
 
-        if (tokens.length > 0) {
-          console.log(`📱 [FCM PUSH] Dispatching notification to ${tokens.length} device tokens: "${title}"`);
+        if (tokens.size > 0) {
+          console.log(`📱 [FCM PUSH] Dispatching single notification to ${tokens.size} device tokens: "${cleanTitle}"`);
         }
       }
     } catch (fcmErr) {
@@ -108,7 +166,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
  */
 export const notifyBookingEvent = async ({ req, io, action = 'created', booking, guestUser = null, property = null }) => {
   try {
-    const socketIo = io || (req && req.app ? req.app.get('socketio') : null) || app.get('socketio');
+    const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
     const propId = booking.propertyId || 'HS-JAI';
     const guestName = booking.guest || booking.guestName || 'A Guest';
     const roomInfo = booking.room || booking.roomType || 'Standard Room';
@@ -119,12 +177,12 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
 
     let title = 'New Reservation Booking';
     let msg = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bookingId}]`;
-    let category = 'New Reservation';
+    let category = 'Reservations';
 
     if (action === 'created' || action === 'booked') {
       title = 'New Online Reservation';
       msg = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bookingId}]`;
-      category = 'New Reservation';
+      category = 'Reservations';
     } else if (action === 'cancelled') {
       title = 'Reservation Cancelled';
       msg = `Booking #${bookingId} for guest ${guestName} (${roomInfo}) was cancelled.`;
@@ -160,7 +218,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       data: { bookingId, guestName, room: roomInfo, action }
     });
 
-    // 2. Notify Manager (target property and default fallback)
+    // 2. Notify Manager for this property (single clean dispatch)
     await triggerNotification({
       req,
       io: socketIo,
@@ -172,20 +230,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       data: { bookingId, guestName, room: roomInfo, action }
     });
 
-    if (propId !== 'HS-JAI') {
-      await triggerNotification({
-        req,
-        io: socketIo,
-        role: 'manager',
-        propertyId: 'HS-JAI',
-        title,
-        message: msg,
-        category,
-        data: { bookingId, guestName, room: roomInfo, action }
-      });
-    }
-
-    // 3. Notify Receptionist
+    // 3. Notify Receptionist for this property
     await triggerNotification({
       req,
       io: socketIo,
@@ -232,7 +277,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
  */
 export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = 'Guest' }) => {
   try {
-    const socketIo = io || (req && req.app ? req.app.get('socketio') : null) || app.get('socketio');
+    const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
     const propId = feedback.propertyId || 'HS-JAI';
     const ratingStars = `${feedback.rating || 5}★`;
     const snippet = (feedback.comment || feedback.comments || '').slice(0, 50);
@@ -248,10 +293,6 @@ export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = '
       // 2. Notify Property Manager & Receptionist
       await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: propId, title, message: msg, category: 'Guest Experience' });
       await triggerNotification({ req, io: socketIo, role: 'receptionist', propertyId: propId, title, message: msg, category: 'Guest Experience' });
-
-      if (propId !== 'HS-JAI') {
-        await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: 'HS-JAI', title, message: msg, category: 'Guest Experience' });
-      }
 
       if (socketIo) {
         emitRealtimeSync(socketIo, propId, 'feedback_received', feedback);

@@ -6,6 +6,7 @@ import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/screens/manager/reservations/manager_create_reservation_screen.dart';
 import 'package:hour_stay_mobile/screens/manager/reservations/manager_reservation_detail_screen.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
+import '../../../core/utils/formatters.dart';
 
 class ManagerRoomDetailDialog extends StatefulWidget {
   final RoomModel room;
@@ -316,7 +317,7 @@ class _ManagerRoomDetailDialogState extends State<ManagerRoomDetailDialog> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Check-In: ${activeRes.checkIn.isNotEmpty ? activeRes.checkIn.substring(0, 10) : "Today"} • Status: ${activeRes.status}',
+                      'Check-In: ${Formatters.checkInDateTime(activeRes.checkIn)} • Status: ${activeRes.status}',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 10),

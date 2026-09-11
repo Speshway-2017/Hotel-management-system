@@ -122,12 +122,16 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
   ) {
     final pendingCount = provider.pendingCount;
     final approvedCount = provider.approvedCount;
+    final processingCount = provider.processingCount;
+    final refundedCount = provider.refundedCount;
     final rejectedCount = provider.rejectedCount;
 
     final filterOptions = [
       {'key': 'all', 'label': 'All Requests', 'count': allApprovals.length},
       {'key': 'pending', 'label': 'Pending', 'count': pendingCount},
       {'key': 'approved', 'label': 'Approved', 'count': approvedCount},
+      {'key': 'processing', 'label': 'Processing', 'count': processingCount},
+      {'key': 'refunded', 'label': 'Refunded', 'count': refundedCount},
       {'key': 'rejected', 'label': 'Rejected', 'count': rejectedCount},
     ];
 
@@ -291,13 +295,19 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
     ApprovalProvider provider,
   ) {
     final isPending = approval.isPending;
-    final isApproved = approval.status.toLowerCase() == 'approved';
+    final isApproved = approval.isApproved;
+    final isProcessing = approval.isProcessing;
+    final isRefunded = approval.isRefunded;
 
     final leftStripeColor = isPending
         ? gold
         : isApproved
             ? emerald
-            : ruby;
+            : isProcessing
+                ? const Color(0xFF2563EB)
+                : isRefunded
+                    ? const Color(0xFF7C3AED)
+                    : ruby;
 
     final catIcon = _getCategoryIcon(approval.category);
     final catColor = _getCategoryColor(approval.category);
@@ -513,7 +523,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                     const SizedBox(height: 6),
                   ],
 
-                  // 5. Action Buttons (For Pending requests)
+                  // 5. Action Buttons (For Pending, Approved, Processing requests)
                   if (isPending) ...[
                     const SizedBox(height: 4),
                     Row(
@@ -569,6 +579,85 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ] else if (approval.isApproved) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: ruby,
+                              side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                              backgroundColor: rubyBg.withAlpha(100),
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: const Icon(Icons.close_rounded, size: 17, color: ruby),
+                            label: const Text(
+                              'Reject',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: ruby,
+                              ),
+                            ),
+                            onPressed: () => _showDecisionDialog(context, approval, 'Rejected', provider),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: const Icon(Icons.sync_rounded, size: 17, color: white),
+                            label: const Text(
+                              'Process',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: white,
+                              ),
+                            ),
+                            onPressed: () => _showDecisionDialog(context, approval, 'Processing', provider),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (approval.isProcessing) ...[
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C3AED),
+                          foregroundColor: white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: const Icon(Icons.task_alt_rounded, size: 17, color: white),
+                        label: const Text(
+                          'Mark as Refunded',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: white,
+                          ),
+                        ),
+                        onPressed: () => _showDecisionDialog(context, approval, 'Refunded', provider),
+                      ),
                     ),
                   ],
                 ],
@@ -627,10 +716,56 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
   void _showDecisionDialog(
     BuildContext context,
     ApprovalModel approval,
-    String action, // 'Approved' or 'Rejected'
+    String action, // 'Approved', 'Rejected', 'Processing', 'Refunded'
     ApprovalProvider provider,
   ) {
-    final isApprove = action.toLowerCase() == 'approved';
+    final actLower = action.toLowerCase();
+    final isApprove = actLower == 'approved';
+    final isProcessing = actLower == 'processing';
+    final isRefunded = actLower == 'refunded';
+
+    Color dialogColor;
+    Color dialogBg;
+    IconData dialogIcon;
+    String dialogTitle;
+    String dialogPrompt;
+    String hintText;
+    String defaultNotes;
+
+    if (isApprove) {
+      dialogColor = emerald;
+      dialogBg = emeraldBg;
+      dialogIcon = Icons.check_rounded;
+      dialogTitle = 'Approve Request';
+      dialogPrompt = 'Are you sure you want to approve the ${approval.category} for ${approval.guest.isNotEmpty ? approval.guest : "this guest"}?';
+      hintText = 'e.g. Approved as per manager policy';
+      defaultNotes = 'Approved via Manager Mobile';
+    } else if (isProcessing) {
+      dialogColor = const Color(0xFF2563EB);
+      dialogBg = const Color(0xFFDBEAFE);
+      dialogIcon = Icons.sync_rounded;
+      dialogTitle = 'Process Refund';
+      dialogPrompt = 'Are you sure you want to initiate payout / move to Processing for ${approval.guest.isNotEmpty ? approval.guest : "this guest"}?';
+      hintText = 'e.g. Payment gateway payout initiated / UTR details';
+      defaultNotes = 'Refund processing initiated via Manager Mobile';
+    } else if (isRefunded) {
+      dialogColor = const Color(0xFF7C3AED);
+      dialogBg = const Color(0xFFEDE9FE);
+      dialogIcon = Icons.task_alt_rounded;
+      dialogTitle = 'Complete Refund';
+      dialogPrompt = 'Are you sure you want to mark this refund as fully Refunded to the guest?';
+      hintText = 'e.g. Bank UTR / Transaction ID #12345678';
+      defaultNotes = 'Refund marked as completed via Manager Mobile';
+    } else {
+      dialogColor = ruby;
+      dialogBg = rubyBg;
+      dialogIcon = Icons.close_rounded;
+      dialogTitle = 'Reject Request';
+      dialogPrompt = 'Are you sure you want to reject the ${approval.category} for ${approval.guest.isNotEmpty ? approval.guest : "this guest"}?';
+      hintText = 'e.g. Policy strictly non-refundable or invalid details';
+      defaultNotes = 'Rejected via Manager Mobile';
+    }
+
     final remarksController = TextEditingController();
     bool isSubmitting = false;
 
@@ -647,22 +782,24 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: isApprove ? emeraldBg : rubyBg,
+                      color: dialogBg,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isApprove ? Icons.check_rounded : Icons.close_rounded,
-                      color: isApprove ? emerald : ruby,
+                      dialogIcon,
+                      color: dialogColor,
                       size: 20,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    '$action Request',
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: navy,
+                  Expanded(
+                    child: Text(
+                      dialogTitle,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: navy,
+                      ),
                     ),
                   ),
                 ],
@@ -673,14 +810,14 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Are you sure you want to ${action.toLowerCase()} the ${approval.category} for ${approval.guest.isNotEmpty ? approval.guest : "this guest"}?',
+                      dialogPrompt,
                       style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569), height: 1.4),
                     ),
                     const SizedBox(height: 14),
 
                     // Decision Remarks Field
                     const Text(
-                      'Decision Notes (Optional)',
+                      'Decision Notes / Transaction Info (Optional)',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy),
                     ),
                     const SizedBox(height: 6),
@@ -688,9 +825,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                       controller: remarksController,
                       style: const TextStyle(fontSize: 13, color: navy),
                       decoration: InputDecoration(
-                        hintText: isApprove
-                            ? 'e.g. Approved as per manager policy'
-                            : 'e.g. Rejected due to peak occupancy',
+                        hintText: hintText,
                         hintStyle: const TextStyle(fontSize: 12, color: muted),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -709,7 +844,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isApprove ? emerald : ruby,
+                    backgroundColor: dialogColor,
                     foregroundColor: white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -724,9 +859,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                           final success = await provider.decideApproval(
                             approval.id,
                             action,
-                            remarks.isNotEmpty
-                                ? remarks
-                                : (isApprove ? 'Approved via Manager Mobile' : 'Rejected via Manager Mobile'),
+                            remarks.isNotEmpty ? remarks : defaultNotes,
                           );
 
                           if (dialogCtx.mounted) {
@@ -737,12 +870,10 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                             SnackBar(
                               content: Text(
                                 success
-                                    ? 'Request $action successfully'
+                                    ? 'Request updated to $action successfully'
                                     : (provider.errorMessage ?? 'Failed to process request'),
                               ),
-                              backgroundColor: success
-                                  ? (isApprove ? emerald : ruby)
-                                  : ruby,
+                              backgroundColor: success ? dialogColor : ruby,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -754,7 +885,11 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: white),
                         )
                       : Text(
-                          'Confirm $action',
+                          isRefunded
+                              ? 'Mark Refunded'
+                              : isProcessing
+                                  ? 'Start Processing'
+                                  : 'Confirm $action',
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                 ),
@@ -786,6 +921,8 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
               orElse: () => approval,
             );
             final isPending = updatedApproval.isPending;
+            final isApproved = updatedApproval.isApproved;
+            final isProcessing = updatedApproval.isProcessing;
             final catIcon = _getCategoryIcon(updatedApproval.category);
             final catColor = _getCategoryColor(updatedApproval.category);
             final catBg = _getCategoryBg(updatedApproval.category);
@@ -910,7 +1047,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Action buttons if Pending
+                  // Action buttons depending on lifecycle status
                   if (isPending) ...[
                     Row(
                       children: [
@@ -954,6 +1091,66 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ] else if (isApproved) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: ruby,
+                              side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                              backgroundColor: rubyBg.withAlpha(100),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.close_rounded, size: 18, color: ruby),
+                            label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              _showDecisionDialog(context, updatedApproval, 'Rejected', provider);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.sync_rounded, size: 18, color: white),
+                            label: const Text('Process', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              _showDecisionDialog(context, updatedApproval, 'Processing', provider);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (isProcessing) ...[
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C3AED),
+                        foregroundColor: white,
+                        elevation: 0,
+                        minimumSize: const Size(double.infinity, 46),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.task_alt_rounded, size: 18, color: white),
+                      label: const Text('Mark as Refunded', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _showDecisionDialog(context, updatedApproval, 'Refunded', provider);
+                      },
                     ),
                   ] else ...[
                     ElevatedButton(

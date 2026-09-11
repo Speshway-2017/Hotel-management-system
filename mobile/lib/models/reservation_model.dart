@@ -27,6 +27,12 @@ class ReservationModel {
   final String? couponCode;
   final String specialRequests;
   final String createdAt;
+  final String refundStatus;
+  final double cancellationFee;
+  final double refundableAmount;
+  final String cancellationReason;
+  final String cancellationRemarks;
+  final Map<String, dynamic>? refundRequest;
 
   // Compatibility getters
   String get guestName => guest;
@@ -34,6 +40,10 @@ class ReservationModel {
   String get guestPhone => phone;
   String get reservationNumber => bookingId;
   double get totalAmount => (originalAmount != null && originalAmount! > 0) ? originalAmount! : amount;
+
+  // Refund helpers
+  bool get hasRefundRequest => refundRequest != null || (refundStatus != 'None' && refundStatus.isNotEmpty);
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
 
   ReservationModel({
     required this.id,
@@ -64,6 +74,12 @@ class ReservationModel {
     this.idVerification = 'Pending',
     this.specialRequests = '',
     this.createdAt = '',
+    this.refundStatus = 'None',
+    this.cancellationFee = 0.0,
+    this.refundableAmount = 0.0,
+    this.cancellationReason = '',
+    this.cancellationRemarks = '',
+    this.refundRequest,
   });
 
   ReservationModel copyWith({
@@ -92,6 +108,12 @@ class ReservationModel {
     String? idVerification,
     String? specialRequests,
     String? createdAt,
+    String? refundStatus,
+    double? cancellationFee,
+    double? refundableAmount,
+    String? cancellationReason,
+    String? cancellationRemarks,
+    Map<String, dynamic>? refundRequest,
   }) {
     return ReservationModel(
       id: id ?? this.id,
@@ -119,6 +141,12 @@ class ReservationModel {
       idVerification: idVerification ?? this.idVerification,
       specialRequests: specialRequests ?? this.specialRequests,
       createdAt: createdAt ?? this.createdAt,
+      refundStatus: refundStatus ?? this.refundStatus,
+      cancellationFee: cancellationFee ?? this.cancellationFee,
+      refundableAmount: refundableAmount ?? this.refundableAmount,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      cancellationRemarks: cancellationRemarks ?? this.cancellationRemarks,
+      refundRequest: refundRequest ?? this.refundRequest,
     );
   }
 
@@ -133,6 +161,15 @@ class ReservationModel {
     final sType = json['stayType']?.toString() ??
         (json['hours'] != null ? 'hourly' : 'overnight');
     final hrs = json['hours'] != null ? int.tryParse(json['hours'].toString()) : null;
+
+    Map<String, dynamic>? refReq;
+    if (json['refundRequest'] is Map) {
+      refReq = Map<String, dynamic>.from(json['refundRequest'] as Map);
+    }
+
+    final rawRefundStatus = json['refundStatus']?.toString() ??
+        (refReq != null ? refReq['status']?.toString() : null) ??
+        'None';
 
     return ReservationModel(
       id: json['id'] ?? json['_id'] ?? '',
@@ -163,6 +200,12 @@ class ReservationModel {
       idVerification: json['idVerification'] ?? 'Pending',
       specialRequests: json['specialRequests'] ?? '',
       createdAt: json['createdAt'] ?? '',
+      refundStatus: rawRefundStatus,
+      cancellationFee: double.tryParse(json['cancellationFee']?.toString() ?? '0') ?? 0.0,
+      refundableAmount: double.tryParse(json['refundableAmount']?.toString() ?? '0') ?? 0.0,
+      cancellationReason: json['cancellationReason']?.toString() ?? '',
+      cancellationRemarks: json['cancellationRemarks']?.toString() ?? '',
+      refundRequest: refReq,
     );
   }
 
@@ -195,6 +238,12 @@ class ReservationModel {
       'idDocNumber': idDocNumber,
       'idVerification': idVerification,
       'specialRequests': specialRequests,
+      'refundStatus': refundStatus,
+      'cancellationFee': cancellationFee,
+      'refundableAmount': refundableAmount,
+      'cancellationReason': cancellationReason,
+      'cancellationRemarks': cancellationRemarks,
+      'refundRequest': refundRequest,
     };
   }
 }

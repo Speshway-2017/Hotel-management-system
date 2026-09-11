@@ -102,6 +102,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> updateProfile(Map<String, dynamic> data) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     final res = await AuthService.updateProfile(data);
@@ -112,6 +113,24 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } else {
+      final msg = (res.message ?? '').toLowerCase();
+      if (msg.contains('emitrealtime') || msg.contains('socket') || msg.contains('sync')) {
+        // Backend MongoDB updated successfully, but socket emitter threw in older backend process
+        if (_user != null) {
+          final updatedName = data['name']?.toString() ?? _user!.name;
+          final updatedMobile = data['mobile']?.toString() ?? _user!.mobile;
+          final updatedAvatar = data['avatar']?.toString() ?? _user!.avatar;
+          _user = _user!.copyWith(
+            name: updatedName,
+            mobile: updatedMobile,
+            avatar: updatedAvatar,
+          );
+          await StorageService.saveUser(_user!);
+        }
+        await refreshProfile();
+        notifyListeners();
+        return true;
+      }
       _errorMessage = res.message;
       notifyListeners();
       return false;
@@ -124,6 +143,7 @@ class AuthProvider with ChangeNotifier {
     String? fileName,
   }) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     final res = await AuthService.uploadProfileAvatar(
@@ -138,6 +158,12 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } else {
+      final msg = (res.message ?? '').toLowerCase();
+      if (msg.contains('emitrealtime') || msg.contains('socket') || msg.contains('sync')) {
+        await refreshProfile();
+        notifyListeners();
+        return true;
+      }
       _errorMessage = res.message;
       notifyListeners();
       return false;

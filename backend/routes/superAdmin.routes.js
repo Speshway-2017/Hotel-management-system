@@ -539,14 +539,17 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { action, decisionReason } = req.body;
     if (!action) {
-      return sendError(res, 400, 'Decision action is required (Approve or Reject).');
+      return sendError(res, 400, 'Decision action is required (Approve, Reject, Processing, Refunded).');
     }
     let finalAction = action;
-    if (finalAction.toLowerCase() === 'approve') finalAction = 'Approved';
-    if (finalAction.toLowerCase() === 'reject') finalAction = 'Rejected';
+    const actLower = String(action).toLowerCase();
+    if (actLower === 'approve' || actLower === 'approved') finalAction = 'Approved';
+    else if (actLower === 'reject' || actLower === 'rejected') finalAction = 'Rejected';
+    else if (actLower === 'processing' || actLower === 'process') finalAction = 'Processing';
+    else if (actLower === 'refunded' || actLower === 'refund') finalAction = 'Refunded';
 
-    if (!['Approved', 'Rejected'].includes(finalAction)) {
-      return sendError(res, 400, 'Invalid decision action. Must be Approve or Reject.');
+    if (!['Approved', 'Rejected', 'Processing', 'Refunded'].includes(finalAction)) {
+      return sendError(res, 400, 'Invalid decision action. Must be Approve, Reject, Processing, or Refunded.');
     }
 
     const approvalQuery = [{ id: req.params.id }];
@@ -558,7 +561,7 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
       { $or: approvalQuery },
       {
         status: finalAction,
-        decisionReason: decisionReason || (finalAction === 'Approved' ? 'Approved via Approvals Console' : 'Rejected via Approvals Console'),
+        decisionReason: decisionReason || (finalAction === 'Approved' ? 'Approved by Staff' : finalAction === 'Processing' ? 'In Processing' : finalAction === 'Refunded' ? 'Refunded' : 'Rejected via Approvals Console'),
         decidedBy: req.user.name || req.user.email || 'Administrator',
         decidedAt: new Date()
       },
@@ -569,11 +572,57 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
       return sendError(res, 404, 'Approval request not found.');
     }
 
+    if (updated.category === 'Refund' || updated.bookingId) {
+      try {
+        const cleanBkId = String(updated.bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
+        const bkQuery = [{ bookingId: updated.bookingId }, { id: updated.bookingId }, { bookingId: cleanBkId }, { id: cleanBkId }];
+        if (mongoose.Types.ObjectId.isValid(cleanBkId)) bkQuery.unshift({ _id: cleanBkId });
+        if (mongoose.Types.ObjectId.isValid(updated.bookingId)) bkQuery.unshift({ _id: updated.bookingId });
+
+        const updateSet = {
+          'refundRequest.status': finalAction,
+          'refundRequest.decidedBy': req.user.name || 'Admin',
+          'refundRequest.decisionReason': decisionReason || '',
+          'refundRequest.decidedAt': new Date(),
+          refundStatus: finalAction
+        };
+
+        if (finalAction === 'Processing') {
+          updateSet['refundRequest.processedAt'] = new Date();
+        } else if (finalAction === 'Refunded') {
+          updateSet['refundRequest.refundedAt'] = new Date();
+          updateSet['refundRequest.transactionId'] = req.body.transactionId || `TXN-REF-${Date.now().toString().slice(-6)}`;
+          updateSet['paymentStatus'] = 'Refunded';
+        }
+
+        const linkedBk = await Booking.findOneAndUpdate(
+          { $or: bkQuery },
+          { $set: updateSet },
+          { new: true }
+        );
+
+        if (finalAction === 'Refunded' && linkedBk) {
+          const pQuery = [
+            { bookingId: linkedBk.bookingId },
+            { bookingId: String(linkedBk._id) },
+            { guestName: linkedBk.guest }
+          ];
+          await Payment.updateMany(
+            { $or: pQuery },
+            { $set: { status: 'Refunded' } }
+          );
+        }
+      } catch (bkErr) {
+        console.warn('Sync refund status to booking error:', bkErr.message);
+      }
+    }
+
     const targetPropId = updated.propertyId || req.user.propertyId || 'HS-JAI';
 
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, targetPropId, 'approval_updated', { approval: updated, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'refund_status_updated', { bookingId: updated.bookingId, status: finalAction, propertyId: targetPropId });
       emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'approval_updated' });
     }
 

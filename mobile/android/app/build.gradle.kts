@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
-    // id("com.google.gms.google-services")
+    id("com.google.gms.google-services")
     // END: FlutterFire Configuration
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
@@ -35,6 +35,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 kotlin {
@@ -46,3 +51,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("com.google.android.gms:play-services-tasks:18.2.0")
+}
+

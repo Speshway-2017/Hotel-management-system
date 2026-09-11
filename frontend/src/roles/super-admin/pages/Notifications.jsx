@@ -13,18 +13,11 @@ import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
 
 function getToneForType(type) {
-  switch (type) {
-    case "OTA Sync":
-    case "Payment Alert":
-      return "warning";
-    case "Property Audit":
-      return "success";
-    case "Security Warning":
-      return "error";
-    case "Access Control":
-    default:
-      return "brand";
-  }
+  const t = (type || "").toLowerCase();
+  if (t.includes("reserv") || t.includes("book") || t.includes("audit")) return "success";
+  if (t.includes("sync") || t.includes("payment") || t.includes("approval") || t.includes("check")) return "warning";
+  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("warning")) return "error";
+  return "brand";
 }
 
 function SuperAdminNotifications() {
@@ -110,6 +103,11 @@ function SuperAdminNotifications() {
     let matchesType = true;
     if (filterType === "Unread") {
       matchesType = !n.read;
+    } else if (filterType === "Reservations") {
+      const t = (n.type || "").toLowerCase();
+      const title = (n.title || "").toLowerCase();
+      const msg = (n.message || "").toLowerCase();
+      matchesType = t.includes("reserv") || t.includes("book") || title.includes("reserv") || title.includes("booking") || msg.includes("booking");
     } else if (filterType === "System") {
       matchesType = n.propertyId === "All" || n.type === "Security Warning" || n.type === "Payment Alert";
     } else if (filterType === "Property") {
@@ -135,6 +133,7 @@ function SuperAdminNotifications() {
             {[
               { label: "All Alerts", key: "All" },
               { label: `Unread (${unreadCount})`, key: "Unread" },
+              { label: "Reservations", key: "Reservations" },
               { label: "System Alerts", key: "System" },
               { label: "Property Audits", key: "Property" }
             ].map((tab) => (

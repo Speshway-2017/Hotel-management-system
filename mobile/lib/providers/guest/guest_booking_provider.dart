@@ -141,15 +141,119 @@ class GuestBookingProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> requestExtension(String bookingId, int extendHours, [String? reason]) async {
+  Future<bool> extendBooking({
+    required String bookingId,
+    required String newCheckOut,
+    int? additionalNights,
+    int? extendHours,
+    required double additionalAmount,
+    String paymentMethod = 'UPI',
+    bool paidNow = true,
+  }) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
       final response = await ApiService.post('${ApiEndpoints.guestBookings}/$bookingId/extend', {
+        'newCheckOut': newCheckOut,
+        'additionalNights': additionalNights,
         'extendHours': extendHours,
-        'reason': reason ?? 'Guest requested $extendHours hour extension',
+        'additionalAmount': additionalAmount,
+        'paymentMethod': paymentMethod,
+        'paidNow': paidNow,
       });
+
+      _isLoading = false;
+      if (response.success) {
+        await fetchDashboardData(silent: true);
+        return true;
+      } else {
+        _errorMessage = response.message;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> requestExtension(String bookingId, int extendHours, [String? reason]) async {
+    return extendBooking(
+      bookingId: bookingId,
+      newCheckOut: '',
+      extendHours: extendHours,
+      additionalAmount: 0.0,
+      paidNow: false,
+    );
+  }
+
+  Future<bool> cancelBooking({
+    required String bookingId,
+    String? reason,
+    String? remarks,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await ApiService.post('${ApiEndpoints.guestBookings}/$bookingId/cancel', {
+        'reason': reason ?? 'Guest requested cancellation',
+        'remarks': remarks ?? '',
+      });
+
+      _isLoading = false;
+      if (response.success) {
+        await fetchDashboardData(silent: true);
+        return true;
+      } else {
+        _errorMessage = response.message;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> submitRefundRequest({
+    required String bookingId,
+    required double amount,
+    required String reason,
+    String? details,
+    String refundMethod = 'UPI',
+    String? upiId,
+    String? accountHolder,
+    String? accountNumber,
+    String? ifscCode,
+    String? bankName,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final payload = {
+        'bookingId': bookingId,
+        'amount': amount,
+        'reason': reason,
+        'details': details ?? '',
+        'refundMethod': refundMethod,
+        'upiId': upiId ?? '',
+        'accountHolder': accountHolder ?? '',
+        'accountNumber': accountNumber ?? '',
+        'ifscCode': ifscCode ?? '',
+        'bankName': bankName ?? '',
+      };
+
+      final response = await ApiService.post(ApiEndpoints.guestRefund, payload);
 
       _isLoading = false;
       if (response.success) {

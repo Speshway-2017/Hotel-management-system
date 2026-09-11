@@ -4,13 +4,14 @@ import {
   Calendar, Bed, Hotel, MapPin, ArrowRight, ShieldCheck, 
   RefreshCw, AlertCircle, Clock, CheckCircle2, ChevronRight, 
   ArrowLeft, CreditCard, User, FileText, Download, Phone, Eye, Sparkles,
-  Star, MessageSquare
+  Star, MessageSquare, RotateCcw, XCircle, AlertTriangle, Receipt
 } from "lucide-react";
+import { toast } from "sonner";
 import { inr } from "@/data/hs-data";
 import { calculateStayNights } from "@/utils/dateUtils";
 import { Button } from "@/components/ui/button";
 import { ActionGroup, ActionIcon, ViewActionIcon } from "@/components/hs/kit";
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { authService } from "@/services/auth";
 
 export const Route = createFileRoute("/guest/bookings")({
@@ -33,9 +34,15 @@ function GuestBookingsPage() {
   const initialTab = urlParams.get('tab') || urlParams.get('status') || 'all';
   const initialSelectedId = urlParams.get('id') || null;
 
-  const [activeTab, setActiveTab] = useState(initialTab); // 'all', 'upcoming', 'check-ins', 'check-outs'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'all', 'upcoming', 'check-ins', 'check-outs', 'cancelled'
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [feedbackBookingIds, setFeedbackBookingIds] = useState(new Set());
+
+  // Cancellation Modal States
+  const [cancelModalBooking, setCancelModalBooking] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState("Change of travel plans");
+  const [cancellationRemarks, setCancellationRemarks] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const fetchBookings = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -103,10 +110,62 @@ function GuestBookingsPage() {
     setSelectedBooking(b);
   };
 
+  const handleExecuteCancellation = async (e) => {
+    e?.preventDefault();
+    if (!cancelModalBooking) return;
+
+    setCancelling(true);
+    try {
+      const token = localStorage.getItem('hms_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+      const targetId = cancelModalBooking.bookingId || cancelModalBooking.id || cancelModalBooking._id;
+
+      const res = await fetch(`${apiBase}/v1/guest/bookings/${targetId}/cancel`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          reason: cancellationReason,
+          remarks: cancellationRemarks
+        })
+      });
+      const data = await res.json();
+
+      if (data && data.success) {
+        toast.success(data.message || "Booking cancelled successfully! You can now request your refund.");
+        emitRealtimeEvent('booking_updated', { action: 'cancelled', bookingId: targetId });
+        emitRealtimeEvent('dashboard_sync', { action: 'booking_cancelled' });
+        
+        const cancelledTarget = cancelModalBooking;
+        setCancelModalBooking(null);
+        await fetchBookings(true);
+
+        // If currently in detail view, update or redirect
+        if (selectedBooking && (selectedBooking.bookingId === targetId || selectedBooking.id === targetId || selectedBooking._id === targetId)) {
+          setSelectedBooking(prev => ({
+            ...prev,
+            status: 'Cancelled',
+            cancellationReason,
+            cancellationRemarks,
+            cancellationFee: data.data?.cancellationFee ?? 0,
+            refundableAmount: data.data?.refundableAmount ?? Number(cancelledTarget.amount || 0)
+          }));
+        }
+      } else {
+        toast.error(data?.message || "Failed to cancel booking.");
+      }
+    } catch (err) {
+      console.error("Cancellation error:", err);
+      toast.error(err.message || "An error occurred while cancelling booking.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   useEffect(() => {
     fetchBookings(false);
-
-    const handleFocus = () => fetchBookings(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       console.log('⚡ Socket event received. Refreshing bookings ledger...');
@@ -165,15 +224,21 @@ function GuestBookingsPage() {
     if (activeTab === 'check-outs' || activeTab === 'check-out') {
       return statusLower === 'checked-out' || statusLower === 'completed';
     }
+    if (activeTab === 'cancelled') {
+      return statusLower === 'cancelled';
+    }
     return true; // 'all'
   });
 
   // Dedicated Detailed Page View when a booking is clicked
   if (selectedBooking) {
     const b = selectedBooking;
-    const isCheckedOut = (b.status || '').toLowerCase() === 'checked-out' || 
-                         (b.status || '').toLowerCase() === 'checked out' || 
-                         (b.status || '').toLowerCase() === 'completed';
+    const statusLower = (b.status || '').toLowerCase();
+    const isCheckedOut = statusLower === 'checked-out' || statusLower === 'checked out' || statusLower === 'completed';
+    const isCancelled = statusLower === 'cancelled';
+    const isUpcoming = (statusLower === 'confirmed' || statusLower === 'paid' || statusLower === 'pending') && !isCheckedOut && !isCancelled;
+    const refundSubmitted = Boolean(b.refundRequest || b.refundStatus);
+    const refundStatusText = b.refundStatus || b.refundRequest?.status || 'Pending';
 
     return (
       <div className="space-y-4 text-left font-ui">
@@ -189,7 +254,7 @@ function GuestBookingsPage() {
           <span className="text-foreground font-semibold">Booking #{b.id || b.bookingId || b._id}</span>
         </nav>
         
-        {/* Detailed Booking Page Card (Admin/Manager Panel Style) */}
+        {/* Detailed Booking Page Card */}
         <div className="bg-white rounded-2xl border border-navy/10 p-6 sm:p-8 shadow-soft space-y-6">
           
           {/* Header info */}
@@ -198,11 +263,13 @@ function GuestBookingsPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-display text-2xl font-bold text-navy">{b.hotel || "Speshway Hotel & Suites"}</span>
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                  isCheckedOut
+                  isCancelled
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : isCheckedOut
                     ? 'bg-purple/10 text-purple border border-purple/20'
-                    : (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'paid'
+                    : statusLower === 'confirmed' || statusLower === 'paid'
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : (b.status || '').toLowerCase() === 'checked-in'
+                    : statusLower === 'checked-in'
                     ? 'bg-blue-50 text-blue-700 border border-blue-200'
                     : 'bg-amber-50 text-amber-700 border border-amber-200'
                 }`}>
@@ -217,9 +284,56 @@ function GuestBookingsPage() {
             <div className="text-left md:text-right">
               <span className="text-[10px] uppercase font-bold text-navy/50 tracking-wider block">Total Amount</span>
               <span className="font-display text-2xl font-bold text-navy">{inr(b.amount || 0)}</span>
-              <span className="text-[11px] font-semibold text-emerald-600 block mt-0.5">✓ Payment Confirmed</span>
+              <span className={`text-[11px] font-semibold block mt-0.5 ${isCancelled ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {isCancelled ? '• Booking Cancelled' : '✓ Payment Confirmed'}
+              </span>
             </div>
           </div>
+
+          {/* Refund Notice / Action Banner for Cancelled Bookings */}
+          {isCancelled && (
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              refundSubmitted
+                ? 'bg-purple/5 border-purple/20'
+                : 'bg-amber-50/70 border-amber-200'
+            }`}>
+              <div className="flex items-start gap-3">
+                <RotateCcw className={`size-5 mt-0.5 shrink-0 ${refundSubmitted ? 'text-purple' : 'text-amber-600'}`} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-navy">Stay Refund Status:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                      refundStatusText === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                      refundStatusText === 'Processing' ? 'bg-blue-100 text-blue-800' :
+                      refundStatusText === 'Refunded' ? 'bg-purple/20 text-purple' :
+                      refundStatusText === 'Rejected' ? 'bg-rose-100 text-rose-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {refundStatusText}
+                    </span>
+                  </div>
+                  <p className="text-xs text-navy/60 font-medium mt-0.5">
+                    {refundSubmitted
+                      ? `Your refund request is currently ${refundStatusText.toLowerCase()}. Click below to view live timeline and details.`
+                      : 'This upcoming reservation was cancelled before check-in. You can submit your refund request directly to hotel management.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/guest/refund?bookingId=${b.bookingId || b.id || b._id}`;
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer inline-flex items-center justify-center shrink-0 border-none hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] ${
+                  refundSubmitted
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                <span className="text-white font-bold">{refundSubmitted ? `Refund: ${refundStatusText}` : 'Request Stay Refund'}</span>
+              </button>
+            </div>
+          )}
 
           {/* Details Grid */}
           <div className="grid gap-6 md:grid-cols-3">
@@ -259,8 +373,18 @@ function GuestBookingsPage() {
                 <CreditCard className="size-3.5 text-purple" /> Payment Ledger
               </span>
               <div className="text-xs font-semibold text-navy space-y-1">
-                <p>Payment Status: <strong className="text-emerald-600">Paid Online</strong></p>
-                <p>Method: <strong>UPI / Credit Card</strong></p>
+                <p>Booking Ref: <strong className="font-mono text-purple">{b.bookingId || b.id}</strong></p>
+                <p>Payment Status: <strong className={
+                  (b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded') ? 'text-purple' :
+                  (b.paymentStatus === 'Processing' || refundStatusText === 'Processing') ? 'text-blue-600' :
+                  (b.paymentStatus === 'Approved' || refundStatusText === 'Approved') ? 'text-emerald-600' :
+                  isCancelled ? 'text-rose-600' : 'text-emerald-600'
+                }>
+                  {(b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded') ? 'Refunded' :
+                   (b.paymentStatus === 'Processing' || refundStatusText === 'Processing') ? 'Processing' :
+                   (b.paymentStatus === 'Approved' || refundStatusText === 'Approved') ? 'Approved' :
+                   isCancelled ? 'Refundable' : 'Paid Online'}
+                </strong></p>
                 <p className="text-navy/60 font-medium">Invoice GST: Included</p>
               </div>
             </div>
@@ -269,6 +393,32 @@ function GuestBookingsPage() {
 
           {/* Action buttons */}
           <div className="pt-4 border-t border-navy/5 flex flex-wrap gap-3 justify-end items-center">
+            
+            {/* Cancel Booking button for upcoming stays before check-in */}
+            {isUpcoming && (
+              <Button
+                onClick={() => setCancelModalBooking(b)}
+                variant="danger"
+                size="sm"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-soft border-none"
+              >
+                <XCircle className="size-3.5" /> Cancel Stay
+              </Button>
+            )}
+
+            {/* Dedicated Refund Button for Cancelled upcoming stays */}
+            {isCancelled && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/guest/refund?bookingId=${b.bookingId || b.id || b._id}`;
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center justify-center cursor-pointer shadow-soft border-none hover:scale-105"
+              >
+                <span className="text-white font-bold">{refundSubmitted ? `Refund (${refundStatusText})` : 'Request Stay Refund'}</span>
+              </button>
+            )}
+
             {/* Feedback button when guest status is Checked Out */}
             {isCheckedOut && (
               (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
@@ -304,6 +454,123 @@ function GuestBookingsPage() {
           </div>
 
         </div>
+
+        {/* Cancellation Modal Render */}
+        {renderCancelModal()}
+      </div>
+    );
+  }
+
+  function renderCancelModal() {
+    if (!cancelModalBooking) return null;
+    const b = cancelModalBooking;
+    const totalAmount = Number(b.amount || b.totalAmount || 0);
+
+    return (
+      <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-navy/10 max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in-95 text-left font-ui">
+          
+          <div className="flex items-start justify-between border-b border-navy/5 pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="size-9 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+                <AlertTriangle className="size-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-base font-bold text-navy">Cancel Stay Reservation</h3>
+                <p className="text-xs text-navy/60 font-medium">Ref #{b.bookingId || b.id} · {b.room}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setCancelModalBooking(null)}
+              className="size-7 rounded-lg hover:bg-cream text-navy/60 flex items-center justify-center cursor-pointer border-none bg-transparent"
+            >
+              <XCircle className="size-4" />
+            </button>
+          </div>
+
+          <div className="bg-cream/30 p-4 rounded-xl border border-navy/5 text-xs space-y-1.5">
+            <div className="flex justify-between font-semibold text-navy">
+              <span>Hotel Property:</span>
+              <span>{b.hotel || "Speshway Hotel"}</span>
+            </div>
+            <div className="flex justify-between text-navy/70">
+              <span>Stay Schedule:</span>
+              <span>{b.dates || `${b.checkIn} → ${b.checkOut}`}</span>
+            </div>
+            <div className="flex justify-between font-bold text-navy pt-1 border-t border-navy/5">
+              <span>Total Booking Amount:</span>
+              <span className="text-emerald-700">{inr(totalAmount)}</span>
+            </div>
+          </div>
+
+          {/* Cancellation Policy Alert */}
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+            <span className="font-bold flex items-center gap-1 text-amber-800">
+              <ShieldCheck className="size-3.5" /> Cancellation Policy
+            </span>
+            <p className="text-[11px] leading-relaxed font-medium">
+              Free cancellation up to 24 hours prior to check-in (12:00 PM). Upon cancellation, you can immediately request your refund to your UPI ID or Bank Account.
+            </p>
+          </div>
+
+          {/* Reason Selection */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-navy">Reason for Cancellation</label>
+              <select
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                className="w-full px-3 py-2 border border-navy/20 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple cursor-pointer bg-white"
+              >
+                <option value="Change of travel plans">Change of travel plans / personal emergency</option>
+                <option value="Flight / train schedule change">Flight / train schedule change</option>
+                <option value="Booking date mistake">Booking date or room selection mistake</option>
+                <option value="Found alternative accommodation">Found alternative accommodation</option>
+                <option value="Other reason">Other operational reason</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-navy">Additional Remarks (Optional)</label>
+              <textarea
+                rows={2}
+                placeholder="Provide any specific note for hotel front desk..."
+                value={cancellationRemarks}
+                onChange={(e) => setCancellationRemarks(e.target.value)}
+                className="w-full px-3 py-2 border border-navy/20 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-navy/5">
+            <button
+              type="button"
+              onClick={() => setCancelModalBooking(null)}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-navy bg-cream/60 hover:bg-cream border border-navy/10 cursor-pointer"
+            >
+              Keep Booking
+            </button>
+            <button
+              type="button"
+              disabled={cancelling}
+              onClick={handleExecuteCancellation}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-soft cursor-pointer inline-flex items-center gap-1.5 border-none disabled:opacity-50"
+            >
+              {cancelling ? (
+                <>
+                  <div className="size-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  <span>Cancelling...</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="size-3.5" />
+                  <span>Confirm Cancellation</span>
+                </>
+              )}
+            </button>
+          </div>
+
+        </div>
       </div>
     );
   }
@@ -323,7 +590,8 @@ function GuestBookingsPage() {
               { id: "all", label: "All Stays" },
               { id: "upcoming", label: "Upcoming" },
               { id: "check-ins", label: "Check-ins" },
-              { id: "check-outs", label: "Check-outs" }
+              { id: "check-outs", label: "Check-outs" },
+              { id: "cancelled", label: "Cancelled" }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -358,7 +626,7 @@ function GuestBookingsPage() {
                 {activeTab === 'all' ? 'No Active Bookings' : `No Bookings in "${activeTab}"`}
               </h3>
               <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">
-                You don't have any active reservations. Book your room stay now at direct hotel rates!
+                You don't have any reservations in this category. Book your room stay now at direct hotel rates!
               </p>
             </div>
             <Button
@@ -383,100 +651,159 @@ function GuestBookingsPage() {
                   <th className="py-3 px-4 text-right whitespace-nowrap">Tariff</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Payment</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Status</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap min-w-[100px]">Actions</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap min-w-[120px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
-                {filteredBookings.map((b) => (
-                  <tr 
-                    key={b.id || b.bookingId} 
-                    onClick={() => handleSelectBooking(b)}
-                    className="hover:bg-purple/5 transition-colors cursor-pointer"
-                  >
-                    <td className="py-3.5 px-4 font-mono font-bold text-purple whitespace-nowrap">
-                      {b.bookingId || b.id}
-                    </td>
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="font-bold text-navy block">{b.hotel || "Speshway Hotel & Suites"}</span>
-                      <span className="text-[11px] text-muted-foreground">{b.city || "Hyderabad"}</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
-                      {b.room || "Standard Suite"}
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-navy whitespace-nowrap">
-                      {b.dates || `${b.checkIn} → ${b.checkOut}`}
-                    </td>
-                    <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
-                      {b.guests || "2 Guests"}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-navy whitespace-nowrap">
-                      {inr(b.amount || 0)}
-                    </td>
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Paid Online
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      {(() => {
-                        const isRowCheckedOut = (b.status || '').toLowerCase() === 'checked-out' || 
-                                                (b.status || '').toLowerCase() === 'checked out' || 
-                                                (b.status || '').toLowerCase() === 'completed';
-                        return (
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            isRowCheckedOut
-                              ? 'bg-purple/10 text-purple border border-purple/20'
-                              : (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'paid'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : (b.status || '').toLowerCase() === 'checked-in'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
-                            {b.status || 'Confirmed'}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[100px]" onClick={(e) => e.stopPropagation()}>
-                      <ActionGroup align="right">
-                        {(((b.status || '').toLowerCase() === 'checked-out' || 
-                          (b.status || '').toLowerCase() === 'checked out' || 
-                          (b.status || '').toLowerCase() === 'completed')) && (
-                          (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
+                {filteredBookings.map((b) => {
+                  const statusLower = (b.status || '').toLowerCase();
+                  const isCheckedOut = statusLower === 'checked-out' || statusLower === 'checked out' || statusLower === 'completed';
+                  const isCancelled = statusLower === 'cancelled';
+                  const isUpcoming = (statusLower === 'confirmed' || statusLower === 'paid' || statusLower === 'pending') && !isCheckedOut && !isCancelled;
+                  const refundSubmitted = Boolean(b.refundRequest || b.refundStatus);
+                  const refundStatusText = b.refundStatus || b.refundRequest?.status || 'Pending';
+
+                  return (
+                    <tr 
+                      key={b.id || b.bookingId} 
+                      onClick={() => handleSelectBooking(b)}
+                      className="hover:bg-purple/5 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4 font-mono font-bold text-purple whitespace-nowrap">
+                        {b.bookingId || b.id}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-bold text-navy block">{b.hotel || "Speshway Hotel & Suites"}</span>
+                        <span className="text-[11px] text-muted-foreground">{b.city || "Hyderabad"}</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
+                        {b.room || "Standard Suite"}
+                      </td>
+                      <td className="py-3.5 px-4 font-medium text-navy whitespace-nowrap">
+                        {b.dates || `${b.checkIn} → ${b.checkOut}`}
+                      </td>
+                      <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
+                        {b.guests || "2 Guests"}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-bold text-navy whitespace-nowrap">
+                        {inr(b.amount || 0)}
+                      </td>
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          (b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded')
+                            ? 'bg-purple/10 text-purple border-purple/20'
+                            : (b.paymentStatus === 'Processing' || refundStatusText === 'Processing')
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : (b.paymentStatus === 'Approved' || refundStatusText === 'Approved')
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : isCancelled
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {(b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded')
+                            ? 'Refunded'
+                            : (b.paymentStatus === 'Processing' || refundStatusText === 'Processing')
+                            ? 'Processing'
+                            : (b.paymentStatus === 'Approved' || refundStatusText === 'Approved')
+                            ? 'Approved'
+                            : isCancelled
+                            ? 'Refundable'
+                            : 'Paid Online'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          isCancelled
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : isCheckedOut
+                            ? 'bg-purple/10 text-purple border border-purple/20'
+                            : statusLower === 'confirmed' || statusLower === 'paid'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : statusLower === 'checked-in'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {b.status || 'Confirmed'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]" onClick={(e) => e.stopPropagation()}>
+                        <ActionGroup align="right">
+                          {/* Cancellation Action for Upcoming stays before check-in */}
+                          {isUpcoming && (
                             <ActionIcon
-                              icon={CheckCircle2}
-                              variant="success"
-                              title="Feedback already submitted"
-                              disabled
-                            />
-                          ) : (
-                            <ActionIcon
-                              icon={Star}
-                              variant="warning"
-                              title="Add Stay Feedback"
+                              icon={XCircle}
+                              variant="danger"
+                              title="Cancel Stay Reservation"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
+                                setCancelModalBooking(b);
                               }}
                             />
-                          )
-                        )}
-                        <ViewActionIcon
-                          title="View Booking Details"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectBooking(b);
-                          }}
-                        />
-                      </ActionGroup>
-                    </td>
-                  </tr>
-                ))}
+                          )}
+
+                          {/* Refund Status tracking badge appears only after refund request is submitted */}
+                          {isCancelled && refundSubmitted && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/guest/refund?bookingId=${b.bookingId || b.id || b._id}`;
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold inline-flex items-center justify-center shadow-2xs transition-all cursor-pointer border-none text-white hover:opacity-90 hover:scale-105 active:scale-95 shrink-0 ${
+                                refundStatusText === 'Approved' ? 'bg-emerald-600' :
+                                refundStatusText === 'Processing' ? 'bg-blue-600' :
+                                refundStatusText === 'Refunded' ? 'bg-purple' :
+                                refundStatusText === 'Rejected' ? 'bg-rose-600' :
+                                'bg-amber-600'
+                              }`}
+                              title="View Live Refund Request Status"
+                            >
+                              <span className="text-white font-bold">{refundStatusText}</span>
+                            </button>
+                          )}
+
+                          {/* Feedback icon for checked out bookings */}
+                          {isCheckedOut && (
+                            (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
+                              <ActionIcon
+                                icon={CheckCircle2}
+                                variant="success"
+                                title="Feedback already submitted"
+                                disabled
+                              />
+                            ) : (
+                              <ActionIcon
+                                icon={Star}
+                                variant="warning"
+                                title="Add Stay Feedback"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
+                                }}
+                              />
+                            )
+                          )}
+
+                          <ViewActionIcon
+                            title="View Booking Details"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectBooking(b);
+                            }}
+                          />
+                        </ActionGroup>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Render Modal */}
+      {renderCancelModal()}
 
     </div>
   );

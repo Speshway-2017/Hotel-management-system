@@ -36,20 +36,11 @@ export const Route = createFileRoute("/manager/notifications")({
 });
 
 function getToneForType(type) {
-  switch (type) {
-    case "New Reservation":
-    case "Payment Alert":
-      return "success";
-    case "Pending Approval":
-    case "Maintenance Alert":
-    case "Service Request":
-      return "warning";
-    case "Guest Complaint":
-    case "Overbooking Alert":
-      return "error";
-    default:
-      return "brand";
-  }
+  const t = (type || "").toLowerCase();
+  if (t.includes("reserv") || t.includes("book") || t.includes("pay")) return "success";
+  if (t.includes("approval") || t.includes("maint") || t.includes("service") || t.includes("check")) return "warning";
+  if (t.includes("complaint") || t.includes("alert") || t.includes("overbook")) return "error";
+  return "brand";
 }
 
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -144,8 +135,15 @@ function ManagerNotificationsPage() {
 
   const filteredNotifications = notifications.filter((n) => {
     if (filterType === "Unread") return !n.read;
-    if (filterType === "Operations") return n.type === "New Reservation" || n.type === "Pending Approval";
-    if (filterType === "Alerts") return n.type === "Guest Complaint" || n.type === "Maintenance Alert" || n.type === "Overbooking Alert";
+    const t = (n.type || "").toLowerCase();
+    const title = (n.title || "").toLowerCase();
+    const msg = (n.message || "").toLowerCase();
+    if (filterType === "Operations") {
+      return t.includes("reserv") || t.includes("book") || t.includes("approval") || title.includes("reserv") || title.includes("booking") || msg.includes("booking");
+    }
+    if (filterType === "Alerts") {
+      return t.includes("complaint") || t.includes("maint") || t.includes("alert") || t.includes("feedback") || t.includes("guest");
+    }
     return true;
   });
 

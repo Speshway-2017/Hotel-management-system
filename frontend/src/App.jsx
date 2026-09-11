@@ -143,6 +143,7 @@ import { Route as GuestSearch } from "./roles/guest/pages/Search";
 import { Route as GuestServices } from "./roles/guest/pages/Services";
 import { Route as GuestCurrentStay } from "./roles/guest/pages/CurrentStay";
 import { Route as GuestInvoices } from "./roles/guest/pages/Invoices";
+import { Route as GuestRefundRequest } from "./roles/guest/pages/RefundRequest";
 import { Route as GuestSettings } from "./roles/guest/pages/Settings";
 
 // Import Super Admin Workspace Pages
@@ -404,6 +405,10 @@ export default function App() {
             <Route path="/guest/services" element={<RouteWrapper routeObj={GuestServices} />} />
             <Route path="/guest/current-stay" element={<RouteWrapper routeObj={GuestCurrentStay} />} />
             <Route path="/guest/invoices" element={<RouteWrapper routeObj={GuestInvoices} />} />
+            <Route path="/guest/refund" element={<RouteWrapper routeObj={GuestRefundRequest} />} />
+            <Route path="/guest/refund/:id" element={<RouteWrapper routeObj={GuestRefundRequest} />} />
+            <Route path="/guest/refund-request" element={<RouteWrapper routeObj={GuestRefundRequest} />} />
+            <Route path="/guest/refund-request/:id" element={<RouteWrapper routeObj={GuestRefundRequest} />} />
             <Route path="/guest/settings" element={<RouteWrapper routeObj={GuestSettings} />} />
           </Route>
 

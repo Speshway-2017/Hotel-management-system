@@ -70,6 +70,7 @@ class AppColors {
       case 'checked-out':
       case 'checked_out':
       case 'completed':
+      case 'refunded':
         return purple;
       case 'cancelled':
       case 'rejected':
@@ -105,6 +106,7 @@ class AppColors {
       case 'checked-out':
       case 'checked_out':
       case 'completed':
+      case 'refunded':
         return purpleBg;
       case 'cancelled':
       case 'rejected':

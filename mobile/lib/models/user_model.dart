@@ -38,6 +38,42 @@ class UserModel {
 
   bool get isGuestRole => role == 'guest';
 
+  UserModel copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? role,
+    String? mobile,
+    String? status,
+    String? propertyId,
+    String? propertyName,
+    String? avatar,
+    String? dept,
+    String? shift,
+    String? city,
+    String? address,
+    String? language,
+    String? currency,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      mobile: mobile ?? this.mobile,
+      status: status ?? this.status,
+      propertyId: propertyId ?? this.propertyId,
+      propertyName: propertyName ?? this.propertyName,
+      avatar: avatar ?? this.avatar,
+      dept: dept ?? this.dept,
+      shift: shift ?? this.shift,
+      city: city ?? this.city,
+      address: address ?? this.address,
+      language: language ?? this.language,
+      currency: currency ?? this.currency,
+    );
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] ?? json['_id'] ?? '',

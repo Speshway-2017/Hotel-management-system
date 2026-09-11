@@ -616,7 +616,11 @@ function ReservationsPage() {
                           <td className="py-3.5 px-3 text-left align-middle">
                             <div className="font-bold text-navy text-xs">₹{(res.amount || 0).toLocaleString("en-IN")}</div>
                             <div className="mt-1 flex justify-start">
-                              {isPaid ? (
+                              {(res.paymentStatus === "Refunded" || res.refundStatus === "Refunded") ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple/10 text-purple border border-purple/20 shadow-2xs whitespace-nowrap">
+                                  Refunded
+                                </span>
+                              ) : isPaid ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs whitespace-nowrap">
                                   <CheckCircle className="size-2.5 shrink-0" />
                                   Fully Paid

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -183,33 +184,60 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
                         ],
                       ),
                       child: ClipOval(
-                        child: avatarUrl != null &&
-                                avatarUrl.isNotEmpty &&
-                                avatarUrl.startsWith('http')
-                            ? Image.network(
-                                avatarUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Center(
-                                  child: Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w900,
-                                      color: navy,
+                        child: Builder(
+                          builder: (context) {
+                            final resolvedUrl = ApiEndpoints.resolveImageUrl(avatarUrl);
+                            if (resolvedUrl.isNotEmpty) {
+                              if (resolvedUrl.startsWith('data:image')) {
+                                try {
+                                  final base64Str = resolvedUrl.split(',').last;
+                                  return Image.memory(
+                                    base64Decode(base64Str),
+                                    key: ValueKey('${user?.id}_${resolvedUrl.hashCode}'),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Center(
+                                      child: Text(
+                                        initials,
+                                        style: const TextStyle(
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.w900,
+                                          color: navy,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } catch (_) {}
+                              }
+                              if (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://')) {
+                                return Image.network(
+                                  resolvedUrl,
+                                  key: ValueKey('${user?.id}_${resolvedUrl.hashCode}'),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w900,
+                                        color: navy,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  initials,
-                                  style: const TextStyle(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.w900,
-                                    color: navy,
-                                  ),
+                                );
+                              }
+                            }
+                            return Center(
+                              child: Text(
+                                initials,
+                                style: const TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w900,
+                                  color: navy,
                                 ),
                               ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                     // Upload / Camera Button Badge on Profile Icon

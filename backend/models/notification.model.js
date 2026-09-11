@@ -240,6 +240,27 @@ const Notification = {
     }
     return await MockNotification.findByIdAndDelete(id);
   },
+  deleteOne: async (filter) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.deleteOne(filter);
+    }
+    const item = await MockNotification.findOne(filter);
+    if (item && item._id) {
+      return await MockNotification.findByIdAndDelete(item._id);
+    }
+  },
+  deleteMany: async (filter) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.deleteMany(filter);
+    }
+  },
+  countDocuments: async (query = {}) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.countDocuments(query);
+    }
+    const items = await MockNotification.find(query);
+    return items.length;
+  },
   updateMany: async (filter, update) => {
     if (mongoose.connection.readyState === 1) {
       return await MongooseNotification.updateMany(filter, update);

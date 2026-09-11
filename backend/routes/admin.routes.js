@@ -301,9 +301,12 @@ const ensureRealPayments = async (propId) => {
       let roomNumber = extractRoomNumber(b) || '101';
       const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
-      const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
+      const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
+      const status = isRefunded
+        ? 'Refunded'
+        : ((b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
         ? 'Settled'
-        : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
+        : 'Pending');
 
       const query = {
         $or: [

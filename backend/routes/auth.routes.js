@@ -5,6 +5,8 @@ import User from '../models/user.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
+import { emitRealtimeSync } from '../utils/socketEmitter.js';
+import CMS from '../models/cms.model.js';
 
 const router = express.Router();
 
@@ -250,8 +252,14 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      emitRealtimeSync(io, 'all', 'user_updated', updatedUser);
-      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'profile_updated', id: userId });
+      try {
+        if (typeof emitRealtimeSync === 'function') {
+          emitRealtimeSync(io, 'all', 'user_updated', updatedUser);
+          emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'profile_updated', id: userId });
+        }
+      } catch (socketErr) {
+        console.warn('Socket broadcast warning on profile update:', socketErr.message);
+      }
     }
 
     return sendSuccess(res, 200, {
@@ -355,8 +363,6 @@ router.delete('/fcm-token', protect, async (req, res) => {
 router.post('/logout', (req, res) => {
   return sendSuccess(res, 200, {}, 'Logged out successfully');
 });
-
-import CMS from '../models/cms.model.js';
 
 // @desc    Get public CMS settings and branding
 // @route   GET /api/auth/cms

@@ -52,6 +52,10 @@ class SocketService {
         debugPrint('⚡ Socket.IO Connected: ${_socket?.id}');
         final prop = propertyId ?? 'HS-JAI';
         _socket!.emit('join_property', prop);
+        _socket!.emit('join_property', 'HS-JAI');
+        _socket!.emit('join_property', 'HS-9HQ8P');
+        _socket!.emit('join_property', 'HS-MUM');
+        _socket!.emit('join_property', 'HS-UDA');
         _socket!.emit('join_property', 'all');
       });
 
@@ -65,10 +69,11 @@ class SocketService {
         debugPrint('❌ Socket.IO Connect Error: $err');
       });
 
-      final events = [
+      final defaultEvents = {
         'booking_created',
         'booking_updated',
         'booking_deleted',
+        'reservation_created',
         'room_status_changed',
         'availability_changed',
         'checkin_completed',
@@ -76,16 +81,26 @@ class SocketService {
         'payment_logged',
         'payment_added',
         'payment_updated',
+        'approval_created',
         'approval_updated',
         'user_created',
         'user_updated',
         'user_deleted',
+        'notification_created',
         'notification_received',
+        'new_notification',
+        'manager_notification',
+        'unread_notifications_count_updated',
+        'feedback_received',
+        'feedback_created',
         'feedback_updated',
         'dashboard_sync',
-      ];
+      };
 
-      for (final evt in events) {
+      final allEvents = {...defaultEvents, ..._listeners.keys};
+
+      for (final evt in allEvents) {
+        _socket!.off(evt);
         _socket!.on(evt, (data) {
           debugPrint('📡 Live Event: $evt -> $data');
           _notifyListeners(evt, data);
@@ -97,10 +112,19 @@ class SocketService {
   }
 
   static void on(String event, SocketEventCallback callback) {
-    if (!_listeners.containsKey(event)) {
+    final isNew = !_listeners.containsKey(event);
+    if (isNew) {
       _listeners[event] = [];
     }
     _listeners[event]!.add(callback);
+
+    if (isNew && _socket != null) {
+      _socket!.off(event);
+      _socket!.on(event, (data) {
+        debugPrint('📡 Live Event: $event -> $data');
+        _notifyListeners(event, data);
+      });
+    }
   }
 
   static void off(String event, [SocketEventCallback? callback]) {

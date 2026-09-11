@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/api_endpoints.dart';
+import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/manager/approval_provider.dart';
 import '../../providers/manager/guest_provider.dart';
@@ -37,6 +40,7 @@ class _ManagerLayoutState extends State<ManagerLayout> {
   }
 
   void _loadData() {
+    context.read<AuthProvider>().refreshProfile();
     context.read<ReservationProvider>().fetchAll();
     context.read<RoomProvider>().fetchAll();
     context.read<ApprovalProvider>().fetchAll();
@@ -45,6 +49,59 @@ class _ManagerLayoutState extends State<ManagerLayout> {
     context.read<GuestProvider>().fetchGuests();
     context.read<ManagerFeedbackProvider>().fetchAll();
     context.read<StaffProvider>().fetchAll();
+  }
+
+  Widget _buildAvatarImageWidget({
+    required UserModel? user,
+    required double size,
+    required double fontSize,
+  }) {
+    final avatarUrl = ApiEndpoints.resolveImageUrl(user?.avatar);
+    final initial = user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'M';
+
+    if (avatarUrl.isNotEmpty) {
+      if (avatarUrl.startsWith('data:image')) {
+        try {
+          final base64Str = avatarUrl.split(',').last;
+          return Image.memory(
+            base64Decode(base64Str),
+            key: ValueKey('${user?.id}_${avatarUrl.hashCode}'),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _buildInitialsFallback(initial, fontSize),
+          );
+        } catch (_) {
+          return _buildInitialsFallback(initial, fontSize);
+        }
+      }
+
+      if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+        return Image.network(
+          avatarUrl,
+          key: ValueKey('${user?.id}_${avatarUrl.hashCode}'),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _buildInitialsFallback(initial, fontSize),
+        );
+      }
+    }
+
+    return _buildInitialsFallback(initial, fontSize);
+  }
+
+  Widget _buildInitialsFallback(String initial, double fontSize) {
+    return Center(
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFF0D1B2A),
+        ),
+      ),
+    );
   }
 
   final List<Widget> _bottomNavScreens = const [
@@ -210,39 +267,11 @@ class _ManagerLayoutState extends State<ManagerLayout> {
                   ],
                 ),
                 child: ClipOval(
-                  child: user?.avatar != null &&
-                          user!.avatar!.isNotEmpty &&
-                          user.avatar!.startsWith('http')
-                      ? Image.network(
-                          user.avatar!,
-                          width: 36,
-                          height: 36,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Center(
-                            child: Text(
-                              user.name.isNotEmpty == true
-                                  ? user.name[0].toUpperCase()
-                                  : 'M',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0D1B2A),
-                              ),
-                            ),
-                          ),
-                        )
-                      : Center(
-                          child: Text(
-                            user?.name.isNotEmpty == true
-                                ? user!.name[0].toUpperCase()
-                                : 'M',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0D1B2A),
-                            ),
-                          ),
-                        ),
+                  child: _buildAvatarImageWidget(
+                    user: user,
+                    size: 36,
+                    fontSize: 15,
+                  ),
                 ),
               ),
               onSelected: (value) {
@@ -251,7 +280,11 @@ class _ManagerLayoutState extends State<ManagerLayout> {
                     MaterialPageRoute(
                       builder: (_) => const ManagerProfileScreen(),
                     ),
-                  );
+                  ).then((_) {
+                    if (context.mounted) {
+                      context.read<AuthProvider>().refreshProfile();
+                    }
+                  });
                 } else if (value == 'signout') {
                   _showSignOutConfirmation(context);
                 }
@@ -276,39 +309,11 @@ class _ManagerLayoutState extends State<ManagerLayout> {
                             ),
                           ),
                           child: ClipOval(
-                            child: user?.avatar != null &&
-                                    user!.avatar!.isNotEmpty &&
-                                    user.avatar!.startsWith('http')
-                                ? Image.network(
-                                    user.avatar!,
-                                    width: 40,
-                                    height: 40,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Center(
-                                      child: Text(
-                                        user.name.isNotEmpty == true
-                                            ? user.name[0].toUpperCase()
-                                            : 'M',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFF0D1B2A),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      user?.name.isNotEmpty == true
-                                          ? user!.name[0].toUpperCase()
-                                          : 'M',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF0D1B2A),
-                                      ),
-                                    ),
-                                  ),
+                            child: _buildAvatarImageWidget(
+                              user: user,
+                              size: 40,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
