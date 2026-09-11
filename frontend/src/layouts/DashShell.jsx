@@ -844,6 +844,12 @@ export function DashShell({ role, children }) {
                     subtitle: "View reservation invoices and receipt ledgers."
                   };
                 }
+                if (path.startsWith("/guest/refund")) {
+                  return {
+                    title: "Request Stay Refund",
+                    subtitle: "Submit early checkout, cancellation, or stay adjustment refund requests directly to hotel staff."
+                  };
+                }
                 if (path.startsWith("/guest/feedback") || path.startsWith("/guest/reviews")) {
                   return {
                     title: "Guest Feedback",
@@ -1115,6 +1121,10 @@ export function DashShell({ role, children }) {
                 "/guest/services": [{ label: "Service Requests" }],
                 "/guest/folio": [{ label: "Digital Folio" }],
                 "/guest/folio/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Folio Details" }],
+                "/guest/refund": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
+                "/guest/refund/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
+                "/guest/refund-request": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
+                "/guest/refund-request/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
                 "/guest/feedback": [{ label: "Guest Feedback" }],
                 "/guest/reviews": [{ label: "Guest Feedback" }],
                 "/guest/invoices": [{ label: "Invoices" }],
@@ -1132,6 +1142,8 @@ export function DashShell({ role, children }) {
                                             .replace(/\/reception\/room-assignment\/[^\/]+$/, "/reception/room-assignment/:id")
                                             .replace(/\/reception\/guest-search\/[^\/]+$/, "/reception/guest-search/:id")
                                             .replace(/\/guest\/folio\/[^\/]+$/, "/guest/folio/:id")
+                                            .replace(/\/guest\/refund\/[^\/]+$/, "/guest/refund/:id")
+                                            .replace(/\/guest\/refund-request\/[^\/]+$/, "/guest/refund/:id")
                                             .replace(/\/guest\/bookings\/[^\/]+$/, "/guest/bookings/:id");
               let segments = mappings[cleanPathname];
               const queryParams = new URLSearchParams(searchStr);

@@ -82,31 +82,19 @@ class _ManagerTodayOperationsScreenState
     // 1. Today's Arrivals (Total check-ins scheduled for today)
     final arrivals = allReservations.where((r) {
       final st = r.status.toLowerCase();
-      final isArrivalStatus = [
-        'confirmed',
-        'pending',
-        'upcoming',
-        'booked',
-        'reserved',
-        'checked-in',
-        'checked_in'
-      ].contains(st);
-      return isArrivalStatus && _isDateToday(r.checkIn);
+      if (st == 'cancelled' || st == 'rejected' || st == 'no-show' || st == 'no_show') {
+        return false;
+      }
+      return _isDateToday(r.checkIn);
     }).toList();
 
     // 2. Today's Departures (Total check-outs scheduled for today)
     final departures = allReservations.where((r) {
       final st = r.status.toLowerCase();
-      final isDepartureStatus = [
-        'completed',
-        'checked-out',
-        'checked_out',
-        'active',
-        'staying',
-        'checked-in',
-        'checked_in'
-      ].contains(st);
-      return isDepartureStatus && _isDateToday(r.checkOut);
+      if (st == 'cancelled' || st == 'rejected' || st == 'no-show' || st == 'no_show') {
+        return false;
+      }
+      return _isDateToday(r.checkOut);
     }).toList();
 
     // 3. In-House Active Stays
@@ -839,8 +827,8 @@ class _ManagerTodayOperationsScreenState
                           const SizedBox(width: 4),
                           Text(
                             isDeparture
-                                ? 'Out: ${Formatters.dateTime(res.checkOut)}'
-                                : 'In: ${Formatters.dateTime(res.checkIn)}',
+                                ? 'Out: ${Formatters.checkOutDateTime(res.checkOut)}'
+                                : 'In: ${Formatters.checkInDateTime(res.checkIn)}',
                             style: const TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,

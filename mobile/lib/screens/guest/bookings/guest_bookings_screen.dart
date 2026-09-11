@@ -173,26 +173,71 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Check-In: ${Formatters.dateTime(b.checkIn)}',
+                'Check-In: ${Formatters.checkInDateTime(b.checkIn)}',
                 style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               const Divider(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    Formatters.currency(b.totalAmount),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
-                  ),
-                  const Row(
-                    children: [
-                      Text('View Details', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                      SizedBox(width: 4),
-                      Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
+              if (b.status.toLowerCase() == 'cancelled') ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      Formatters.currency(b.totalAmount),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                    ),
+                    if (b.hasRefundRequest) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: b.refundStatus.toLowerCase() == 'refunded'
+                              ? const Color(0xFFEDE9FE)
+                              : b.refundStatus.toLowerCase() == 'processing'
+                                  ? const Color(0xFFDBEAFE)
+                                  : b.refundStatus.toLowerCase() == 'approved'
+                                      ? const Color(0xFFDCFCE7)
+                                      : b.refundStatus.toLowerCase() == 'rejected'
+                                          ? const Color(0xFFFEE2E2)
+                                          : const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Refund: ${b.refundStatus}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: b.refundStatus.toLowerCase() == 'refunded'
+                                ? const Color(0xFF7C3AED)
+                                : b.refundStatus.toLowerCase() == 'processing'
+                                    ? const Color(0xFF2563EB)
+                                    : b.refundStatus.toLowerCase() == 'approved'
+                                        ? const Color(0xFF10B981)
+                                        : b.refundStatus.toLowerCase() == 'rejected'
+                                            ? const Color(0xFFE53935)
+                                            : const Color(0xFFD97706),
+                          ),
+                        ),
+                      ),
                     ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      Formatters.currency(b.totalAmount),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                    ),
+                    const Row(
+                      children: [
+                        Text('View Details', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                        SizedBox(width: 4),
+                        Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

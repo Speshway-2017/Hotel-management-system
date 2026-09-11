@@ -5,6 +5,7 @@ import Booking from '../models/booking.model.js';
 import User from '../models/user.model.js';
 import Property from '../models/property.model.js';
 import bcrypt from 'bcryptjs';
+import Notification from '../models/notification.model.js';
 import {
   Room,
   Payment,
@@ -32,20 +33,17 @@ const findBookingById = async (id, propertyId) => {
   if (mongoose.Types.ObjectId.isValid(id)) {
     queries.unshift({ _id: id });
   }
-
-  // 1. Direct query matching the booking ID
-  let booking = await Booking.findOne({ $or: queries });
-  if (booking) return booking;
-
-  // 2. Fallback direct findById
-  return await Booking.findById(id);
+  const propQuery = propertyId ? { propertyId } : {};
+  return await Booking.findOne({ $and: [{ $or: queries }, propQuery] });
 };
 
-// Protect all routes and allow receptionists, managers, admins, super-admins
+// All receptionist routes are protected and restricted to receptionist / admin / manager role
 router.use(protect);
-router.use(authorize('receptionist', 'manager', 'admin', 'super-admin'));
+router.use(authorize('receptionist', 'admin', 'super-admin', 'manager'));
 
-// Fetch receptionist's assigned property profile
+// ==========================================
+// PROPERTY DETAILS
+// ==========================================
 router.get('/property', async (req, res) => {
   try {
     const property = await findPropertySafely(req.user?.propertyId, req.user);
@@ -60,7 +58,7 @@ router.get('/property', async (req, res) => {
 
 // Helper to seed default receptionist notifications if empty
 const seedDefaultReceptionistNotifications = async (propertyId) => {
-  const count = await ReceptionistNotification.countDocuments({ propertyId });
+  const count = await ReceptionistNotification.countDocuments({});
   if (count === 0) {
     const defaults = [
       {
@@ -68,24 +66,93 @@ const seedDefaultReceptionistNotifications = async (propertyId) => {
         message: "Booking BK-10101 confirmed via MakeMyTrip for Standard Room.",
         category: "New reservations",
         isRead: false,
-        propertyId
+        propertyId: propertyId || 'HS-JAI'
       },
       {
         title: "Room Overdue Check-out",
         message: "Room 101 occupied by Mounika is scheduled for departure check-out.",
         category: "Upcoming check-ins/check-outs",
         isRead: false,
-        propertyId
+        propertyId: propertyId || 'HS-JAI'
       },
       {
         title: "Incidentals Surcharge Added",
         message: "Recorded ₹450 laundry service POS charge to Room 101.",
         category: "Payment updates",
         isRead: false,
-        propertyId
+        propertyId: propertyId || 'HS-JAI'
       }
     ];
     await ReceptionistNotification.insertMany(defaults);
+  }
+};
+
+// Permanent synchronizer: ensures all bookings in database have matching receptionist notifications
+const syncReceptionistBookingNotifications = async (propertyId) => {
+  try {
+    const allBookings = await Booking.find({}).sort({ createdAt: -1 });
+    for (const b of allBookings) {
+      const bId = b.bookingId || String(b._id) || b.id;
+      const guestName = b.guest || b.guestName || b.customerName || 'Guest';
+      const roomInfo = b.room || b.roomType || 'Standard Room';
+      const checkIn = b.checkIn || b.checkInDate || 'Today';
+      const checkOut = b.checkOut || b.checkOutDate || 'Tomorrow';
+      const amount = b.totalAmount || b.amount || 0;
+      const targetProp = b.propertyId || propertyId || 'HS-9HQ8P';
+
+      const title = 'New Online Reservation';
+      const message = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`;
+
+      let existsInReceptionist = null;
+      try {
+        existsInReceptionist = await ReceptionistNotification.findOne({
+          $or: [
+            { message: { $regex: bId, $options: 'i' } },
+            { title: { $regex: bId, $options: 'i' } }
+          ]
+        });
+      } catch (_) {}
+
+      if (!existsInReceptionist) {
+        try {
+          await ReceptionistNotification.create({
+            title,
+            message,
+            category: 'New reservations',
+            isRead: false,
+            propertyId: targetProp,
+            createdAt: b.createdAt || new Date()
+          });
+        } catch (_) {}
+      }
+
+      let existsInNotif = null;
+      try {
+        existsInNotif = await Notification.findOne({
+          role: 'receptionist',
+          $or: [
+            { message: { $regex: bId, $options: 'i' } },
+            { title: { $regex: bId, $options: 'i' } }
+          ]
+        });
+      } catch (_) {}
+
+      if (!existsInNotif) {
+        try {
+          await Notification.create({
+            role: 'receptionist',
+            propertyId: targetProp,
+            title,
+            message,
+            category: 'Reservations',
+            isRead: false,
+            createdAt: b.createdAt || new Date()
+          });
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing receptionist booking notifications:', err.message);
   }
 };
 
@@ -972,9 +1039,12 @@ const ensureRealPayments = async (propId) => {
       let roomNumber = extractRoomNumber(b) || '101';
       const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
-      const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
+      const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
+      const status = isRefunded
+        ? 'Refunded'
+        : ((b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
         ? 'Settled'
-        : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
+        : 'Pending');
 
       const query = {
         $or: [
@@ -1136,41 +1206,198 @@ router.get('/notifications', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
     await seedDefaultReceptionistNotifications(propertyId);
-    const list = await ReceptionistNotification.find({ propertyId }).sort({ createdAt: -1 });
-    return sendSuccess(res, 200, list, 'Receptionist system alerts feed retrieved.');
-  } catch (err) {
-    return sendError(res, 500, err.message);
-  }
-});
+    await syncReceptionistBookingNotifications(propertyId);
 
-router.post('/notifications/:id/read', async (req, res) => {
-  try {
-    const updated = await ReceptionistNotification.findOneAndUpdate(
-      { _id: req.params.id, propertyId: req.user.propertyId || 'HS-JAI' },
-      { isRead: true },
-      { new: true }
-    );
-    if (!updated) {
-      return sendError(res, 404, 'Notification alert not found.');
+    const propQuery = [
+      { role: 'receptionist' },
+      { role: 'all' },
+      { role: null },
+      { role: { $exists: false } },
+      { userId: req.user.id || req.user._id },
+      { propertyId },
+      { propertyId: 'HS-JAI' },
+      { propertyId: 'HS-9HQ8P' },
+      { propertyId: { $exists: false } },
+      { propertyId: null },
+      { propertyId: '' }
+    ];
+
+    const [standardList, receptionistList] = await Promise.all([
+      Notification.find({ $or: propQuery }),
+      ReceptionistNotification.find()
+    ]);
+
+    const itemsMap = new Map();
+    const normalize = (it) => {
+      const id = it._id ? String(it._id) : (it.id ? String(it.id) : '');
+      const cleanTitle = (it.title || '').trim().toLowerCase();
+      const cleanMsg = (it.message || '').trim().toLowerCase();
+      const key = `${cleanTitle}_${cleanMsg}`;
+      return {
+        id,
+        _id: id,
+        title: it.title,
+        message: it.message,
+        category: it.category || 'General',
+        isRead: Boolean(it.isRead),
+        propertyId: it.propertyId || propertyId,
+        createdAt: it.createdAt || new Date().toISOString(),
+        updatedAt: it.updatedAt || new Date().toISOString(),
+        _dedupKey: key
+      };
+    };
+
+    for (const it of standardList || []) {
+      const norm = normalize(it);
+      itemsMap.set(norm._dedupKey || norm.id, norm);
     }
-    return sendSuccess(res, 200, updated, 'Notification marked as read.');
+    for (const it of receptionistList || []) {
+      const norm = normalize(it);
+      const key = norm._dedupKey || norm.id;
+      if (itemsMap.has(key)) {
+        const existing = itemsMap.get(key);
+        if (norm.isRead || existing.isRead) {
+          existing.isRead = true;
+        }
+      } else {
+        itemsMap.set(key, norm);
+      }
+    }
+
+    const mergedList = Array.from(itemsMap.values()).sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return sendSuccess(res, 200, mergedList, 'Receptionist system alerts feed retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
 });
 
-router.post('/notifications/read-all', async (req, res) => {
+const handleMarkReceptionistNotifRead = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
+
+    const [updated1, updated2] = await Promise.all([
+      ReceptionistNotification.findOneAndUpdate(
+        { $or: idQuery },
+        { isRead: true },
+        { new: true }
+      ).catch(() => null),
+      Notification.findOneAndUpdate(
+        { $or: idQuery },
+        { isRead: true },
+        { new: true }
+      ).catch(() => null)
+    ]);
+
+    const updated = updated1 || updated2;
+    if (updated?.title && updated?.message) {
+      await Promise.all([
+        ReceptionistNotification.updateMany({ title: updated.title, message: updated.message }, { isRead: true }).catch(() => null),
+        Notification.updateMany({ title: updated.title, message: updated.message }, { isRead: true }).catch(() => null)
+      ]);
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propertyId = req.user.propertyId || 'HS-JAI';
+      emitRealtimeSync(io, propertyId, 'unread_notifications_count_updated', { propertyId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'receptionist_notification_read', id });
+    }
+
+    return sendSuccess(res, 200, updated || { id, isRead: true }, 'Notification marked as read.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+};
+
+router.post('/notifications/:id/read', handleMarkReceptionistNotifRead);
+router.patch('/notifications/:id/read', handleMarkReceptionistNotifRead);
+router.put('/notifications/:id/read', handleMarkReceptionistNotifRead);
+
+const handleMarkReceptionistNotifUnread = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
+
+    const [updated1, updated2] = await Promise.all([
+      ReceptionistNotification.findOneAndUpdate(
+        { $or: idQuery },
+        { isRead: false },
+        { new: true }
+      ).catch(() => null),
+      Notification.findOneAndUpdate(
+        { $or: idQuery },
+        { isRead: false },
+        { new: true }
+      ).catch(() => null)
+    ]);
+
+    const updated = updated1 || updated2;
+    if (updated?.title && updated?.message) {
+      await Promise.all([
+        ReceptionistNotification.updateMany({ title: updated.title, message: updated.message }, { isRead: false }).catch(() => null),
+        Notification.updateMany({ title: updated.title, message: updated.message }, { isRead: false }).catch(() => null)
+      ]);
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propertyId = req.user.propertyId || 'HS-JAI';
+      emitRealtimeSync(io, propertyId, 'unread_notifications_count_updated', { propertyId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'receptionist_notification_unread', id });
+    }
+
+    return sendSuccess(res, 200, updated || { id, isRead: false }, 'Notification marked as unread.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+};
+
+router.post('/notifications/:id/unread', handleMarkReceptionistNotifUnread);
+router.patch('/notifications/:id/unread', handleMarkReceptionistNotifUnread);
+router.put('/notifications/:id/unread', handleMarkReceptionistNotifUnread);
+
+const handleMarkAllReceptionistNotifsRead = async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
-    await ReceptionistNotification.updateMany(
-      { propertyId, isRead: false },
-      { isRead: true }
-    );
+    await Promise.all([
+      ReceptionistNotification.updateMany(
+        { isRead: false },
+        { isRead: true }
+      ),
+      Notification.updateMany(
+        {
+          isRead: false,
+          $or: [
+            { propertyId },
+            { role: 'receptionist' },
+            { userId: req.user.id || req.user._id }
+          ]
+        },
+        { isRead: true }
+      ).catch(() => null)
+    ]);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'unread_notifications_count_updated', { propertyId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'all_receptionist_notifications_read' });
+    }
+
     return sendSuccess(res, 200, {}, 'All notifications marked as read.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
-});
+};
+
+router.post('/notifications/read-all', handleMarkAllReceptionistNotifsRead);
+router.patch('/notifications/read-all', handleMarkAllReceptionistNotifsRead);
+router.put('/notifications/read-all', handleMarkAllReceptionistNotifsRead);
 
 // ==========================================
 // 8. PROFILE / CHANGE PASSWORD

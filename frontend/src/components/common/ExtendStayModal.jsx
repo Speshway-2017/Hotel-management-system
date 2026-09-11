@@ -178,9 +178,8 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
       // Calculate approximate daily base rate
       const totalAmount = Number(booking.amount || booking.totalAmount || 3000);
       const totalNights = Number(booking.nights || 1);
-      const avgNightWithTax = totalAmount / Math.max(1, totalNights);
-      // Remove 18% GST to get base rate
-      const baseDailyRate = Math.round(avgNightWithTax / 1.18);
+      const avgNight = totalAmount / Math.max(1, totalNights);
+      const baseDailyRate = Math.round(avgNight);
       setDailyRate(baseDailyRate > 0 ? baseDailyRate : 3000);
       setNotes("");
     }
@@ -190,8 +189,7 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
   
   const additionalNights = getAdditionalNights(currentCheckOut, newCheckOutDate);
   const roomCharges = dailyRate * additionalNights;
-  const gstAmount = Math.round(roomCharges * 0.18);
-  const totalAdditionalAmount = roomCharges + gstAmount;
+  const totalAdditionalAmount = roomCharges;
 
   const handleQuickAddNights = (nightsToAdd) => {
     const targetDate = new Date(currentOutDate.getTime() + nightsToAdd * 24 * 60 * 60 * 1000);
@@ -364,7 +362,7 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
-                Daily Rate (Excl. GST)
+                Daily Rate
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 font-bold text-slate-500 text-xs">₹</span>
@@ -384,10 +382,6 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
               <span>Room Tariff ({additionalNights} × {inr(dailyRate)}):</span>
               <span className="font-bold text-slate-900">{inr(roomCharges)}</span>
             </div>
-            <div className="flex justify-between text-slate-600 font-semibold">
-              <span>GST (18% Statutory Liability):</span>
-              <span className="font-bold text-slate-900">{inr(gstAmount)}</span>
-            </div>
           </div>
 
           {/* Prominent Total Additional Payable Banner */}
@@ -396,7 +390,7 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
               <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">
                 Total Additional Payable
               </span>
-              <span className="text-[11px] text-slate-300 font-medium">Tariff + 18% GST</span>
+              <span className="text-[11px] text-slate-300 font-medium">Additional Room Tariff</span>
             </div>
             <div className="text-right">
               <span className="text-xl font-black text-emerald-400 block tracking-tight">

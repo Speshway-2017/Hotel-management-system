@@ -214,7 +214,7 @@ const seedDefaultApprovals = async (propertyId) => {
 
 // Helper to seed default notifications if empty
 const seedDefaultNotifications = async (propertyId) => {
-  const count = await ManagerNotification.countDocuments({ propertyId });
+  const count = await ManagerNotification.countDocuments({});
   if (count === 0) {
     const defaults = [
       {
@@ -222,17 +222,86 @@ const seedDefaultNotifications = async (propertyId) => {
         message: "Front Desk submitted a refund request of ₹4,900 for Approval.",
         category: "Approvals",
         isRead: false,
-        propertyId
+        propertyId: propertyId || 'HS-JAI'
       },
       {
         title: "Guest Feedback Submitted",
         message: "Surya submitted a 5-star review for cleanliness and services.",
         category: "Guest Experience",
         isRead: false,
-        propertyId
+        propertyId: propertyId || 'HS-JAI'
       }
     ];
     await ManagerNotification.insertMany(defaults);
+  }
+};
+
+// Permanent synchronizer: ensures all bookings in database have matching manager notifications
+const syncManagerBookingNotifications = async (propertyId) => {
+  try {
+    const allBookings = await Booking.find({}).sort({ createdAt: -1 });
+    for (const b of allBookings) {
+      const bId = b.bookingId || String(b._id) || b.id;
+      const guestName = b.guest || b.guestName || b.customerName || 'Guest';
+      const roomInfo = b.room || b.roomType || 'Standard Room';
+      const checkIn = b.checkIn || b.checkInDate || 'Today';
+      const checkOut = b.checkOut || b.checkOutDate || 'Tomorrow';
+      const amount = b.totalAmount || b.amount || 0;
+      const targetProp = b.propertyId || propertyId || 'HS-9HQ8P';
+
+      const title = 'New Online Reservation';
+      const message = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`;
+
+      let existsInManager = null;
+      try {
+        existsInManager = await ManagerNotification.findOne({
+          $or: [
+            { message: { $regex: bId, $options: 'i' } },
+            { title: { $regex: bId, $options: 'i' } }
+          ]
+        });
+      } catch (_) {}
+
+      if (!existsInManager) {
+        try {
+          await ManagerNotification.create({
+            title,
+            message,
+            category: 'Reservations',
+            isRead: false,
+            propertyId: targetProp,
+            createdAt: b.createdAt || new Date()
+          });
+        } catch (_) {}
+      }
+
+      let existsInNotif = null;
+      try {
+        existsInNotif = await Notification.findOne({
+          role: 'manager',
+          $or: [
+            { message: { $regex: bId, $options: 'i' } },
+            { title: { $regex: bId, $options: 'i' } }
+          ]
+        });
+      } catch (_) {}
+
+      if (!existsInNotif) {
+        try {
+          await Notification.create({
+            role: 'manager',
+            propertyId: targetProp,
+            title,
+            message,
+            category: 'Reservations',
+            isRead: false,
+            createdAt: b.createdAt || new Date()
+          });
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing manager booking notifications:', err.message);
   }
 };
 
@@ -830,17 +899,20 @@ router.get('/approvals', async (req, res) => {
 
 router.post('/approvals/:id', async (req, res) => {
   try {
-    const { action, decisionReason } = req.body;
+    const { action, decisionReason, transactionId, notes } = req.body;
     if (!action) {
-      return sendError(res, 400, 'Decision action is required (Approve or Reject).');
+      return sendError(res, 400, 'Decision action is required (Approve, Reject, Processing, Refunded).');
     }
     
     let finalAction = action;
-    if (finalAction.toLowerCase() === 'approve') finalAction = 'Approved';
-    if (finalAction.toLowerCase() === 'reject') finalAction = 'Rejected';
+    const actLower = String(action).toLowerCase();
+    if (actLower === 'approve' || actLower === 'approved') finalAction = 'Approved';
+    else if (actLower === 'reject' || actLower === 'rejected') finalAction = 'Rejected';
+    else if (actLower === 'processing' || actLower === 'process') finalAction = 'Processing';
+    else if (actLower === 'refunded' || actLower === 'refund') finalAction = 'Refunded';
 
-    if (!['Approved', 'Rejected'].includes(finalAction)) {
-      return sendError(res, 400, 'Invalid decision action. Must be Approve or Reject.');
+    if (!['Approved', 'Rejected', 'Processing', 'Refunded'].includes(finalAction)) {
+      return sendError(res, 400, 'Invalid decision action. Must be Approve, Reject, Processing, or Refunded.');
     }
 
     const approvalQuery = [{ id: req.params.id }];
@@ -852,7 +924,12 @@ router.post('/approvals/:id', async (req, res) => {
       { $or: approvalQuery },
       {
         status: finalAction,
-        decisionReason: decisionReason || (finalAction === 'Approved' ? 'Approved via Approvals Console' : 'Rejected via Approvals Console'),
+        decisionReason: decisionReason || notes || (
+          finalAction === 'Approved' ? 'Approved by Hotel Staff' :
+          finalAction === 'Processing' ? 'Disbursement in processing via bank gateway' :
+          finalAction === 'Refunded' ? 'Refund payment successfully disbursed and settled' :
+          'Rejected via Approvals Console'
+        ),
         decidedBy: req.user.name || req.user.email || 'Administrator',
         decidedAt: new Date()
       },
@@ -863,25 +940,90 @@ router.post('/approvals/:id', async (req, res) => {
       return sendError(res, 404, 'Approval request not found.');
     }
 
+    let linkedBooking = null;
+    if (updated.category === 'Refund' || updated.bookingId) {
+      try {
+        const cleanBkId = String(updated.bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
+        const bkQuery = [{ bookingId: updated.bookingId }, { id: updated.bookingId }, { bookingId: cleanBkId }, { id: cleanBkId }];
+        if (mongoose.Types.ObjectId.isValid(cleanBkId)) bkQuery.unshift({ _id: cleanBkId });
+        if (mongoose.Types.ObjectId.isValid(updated.bookingId)) bkQuery.unshift({ _id: updated.bookingId });
+
+        const updateSet = {
+          'refundRequest.status': finalAction,
+          'refundRequest.decidedBy': req.user.name || 'Manager',
+          'refundRequest.decisionReason': decisionReason || notes || '',
+          'refundRequest.decidedAt': new Date(),
+          refundStatus: finalAction
+        };
+
+        if (finalAction === 'Processing') {
+          updateSet['refundRequest.processedAt'] = new Date();
+        } else if (finalAction === 'Refunded') {
+          updateSet['refundRequest.refundedAt'] = new Date();
+          updateSet['refundRequest.transactionId'] = transactionId || `TXN-REF-${Date.now().toString().slice(-6)}`;
+          updateSet['paymentStatus'] = 'Refunded';
+        }
+
+        linkedBooking = await Booking.findOneAndUpdate(
+          { $or: bkQuery },
+          { $set: updateSet },
+          { new: true }
+        );
+
+        if (finalAction === 'Refunded' && linkedBooking) {
+          const pQuery = [
+            { bookingId: linkedBooking.bookingId },
+            { bookingId: String(linkedBooking._id) },
+            { guestName: linkedBooking.guest }
+          ];
+          await Payment.updateMany(
+            { $or: pQuery },
+            { $set: { status: 'Refunded' } }
+          );
+        }
+      } catch (bkErr) {
+        console.warn('Sync refund status to booking error:', bkErr.message);
+      }
+    }
+
     const targetPropId = updated.propertyId || req.user.propertyId || 'HS-JAI';
 
     try {
+      // 1. Notify Guest directly
+      if (linkedBooking?.guestId) {
+        await triggerNotification({
+          req,
+          role: 'guest',
+          userId: linkedBooking.guestId,
+          title: `Stay Refund Request: ${finalAction}`,
+          message: `Your refund request of ₹${Number(updated.amount || linkedBooking.refundableAmount || 0).toLocaleString('en-IN')} for Booking ${updated.bookingId || linkedBooking.bookingId} is now ${finalAction}. ${decisionReason ? '(' + decisionReason + ')' : ''}`,
+          category: 'Refund Update',
+          data: {
+            bookingId: linkedBooking._id || linkedBooking.bookingId,
+            refundStatus: finalAction,
+            decisionReason: decisionReason || ''
+          }
+        });
+      }
+
+      // 2. Notify Admin & Manager
       await triggerNotification({
         req,
         role: 'admin',
         propertyId: targetPropId,
-        title: `Approval Decision: ${updated.category || 'Request'} ${finalAction}`,
-        message: `Request for ${updated.guest || 'Guest'} was ${finalAction} by ${req.user.name || 'Admin'}.`,
-        category: 'Approvals'
+        title: `Refund Lifecycle: ${finalAction}`,
+        message: `Refund request for ${updated.guest || 'Guest'} (${updated.bookingId || 'Ref'}) was marked as ${finalAction} by ${req.user.name || 'Staff'}.`,
+        category: 'Refunds'
       });
 
+      // 3. Notify Receptionist
       await triggerNotification({
         req,
         role: 'receptionist',
         propertyId: targetPropId,
-        title: `Approval Decision: ${updated.category || 'Request'} ${finalAction}`,
-        message: `Request for ${updated.guest || 'Guest'} was ${finalAction}.`,
-        category: 'Approvals'
+        title: `Refund Lifecycle: ${finalAction}`,
+        message: `Refund request for ${updated.guest || 'Guest'} marked as ${finalAction}.`,
+        category: 'Refunds'
       });
     } catch (notifErr) {
       console.warn('Notification dispatch failed for approval:', notifErr.message);
@@ -890,6 +1032,8 @@ router.post('/approvals/:id', async (req, res) => {
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, targetPropId, 'approval_updated', { approval: updated, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'refund_status_updated', { bookingId: updated.bookingId, status: finalAction, propertyId: targetPropId });
+      emitRealtimeSync(io, targetPropId, 'booking_updated', { bookingId: updated.bookingId, refundStatus: finalAction, propertyId: targetPropId });
       emitRealtimeSync(io, targetPropId, 'dashboard_sync', { propertyId: targetPropId, action: 'approval_updated' });
     }
 
@@ -1480,9 +1624,12 @@ const ensureRealPayments = async (propId) => {
       let roomNumber = extractRoomNumber(b) || '101';
       const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
-      const status = (b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
+      const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
+      const status = isRefunded
+        ? 'Refunded'
+        : ((b.paymentStatus === 'Paid' || b.status === 'Checked-in' || b.status === 'Checked-out' || Number(b.balance || 0) === 0)
         ? 'Settled'
-        : (b.paymentStatus === 'Refunded' ? 'Refunded' : 'Pending');
+        : 'Pending');
 
       const query = {
         $or: [
@@ -1644,39 +1791,35 @@ router.get('/notifications', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
     await seedDefaultNotifications(propertyId);
+    await syncManagerBookingNotifications(propertyId);
 
     // Fetch from both Notification and ManagerNotification with fallback property coverage
     const propQuery = [
+      { role: 'manager' },
+      { role: 'all' },
+      { role: null },
+      { role: { $exists: false } },
+      { userId: req.user.id || req.user._id },
       { propertyId },
       { propertyId: 'HS-JAI' },
       { propertyId: 'HS-9HQ8P' },
       { propertyId: { $exists: false } },
       { propertyId: null },
-      { propertyId: '' },
-      { role: 'manager' },
-      { role: 'admin' },
-      { userId: req.user.id || req.user._id }
+      { propertyId: '' }
     ];
 
     const [standardList, managerList] = await Promise.all([
       Notification.find({ $or: propQuery }),
-      ManagerNotification.find({
-        $or: [
-          { propertyId },
-          { propertyId: 'HS-JAI' },
-          { propertyId: 'HS-9HQ8P' },
-          { propertyId: { $exists: false } },
-          { propertyId: null },
-          { propertyId: '' }
-        ]
-      })
+      ManagerNotification.find()
     ]);
 
-    // Map and merge
+    // Map and merge with robust deduplication
     const itemsMap = new Map();
     const normalize = (it) => {
       const id = it._id ? String(it._id) : (it.id ? String(it.id) : '');
-      const key = `${it.title}_${it.message}_${it.createdAt ? new Date(it.createdAt).getTime() : ''}`;
+      const cleanTitle = (it.title || '').trim().toLowerCase();
+      const cleanMsg = (it.message || '').trim().toLowerCase();
+      const key = `${cleanTitle}_${cleanMsg}`;
       return {
         id,
         _id: id,
@@ -1693,12 +1836,19 @@ router.get('/notifications', async (req, res) => {
 
     for (const it of standardList || []) {
       const norm = normalize(it);
-      itemsMap.set(norm.id || norm._dedupKey, norm);
+      itemsMap.set(norm._dedupKey || norm.id, norm);
     }
     for (const it of managerList || []) {
       const norm = normalize(it);
-      if (!itemsMap.has(norm.id) && !itemsMap.has(norm._dedupKey)) {
-        itemsMap.set(norm.id || norm._dedupKey, norm);
+      const key = norm._dedupKey || norm.id;
+      if (itemsMap.has(key)) {
+        // If either collection marked this notification as read, treat as read!
+        const existing = itemsMap.get(key);
+        if (norm.isRead || existing.isRead) {
+          existing.isRead = true;
+        }
+      } else {
+        itemsMap.set(key, norm);
       }
     }
 
@@ -1712,81 +1862,145 @@ router.get('/notifications', async (req, res) => {
   }
 });
 
-router.post('/notifications/:id/read', async (req, res) => {
+const handleMarkNotificationRead = async (req, res) => {
   try {
     const id = req.params.id;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
-    const [updated1, updated2] = await Promise.all([
-      ManagerNotification.findOneAndUpdate(
-        { _id: id, propertyId },
-        { isRead: true },
-        { new: true }
-      ).catch(() => null),
-      Notification.findByIdAndUpdate(
-        id,
-        { isRead: true },
-        { new: true }
-      ).catch(() => null)
+    // Find in either collection
+    const [doc1, doc2] = await Promise.all([
+      ManagerNotification.findOne({ $or: idQuery }).catch(() => null),
+      Notification.findOne({ $or: idQuery }).catch(() => null)
     ]);
 
-    const updated = updated1 || updated2;
-    return sendSuccess(res, 200, updated || { id, isRead: true }, 'Notification marked as read.');
+    const targetDoc = doc1 || doc2;
+    const title = targetDoc?.title;
+    const message = targetDoc?.message;
+
+    // Update in both collections by ID
+    const updatePromises = [
+      ManagerNotification.updateMany({ $or: idQuery }, { isRead: true }).catch(() => null),
+      Notification.updateMany({ $or: idQuery }, { isRead: true }).catch(() => null)
+    ];
+
+    // If title & message are known, sync any twin records across both collections
+    if (title && message) {
+      updatePromises.push(
+        ManagerNotification.updateMany({ title, message }, { isRead: true }).catch(() => null),
+        Notification.updateMany({ title, message }, { isRead: true }).catch(() => null)
+      );
+    }
+
+    await Promise.all(updatePromises);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propId = req.user?.propertyId || 'HS-JAI';
+      emitRealtimeSync(io, propId, 'unread_notifications_count_updated', { propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'notification_read', id });
+    }
+
+    return sendSuccess(res, 200, { id, isRead: true }, 'Notification marked as read.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
-});
+};
 
-router.post('/notifications/:id/unread', async (req, res) => {
+router.post('/notifications/:id/read', handleMarkNotificationRead);
+router.patch('/notifications/:id/read', handleMarkNotificationRead);
+router.put('/notifications/:id/read', handleMarkNotificationRead);
+
+const handleMarkNotificationUnread = async (req, res) => {
   try {
     const id = req.params.id;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
-    const [updated1, updated2] = await Promise.all([
-      ManagerNotification.findOneAndUpdate(
-        { _id: id, propertyId },
-        { isRead: false },
-        { new: true }
-      ).catch(() => null),
-      Notification.findByIdAndUpdate(
-        id,
-        { isRead: false },
-        { new: true }
-      ).catch(() => null)
+    const [doc1, doc2] = await Promise.all([
+      ManagerNotification.findOne({ $or: idQuery }).catch(() => null),
+      Notification.findOne({ $or: idQuery }).catch(() => null)
     ]);
 
-    const updated = updated1 || updated2;
-    return sendSuccess(res, 200, updated || { id, isRead: false }, 'Notification marked as unread.');
+    const targetDoc = doc1 || doc2;
+    const title = targetDoc?.title;
+    const message = targetDoc?.message;
+
+    const updatePromises = [
+      ManagerNotification.updateMany({ $or: idQuery }, { isRead: false }).catch(() => null),
+      Notification.updateMany({ $or: idQuery }, { isRead: false }).catch(() => null)
+    ];
+
+    if (title && message) {
+      updatePromises.push(
+        ManagerNotification.updateMany({ title, message }, { isRead: false }).catch(() => null),
+        Notification.updateMany({ title, message }, { isRead: false }).catch(() => null)
+      );
+    }
+
+    await Promise.all(updatePromises);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      const propId = req.user?.propertyId || 'HS-JAI';
+      emitRealtimeSync(io, propId, 'unread_notifications_count_updated', { propertyId: propId });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'notification_unread', id });
+    }
+
+    return sendSuccess(res, 200, { id, isRead: false }, 'Notification marked as unread.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
-});
+};
 
-router.post('/notifications/read-all', async (req, res) => {
+router.post('/notifications/:id/unread', handleMarkNotificationUnread);
+router.patch('/notifications/:id/unread', handleMarkNotificationUnread);
+router.put('/notifications/:id/unread', handleMarkNotificationUnread);
+
+const handleMarkAllNotificationsRead = async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user?.propertyId || 'HS-JAI';
+    const propQuery = [
+      { propertyId },
+      { propertyId: 'HS-JAI' },
+      { propertyId: 'HS-9HQ8P' },
+      { propertyId: { $exists: false } },
+      { propertyId: null },
+      { propertyId: '' },
+      { role: 'manager' },
+      { role: 'admin' },
+      { userId: req.user?.id || req.user?._id }
+    ];
+
     await Promise.all([
       ManagerNotification.updateMany(
-        { propertyId, isRead: false },
+        { isRead: false },
         { isRead: true }
       ).catch(() => null),
       Notification.updateMany(
         {
           isRead: false,
-          $or: [
-            { propertyId },
-            { role: 'manager', propertyId },
-            { userId: req.user.id || req.user._id }
-          ]
+          $or: propQuery
         },
         { isRead: true }
       ).catch(() => null)
     ]);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propertyId, 'unread_notifications_count_updated', { propertyId });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'all_notifications_read' });
+    }
+
     return sendSuccess(res, 200, null, 'All notifications marked as read.');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
-});
+};
+
+router.post('/notifications/read-all', handleMarkAllNotificationsRead);
+router.patch('/notifications/read-all', handleMarkAllNotificationsRead);
+router.put('/notifications/read-all', handleMarkAllNotificationsRead);
 
 const handleExtendReservation = async (req, res) => {
   try {

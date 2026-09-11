@@ -106,8 +106,13 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
     if (widget.preselectedCategory != null && widget.preselectedCategory!.isNotEmpty) {
       _selectedCategory = widget.preselectedCategory;
     }
+    _updateTariffAndBalance();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RoomProvider>().fetchAll();
+      context.read<RoomProvider>().fetchAll().then((_) {
+        if (mounted) {
+          _updateTariffAndBalance();
+        }
+      });
     });
   }
 
@@ -129,26 +134,47 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
     return dt.year == now.year && dt.month == now.month && dt.day == now.day;
   }
 
-  double get _calculatedTariff {
-    final manual = double.tryParse(_amountController.text.trim());
-    if (manual != null && manual > 0) return manual;
-
-    double baseRate = 3000.0;
-    final cat = _roomCategories.firstWhere(
-      (c) => c['name'] == _selectedCategory,
-      orElse: () => _roomCategories.first,
-    );
-
-    // Try finding dynamic rate from loaded rooms
-    final roomProvider = context.read<RoomProvider>();
-    final matchedRoom = roomProvider.rooms.where((r) => r.category == _selectedCategory).firstOrNull;
-    if (matchedRoom != null && matchedRoom.basePrice > 0) {
-      baseRate = matchedRoom.basePrice;
-    } else {
-      baseRate = (cat['defaultRate'] as num).toDouble();
+  double _getRatePerNightForCategory(String? category) {
+    // 1. If a specific room number is selected, find its rate and category
+    if (_selectedRoomNumber != null && _selectedRoomNumber!.isNotEmpty) {
+      final roomProvider = context.read<RoomProvider>();
+      final room = roomProvider.rooms.where((r) => r.roomNumber == _selectedRoomNumber).firstOrNull;
+      if (room != null && room.basePrice > 0) {
+        return room.basePrice;
+      }
     }
 
-    return (_nights > 0 ? _nights : 1) * baseRate;
+    // 2. Check loaded rooms in roomProvider matching category
+    final roomProvider = context.read<RoomProvider>();
+    final matchedRoom = roomProvider.rooms.where(
+      (r) => r.category.trim().toLowerCase() == (category ?? '').trim().toLowerCase(),
+    ).firstOrNull;
+    if (matchedRoom != null && matchedRoom.basePrice > 0) {
+      return matchedRoom.basePrice;
+    }
+
+    // 3. Fallback to predefined room category rates
+    final cat = _roomCategories.firstWhere(
+      (c) => (c['name'] as String).trim().toLowerCase() == (category ?? '').trim().toLowerCase(),
+      orElse: () => _roomCategories.first,
+    );
+    return (cat['defaultRate'] as num).toDouble();
+  }
+
+  double get _calculatedTariff {
+    final ratePerNight = _getRatePerNightForCategory(_selectedCategory);
+    return (_nights > 0 ? _nights : 1) * ratePerNight;
+  }
+
+  void _updateTariffAndBalance() {
+    final total = _calculatedTariff;
+    _amountController.text = total.toInt().toString();
+    if (_balanceController.text.trim().isEmpty) {
+      _balanceController.text = '0';
+    }
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _selectCheckInDate() async {
@@ -183,6 +209,7 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
           _selectedStatus = _isDateToday(_checkInDate) ? 'Checked-in' : 'Confirmed';
         }
       });
+      _updateTariffAndBalance();
     }
   }
 
@@ -212,6 +239,7 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
         final diff = _checkOutDate.difference(_checkInDate).inDays;
         _nights = diff > 0 ? diff : 1;
       });
+      _updateTariffAndBalance();
     }
   }
 
@@ -827,7 +855,17 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                 .toList(),
             onChanged: (val) {
               if (val != null) {
-                setState(() => _selectedCategory = val);
+                setState(() {
+                  _selectedCategory = val;
+                  if (_selectedRoomNumber != null) {
+                    final roomProvider = context.read<RoomProvider>();
+                    final room = roomProvider.rooms.where((r) => r.roomNumber == _selectedRoomNumber).firstOrNull;
+                    if (room != null && room.category.trim().toLowerCase() != val.trim().toLowerCase()) {
+                      _selectedRoomNumber = null;
+                    }
+                  }
+                });
+                _updateTariffAndBalance();
               }
             },
           ),
@@ -862,7 +900,19 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                 const DropdownMenuItem(value: '301', child: Text('Room 301 (Executive Suite)')),
               ]
             ],
-            onChanged: (val) => setState(() => _selectedRoomNumber = (val == null || val.isEmpty) ? null : val),
+            onChanged: (val) {
+              setState(() {
+                _selectedRoomNumber = (val == null || val.isEmpty) ? null : val;
+                if (_selectedRoomNumber != null) {
+                  final roomProvider = context.read<RoomProvider>();
+                  final room = roomProvider.rooms.where((r) => r.roomNumber == _selectedRoomNumber).firstOrNull;
+                  if (room != null && room.category.isNotEmpty) {
+                    _selectedCategory = room.category;
+                  }
+                }
+              });
+              _updateTariffAndBalance();
+            },
           ),
         ],
       ),
@@ -871,7 +921,10 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
 
   // --- 4. Tariff, Billing & Notes Section ---
   Widget _buildTariffAndBillingSection() {
-    final defaultTariff = _calculatedTariff.toInt();
+    final ratePerNight = _getRatePerNightForCategory(_selectedCategory).toInt();
+    final totalAutoTariff = (_nights > 0 ? _nights : 1) * ratePerNight;
+    final currentTariff = int.tryParse(_amountController.text.trim()) ?? totalAutoTariff;
+    final isCustomTariff = currentTariff != totalAutoTariff;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -902,6 +955,56 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
           ),
           const SizedBox(height: 12),
 
+          // Dynamic Rate Auto-Calculation Pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF86EFAC)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome_rounded, color: Color(0xFF15803D), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF166534)),
+                      children: [
+                        const TextSpan(text: 'Auto Rate: ', style: TextStyle(fontWeight: FontWeight.w700)),
+                        TextSpan(
+                          text: '₹$ratePerNight/night × $_nights Night${_nights > 1 ? "s" : ""} = ',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        TextSpan(
+                          text: '₹$totalAutoTariff',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (isCustomTariff)
+                  InkWell(
+                    onTap: _updateTariffAndBalance,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: navy,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Reset',
+                        style: TextStyle(fontSize: 10, color: gold, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
           // Total Tariff & Balance
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -912,11 +1015,13 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                   keyboardType: TextInputType.number,
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: navy),
                   decoration: _inputDecoration(
-                    label: 'Tariff (₹)',
-                    hint: 'Auto: ₹$defaultTariff',
+                    label: 'Tariff (₹) *',
+                    hint: 'Auto: ₹$totalAutoTariff',
                     prefixIcon: Icons.payments_rounded,
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (val) {
+                    setState(() {});
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -926,7 +1031,7 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                   keyboardType: TextInputType.number,
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: ruby),
                   decoration: _inputDecoration(
-                    label: 'Balance (₹)',
+                    label: 'Balance Due (₹) *',
                     hint: '0 (Paid in Full)',
                     prefixIcon: Icons.account_balance_wallet_rounded,
                   ),

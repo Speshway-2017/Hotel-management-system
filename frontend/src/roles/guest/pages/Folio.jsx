@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   FileText, Download, Printer, ShieldCheck, Hotel, MapPin, 
   CreditCard, Calendar, Bed, RefreshCw, AlertCircle, Sparkles, 
@@ -135,7 +135,7 @@ function GuestFolioPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             {f.invoiceAvailable && (
               <button
                 onClick={() => window.print()}

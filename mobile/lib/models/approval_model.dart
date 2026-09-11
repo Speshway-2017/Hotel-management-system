@@ -20,6 +20,11 @@ class ApprovalModel {
   String get type => category;
   String get requesterName => requestedBy;
   bool get isPending => status.toLowerCase() == 'pending';
+  bool get isApproved => status.toLowerCase() == 'approved';
+  bool get isProcessing => status.toLowerCase() == 'processing';
+  bool get isRefunded => status.toLowerCase() == 'refunded';
+  bool get isRejected => status.toLowerCase() == 'rejected';
+  bool get isRefundCategory => category.toLowerCase().contains('refund');
 
   ApprovalModel({
     required this.id,

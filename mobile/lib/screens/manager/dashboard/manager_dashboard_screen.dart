@@ -79,23 +79,18 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
     // Today's operational metrics (Today's Arrivals, Departures & Revenue strictly for today)
     final todayArrivals = resProvider.reservations.where((r) {
       final st = r.status.toLowerCase();
-      final isArrivalStatus = [
-        'confirmed',
-        'pending',
-        'upcoming',
-        'booked',
-        'reserved',
-        'pre-checked',
-        'pre_checked',
-        'paid',
-      ].contains(st);
-      return isArrivalStatus && Formatters.isToday(r.checkIn);
+      if (st == 'cancelled' || st == 'rejected' || st == 'no-show' || st == 'no_show') {
+        return false;
+      }
+      return Formatters.isToday(r.checkIn);
     }).length;
 
     final todayDepartures = resProvider.reservations.where((r) {
       final st = r.status.toLowerCase();
-      final isDepartureStatus = ['completed', 'checked-out', 'checked_out'].contains(st);
-      return isDepartureStatus && Formatters.isToday(r.checkOut);
+      if (st == 'cancelled' || st == 'rejected' || st == 'no-show' || st == 'no_show') {
+        return false;
+      }
+      return Formatters.isToday(r.checkOut);
     }).length;
 
     // Calculate today's revenue (from completed payments today or today's checked-in/settled stays)
@@ -149,46 +144,6 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
             _buildSectionHeader(
               title: "Today's Operations",
               subtitle: 'Live daily operational pulse & turns',
-              trailing: InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ManagerTodayOperationsScreen(),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: emerald.withAlpha(20),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: emerald.withAlpha(60)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 5.5,
-                        height: 5.5,
-                        decoration: const BoxDecoration(
-                          color: emerald,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'View All',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: emerald,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
             const SizedBox(height: 8),
 
@@ -999,7 +954,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Check-in: ${Formatters.date(res.checkIn)}',
+                  'Check-in: ${Formatters.checkInDateTime(res.checkIn)}',
                   style: const TextStyle(fontSize: 10, color: muted),
                 ),
               ],

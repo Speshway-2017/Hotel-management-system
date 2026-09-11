@@ -33,17 +33,11 @@ export const Route = createFileRoute("/admin/notifications")({
 });
 
 function getToneForType(type) {
-  switch (type) {
-    case "OTA Sync":
-    case "Payment Alert":
-      return "warning";
-    case "Property Audit":
-      return "success";
-    case "Security Warning":
-      return "error";
-    default:
-      return "brand";
-  }
+  const t = (type || "").toLowerCase();
+  if (t.includes("reserv") || t.includes("book") || t.includes("audit")) return "success";
+  if (t.includes("sync") || t.includes("payment") || t.includes("approval") || t.includes("check")) return "warning";
+  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("warning")) return "error";
+  return "brand";
 }
 
 function AdminNotificationsPage() {
@@ -105,10 +99,17 @@ function AdminNotificationsPage() {
     let matchesType = true;
     if (filterType === "Unread") {
       matchesType = !n.read;
+    } else if (filterType === "Reservations") {
+      const t = (n.type || "").toLowerCase();
+      const title = (n.title || "").toLowerCase();
+      const msg = (n.message || "").toLowerCase();
+      matchesType = t.includes("reserv") || t.includes("book") || title.includes("reserv") || title.includes("booking") || msg.includes("booking");
     } else if (filterType === "Sync") {
-      matchesType = n.type === "OTA Sync" || n.type === "Payment Alert";
+      const t = (n.type || "").toLowerCase();
+      matchesType = t.includes("sync") || t.includes("payment");
     } else if (filterType === "Audit") {
-      matchesType = n.type === "Property Audit";
+      const t = (n.type || "").toLowerCase();
+      matchesType = t.includes("audit") || t.includes("property");
     }
     return matchesType;
   });
@@ -127,6 +128,7 @@ function AdminNotificationsPage() {
             {[
               { label: "All Alerts", key: "All" },
               { label: `Unread (${unreadCount})`, key: "Unread" },
+              { label: "Reservations", key: "Reservations" },
               { label: "Channel Syncs", key: "Sync" },
               { label: "Property Audits", key: "Audit" }
             ].map((tab) => (

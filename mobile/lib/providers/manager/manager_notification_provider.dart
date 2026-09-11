@@ -13,6 +13,7 @@ class ManagerNotificationProvider with ChangeNotifier {
   String _selectedCategory = 'All';
   StreamSubscription? _fcmForegroundSub;
   StreamSubscription? _fcmTapSub;
+  Timer? _debounceTimer;
 
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -29,7 +30,27 @@ class ManagerNotificationProvider with ChangeNotifier {
     } else if (_selectedCategory == 'Read') {
       return _notifications.where((n) => n.isRead).toList();
     } else {
-      return _notifications.where((n) => n.category.toLowerCase() == _selectedCategory.toLowerCase()).toList();
+      final target = _selectedCategory.trim().toLowerCase();
+      return _notifications.where((n) {
+        final cat = n.category.trim().toLowerCase();
+        final type = n.type.trim().toLowerCase();
+        if (target == 'reservations' && (cat.contains('reserv') || cat.contains('book') || type.contains('reserv') || type.contains('book'))) {
+          return true;
+        }
+        if (target == 'approvals' && (cat.contains('approval') || type.contains('approval'))) {
+          return true;
+        }
+        if (target == 'payments' && (cat.contains('pay') || cat.contains('bill') || type.contains('pay'))) {
+          return true;
+        }
+        if (target == 'guest experience' && (cat.contains('guest') || cat.contains('feedback') || cat.contains('review'))) {
+          return true;
+        }
+        if (target == 'operations' && (cat.contains('operat') || cat.contains('room') || cat.contains('shift') || cat.contains('staff'))) {
+          return true;
+        }
+        return cat == target || type == target;
+      }).toList();
     }
   }
 
@@ -38,32 +59,40 @@ class ManagerNotificationProvider with ChangeNotifier {
     _registerFcmListeners();
   }
 
+  void _debouncedFetchNotifications({Duration duration = const Duration(milliseconds: 300)}) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(duration, () {
+      fetchNotifications(silent: true);
+    });
+  }
+
   void _registerSocketListeners() {
-    SocketService.on('notification_received', (_) => fetchNotifications(silent: true));
-    SocketService.on('notification_created', (_) => fetchNotifications(silent: true));
-    SocketService.on('new_notification', (_) => fetchNotifications(silent: true));
-    SocketService.on('manager_notification', (_) => fetchNotifications(silent: true));
-    SocketService.on('unread_notifications_count_updated', (_) => fetchNotifications(silent: true));
-    SocketService.on('dashboard_sync', (_) => fetchNotifications(silent: true));
-    SocketService.on('feedback_received', (_) => fetchNotifications(silent: true));
-    SocketService.on('feedback_created', (_) => fetchNotifications(silent: true));
-    SocketService.on('approval_created', (_) => fetchNotifications(silent: true));
-    SocketService.on('booking_created', (_) => fetchNotifications(silent: true));
-    SocketService.on('booking_updated', (_) => fetchNotifications(silent: true));
-    SocketService.on('reservation_created', (_) => fetchNotifications(silent: true));
+    SocketService.on('notification_received', (_) => _debouncedFetchNotifications());
+    SocketService.on('notification_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('new_notification', (_) => _debouncedFetchNotifications());
+    SocketService.on('manager_notification', (_) => _debouncedFetchNotifications());
+    SocketService.on('unread_notifications_count_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('dashboard_sync', (_) => _debouncedFetchNotifications());
+    SocketService.on('feedback_received', (_) => _debouncedFetchNotifications());
+    SocketService.on('feedback_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('approval_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('booking_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('booking_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('reservation_created', (_) => _debouncedFetchNotifications());
   }
 
   void _registerFcmListeners() {
     _fcmForegroundSub = NotificationService.onForegroundMessage.listen((_) {
-      fetchNotifications(silent: true);
+      _debouncedFetchNotifications();
     });
     _fcmTapSub = NotificationService.onNotificationTap.listen((_) {
-      fetchNotifications(silent: true);
+      _debouncedFetchNotifications();
     });
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _fcmForegroundSub?.cancel();
     _fcmTapSub?.cancel();
     super.dispose();
@@ -87,7 +116,26 @@ class ManagerNotificationProvider with ChangeNotifier {
       final response = await ApiService.get(ApiEndpoints.managerNotifications);
       if (response.success && response.data != null) {
         final list = response.data as List<dynamic>;
-        _notifications = list.map((e) => NotificationModel.fromJson(e as Map<String, dynamic>)).toList();
+        final fetched = list.map((e) => NotificationModel.fromJson(e as Map<String, dynamic>)).toList();
+        
+        // Clean deduplication by ID or composite key
+        final seenIds = <String>{};
+        final seenKeys = <String>{};
+        final unique = <NotificationModel>[];
+        for (final n in fetched) {
+          final compositeKey = '${n.title.trim().toLowerCase()}__${n.message.trim().toLowerCase()}';
+          if (n.id.isNotEmpty) {
+            if (!seenIds.contains(n.id)) {
+              seenIds.add(n.id);
+              seenKeys.add(compositeKey);
+              unique.add(n);
+            }
+          } else if (!seenKeys.contains(compositeKey)) {
+            seenKeys.add(compositeKey);
+            unique.add(n);
+          }
+        }
+        _notifications = unique;
       } else {
         if (!silent) _errorMessage = response.message;
       }

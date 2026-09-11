@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton, ProcessActionButton, MarkRefundedActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
@@ -225,8 +225,10 @@ function ManagerApprovalsPage() {
               className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
             >
               <option value="all">All statuses</option>
-              <option value="Pending">Pending</option>
+              <option value="Pending">Pending Review</option>
               <option value="Approved">Approved</option>
+              <option value="Processing">Processing Payout</option>
+              <option value="Refunded">Refunded (Settled)</option>
               <option value="Rejected">Rejected</option>
             </Select>
           </div>
@@ -271,7 +273,7 @@ function ManagerApprovalsPage() {
                   <th className="py-4.5 px-4">Reason</th>
                   <th className="py-4.5 px-4">Requested Date</th>
                   <th className="py-4.5 px-4 text-center">Status</th>
-                  <th className="py-4.5 px-4 text-left min-w-[180px] whitespace-nowrap">Actions</th>
+                  <th className="py-4.5 px-4 text-left min-w-[200px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
@@ -303,27 +305,54 @@ function ManagerApprovalsPage() {
                       <td className="py-4 px-4 text-center">
                         <Tag tone={
                           r.status === "Approved" ? "success" :
-                          r.status === "Rejected" ? "error" : "brand"
+                          r.status === "Processing" ? "brand" :
+                          r.status === "Refunded" ? "success" :
+                          r.status === "Rejected" ? "error" : "warning"
                         }>
                           {r.status}
                         </Tag>
                       </td>
-                      <td className="py-4 px-4 text-left align-middle whitespace-nowrap min-w-[180px]">
+                      <td className="py-4 px-4 text-left align-middle whitespace-nowrap min-w-[200px]">
                         <ActionGroup align="left">
                           <ViewActionButton
                             onClick={() => navigate({ to: `/manager/approvals/view/${r.id}` })}
                             title="View Request Details"
                           />
                           
+                          {/* 1. Pending -> Approve or Reject */}
                           {r.status === "Pending" && (
                             <>
                               <ApproveActionButton
-                                onClick={() => handleDecision(r.id, "Approved")}
+                                onClick={() => handleDecision(r.id, "Approved", "Approved by Hotel Manager")}
+                                title="Approve Request"
                               />
                               <RejectActionButton
-                                onClick={() => handleDecision(r.id, "Rejected")}
+                                onClick={() => handleDecision(r.id, "Rejected", "Rejected by Hotel Manager")}
+                                title="Reject Request"
                               />
                             </>
+                          )}
+
+                          {/* 2. Approved -> Move to Processing */}
+                          {r.status === "Approved" && (
+                            <>
+                              <ProcessActionButton
+                                onClick={() => handleDecision(r.id, "Processing", "Disbursement in processing via bank gateway")}
+                                title="Initiate Payout / Mark as Processing"
+                              />
+                              <RejectActionButton
+                                onClick={() => handleDecision(r.id, "Rejected", "Revoked & Rejected by Hotel Manager")}
+                                title="Reject Request"
+                              />
+                            </>
+                          )}
+
+                          {/* 3. Processing -> Mark as Refunded */}
+                          {r.status === "Processing" && (
+                            <MarkRefundedActionButton
+                              onClick={() => handleDecision(r.id, "Refunded", "Refund payment successfully disbursed and settled")}
+                              title="Complete Refund / Mark as Refunded"
+                            />
                           )}
                         </ActionGroup>
                       </td>

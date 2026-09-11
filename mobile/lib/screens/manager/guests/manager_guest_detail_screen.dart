@@ -622,7 +622,7 @@ class _ManagerGuestDetailScreenState extends State<ManagerGuestDetailScreen> {
                         icon: Icons.login_rounded,
                         iconColor: emerald,
                         title: 'Check-In Schedule',
-                        value: Formatters.dateTime(reservation.checkIn),
+                        value: Formatters.checkInDateTime(reservation.checkIn),
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
@@ -632,7 +632,7 @@ class _ManagerGuestDetailScreenState extends State<ManagerGuestDetailScreen> {
                         icon: Icons.logout_rounded,
                         iconColor: amber,
                         title: 'Check-Out Schedule',
-                        value: Formatters.dateTime(reservation.checkOut),
+                        value: Formatters.checkOutDateTime(reservation.checkOut),
                       ),
                     ],
                   ),

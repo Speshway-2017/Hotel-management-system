@@ -378,10 +378,13 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
               final roomProv = context.read<RoomProvider>();
               final messenger = ScaffoldMessenger.of(context);
 
-              final checkIn = DateTime.now();
+              final now = DateTime.now();
+              final checkIn = _stayType == 'hourly'
+                  ? now
+                  : DateTime(now.year, now.month, now.day, 12, 0);
               final checkOut = _stayType == 'hourly'
                   ? checkIn.add(Duration(hours: _selectedHours))
-                  : checkIn.add(const Duration(days: 1));
+                  : DateTime(now.year, now.month, now.day + 1, 11, 0);
 
               final success = await bookingProvider.bookRoom(
                 roomId: room.id,

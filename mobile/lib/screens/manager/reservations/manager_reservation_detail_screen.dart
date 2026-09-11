@@ -240,82 +240,182 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            DateTime currentDt;
+            try {
+              currentDt = Formatters.parseDateSafe(_reservation.checkOut) ?? DateTime.now();
+            } catch (_) {
+              currentDt = DateTime.now();
+            }
+            if (currentDt.hour == 0 && currentDt.minute == 0) {
+              currentDt = DateTime(currentDt.year, currentDt.month, currentDt.day, 11, 0);
+            }
+            final newCheckOutDt = DateTime(currentDt.year, currentDt.month, currentDt.day + extraNights, 11, 0);
+            final newTotalAmount = _reservation.amount + extraAmount;
+
             return AlertDialog(
-              title: const Text('Extend Guest Stay'),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.more_time_rounded, color: AppColors.primary, size: 22),
+                  SizedBox(width: 8),
+                  Text('Extend Guest Stay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Current Check-Out: ${Formatters.dateTime(_reservation.checkOut)}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Current Check-Out:', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                            Text(
+                              Formatters.checkOutDateTime(_reservation.checkOut),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.event_available_rounded, size: 13, color: AppColors.success),
+                                SizedBox(width: 4),
+                                Text('New Check-Out:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                              ],
+                            ),
+                            Text(
+                              Formatters.checkOutDateTime(newCheckOutDt.toIso8601String()),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Additional Nights:'),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
-                            onPressed: extraNights > 1 ? () {
-                              setDialogState(() {
-                                extraNights--;
-                                extraAmount = dailyRate * extraNights;
-                              });
-                            } : null,
-                          ),
-                          Text('$extraNights', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () {
-                              setDialogState(() {
-                                extraNights++;
-                                extraAmount = dailyRate * extraNights;
-                              });
-                            },
-                          ),
-                        ],
+                      const Text('Additional Nights:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: extraNights > 1 ? () {
+                                setDialogState(() {
+                                  extraNights--;
+                                  extraAmount = dailyRate * extraNights;
+                                });
+                              } : null,
+                            ),
+                            Text(
+                              '$extraNights Night${extraNights > 1 ? "s" : ""}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () {
+                                setDialogState(() {
+                                  extraNights++;
+                                  extraAmount = dailyRate * extraNights;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  const Divider(),
+                  const Divider(height: 20),
+
+                  // Real-time calculated payment summary
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Additional Tariff:'),
-                      Text(Formatters.currency(extraAmount), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 16)),
+                      const Text('Daily Rate:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text('${Formatters.currency(dailyRate)} / night', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Additional Tariff:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                      Text(
+                        Formatters.currency(extraAmount),
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('New Total Amount:', style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary)),
+                      Text(
+                        Formatters.currency(newTotalAmount),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      ),
                     ],
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                ),
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    DateTime currentDt;
-                    try {
-                      currentDt = DateTime.parse(_reservation.checkOut);
-                    } catch (_) {
-                      currentDt = DateTime.now();
-                    }
-                    final newCheckOut = currentDt.add(Duration(days: extraNights)).toIso8601String();
+                    final newCheckOut = newCheckOutDt.toIso8601String();
                     final resProvider = context.read<ReservationProvider>();
                     final messenger = ScaffoldMessenger.of(context);
                     final ok = await resProvider.extendReservation(_reservation.id, newCheckOut, extraNights, extraAmount);
                     if (ok && mounted) {
                       messenger.showSnackBar(
-                        const SnackBar(content: Text('Stay extended successfully!'), backgroundColor: AppColors.success),
+                        SnackBar(
+                          content: Text('Stay extended to ${Formatters.checkOutDateTime(newCheckOut)}! Added ${Formatters.currency(extraAmount)}.'),
+                          backgroundColor: AppColors.success,
+                          duration: const Duration(seconds: 4),
+                        ),
                       );
                       setState(() {
                         _reservation = _reservation.copyWith(
                           checkOut: newCheckOut,
                           nights: _reservation.nights + extraNights,
-                          amount: _reservation.amount + extraAmount,
+                          amount: newTotalAmount,
                         );
                       });
                     }
                   },
-                  child: const Text('Confirm Extension'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text('Confirm (+${Formatters.currency(extraAmount)})'),
                 ),
               ],
             );
@@ -622,9 +722,9 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
               ),
               child: Column(
                 children: [
-                  _buildDetailRow(Icons.login, 'Check-In', Formatters.dateTime(_reservation.checkIn)),
+                  _buildDetailRow(Icons.login, 'Check-In', Formatters.checkInDateTime(_reservation.checkIn)),
                   const Divider(height: 16),
-                  _buildDetailRow(Icons.logout, 'Check-Out', Formatters.dateTime(_reservation.checkOut)),
+                  _buildDetailRow(Icons.logout, 'Check-Out', Formatters.checkOutDateTime(_reservation.checkOut)),
                 ],
               ),
             ),

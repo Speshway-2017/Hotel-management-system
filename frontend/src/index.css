@@ -849,16 +849,52 @@ td {
   table td .font-mono {
     color: var(--text-muted) !important;
   }
-  table td button {
+  table td button:not([class*="ActionIcon"]):not([class*="size-7"]):not([class*="rounded-lg"]):not([class*="rounded-full"]):not([class*="bg-"]):not([class*="hover:text-white"]) {
     color: var(--text-link) !important;
   }
-  table td button:hover {
+  table td button:not([class*="ActionIcon"]):not([class*="size-7"]):not([class*="rounded-lg"]):not([class*="rounded-full"]):not([class*="bg-"]):not([class*="hover:text-white"]):hover {
     color: var(--text-link-hover) !important;
   }
   table td button.text-error,
   table td button[title*="Delete"],
   table td button[title*="Remove"] {
     color: var(--text-danger) !important;
+  }
+
+  /* Universal Action Button & Icon Hover Rules: Cursor hover turns icon & text to crisp white */
+  button[class*="size-7"]:hover,
+  button[class*="size-7"]:hover *,
+  button[class*="ActionIcon"]:hover,
+  button[class*="ActionIcon"]:hover *,
+  button[class*="ActionButton"]:hover,
+  button[class*="ActionButton"]:hover *,
+  div[class*="ActionGroup"] button:hover,
+  div[class*="ActionGroup"] button:hover *,
+  table td button[class*="size-7"]:hover,
+  table td button[class*="size-7"]:hover *,
+  table td button[class*="ActionIcon"]:hover,
+  table td button[class*="ActionIcon"]:hover *,
+  table td button[class*="hover:text-white"]:hover,
+  table td button[class*="hover:text-white"]:hover * {
+    color: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+  }
+
+  button[class*="size-7"] svg,
+  button[class*="ActionIcon"] svg,
+  div[class*="ActionGroup"] button svg,
+  table td button[class*="size-7"] svg,
+  table td button[class*="ActionIcon"] svg {
+    transition: color 0.15s ease-in-out, stroke 0.15s ease-in-out;
+  }
+
+  button[class*="size-7"]:hover svg,
+  button[class*="ActionIcon"]:hover svg,
+  div[class*="ActionGroup"] button:hover svg,
+  table td button[class*="size-7"]:hover svg,
+  table td button[class*="ActionIcon"]:hover svg {
+    color: #FFFFFF !important;
+    stroke: #FFFFFF !important;
   }
 
   /* Forms & Input fields */

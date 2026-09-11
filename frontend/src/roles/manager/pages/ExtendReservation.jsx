@@ -119,7 +119,7 @@ function ManagerExtendReservation() {
         const totalAmt = Number(matched.amount || matched.totalAmount || 3000);
         const totalNights = Number(matched.nights || 1);
         const avgNight = totalAmt / Math.max(1, totalNights);
-        const baseRate = Math.round(avgNight / 1.18);
+        const baseRate = Math.round(avgNight);
         setDailyRate(baseRate > 0 ? baseRate : 3000);
       } else {
         setError("Reservation not found. Please verify the booking reference.");
@@ -150,7 +150,6 @@ function ManagerExtendReservation() {
         remainderHours: 0,
         durationLabel: "0 Hours",
         roomCharges: 0,
-        gstAmount: 0,
         totalAdditionalAmount: 0,
         isValid: false
       };
@@ -192,8 +191,7 @@ function ManagerExtendReservation() {
       }
     }
 
-    const gstAmount = Math.round(roomCharges * 0.18);
-    const totalAdditionalAmount = roomCharges + gstAmount;
+    const totalAdditionalAmount = roomCharges;
 
     return {
       totalHours,
@@ -202,7 +200,6 @@ function ManagerExtendReservation() {
       remainderHours,
       durationLabel,
       roomCharges,
-      gstAmount,
       totalAdditionalAmount,
       isValid: totalHours > 0
     };
@@ -323,7 +320,7 @@ function ManagerExtendReservation() {
             Extend Stay Duration
           </h1>
           <p className="text-xs font-semibold text-slate-600 mt-0.5">
-            Modify departure timestamp starting directly from current checkout. Calculates dynamic hourly/nightly tariff and GST.
+            Modify departure timestamp starting directly from current checkout. Calculates dynamic hourly/nightly tariff.
           </p>
         </div>
       </div>
@@ -609,23 +606,13 @@ function ManagerExtendReservation() {
                 Itemized Stay Charges
               </span>
 
-              <div className="flex justify-between items-center py-2 text-xs border-b" style={{ borderColor: '#e2e8f0' }}>
+              <div className="flex justify-between items-center py-2 text-xs">
                 <span className="font-extrabold flex items-center gap-2" style={{ color: '#0f172a' }}>
                   <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: '#4f46e5' }} />
                   <span style={{ color: '#0f172a', fontWeight: '800' }}>Additional Room Tariff ({calculation.durationLabel})</span>
                 </span>
                 <span className="font-black text-sm shrink-0" style={{ color: '#0f172a' }}>
                   {inr(calculation.roomCharges)}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center py-2 text-xs">
-                <span className="font-extrabold flex items-center gap-2" style={{ color: '#0f172a' }}>
-                  <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: '#4f46e5' }} />
-                  <span style={{ color: '#0f172a', fontWeight: '800' }}>Statutory GST Liability (18%)</span>
-                </span>
-                <span className="font-black text-sm shrink-0" style={{ color: '#0f172a' }}>
-                  {inr(calculation.gstAmount)}
                 </span>
               </div>
             </div>
@@ -640,7 +627,7 @@ function ManagerExtendReservation() {
                   Total Additional Payable
                 </span>
                 <span className="text-xs font-semibold block mt-0.5" style={{ color: '#e2e8f0' }}>
-                  Tariff + 18% GST Included
+                  Additional Tariff
                 </span>
               </div>
               <div className="text-right">

@@ -17,7 +17,7 @@
     "propertyId": "all",
     "applicableSource": "website",
     "createdAt": "2026-09-04T07:14:36.870Z",
-    "updatedAt": "2026-09-10T10:54:49.793Z",
+    "updatedAt": "2026-09-11T07:14:31.982Z",
     "$inc": {
       "usedCount": 1
     }

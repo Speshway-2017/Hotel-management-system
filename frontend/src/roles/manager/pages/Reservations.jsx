@@ -450,8 +450,8 @@ function ManagerReservationsPage() {
                       <td className="py-3.5 px-3 text-left align-middle">
                         <div className="font-bold text-navy text-xs">₹{res.amount?.toLocaleString()}</div>
                         <div className="mt-0.5">
-                          <Tag tone={isPaid ? "success" : "error"}>
-                            {isPaid ? "Paid" : `Due: ₹${balanceVal.toLocaleString()}`}
+                          <Tag tone={(res.paymentStatus === "Refunded" || res.refundStatus === "Refunded") ? "purple" : isPaid ? "success" : "error"}>
+                            {(res.paymentStatus === "Refunded" || res.refundStatus === "Refunded") ? "Refunded" : isPaid ? "Paid" : `Due: ₹${balanceVal.toLocaleString()}`}
                           </Tag>
                         </div>
                       </td>

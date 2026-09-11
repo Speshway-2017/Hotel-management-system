@@ -51,7 +51,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-09-04T06:47:43.786Z",
-    "updatedAt": "2026-09-10T11:37:15.820Z"
+    "updatedAt": "2026-09-11T09:51:15.377Z"
   },
   {
     "id": "6a99315b257a3b6f61660171",
@@ -622,8 +622,10 @@
     "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-08-21T05:40:50.570Z",
-    "updatedAt": "2026-09-09T04:45:07.532Z"
+    "updatedAt": "2026-09-11T09:26:48.460Z"
   },
   {
     "id": "lfir6yhyu3b",
@@ -632,12 +634,12 @@
     "email": "meghana@hourstay.com",
     "password": "$2a$10$BGFaZp0VducLncCKXaHX5.eFp4UcbEYiO9Jhd1Mtiu2jE3ZU0LzRG",
     "role": "manager",
-    "mobile": "9888888888",
+    "mobile": "9888888866",
     "propertyId": "HS-9HQ8P",
     "status": "Active",
     "dept": "Front Desk",
     "shift": "General Shift",
-    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1787659159/hourstay_hms_assets/rmnsmxftzqqvkrhowpou.jpg",
+    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1789108796/hourstay_hms_assets/ivbtxfnst2q9l8qcucnz.jpg",
     "city": "",
     "state": "",
     "country": "India",
@@ -653,7 +655,7 @@
       "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
     ],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-10T12:04:40.686Z"
+    "updatedAt": "2026-09-11T10:20:43.916Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -782,8 +784,10 @@
     "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-08-24T11:47:56.630Z",
-    "updatedAt": "2026-09-08T05:13:23.521Z"
+    "updatedAt": "2026-09-11T08:44:54.073Z"
   },
   {
     "id": "nhb9td45vas",

@@ -6,9 +6,15 @@ class ApiEndpoints {
   static const String localHostIp = '192.168.88.17';
   static const String localPort = '5000';
 
-  // Production configuration switch
-  static const bool useProduction = false;
-  static const String productionBaseUrl = 'https://api.hourstay.com/api';
+  // Environment URLs
+  static const String devBaseUrl = 'http://192.168.88.17:5000/api';
+  static const String productionBaseUrl = 'https://booknstay.speshway.site/api';
+
+  static const String devSocketUrl = 'http://192.168.88.17:5000';
+  static const String productionSocketUrl = 'https://booknstay.speshway.site';
+
+  // Build mode awareness
+  static bool get isProduction => kReleaseMode;
 
   static String baseUrl = getDefaultBaseUrl();
 
@@ -17,30 +23,30 @@ class ApiEndpoints {
   }
 
   static String getDefaultBaseUrl() {
-    if (useProduction) {
+    if (kReleaseMode) {
       return productionBaseUrl;
     }
     if (kIsWeb) {
       return 'http://localhost:$localPort/api';
     } else if (Platform.isAndroid) {
-      return 'http://$localHostIp:$localPort/api';
+      return devBaseUrl;
     } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       return 'http://127.0.0.1:$localPort/api';
     } else {
-      return 'http://$localHostIp:$localPort/api';
+      return devBaseUrl;
     }
   }
 
   static List<String> getCandidateBaseUrls() {
-    if (useProduction) {
+    if (kReleaseMode) {
       return const [productionBaseUrl];
     }
     if (kIsWeb) {
       return const ['http://localhost:$localPort/api'];
     }
     return const [
+      devBaseUrl,
       'http://127.0.0.1:$localPort/api',
-      'http://$localHostIp:$localPort/api',
       'http://10.0.2.2:$localPort/api',
       'http://localhost:$localPort/api',
     ];
@@ -51,18 +57,41 @@ class ApiEndpoints {
     if (activeBase.endsWith('/api')) {
       return activeBase.substring(0, activeBase.length - 4);
     }
-    if (useProduction) {
-      return productionBaseUrl.replaceAll('/api', '');
+    if (kReleaseMode) {
+      return productionSocketUrl;
     }
     if (kIsWeb) {
       return 'http://localhost:$localPort';
     } else if (Platform.isAndroid) {
-      return 'http://$localHostIp:$localPort';
+      return devSocketUrl;
     } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       return 'http://127.0.0.1:$localPort';
     } else {
-      return 'http://$localHostIp:$localPort';
+      return devSocketUrl;
     }
+  }
+
+  static String resolveImageUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return '';
+    final s = url.trim();
+    if (s.startsWith('data:image')) return s;
+
+    // Relative uploads path
+    if (s.startsWith('/uploads/') || s.startsWith('uploads/')) {
+      final base = getDefaultSocketUrl();
+      final cleanPath = s.startsWith('/') ? s : '/$s';
+      return '$base$cleanPath';
+    }
+
+    // Rewriting localhost / 127.0.0.1 for mobile clients
+    if (!kIsWeb && (s.contains('localhost:5000') || s.contains('127.0.0.1:5000'))) {
+      final base = getDefaultSocketUrl();
+      return s
+          .replaceAll('http://localhost:5000', base)
+          .replaceAll('http://127.0.0.1:5000', base);
+    }
+
+    return s;
   }
 
   // Auth Routes
@@ -109,5 +138,6 @@ class ApiEndpoints {
   static const String guestNotificationsReadAll = '/guest/notifications/read-all';
   static const String guestChangePassword = '/guest/change-password';
   static const String guestRooms = '/guest/rooms';
+  static const String guestRefund = '/guest/refund';
   static const String publicProperties = '/public/properties';
 }

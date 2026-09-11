@@ -16,9 +16,16 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    project.evaluationDependsOn(":app")
+    configurations.configureEach {
+        if (name.contains("CompileClasspath", ignoreCase = true) || name == "compileOnly" || name == "implementation") {
+            dependencies.add(project.dependencies.create("com.google.android.gms:play-services-tasks:18.2.0"))
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+
+
