@@ -763,7 +763,6 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
         icon: Icons.star_rounded,
         iconColor: const Color(0xFFD97706),
         bgColor: const Color(0xFFFEF3C7),
-        badgeCount: feedbackCount,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const ManagerFeedbackScreen()),
@@ -811,30 +810,22 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Badge(
-              isLabelVisible: (action.badgeCount ?? 0) > 0,
-              backgroundColor: const Color(0xFFE53935),
-              label: Text(
-                '${action.badgeCount}',
-                style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
-              ),
-              child: Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: action.bgColor,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: action.iconColor.withAlpha(35),
-                    width: 1.0,
-                  ),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: action.bgColor,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: action.iconColor.withAlpha(35),
+                  width: 1.0,
                 ),
-                child: Center(
-                  child: Icon(
-                    action.icon,
-                    color: action.iconColor,
-                    size: 12,
-                  ),
+              ),
+              child: Center(
+                child: Icon(
+                  action.icon,
+                  color: action.iconColor,
+                  size: 12,
                 ),
               ),
             ),
@@ -1110,7 +1101,6 @@ class _QuickActionItem {
   final Color iconColor;
   final Color bgColor;
   final VoidCallback onTap;
-  final int? badgeCount;
 
   const _QuickActionItem({
     required this.label,
@@ -1118,6 +1108,5 @@ class _QuickActionItem {
     required this.iconColor,
     required this.bgColor,
     required this.onTap,
-    this.badgeCount,
   });
 }

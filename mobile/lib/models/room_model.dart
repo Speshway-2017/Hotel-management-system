@@ -18,10 +18,17 @@ class RoomModel {
   final String? checkOut;
   final Map<int, double> rates;
   final List<String> amenities;
+  final List<String> images;
+  final String? description;
+  final String? propertyName;
+  final String? city;
+  final String? cancellationPolicy;
+  final double rating;
 
   // Compatibility getters
   String get type => category;
   double get basePrice => baseRate;
+  String get mainImage => images.isNotEmpty ? images.first : '';
 
   RoomModel({
     required this.id,
@@ -43,6 +50,12 @@ class RoomModel {
     this.checkOut,
     Map<int, double>? rates,
     List<String>? amenities,
+    List<String>? images,
+    this.description,
+    this.propertyName,
+    this.city,
+    this.cancellationPolicy,
+    this.rating = 4.9,
   })  : rates = rates ??
             {
               2: (baseRate * 0.3).roundToDouble(),
@@ -58,7 +71,8 @@ class RoomModel {
               'Smart TV',
               'Air Conditioning',
               'Complimentary Toiletries',
-            ];
+            ],
+        images = images ?? const [];
 
   RoomModel copyWith({
     String? id,
@@ -80,6 +94,12 @@ class RoomModel {
     String? checkOut,
     Map<int, double>? rates,
     List<String>? amenities,
+    List<String>? images,
+    String? description,
+    String? propertyName,
+    String? city,
+    String? cancellationPolicy,
+    double? rating,
   }) {
     return RoomModel(
       id: id ?? this.id,
@@ -101,6 +121,12 @@ class RoomModel {
       checkOut: checkOut ?? this.checkOut,
       rates: rates ?? this.rates,
       amenities: amenities ?? this.amenities,
+      images: images ?? this.images,
+      description: description ?? this.description,
+      propertyName: propertyName ?? this.propertyName,
+      city: city ?? this.city,
+      cancellationPolicy: cancellationPolicy ?? this.cancellationPolicy,
+      rating: rating ?? this.rating,
     );
   }
 
@@ -121,9 +147,22 @@ class RoomModel {
     }
 
     List<String> amenitiesList = [];
-    if (json['amenities'] != null && json['amenities'] is List) {
-      amenitiesList = (json['amenities'] as List).map((e) => e.toString()).toList();
+    if (json['amenities'] != null) {
+      if (json['amenities'] is List) {
+        amenitiesList = (json['amenities'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      } else if (json['amenities'] is String) {
+        amenitiesList = (json['amenities'] as String).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
     }
+
+    List<String> imagesList = [];
+    if (json['images'] != null && json['images'] is List) {
+      imagesList = (json['images'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    } else if (json['image'] != null && json['image'].toString().trim().isNotEmpty) {
+      imagesList = [json['image'].toString().trim()];
+    }
+
+    final rat = double.tryParse(json['rating']?.toString() ?? '4.9') ?? 4.9;
 
     return RoomModel(
       id: json['id'] ?? json['_id'] ?? '',
@@ -136,7 +175,7 @@ class RoomModel {
       currentRate: cRate,
       floor: json['floor']?.toString() ?? 'Floor 1',
       capacity: json['capacity']?.toString() ?? '2 Adults',
-      bedType: json['bedType']?.toString() ?? 'King Bed',
+      bedType: json['bedType']?.toString() ?? json['beds']?.toString() ?? 'King Bed',
       propertyId: json['propertyId']?.toString() ?? 'HS-JAI',
       isReserved: json['isReserved'] == true,
       isAvailable: json['isAvailable'] == true || (json['status'] == 'Available' && json['isReserved'] != true),
@@ -145,6 +184,12 @@ class RoomModel {
       checkOut: json['checkOut'],
       rates: customRates.isNotEmpty ? customRates : null,
       amenities: amenitiesList.isNotEmpty ? amenitiesList : null,
+      images: imagesList,
+      description: json['description']?.toString(),
+      propertyName: json['propertyName']?.toString() ?? json['hotelName']?.toString() ?? json['hotel']?.toString(),
+      city: json['city']?.toString(),
+      cancellationPolicy: json['cancellationPolicy']?.toString(),
+      rating: rat,
     );
   }
 
@@ -164,6 +209,12 @@ class RoomModel {
       'propertyId': propertyId,
       'rates': rates.map((k, v) => MapEntry(k.toString(), v)),
       'amenities': amenities,
+      'images': images,
+      'description': description,
+      'propertyName': propertyName,
+      'city': city,
+      'cancellationPolicy': cancellationPolicy,
+      'rating': rating,
     };
   }
 }

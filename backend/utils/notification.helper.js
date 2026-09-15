@@ -195,6 +195,14 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       title = 'Guest Checked Out';
       msg = `Guest ${guestName} checked out from ${roomInfo} (Ref: #${bookingId}).`;
       category = 'Operations';
+    } else if (action === 'room_assigned') {
+      title = 'Room Assigned';
+      msg = `Room ${roomInfo} assigned for guest ${guestName} (Ref: #${bookingId}).`;
+      category = 'Operations';
+    } else if (action === 'extended') {
+      title = 'Stay Extended';
+      msg = `Stay extended for guest ${guestName} to ${checkOut} (Ref: #${bookingId}).`;
+      category = 'Operations';
     }
 
     // 1. Notify Super Admin & Admin (Global)
@@ -242,27 +250,61 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       data: { bookingId, guestName, room: roomInfo, action }
     });
 
-    // 4. Notify Guest
-    const targetGuestId = booking.guestId || (guestUser ? (guestUser._id || guestUser.id) : null);
-    if (targetGuestId) {
-      await triggerNotification({
-        req,
-        io: socketIo,
-        userId: targetGuestId,
-        role: 'guest',
-        title: action === 'created' ? 'Booking Confirmed!' : title,
-        message: action === 'created'
-          ? `Your reservation is confirmed for ${checkIn} → ${checkOut}. Booking Reference: #${bookingId}.`
-          : msg,
-        category: 'Booking Confirmation',
-        data: { bookingId, guestName, room: roomInfo, action }
-      });
+    // 4. Resolve Guest Recipient Identity
+    let targetGuestId = booking.guestId || booking.userId || (guestUser ? (guestUser._id || guestUser.id) : null);
+    if (!targetGuestId && (booking.email || booking.guestEmail)) {
+      try {
+        const u = await User.findOne({ email: booking.email || booking.guestEmail });
+        if (u) targetGuestId = String(u._id || u.id);
+      } catch (_) {}
+    }
+    if (!targetGuestId && (booking.phone || booking.guestPhone)) {
+      try {
+        const u = await User.findOne({ phone: booking.phone || booking.guestPhone });
+        if (u) targetGuestId = String(u._id || u.id);
+      } catch (_) {}
     }
 
-    // 5. Realtime Socket.io Broadcast
+    // 5. Notify Guest
+    let guestTitle = action === 'created' || action === 'booked' ? 'Booking Confirmed!' :
+      action === 'checkin' ? 'Check-in Confirmed!' :
+      action === 'checkout' ? 'Check-out Completed' :
+      action === 'room_assigned' ? 'Room Assigned' :
+      action === 'extended' ? 'Stay Extended' :
+      action === 'cancelled' ? 'Reservation Cancelled' : title;
+
+    let guestMsg = action === 'created' || action === 'booked'
+      ? `Your reservation is confirmed for ${checkIn} → ${checkOut}. Booking Reference: #${bookingId}.`
+      : action === 'checkin'
+      ? `Welcome! You have checked in to Room ${roomInfo}. Enjoy your stay! [Ref: #${bookingId}]`
+      : action === 'checkout'
+      ? `Thank you for choosing Hour Stay! We hope you had a pleasant stay in Room ${roomInfo}. [Ref: #${bookingId}]`
+      : action === 'room_assigned'
+      ? `Room ${roomInfo} has been assigned for your reservation. [Ref: #${bookingId}]`
+      : action === 'extended'
+      ? `Your reservation #${bookingId} has been extended to ${checkOut}. Enjoy your continued stay!`
+      : action === 'cancelled'
+      ? `Your reservation #${bookingId} for ${roomInfo} has been cancelled.`
+      : msg;
+
+    await triggerNotification({
+      req,
+      io: socketIo,
+      userId: targetGuestId || booking.email || null,
+      role: 'guest',
+      propertyId: propId,
+      title: guestTitle,
+      message: guestMsg,
+      category: 'Booking Confirmation',
+      data: { bookingId, guestName, room: roomInfo, action }
+    });
+
+    // 6. Realtime Socket.io Broadcast
     if (socketIo) {
       emitRealtimeSync(socketIo, propId, 'booking_created', { booking, propertyId: propId });
-      emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), booking, propertyId: propId });
+      emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), action, booking, propertyId: propId });
+      emitRealtimeSync(socketIo, propId, 'guest_notification', { action, bookingId, title: guestTitle, message: guestMsg });
+      emitRealtimeSync(socketIo, propId, 'notification_created', { action, bookingId, role: 'guest', userId: targetGuestId });
       emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: `booking_${action}`, bookingId });
     }
   } catch (err) {

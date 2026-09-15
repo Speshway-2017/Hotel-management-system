@@ -33,6 +33,7 @@ import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { inr, searchResults, blogPosts } from "@/data/hs-data";
+import { InsightsStackedCarousel } from "@/components/hs/InsightsStackedCarousel";
 
 // Import Slider Images
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -812,10 +813,10 @@ function Home() {
         </div>
       </section>
 
-      {/* Latest Blog Insights from Journal */}
-      <section className="bg-cream/40 py-24 border-t border-navy/5">
+      {/* Latest Blog Insights from Journal - Overlapping Stacked Card Carousel */}
+      <section className="bg-cream/40 py-24 border-t border-navy/5 overflow-hidden">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="text-center mb-14">
+          <div className="text-center mb-12">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Hour Stay Journal</span>
             <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Insights from the hospitality frontline
@@ -825,68 +826,7 @@ function Home() {
             </p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
-            {blogPosts.slice(0, 3).map((p, idx) => {
-              const gradients = [
-                "from-purple/15 via-purple/5 to-transparent",
-                "from-indigo-600/15 via-indigo-600/5 to-transparent",
-                "from-blue-600/15 via-blue-600/5 to-transparent"
-              ];
-              const badgeColors = [
-                "bg-purple/10 text-purple border-purple/20",
-                "bg-indigo-600/10 text-indigo-700 border-indigo-600/20",
-                "bg-blue-600/10 text-blue-700 border-blue-600/20"
-              ];
-              const grad = gradients[idx % gradients.length];
-              const badge = badgeColors[idx % badgeColors.length];
-
-              return (
-                <Link
-                  key={p.slug}
-                  to="/blog/$slug"
-                  params={{ slug: p.slug }}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-navy/10 bg-white p-7 shadow-soft transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lift hover:border-purple/40"
-                >
-                  {/* Top Ambient Accent Glow */}
-                  <div className={`absolute top-0 inset-x-0 h-28 bg-gradient-to-b ${grad} pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity`} />
-
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between gap-2 mb-4">
-                      <span className={`rounded-full border px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider font-ui ${badge}`}>
-                        {p.tag}
-                      </span>
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-[#4A4F58] font-ui">
-                        <Clock className="size-3 text-purple" /> {p.readTime}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-2 font-display text-lg sm:text-xl font-bold text-navy group-hover:text-purple transition-colors leading-snug">
-                      {p.title}
-                    </h3>
-                    <p className="mt-3 text-xs leading-relaxed text-[#4A4F58] font-ui line-clamp-3">
-                      {p.excerpt}
-                    </p>
-                  </div>
-
-                  <div className="relative z-10 mt-8 border-t border-navy/5 pt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="size-8 rounded-full bg-navy text-cream flex items-center justify-center font-bold text-xs font-display shrink-0">
-                        {p.author.split(" ").map(n => n[0]).join("")}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-navy leading-tight">{p.author}</p>
-                        <p className="text-[10px] text-[#4A4F58] font-ui">{p.date}</p>
-                      </div>
-                    </div>
-
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-purple group-hover:translate-x-1 transition-transform">
-                      Read <ArrowRight className="size-3.5" />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          <InsightsStackedCarousel />
         </div>
       </section>
 

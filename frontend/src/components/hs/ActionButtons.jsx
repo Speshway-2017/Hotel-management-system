@@ -30,43 +30,43 @@ import { cn } from "@/utils/utils";
  */
 const variantStyles = {
   // View / Info (Sleek Purple/Indigo)
-  view: "bg-purple/10 text-purple border-purple/20 hover:bg-purple hover:text-white hover:border-purple [&>svg]:hover:text-white [&_*]:hover:text-white",
-  info: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
+  view: "bg-purple/10 text-purple border-purple/20 hover:bg-purple hover:text-white hover:border-purple",
+  info: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600",
   
   // Edit / Primary (Sleek Navy/Brand)
-  edit: "bg-navy/5 text-navy border-navy/15 hover:bg-navy hover:text-white hover:border-navy [&>svg]:hover:text-white [&_*]:hover:text-white",
-  primary: "bg-navy text-white border-navy hover:bg-navy-deep hover:text-white hover:border-navy-deep [&>svg]:hover:text-white [&_*]:hover:text-white",
+  edit: "bg-navy/5 text-navy border-navy/15 hover:bg-navy hover:text-white hover:border-navy",
+  primary: "bg-navy text-white border-navy hover:bg-navy-deep hover:text-white hover:border-navy-deep",
   
   // Success / Check-In / Approve (Emerald)
-  success: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  checkin: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  approve: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
+  success: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600",
+  checkin: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600",
+  approve: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600",
   
   // Warning / Check-Out / Settle (Amber / Warm)
-  checkout: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  warning: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
+  checkout: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600",
+  warning: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600",
   
   // Extend stay (Violet / Indigo pill)
-  extend: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
+  extend: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-600 hover:text-white hover:border-indigo-600",
   
   // Danger / Delete / Reject / Cancel (Rose / Red)
-  danger: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  delete: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  reject: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  cancel: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
+  danger: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600",
+  delete: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600",
+  reject: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600",
+  cancel: "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600",
   
   // Processing / Payout in Progress (Blue)
-  processing: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
-  process: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 [&>svg]:hover:text-white [&_*]:hover:text-white",
+  processing: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600",
+  process: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600",
   
   // Refunded / Settled (Purple)
-  refunded: "bg-purple/10 text-purple border-purple/20 hover:bg-purple hover:text-white hover:border-purple [&>svg]:hover:text-white [&_*]:hover:text-white",
-  refund: "bg-purple/10 text-purple border-purple/20 hover:bg-purple hover:text-white hover:border-purple [&>svg]:hover:text-white [&_*]:hover:text-white",
+  refunded: "bg-purple/10 text-purple border-purple/20 hover:bg-purple hover:text-white hover:border-purple",
+  refund: "bg-purple/10 text-purple border-purple/20 hover:bg-purple hover:text-white hover:border-purple",
   
   // Secondary / Outline / Ghost
-  secondary: "bg-muted/40 text-navy border-muted/80 hover:bg-navy hover:text-white hover:border-navy [&>svg]:hover:text-white [&_*]:hover:text-white",
-  outline: "bg-white text-navy border-muted hover:bg-navy hover:text-white hover:border-navy [&>svg]:hover:text-white [&_*]:hover:text-white",
-  ghost: "bg-transparent text-muted-foreground border-transparent hover:bg-navy hover:text-white [&>svg]:hover:text-white [&_*]:hover:text-white"
+  secondary: "bg-muted/40 text-navy border-muted/80 hover:bg-navy hover:text-white hover:border-navy",
+  outline: "bg-white text-navy border-muted hover:bg-navy hover:text-white hover:border-navy",
+  ghost: "bg-transparent text-muted-foreground border-transparent hover:bg-navy hover:text-white"
 };
 
 /**
@@ -117,7 +117,7 @@ export function ActionIcon({
       title={tooltipText}
       aria-label={tooltipText}
       className={cn(
-        "relative inline-flex items-center justify-center rounded-lg border text-xs font-bold leading-none font-ui select-none shrink-0 shadow-2xs transition-all duration-150 cursor-pointer group hover:text-white [&>svg]:hover:text-white [&_*]:hover:text-white",
+        "relative inline-flex items-center justify-center rounded-lg border text-xs font-bold leading-none font-ui select-none shrink-0 shadow-2xs transition-all duration-150 cursor-pointer",
         isIconOnly ? "size-7 w-7 h-7 min-w-7 min-h-7 max-w-7 max-h-7 p-0" : "h-7 min-h-7 px-2.5 gap-1.5 whitespace-nowrap",
         disabled ? "opacity-50 pointer-events-none cursor-not-allowed" : styleClass,
         className
@@ -132,8 +132,8 @@ export function ActionIcon({
       }}
       {...props}
     >
-      {Icon && <Icon className="size-3.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 shrink-0 transition-colors duration-150 text-current group-hover:text-white group-hover:stroke-white" />}
-      {!isIconOnly && label && <span className="ml-1.5 text-current group-hover:text-white">{label}</span>}
+      {Icon && <Icon className="size-3.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 shrink-0 transition-colors duration-150 text-current" />}
+      {!isIconOnly && label && <span className="ml-1.5 text-current">{label}</span>}
       {children}
     </button>
   );
@@ -250,3 +250,9 @@ export function MarkRefundedActionIcon({ label = "Refunded", title = "Complete R
   return <ActionIcon icon={CheckCircle2} label={label} title={title} variant="refunded" {...props} />;
 }
 export const MarkRefundedActionButton = MarkRefundedActionIcon;
+
+export function PaymentActionIcon({ label = "Payment", title = "View Payment Details", ...props }) {
+  return <ActionIcon icon={CreditCard} label={label} title={title} variant="info" {...props} />;
+}
+export const PaymentActionButton = PaymentActionIcon;
+

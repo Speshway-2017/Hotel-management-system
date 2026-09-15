@@ -989,6 +989,11 @@ export function DashShell({ role, children }) {
                   { label: "Management", to: "/admin/staff" },
                   { label: "Approvals" }
                 ],
+                "/admin/approvals/view/:id": [
+                  { label: "Management", to: "/admin/staff" },
+                  { label: "Approvals", to: "/admin/approvals" },
+                  { label: "Approval Request Details" }
+                ],
                 "/admin/taxes": [
                   { label: "Finance", to: "/admin/payments" },
                   { label: "Taxes & GST" }

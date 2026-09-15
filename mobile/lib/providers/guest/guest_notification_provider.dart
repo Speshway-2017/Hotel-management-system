@@ -10,6 +10,7 @@ class GuestNotificationProvider with ChangeNotifier {
   List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   String? _error;
+  String _selectedCategory = 'All';
   StreamSubscription? _fcmForegroundSub;
   StreamSubscription? _fcmTapSub;
   Timer? _debounceTimer;
@@ -17,12 +18,48 @@ class GuestNotificationProvider with ChangeNotifier {
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get errorMessage => _error;
+  String get selectedCategory => _selectedCategory;
 
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
+
+  List<NotificationModel> get filteredNotifications {
+    if (_selectedCategory == 'All') {
+      return _notifications;
+    } else if (_selectedCategory == 'Unread') {
+      return _notifications.where((n) => !n.isRead).toList();
+    } else if (_selectedCategory == 'Read') {
+      return _notifications.where((n) => n.isRead).toList();
+    } else {
+      final target = _selectedCategory.trim().toLowerCase();
+      return _notifications.where((n) {
+        final cat = n.category.trim().toLowerCase();
+        final type = n.type.trim().toLowerCase();
+        final msg = n.message.trim().toLowerCase();
+        final title = n.title.trim().toLowerCase();
+
+        if (target == 'bookings' && (cat.contains('book') || cat.contains('reserv') || cat.contains('stay') || cat.contains('check') || cat.contains('room') || type.contains('book') || type.contains('check') || type.contains('stay') || title.contains('booking') || title.contains('reservation') || title.contains('check-in') || title.contains('checked in') || title.contains('check-out') || title.contains('checked out') || title.contains('room assigned') || msg.contains('booking') || msg.contains('reservation') || msg.contains('check-in') || msg.contains('checked in') || msg.contains('check-out') || msg.contains('checked out') || msg.contains('room assigned'))) {
+          return true;
+        }
+        if (target == 'payments' && (cat.contains('pay') || cat.contains('bill') || cat.contains('folio') || type.contains('pay') || msg.contains('paid') || msg.contains('payment') || title.contains('payment'))) {
+          return true;
+        }
+        if (target == 'announcements' && (cat.contains('announc') || cat.contains('alert') || cat.contains('promo') || type.contains('announc') || cat.contains('general'))) {
+          return true;
+        }
+        return cat == target || type == target;
+      }).toList();
+    }
+  }
 
   GuestNotificationProvider() {
     _registerSocketListeners();
     _registerFcmListeners();
+  }
+
+  void setCategory(String category) {
+    _selectedCategory = category;
+    notifyListeners();
   }
 
   void _debouncedFetchNotifications({Duration duration = const Duration(milliseconds: 300)}) {
@@ -41,6 +78,12 @@ class GuestNotificationProvider with ChangeNotifier {
     SocketService.on('dashboard_sync', (_) => _debouncedFetchNotifications());
     SocketService.on('booking_created', (_) => _debouncedFetchNotifications());
     SocketService.on('booking_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('room_status_changed', (_) => _debouncedFetchNotifications());
+    SocketService.on('room_assigned', (_) => _debouncedFetchNotifications());
+    SocketService.on('checkin_completed', (_) => _debouncedFetchNotifications());
+    SocketService.on('checkout_completed', (_) => _debouncedFetchNotifications());
+    SocketService.on('payment_logged', (_) => _debouncedFetchNotifications());
+    SocketService.on('payment_updated', (_) => _debouncedFetchNotifications());
   }
 
   void _registerFcmListeners() {
@@ -123,7 +166,6 @@ class GuestNotificationProvider with ChangeNotifier {
     try {
       final response = await ApiService.post('${ApiEndpoints.guestNotifications}/$id/read');
       if (!response.success) {
-        // Fallback to patch if post isn't supported
         await ApiService.patch('${ApiEndpoints.guestNotifications}/$id/read');
       }
     } catch (_) {
@@ -173,7 +215,6 @@ class GuestNotificationProvider with ChangeNotifier {
   Future<void> markAllAsRead() async {
     if (_notifications.isEmpty) return;
 
-    // Optimistic update
     _notifications = _notifications.map((old) => NotificationModel(
       id: old.id,
       title: old.title,

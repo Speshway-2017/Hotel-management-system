@@ -28,6 +28,7 @@ import { Route as BookingConfirmation } from "./pages/BookingConfirmation";
 import { Route as AdminLayout } from "./roles/admin/pages/AdminLayout";
 import { Route as AdminDashboard } from "./roles/admin/pages/Dashboard";
 import { Route as AdminApprovals } from "./roles/admin/pages/Approvals";
+import { Route as AdminViewApproval } from "./roles/admin/pages/ViewApproval";
 import { Route as AdminBilling } from "./roles/admin/pages/Billing";
 import { Route as AdminChannels } from "./roles/admin/pages/Channels";
 import { Route as AdminGuests } from "./roles/admin/pages/Guests";
@@ -273,6 +274,8 @@ export default function App() {
           <Route element={<ProtectedRoute allowedRoles={["admin"]}><RouteWrapper routeObj={AdminLayout} /></ProtectedRoute>}>
             <Route path="/admin" element={<RouteWrapper routeObj={AdminDashboard} />} />
             <Route path="/admin/approvals" element={<RouteWrapper routeObj={AdminApprovals} />} />
+            <Route path="/admin/approvals/view/:id" element={<RouteWrapper routeObj={AdminViewApproval} />} />
+            <Route path="/admin/approvals/:id" element={<RouteWrapper routeObj={AdminViewApproval} />} />
             <Route path="/admin/billing" element={<RouteWrapper routeObj={AdminBilling} />} />
             <Route path="/admin/channels" element={<RouteWrapper routeObj={AdminChannels} />} />
             <Route path="/admin/guests" element={<RouteWrapper routeObj={AdminGuests} />} />

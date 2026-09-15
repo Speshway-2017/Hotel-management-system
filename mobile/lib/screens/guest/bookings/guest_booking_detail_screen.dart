@@ -7,6 +7,7 @@ import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
 import 'package:hour_stay_mobile/widgets/custom_button.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
 import '../feedback/guest_add_feedback_screen.dart';
+import '../folio/guest_folio_screen.dart';
 
 class GuestBookingDetailScreen extends StatefulWidget {
   final ReservationModel booking;
@@ -938,11 +939,26 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
         currentBooking.status.toLowerCase() != 'completed';
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text('Stay #${currentBooking.reservationNumber}'),
+        backgroundColor: const Color(0xFF0D1B2A),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFFF5C06A), size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Stay #${currentBooking.reservationNumber}',
+          style: const TextStyle(
+            color: Color(0xFFFFF7E6),
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -990,6 +1006,35 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                       const Text('Payment Status', style: TextStyle(color: AppColors.textSecondary)),
                       StatusBadge(status: currentBooking.paymentStatus),
                     ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Digital Folio & Invoice Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0D1B2A),
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                        backgroundColor: const Color(0xFFF8FAFC),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF0D1B2A)),
+                      label: const Text(
+                        'Digital Folio & Invoice',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => GuestFolioScreen(
+                              booking: currentBooking,
+                              bookingId: currentBooking.id,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -1159,24 +1204,23 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                         style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [1, 2, 3, 6].map((h) {
                           final isSel = _extendHours == h;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text('+$h Hours'),
-                              selected: isSel,
-                              selectedColor: AppColors.secondary,
-                              labelStyle: TextStyle(
-                                color: isSel ? Colors.white : AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                              onSelected: (val) {
-                                if (val) setState(() => _extendHours = h);
-                              },
+                          return ChoiceChip(
+                            label: Text('+$h Hours'),
+                            selected: isSel,
+                            selectedColor: AppColors.secondary,
+                            labelStyle: TextStyle(
+                              color: isSel ? Colors.white : AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
+                            onSelected: (val) {
+                              if (val) setState(() => _extendHours = h);
+                            },
                           );
                         }).toList(),
                       ),
@@ -1186,24 +1230,23 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                         style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 8,
                         children: [1, 2, 3, 4, 5].map((n) {
                           final isSel = _extendNights == n;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ChoiceChip(
-                              label: Text('+$n Night${n > 1 ? "s" : ""}'),
-                              selected: isSel,
-                              selectedColor: AppColors.secondary,
-                              labelStyle: TextStyle(
-                                color: isSel ? Colors.white : AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                              onSelected: (val) {
-                                if (val) setState(() => _extendNights = n);
-                              },
+                          return ChoiceChip(
+                            label: Text('+$n Night${n > 1 ? "s" : ""}'),
+                            selected: isSel,
+                            selectedColor: AppColors.secondary,
+                            labelStyle: TextStyle(
+                              color: isSel ? Colors.white : AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
+                            onSelected: (val) {
+                              if (val) setState(() => _extendNights = n);
+                            },
                           );
                         }).toList(),
                       ),
