@@ -1,26 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { HorizontalRouteTabs, Panel, Tag, Notice } from "@/components/hs/kit";
+import { Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 import {
-  UserCog,
-  Activity,
-  Users,
-  Bell,
   CheckCheck,
   Building
 } from "lucide-react";
 import { notificationsService } from "@/services/notifications";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { toast } from "sonner";
-
-const managementTabs = [
-  { label: "Staff Management", to: "/admin/staff", icon: UserCog },
-  { label: "OTA / Channels", to: "/admin/channels", icon: Activity },
-  { label: "Guest CRM", to: "/admin/crm", icon: Users },
-  { label: "Notifications", to: "/admin/notifications", icon: Bell }
-];
 
 export const Route = createFileRoute("/admin/notifications")({
   head: () => ({
@@ -118,8 +107,6 @@ function AdminNotificationsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <HorizontalRouteTabs tabs={managementTabs} />
-
       {/* Advanced Filter Toolbar */}
       <div className="flex flex-col gap-3 bg-white border border-muted p-4 rounded-2xl shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3">

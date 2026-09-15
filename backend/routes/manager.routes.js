@@ -262,19 +262,6 @@ const syncManagerBookingNotifications = async (propertyId) => {
         });
       } catch (_) {}
 
-      if (!existsInManager) {
-        try {
-          await ManagerNotification.create({
-            title,
-            message,
-            category: 'Reservations',
-            isRead: false,
-            propertyId: targetProp,
-            createdAt: b.createdAt || new Date()
-          });
-        } catch (_) {}
-      }
-
       let existsInNotif = null;
       try {
         existsInNotif = await Notification.findOne({
@@ -286,17 +273,27 @@ const syncManagerBookingNotifications = async (propertyId) => {
         });
       } catch (_) {}
 
-      if (!existsInNotif) {
+      if (!existsInManager && !existsInNotif) {
         try {
-          await Notification.create({
-            role: 'manager',
-            propertyId: targetProp,
-            title,
-            message,
-            category: 'Reservations',
-            isRead: false,
-            createdAt: b.createdAt || new Date()
-          });
+          await Promise.all([
+            ManagerNotification.create({
+              title,
+              message,
+              category: 'Reservations',
+              isRead: false,
+              propertyId: targetProp,
+              createdAt: b.createdAt || new Date()
+            }).catch(() => null),
+            Notification.create({
+              role: 'manager',
+              propertyId: targetProp,
+              title,
+              message,
+              category: 'Reservations',
+              isRead: false,
+              createdAt: b.createdAt || new Date()
+            }).catch(() => null)
+          ]);
         } catch (_) {}
       }
     }
@@ -529,10 +526,18 @@ router.put('/reservations/:id', async (req, res) => {
       await syncRoomStatus(roomNum, rmStatus, propId);
     }
 
+    const action = updated.status === 'Checked-in' ? 'checkin' : updated.status === 'Checked-out' ? 'checkout' : updated.status === 'Cancelled' ? 'cancelled' : 'status_change';
+
+    // Broadcast notifications to all stakeholders including Guest
+    await notifyBookingEvent({
+      req,
+      action,
+      booking: updated
+    });
+
     // Realtime broadcast across all dashboards
     const io = req.app.get('socketio');
     if (io) {
-      const action = updated.status === 'Checked-in' ? 'checkin' : updated.status === 'Checked-out' ? 'checkout' : 'status_change';
       broadcastCheckinCheckout(io, propId, {
         action,
         booking: updated,
@@ -575,6 +580,13 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
     if (cleanRoomNum) {
       await syncRoomStatus(cleanRoomNum, rmStatus, propId);
     }
+
+    // Notify guest and dashboards of room assignment
+    await notifyBookingEvent({
+      req,
+      action: 'room_assigned',
+      booking: updated
+    });
 
     const io = req.app.get('socketio');
     if (io) {
@@ -2031,24 +2043,12 @@ const handleExtendReservation = async (req, res) => {
       { new: true }
     );
 
-    // Trigger notification
-    await triggerNotification({
-      role: 'manager',
-      propertyId: booking.propertyId || req.user.propertyId || 'HS-JAI',
-      title: 'Stay Extended',
-      message: `Stay extended by ${additionalNights} night(s) for guest ${booking.guest}. New checkout: ${newCheckOut}.`,
-      category: 'Operations'
+    // Trigger notifications for all stakeholders including guest
+    await notifyBookingEvent({
+      req,
+      action: 'extended',
+      booking: updated
     });
-
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-JAI', 'booking_updated', {
-        action: 'extend',
-        booking: updated,
-        bookingId: updated._id,
-        checkOut: newCheckOut
-      });
-    }
 
     return sendSuccess(res, 200, updated, 'Stay reservation extended successfully.');
   } catch (err) {

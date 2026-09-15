@@ -810,43 +810,18 @@ router.put('/reservations/:id/status', async (req, res) => {
       await syncRoomStatus(roomNum, rmStatus, propertyId);
     }
 
-    // Trigger notifications
-    await triggerNotification({
-      req,
-      role: 'manager',
-      propertyId,
-      title: `Reservation ${status}`,
-      message: `Reservation for guest ${booking.guest} has been updated to: ${status} in Room ${roomNum || 'TBD'}.`,
-      category: status === 'Cancelled' || status === 'No-show' ? 'Alerts' : 'Operations'
-    });
-    await triggerNotification({
-      req,
-      role: 'receptionist',
-      propertyId,
-      title: `Reservation ${status}`,
-      message: `Reservation for guest ${booking.guest} has been updated to: ${status} in Room ${roomNum || 'TBD'}.`,
-      category: status === 'Cancelled' || status === 'No-show' ? 'Alerts' : 'Operations'
-    });
+    const action = status === 'Checked-in' ? 'checkin' : status === 'Checked-out' ? 'checkout' : status === 'Cancelled' ? 'cancelled' : 'status_change';
 
-    if (booking.guestId) {
-      await triggerNotification({
-        req,
-        userId: booking.guestId,
-        role: 'guest',
-        title: status === 'Checked-in' ? 'Check-in Confirmed!' : (status === 'Checked-out' ? 'Check-out Completed' : `Booking Status: ${status}`),
-        message: status === 'Checked-in' 
-          ? `Welcome! You have checked in to Room ${roomNum || 'assigned room'}. Enjoy your stay!`
-          : (status === 'Checked-out' 
-            ? 'Thank you for choosing Hour Stay. We hope you had a pleasant experience!' 
-            : `Your reservation status is now ${status}.`),
-        category: status === 'Checked-in' || status === 'Checked-out' ? 'Booking Confirmation' : 'General'
-      });
-    }
+    // Broadcast notifications to all stakeholders including Guest
+    await notifyBookingEvent({
+      req,
+      action,
+      booking: updated
+    });
 
     // Notify Realtime (Socket.io) across all dashboards
     const io = req.app.get('socketio');
     if (io) {
-      const action = status === 'Checked-in' ? 'checkin' : status === 'Checked-out' ? 'checkout' : 'status_change';
       broadcastCheckinCheckout(io, propertyId, {
         action,
         booking: updated,

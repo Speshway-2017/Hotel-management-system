@@ -32,6 +32,24 @@ const userSchema = new mongoose.Schema({
   idDocType: { type: String, default: "Aadhaar Card" },
   idDocNumber: { type: String, trim: true },
   loyaltyPoints: { type: Number, default: 0 },
+  notificationSettings: {
+    emailConfirmations: { type: Boolean, default: true },
+    smsAlerts: { type: Boolean, default: true },
+    pushNotifications: { type: Boolean, default: true },
+    promotionalOffers: { type: Boolean, default: false },
+    checkInReminders: { type: Boolean, default: true }
+  },
+  appPreferences: {
+    currency: { type: String, default: 'INR (₹)' },
+    language: { type: String, default: 'English (IN)' },
+    theme: { type: String, default: 'System' },
+    biometricLogin: { type: Boolean, default: false },
+    hapticFeedback: { type: Boolean, default: true }
+  },
+  securitySettings: {
+    twoFactorAuth: { type: Boolean, default: false },
+    lastPasswordChange: { type: Date }
+  },
   notes: { type: String, trim: true },
   fcmToken: { type: String, default: null },
   fcmTokens: [{ type: String }]

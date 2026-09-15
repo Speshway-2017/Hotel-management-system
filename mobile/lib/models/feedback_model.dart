@@ -6,6 +6,8 @@ class FeedbackModel {
   final String guestPhone;
   final String room;
   final String roomType;
+  final String propertyName;
+  final String propertyId;
   final double rating;
   final Map<String, dynamic> ratings;
   final String category;
@@ -25,6 +27,8 @@ class FeedbackModel {
     this.guestPhone = '',
     this.room = '101',
     this.roomType = 'Standard Room',
+    this.propertyName = 'Hour Stay Property',
+    this.propertyId = 'HS-JAI',
     this.rating = 5.0,
     this.ratings = const {},
     this.category = 'General',
@@ -39,6 +43,8 @@ class FeedbackModel {
 
   bool get hasResponse => response.trim().isNotEmpty;
   bool get isResolved => status.toLowerCase() == 'resolved';
+  bool get isPublished => status.toLowerCase() == 'published';
+  bool get isPending => status.toLowerCase() == 'pending';
   bool get isPositive => rating >= 4.0 || sentiment.toLowerCase() == 'positive';
   bool get isCritical => rating <= 2.0 || sentiment.toLowerCase() == 'negative';
 
@@ -47,9 +53,11 @@ class FeedbackModel {
   double get serviceRating =>
       _extractRating('service', fallback: rating);
   double get roomRating =>
-      _extractRating('room', fallback: rating);
+      _extractRating('room', fallback: _extractRating('comfort', fallback: rating));
   double get foodRating =>
-      _extractRating('food', fallback: rating);
+      _extractRating('food', fallback: _extractRating('amenities', fallback: rating));
+  double get staffRating =>
+      _extractRating('staff', fallback: _extractRating('service', fallback: rating));
   double get overallRating =>
       _extractRating('overall', fallback: rating);
 
@@ -69,6 +77,8 @@ class FeedbackModel {
       guestPhone: json['guestPhone'] ?? json['phone'] ?? '',
       room: json['room'] ?? json['roomNumber'] ?? '101',
       roomType: json['roomType'] ?? 'Standard Room',
+      propertyName: json['propertyName'] ?? json['hotel'] ?? json['hotelName'] ?? 'Hour Stay Property',
+      propertyId: json['propertyId'] ?? 'HS-JAI',
       rating: double.tryParse(json['rating']?.toString() ?? '5') ?? 5.0,
       ratings: json['ratings'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(json['ratings'] as Map)
@@ -84,4 +94,3 @@ class FeedbackModel {
     );
   }
 }
-

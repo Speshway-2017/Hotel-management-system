@@ -625,7 +625,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:40:50.570Z",
-    "updatedAt": "2026-09-11T09:26:48.460Z"
+    "updatedAt": "2026-09-15T06:31:45.107Z"
   },
   {
     "id": "lfir6yhyu3b",
@@ -650,12 +650,10 @@
     "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
-    "fcmTokens": [
-      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
-    ],
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-11T10:20:43.916Z"
+    "updatedAt": "2026-09-15T09:14:16.357Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -796,12 +794,12 @@
     "email": "sunny@gmail.com",
     "password": "$2a$10$39qxCJKiMR2l7HHCggQC6ePusAGJG5yZXjzBBxmDr0F2W0kkLhGMu",
     "role": "guest",
-    "mobile": "4563536436",
+    "mobile": "4563536437",
     "propertyId": null,
     "status": "Active",
     "dept": "Front Desk",
     "shift": "Morning (06:00 - 14:00)",
-    "avatar": null,
+    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1789452154/hourstay_hms_assets/hlbi20n8oa6t6fsgxurx.jpg",
     "city": "",
     "state": "",
     "country": "India",
@@ -809,13 +807,15 @@
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
-    "idDocNumber": "4356 6777 8788",
+    "idDocNumber": "5356 7645 8547",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": null,
-    "fcmTokens": [],
+    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
+    "fcmTokens": [
+      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
+    ],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-10T11:53:42.069Z"
+    "updatedAt": "2026-09-15T10:54:24.136Z"
   },
   {
     "id": "omk6dktv7lj",
@@ -866,8 +866,10 @@
     "idDocNumber": "6536 7834 8788",
     "loyaltyPoints": 0,
     "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-09-07T05:58:33.215Z",
-    "updatedAt": "2026-09-08T11:50:18.209Z"
+    "updatedAt": "2026-09-15T09:12:51.489Z"
   },
   {
     "id": "roetf6hsy6c4218o9trtx9",

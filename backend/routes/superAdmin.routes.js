@@ -808,10 +808,18 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       await syncRoomStatus(roomNum, rmStatus, targetPropId);
     }
 
+    const action = booking.status === 'Checked-in' ? 'checkin' : booking.status === 'Checked-out' ? 'checkout' : booking.status === 'Cancelled' ? 'cancelled' : 'status_change';
+
+    // Broadcast notifications to all stakeholders including Guest
+    await notifyBookingEvent({
+      req,
+      action,
+      booking
+    });
+
     // Realtime broadcast across all dashboards
     const io = req.app.get('socketio');
     if (io) {
-      const action = booking.status === 'Checked-in' ? 'checkin' : booking.status === 'Checked-out' ? 'checkout' : 'status_change';
       broadcastCheckinCheckout(io, targetPropId, {
         action,
         booking,

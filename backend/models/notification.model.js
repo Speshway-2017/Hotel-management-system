@@ -51,44 +51,92 @@ const writeMockData = (data) => {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 };
 
+const matchesClause = (item, clause) => {
+  return Object.keys(clause).every(key => {
+    const expected = clause[key];
+    const actual = item[key];
+
+    if (expected === null) {
+      return actual === null || actual === undefined;
+    }
+    if (expected === undefined) {
+      return true;
+    }
+    if (key === '_id' || key === 'id') {
+      const expStr = String(expected?.toString ? expected.toString() : expected);
+      const actId = String(item.id || item._id || '');
+      const actMongoId = String(item._id || '');
+      return actId === expStr || actMongoId === expStr;
+    }
+    if (typeof expected === 'object' && expected !== null) {
+      if (expected.$regex !== undefined) {
+        const flags = expected.$options || 'i';
+        const re = new RegExp(expected.$regex, flags);
+        return re.test(String(actual || ''));
+      }
+      if (expected.$exists !== undefined) {
+        const exists = actual !== undefined && actual !== null && actual !== '';
+        return expected.$exists ? exists : !exists;
+      }
+      if (expected.$gte !== undefined) {
+        return new Date(actual) >= new Date(expected.$gte);
+      }
+      if (expected.$lte !== undefined) {
+        return new Date(actual) <= new Date(expected.$lte);
+      }
+      if (expected.$in !== undefined && Array.isArray(expected.$in)) {
+        return expected.$in.some(val => String(val) === String(actual));
+      }
+      if (expected.$ne !== undefined) {
+        return String(actual) !== String(expected.$ne);
+      }
+      return String(actual) === String(expected);
+    }
+    if (typeof expected === 'boolean') {
+      return Boolean(actual) === expected;
+    }
+    return String(actual ?? '').toLowerCase() === String(expected).toLowerCase();
+  });
+};
+
+const matchesQuery = (item, query = {}) => {
+  for (const key of Object.keys(query)) {
+    if (key === '$or') continue;
+    if (!matchesClause(item, { [key]: query[key] })) {
+      return false;
+    }
+  }
+  if (query.$or && Array.isArray(query.$or) && query.$or.length > 0) {
+    const orMatches = query.$or.some(clause => matchesClause(item, clause));
+    if (!orMatches) return false;
+  }
+  return true;
+};
+
+const normalizeUpdate = (update) => {
+  if (!update || typeof update !== 'object') return {};
+  const cleaned = { ...update };
+  if (cleaned.$set && typeof cleaned.$set === 'object') {
+    Object.assign(cleaned, cleaned.$set);
+    delete cleaned.$set;
+  }
+  return cleaned;
+};
+
 const MockNotification = {
   find: async (query = {}) => {
     let list = readMockData();
-    
-    // Support MongoDB-style $or query for matching user context
-    if (query.$or && Array.isArray(query.$or)) {
-      list = list.filter(n => {
-        return query.$or.some(clause => {
-          return Object.keys(clause).every(key => {
-            return String(n[key]) === String(clause[key]);
-          });
-        });
-      });
-    } else {
-      if (query.userId !== undefined) {
-        list = list.filter(n => n.userId === query.userId);
-      }
-      if (query.role !== undefined) {
-        list = list.filter(n => n.role === query.role);
-      }
-      if (query.propertyId !== undefined) {
-        list = list.filter(n => n.propertyId === query.propertyId);
-      }
-      if (query.isRead !== undefined) {
-        list = list.filter(n => n.isRead === query.isRead);
-      }
-    }
-    
-    // Sort by createdAt descending
-    return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    list = list.filter(n => matchesQuery(n, query));
+    return list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   },
   findOne: async (query = {}) => {
-    const list = await MockNotification.find(query);
-    return list[0] || null;
+    const list = readMockData();
+    return list.find(n => matchesQuery(n, query)) || null;
   },
   findById: async (id) => {
     const list = readMockData();
-    return list.find(n => n._id === id || n.id === id) || null;
+    const idStr = String(id?.toString ? id.toString() : id);
+    return list.find(n => String(n._id) === idStr || String(n.id) === idStr) || null;
   },
   create: async (data) => {
     const list = readMockData();
@@ -101,62 +149,93 @@ const MockNotification = {
       title: data.title,
       message: data.message,
       category: data.category || 'General',
-      isRead: data.isRead !== undefined ? data.isRead : false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      isRead: data.isRead !== undefined ? Boolean(data.isRead) : false,
+      createdAt: data.createdAt ? new Date(data.createdAt).toISOString() : new Date().toISOString(),
+      updatedAt: data.updatedAt ? new Date(data.updatedAt).toISOString() : new Date().toISOString()
     };
     list.push(newRecord);
     writeMockData(list);
     return newRecord;
   },
-  findByIdAndUpdate: async (id, update, options = {}) => {
+  findOneAndUpdate: async (query, update, options = {}) => {
     const list = readMockData();
-    const idx = list.findIndex(n => n._id === id || n.id === id);
-    if (idx === -1) return null;
-    
+    const idx = list.findIndex(n => matchesQuery(n, query));
+    const normalized = normalizeUpdate(update);
+    if (idx === -1) {
+      if (options.upsert) {
+        return await MockNotification.create({ ...query, ...normalized });
+      }
+      return null;
+    }
     const record = list[idx];
-    const updatedRecord = { ...record, ...update, updatedAt: new Date().toISOString() };
+    const updatedRecord = { ...record, ...normalized, updatedAt: new Date().toISOString() };
     list[idx] = updatedRecord;
     writeMockData(list);
     return updatedRecord;
   },
+  findByIdAndUpdate: async (id, update, options = {}) => {
+    const list = readMockData();
+    const idStr = String(id?.toString ? id.toString() : id);
+    const idx = list.findIndex(n => String(n._id) === idStr || String(n.id) === idStr);
+    if (idx === -1) return null;
+    
+    const record = list[idx];
+    const normalized = normalizeUpdate(update);
+    const updatedRecord = { ...record, ...normalized, updatedAt: new Date().toISOString() };
+    list[idx] = updatedRecord;
+    writeMockData(list);
+    return updatedRecord;
+  },
+  updateOne: async (query, update) => {
+    const list = readMockData();
+    const idx = list.findIndex(n => matchesQuery(n, query));
+    if (idx === -1) return { modifiedCount: 0, acknowledged: true };
+    const normalized = normalizeUpdate(update);
+    list[idx] = { ...list[idx], ...normalized, updatedAt: new Date().toISOString() };
+    writeMockData(list);
+    return { modifiedCount: 1, acknowledged: true };
+  },
   findByIdAndDelete: async (id) => {
     const list = readMockData();
-    const idx = list.findIndex(n => n._id === id || n.id === id);
+    const idStr = String(id?.toString ? id.toString() : id);
+    const idx = list.findIndex(n => String(n._id) === idStr || String(n.id) === idStr);
     if (idx === -1) return null;
     const removed = list.splice(idx, 1);
     writeMockData(list);
     return removed[0];
   },
+  deleteOne: async (query) => {
+    const list = readMockData();
+    const idx = list.findIndex(n => matchesQuery(n, query));
+    if (idx === -1) return { deletedCount: 0, acknowledged: true };
+    list.splice(idx, 1);
+    writeMockData(list);
+    return { deletedCount: 1, acknowledged: true };
+  },
+  deleteMany: async (query) => {
+    const list = readMockData();
+    const initialLen = list.length;
+    const remaining = list.filter(n => !matchesQuery(n, query));
+    writeMockData(remaining);
+    return { deletedCount: initialLen - remaining.length, acknowledged: true };
+  },
   updateMany: async (filter, update) => {
     const list = readMockData();
     let updatedCount = 0;
-    
-    // Handle $or matching or standard property criteria
-    const matchFilter = (n) => {
-      if (filter.$or && Array.isArray(filter.$or)) {
-        return filter.$or.some(clause => {
-          return Object.keys(clause).every(key => {
-            return String(n[key]) === String(clause[key]);
-          });
-        });
-      }
-      if (filter.userId !== undefined && n.userId !== filter.userId) return false;
-      if (filter.role !== undefined && n.role !== filter.role) return false;
-      if (filter.propertyId !== undefined && n.propertyId !== filter.propertyId) return false;
-      if (filter.isRead !== undefined && n.isRead !== filter.isRead) return false;
-      return true;
-    };
-
+    const normalized = normalizeUpdate(update);
     const newList = list.map(n => {
-      if (matchFilter(n)) {
+      if (matchesQuery(n, filter)) {
         updatedCount++;
-        return { ...n, ...update, updatedAt: new Date().toISOString() };
+        return { ...n, ...normalized, updatedAt: new Date().toISOString() };
       }
       return n;
     });
     writeMockData(newList);
-    return { modifiedCount: updatedCount };
+    return { modifiedCount: updatedCount, acknowledged: true };
+  },
+  countDocuments: async (query = {}) => {
+    const list = readMockData();
+    return list.filter(n => matchesQuery(n, query)).length;
   }
 };
 
@@ -212,6 +291,30 @@ const Notification = {
       return MockNotification.findById(id);
     });
   },
+  findOneAndUpdate: async (query, update, options = { new: true }) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.findOneAndUpdate(query, update, { new: true, ...options });
+    }
+    return await MockNotification.findOneAndUpdate(query, update, options);
+  },
+  findByIdAndUpdate: async (id, update, options = { new: true }) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.findByIdAndUpdate(id, update, { new: true, ...options });
+    }
+    return await MockNotification.findByIdAndUpdate(id, update, options);
+  },
+  updateOne: async (query, update) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.updateOne(query, update);
+    }
+    return await MockNotification.updateOne(query, update);
+  },
+  updateMany: async (filter, update) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseNotification.updateMany(filter, update);
+    }
+    return await MockNotification.updateMany(filter, update);
+  },
   create: async (data) => {
     if (mongoose.connection.readyState === 1) {
       return await MongooseNotification.create(data);
@@ -228,12 +331,6 @@ const Notification = {
     }
     return created;
   },
-  findByIdAndUpdate: async (id, update, options) => {
-    if (mongoose.connection.readyState === 1) {
-      return await MongooseNotification.findByIdAndUpdate(id, update, { new: true, ...options });
-    }
-    return await MockNotification.findByIdAndUpdate(id, update, options);
-  },
   findByIdAndDelete: async (id) => {
     if (mongoose.connection.readyState === 1) {
       return await MongooseNotification.findByIdAndDelete(id);
@@ -244,28 +341,19 @@ const Notification = {
     if (mongoose.connection.readyState === 1) {
       return await MongooseNotification.deleteOne(filter);
     }
-    const item = await MockNotification.findOne(filter);
-    if (item && item._id) {
-      return await MockNotification.findByIdAndDelete(item._id);
-    }
+    return await MockNotification.deleteOne(filter);
   },
   deleteMany: async (filter) => {
     if (mongoose.connection.readyState === 1) {
       return await MongooseNotification.deleteMany(filter);
     }
+    return await MockNotification.deleteMany(filter);
   },
   countDocuments: async (query = {}) => {
     if (mongoose.connection.readyState === 1) {
       return await MongooseNotification.countDocuments(query);
     }
-    const items = await MockNotification.find(query);
-    return items.length;
-  },
-  updateMany: async (filter, update) => {
-    if (mongoose.connection.readyState === 1) {
-      return await MongooseNotification.updateMany(filter, update);
-    }
-    return await MockNotification.updateMany(filter, update);
+    return await MockNotification.countDocuments(query);
   }
 };
 

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton, ProcessActionButton, MarkRefundedActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 }
 
 function AdminApprovalsPage() {
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -55,9 +56,6 @@ function AdminApprovalsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-
-  // Selected details modal
-  const [selectedReq, setSelectedReq] = useState(null);
 
   const loadApprovals = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -373,7 +371,7 @@ function AdminApprovalsPage() {
                         )}
 
                         <ViewActionButton
-                          onClick={() => setSelectedReq(r)}
+                          onClick={() => navigate({ to: `/admin/approvals/view/${r.id}` })}
                         />
                       </ActionGroup>
                     </td>
@@ -384,124 +382,6 @@ function AdminApprovalsPage() {
           </div>
         )}
       </Panel>
-
-      {/* Detail Slideover Modal popup */}
-      {selectedReq && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
-          <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
-            
-            <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-navy text-sm">Request Details: {selectedReq.id}</h3>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-0.5">Booking Ref: {selectedReq.bookingId}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 rounded-full text-muted-foreground hover:text-navy"
-                onClick={() => setSelectedReq(null)}
-              >
-                <XCircle className="size-4" />
-              </Button>
-            </div>
-
-            {/* Content body */}
-            <div className="p-5 space-y-4 text-xs">
-              <div className="p-3 bg-muted/20 border border-muted rounded-lg space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-semibold">Override Action:</span>
-                  <span className="font-bold">{selectedReq.type}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-semibold">Waiver Value:</span>
-                  <span className="font-black text-navy">{selectedReq.value}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-semibold">Guest Name:</span>
-                  <span className="font-bold">{selectedReq.guest}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-semibold">Requested By:</span>
-                  <span className="font-bold">{selectedReq.requestedBy}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-semibold">Status:</span>
-                  <Tag tone={
-                    selectedReq.status === "Approved" ? "success" :
-                    selectedReq.status === "Processing" ? "brand" :
-                    selectedReq.status === "Refunded" ? "success" :
-                    selectedReq.status === "Rejected" ? "error" : "warning"
-                  }>
-                    {selectedReq.status}
-                  </Tag>
-                </div>
-              </div>
-
-              <div className="p-3 bg-[#fafafa]/50 border border-muted rounded-lg space-y-1">
-                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Justification Rationale</p>
-                <p className="text-[11px] leading-relaxed text-navy font-medium mt-1">{selectedReq.description}</p>
-              </div>
-
-              {selectedReq.status === "Pending" ? (
-                <div className="pt-2 border-t border-muted/50 flex gap-2">
-                  <Button
-                    onClick={() => handleApprove(selectedReq.id)}
-                    className="flex-1 bg-success hover:bg-success/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <CheckCircle className="size-3.5" /> Approve
-                  </Button>
-                  <Button
-                    onClick={() => handleReject(selectedReq.id)}
-                    className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <XCircle className="size-3.5" /> Reject
-                  </Button>
-                </div>
-              ) : selectedReq.status === "Approved" ? (
-                <div className="pt-2 border-t border-muted/50 flex gap-2">
-                  <Button
-                    onClick={() => handleMoveProcessing(selectedReq.id)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Clock className="size-3.5" /> Move to Processing
-                  </Button>
-                  <Button
-                    onClick={() => handleReject(selectedReq.id)}
-                    className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <XCircle className="size-3.5" /> Reject
-                  </Button>
-                </div>
-              ) : selectedReq.status === "Processing" ? (
-                <div className="pt-2 border-t border-muted/50">
-                  <Button
-                    onClick={() => handleMarkRefunded(selectedReq.id)}
-                    className="w-full bg-purple hover:bg-purple/90 text-white font-bold h-9 text-xs rounded-full flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <CheckCircle className="size-3.5" /> Mark as Refunded (Settled)
-                  </Button>
-                </div>
-              ) : (
-                <div className="p-3 bg-success/10 border border-success/20 rounded-lg text-center font-bold text-success text-[10px] uppercase tracking-wider">
-                  {selectedReq.status} by {selectedReq.approvedBy}
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-muted bg-[#fcfcfc] flex justify-end">
-              <Button
-                variant="ghost"
-                onClick={() => setSelectedReq(null)}
-                className="h-8 px-4 text-xs rounded-full"
-              >
-                Close View
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

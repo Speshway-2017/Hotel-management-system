@@ -138,6 +138,12 @@ class ApiEndpoints {
   static const String guestNotificationsReadAll = '/guest/notifications/read-all';
   static const String guestChangePassword = '/guest/change-password';
   static const String guestRooms = '/guest/rooms';
+  static const String guestPayments = '/guest/payments';
+  static const String guestPayBalance = '/guest/payments/pay-balance';
   static const String guestRefund = '/guest/refund';
+  static const String guestSettings = '/guest/settings';
+  static const String guestNotificationSettings = '/guest/notifications-settings';
+  static const String guestExportData = '/guest/export-data';
+  static const String guestDeleteAccount = '/guest/delete-account-request';
   static const String publicProperties = '/public/properties';
 }

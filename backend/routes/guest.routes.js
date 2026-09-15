@@ -283,20 +283,19 @@ router.get('/folio', async (req, res) => {
 // GET /api/v1/guest/feedback
 router.get('/feedback', async (req, res) => {
   try {
+    const userId = req.user?._id || req.user?.id;
     const userMobile = req.user?.mobile || '';
     const userName = req.user?.name || '';
     const userEmail = req.user?.email || '';
 
     const query = [];
+    if (userId) query.push({ userId: String(userId) });
+    if (userId) query.push({ userId: userId });
     if (userName) query.push({ guestName: userName });
     if (userMobile) query.push({ guestPhone: userMobile });
     if (userEmail) query.push({ guestEmail: userEmail });
 
-    let feedbacks = await Feedback.find(query.length > 0 ? { $or: query } : {}).sort({ createdAt: -1 });
-
-    if (feedbacks.length === 0) {
-      feedbacks = await Feedback.find({}).sort({ createdAt: -1 });
-    }
+    const feedbacks = await Feedback.find(query.length > 0 ? { $or: query } : { guestEmail: '__none__' }).sort({ createdAt: -1 });
 
     return sendSuccess(res, 200, feedbacks, 'Guest feedback retrieved successfully from MongoDB');
   } catch (error) {
@@ -309,6 +308,7 @@ router.post('/feedback', async (req, res) => {
   try {
     const {
       bookingId,
+      reservationId,
       hotelName,
       rating,
       categories,
@@ -321,26 +321,37 @@ router.post('/feedback', async (req, res) => {
 
     const feedbackText = comments || comment || reviewText;
     const feedbackRating = Number(rating) || 5;
+    const effectiveBookingId = bookingId || reservationId;
 
     if (!feedbackText) {
       return sendError(res, 400, 'Review comment text is required');
     }
 
-    // Try to find matching booking for room details & propertyId
+    // Find matching booking for room details & propertyId
     let propertyId = req.body.propertyId || 'HS-JAI';
-    let room = '101';
-    let roomType = 'Standard Room';
+    let room = req.body.room || '101';
+    let roomType = req.body.roomType || 'Standard Room';
     let guestName = customGuestName || req.user?.name || 'Valued Guest';
     let guestEmail = customGuestEmail || req.user?.email || '';
+    let guestPhone = req.user?.mobile || '';
 
-    if (bookingId) {
-      const b = await Booking.findOne({
-        $or: [{ bookingId: bookingId }, { _id: bookingId.length === 24 ? bookingId : null }, { id: bookingId }]
-      });
+    if (effectiveBookingId) {
+      const cleanId = String(effectiveBookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
+      const bQuery = [
+        { bookingId: effectiveBookingId },
+        { id: effectiveBookingId },
+        { bookingId: cleanId },
+        { id: cleanId }
+      ];
+      if (mongoose.Types.ObjectId.isValid(cleanId)) {
+        bQuery.unshift({ _id: cleanId });
+      }
+      const b = await Booking.findOne({ $or: bQuery });
       if (b) {
         propertyId = b.propertyId || 'HS-JAI';
         room = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
         roomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
+        if (b.hotel || b.hotelName) hotelName = b.hotel || b.hotelName;
       }
     }
 
@@ -349,10 +360,10 @@ router.post('/feedback', async (req, res) => {
 
     // Single source of truth: Create Feedback document in MongoDB 'feedbacks' collection
     const newFeedback = await Feedback.create({
-      bookingId: bookingId || `BK-${Date.now().toString().slice(-5)}`,
+      bookingId: effectiveBookingId || `BK-${Date.now().toString().slice(-5)}`,
       guestName: guestName || req.user?.name || 'Guest',
       guestEmail: guestEmail || req.user?.email || '',
-      guestPhone: req.user?.mobile || '',
+      guestPhone: guestPhone,
       userId: req.user?._id || req.user?.id || null,
       room,
       roomType,
@@ -360,8 +371,9 @@ router.post('/feedback', async (req, res) => {
       ratings: {
         cleanliness: categories?.cleanliness || 5,
         service: categories?.service || 5,
-        room: categories?.room || 5,
-        food: categories?.food || 5,
+        room: categories?.room || categories?.comfort || 5,
+        food: categories?.food || categories?.amenities || 5,
+        staff: categories?.staff || categories?.service || 5,
         overall: feedbackRating
       },
       category: 'Guest Stay Review',
@@ -369,6 +381,7 @@ router.post('/feedback', async (req, res) => {
       status: 'Published',
       comment: feedbackText,
       comments: feedbackText,
+      propertyName: hotelName || 'Hour Stay Property',
       propertyId
     });
 
@@ -383,6 +396,58 @@ router.post('/feedback', async (req, res) => {
     return sendSuccess(res, 201, { feedback: newFeedback, review: newFeedback }, 'Thank you! Your feedback has been submitted successfully.');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to submit feedback');
+  }
+});
+
+// PUT /api/v1/guest/feedback/:id - Edit guest feedback
+router.put('/feedback/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, categories, comments, comment, reviewText } = req.body;
+    const feedbackText = comments || comment || reviewText;
+    const feedbackRating = rating ? Number(rating) : undefined;
+
+    const query = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+
+    const existing = await Feedback.findOne({ $or: query });
+    if (!existing) {
+      return sendError(res, 404, 'Feedback record not found');
+    }
+
+    if (feedbackRating) existing.rating = feedbackRating;
+    if (feedbackText) {
+      existing.comment = feedbackText;
+      existing.comments = feedbackText;
+    }
+    if (categories) {
+      existing.ratings = {
+        cleanliness: categories.cleanliness || existing.ratings?.cleanliness || 5,
+        service: categories.service || existing.ratings?.service || 5,
+        room: categories.room || categories.comfort || existing.ratings?.room || 5,
+        food: categories.food || categories.amenities || existing.ratings?.food || 5,
+        staff: categories.staff || existing.ratings?.staff || 5,
+        overall: feedbackRating || existing.rating || 5
+      };
+    }
+    if (feedbackRating) {
+      existing.sentiment = feedbackRating >= 4 ? 'Positive' : feedbackRating === 3 ? 'Neutral' : 'Negative';
+    }
+
+    await existing.save();
+
+    await notifyFeedbackEvent({
+      req,
+      action: 'updated',
+      feedback: existing,
+      actor: req.user?.name || 'Guest'
+    });
+
+    return sendSuccess(res, 200, existing, 'Feedback updated successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to update feedback');
   }
 });
 
@@ -506,77 +571,212 @@ router.put('/notifications-settings', async (req, res) => {
   }
 });
 
+// Helper to ensure all booking lifecycle events (Check-in, Check-out, Room Assigned, Confirmed) have matching guest notifications
+const syncGuestBookingNotifications = async (user) => {
+  if (!user) return;
+  try {
+    const userId = user._id || user.id;
+    const userEmail = user.email;
+    const userPhone = user.mobile || user.phone;
+    const userName = user.name;
+
+    const bQuery = [{ guestId: userId }, { guestId: String(userId) }];
+    if (userEmail) bQuery.push({ email: userEmail });
+    if (userPhone) bQuery.push({ phone: userPhone });
+    if (userName) bQuery.push({ guest: userName });
+
+    const guestBookings = await Booking.find({ $or: bQuery }).sort({ createdAt: -1 });
+
+    for (const b of guestBookings) {
+      const bId = b.bookingId || String(b._id) || b.id;
+      const hotelName = b.hotel || b.hotelName || b.propertyName || 'Hour Stay Hotel & Suites';
+      const roomInfo = b.roomNumber ? `Room ${b.roomNumber} (${b.room || b.roomType || 'Standard Room'})` : (b.room || b.roomType || 'Standard Room');
+      const checkIn = b.checkIn || b.checkInDate || 'Today';
+      const checkOut = b.checkOut || b.checkOutDate || 'Tomorrow';
+      const status = (b.status || '').toLowerCase();
+      const propId = b.propertyId || 'HS-JAI';
+
+      // 1. If Booking is Checked-in / Staying / Active
+      if (status === 'checked-in' || status === 'checked_in' || status === 'checked in' || status === 'staying' || status === 'active') {
+        const title = 'Check-in Confirmed!';
+        const message = `Welcome! Your check-in to ${roomInfo} at ${hotelName} is complete. Enjoy your stay! [Ref: #${bId}]`;
+        
+        let exists = null;
+        try {
+          exists = await Notification.findOne({
+            $or: [
+              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'check-in', $options: 'i' } },
+              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'checked in', $options: 'i' } }
+            ]
+          });
+        } catch (_) {}
+
+        if (!exists) {
+          try {
+            await Notification.create({
+              userId: String(userId),
+              role: 'guest',
+              propertyId: propId,
+              title,
+              message,
+              category: 'Check-in',
+              isRead: false,
+              createdAt: b.updatedAt || b.createdAt || new Date()
+            });
+          } catch (_) {}
+        }
+      }
+
+      // 2. If Booking is Checked-out / Completed
+      if (status === 'checked-out' || status === 'checked_out' || status === 'checked out' || status === 'completed') {
+        const title = 'Check-out Completed';
+        const message = `Thank you for staying with us at ${hotelName} (${roomInfo}). We hope you had a pleasant experience! [Ref: #${bId}]`;
+
+        let exists = null;
+        try {
+          exists = await Notification.findOne({
+            $or: [
+              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'check-out', $options: 'i' } },
+              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'checked out', $options: 'i' } }
+            ]
+          });
+        } catch (_) {}
+
+        if (!exists) {
+          try {
+            await Notification.create({
+              userId: String(userId),
+              role: 'guest',
+              propertyId: propId,
+              title,
+              message,
+              category: 'Stay',
+              isRead: false,
+              createdAt: b.updatedAt || b.createdAt || new Date()
+            });
+          } catch (_) {}
+        }
+      }
+
+      // 3. If Booking is Confirmed / Paid / Pending
+      if (status === 'confirmed' || status === 'paid' || status === 'pending') {
+        const title = 'Booking Confirmed!';
+        const message = `Your stay at ${hotelName} (${roomInfo}) is confirmed for ${checkIn} → ${checkOut}. [Ref: #${bId}]`;
+
+        let exists = null;
+        try {
+          exists = await Notification.findOne({
+            message: { $regex: bId, $options: 'i' },
+            title: { $regex: 'confirmed', $options: 'i' }
+          });
+        } catch (_) {}
+
+        if (!exists) {
+          try {
+            await Notification.create({
+              userId: String(userId),
+              role: 'guest',
+              propertyId: propId,
+              title,
+              message,
+              category: 'Bookings',
+              isRead: false,
+              createdAt: b.createdAt || new Date()
+            });
+          } catch (_) {}
+        }
+      }
+
+      // 4. If Room is assigned
+      if (roomNum && roomNum !== 'TBD' && roomNum !== '') {
+        const title = 'Room Assigned';
+        const message = `Room ${roomNum} has been allocated for your reservation #${bId} at ${hotelName}.`;
+
+        let exists = null;
+        try {
+          exists = await Notification.findOne({
+            message: { $regex: bId, $options: 'i' },
+            title: { $regex: 'room assigned', $options: 'i' }
+          });
+        } catch (_) {}
+
+        if (!exists) {
+          try {
+            await Notification.create({
+              userId: String(userId),
+              role: 'guest',
+              propertyId: propId,
+              title,
+              message,
+              category: 'Room Assigned',
+              isRead: false,
+              createdAt: b.updatedAt || b.createdAt || new Date()
+            });
+          } catch (_) {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('syncGuestBookingNotifications error:', err.message);
+  }
+};
+
 // GET /api/v1/guest/notifications
 router.get('/notifications', async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
-    let list = await Notification.find({
-      $or: [
-        { role: 'guest' },
-        { userId: userId }
-      ]
-    });
+    const userEmail = req.user?.email;
+    const userPhone = req.user?.mobile || req.user?.phone;
+    const userName = req.user?.name;
+
+    // Permanently sync any check-in, check-out, or reservation status changes for this guest
+    await syncGuestBookingNotifications(req.user);
+
+    const notifQuery = [
+      { role: 'guest' },
+      { role: 'all' },
+      { userId: userId },
+      { userId: String(userId) }
+    ];
+    if (userEmail) notifQuery.push({ userId: userEmail });
+    if (userPhone) notifQuery.push({ userId: userPhone });
+
+    // Also match notifications for any of this guest's bookings
+    try {
+      const bQuery = [{ guestId: userId }, { guestId: String(userId) }];
+      if (userEmail) bQuery.push({ email: userEmail });
+      if (userPhone) bQuery.push({ phone: userPhone });
+      if (userName) bQuery.push({ guest: userName });
+      const guestBookings = await Booking.find({ $or: bQuery });
+      for (const b of guestBookings) {
+        const bId = b.bookingId || String(b._id) || b.id;
+        if (bId) {
+          notifQuery.push({ message: { $regex: bId, $options: 'i' } });
+          notifQuery.push({ title: { $regex: bId, $options: 'i' } });
+        }
+      }
+    } catch (_) {}
+
+    let list = await Notification.find({ $or: notifQuery });
 
     if (Array.isArray(list)) {
       list = list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
 
-    if (list.length === 0) {
-      const defaultNotifications = [
-        {
-          userId: userId || 'guest_user_1',
-          role: 'guest',
-          title: 'Booking Confirmed!',
-          message: 'Your stay at Speshway Hotel & Suites (Ref: HS-1001) is confirmed for Sep 01 - Sep 03, 2026.',
-          category: 'Booking Confirmation',
-          isRead: false
-        },
-        {
-          userId: userId || 'guest_user_1',
-          role: 'guest',
-          title: 'Payment Received',
-          message: 'Payment of ₹4,350 processed successfully via UPI for Deluxe Suite booking (Ref: HS-1001).',
-          category: 'Payment Update',
-          isRead: false
-        },
-        {
-          userId: userId || 'guest_user_1',
-          role: 'guest',
-          title: 'Check-in Reminder',
-          message: 'Upcoming Stay Reminder: Your check-in at Speshway Hotel & Suites is tomorrow at 02:00 PM.',
-          category: 'Check-in Reminder',
-          isRead: false
-        },
-        {
-          userId: userId || 'guest_user_1',
-          role: 'guest',
-          title: 'Service Charge Added',
-          message: 'In-room refreshments (₹350) added to your Digital Folio FOL-1001.',
-          category: 'Service & Folio',
-          isRead: true
-        },
-        {
-          userId: userId || 'guest_user_1',
-          role: 'guest',
-          title: 'GST Invoice Ready',
-          message: 'Official tax invoice for booking HS-1001 is available for instant download.',
-          category: 'Invoice Notification',
-          isRead: true
-        },
-        {
-          userId: userId || 'guest_user_1',
-          role: 'guest',
-          title: 'Feedback Request',
-          message: 'How was your recent stay? Share your valuable experience and help us improve.',
-          category: 'Feedback Reminder',
-          isRead: true
-        }
-      ];
-
-      list = await Notification.insertMany(defaultNotifications);
+    // Deduplicate by composite key while preserving read state
+    const seen = new Set();
+    const unique = [];
+    for (const n of list || []) {
+      const id = n._id ? String(n._id) : (n.id ? String(n.id) : '');
+      const key = `${(n.title || '').trim().toLowerCase()}__${(n.message || '').trim().toLowerCase()}`;
+      if (!seen.has(id) && !seen.has(key)) {
+        if (id) seen.add(id);
+        seen.add(key);
+        unique.push(n);
+      }
     }
 
-    return sendSuccess(res, 200, list, 'Guest notifications fetched successfully from MongoDB');
+    return sendSuccess(res, 200, unique, 'Guest notifications fetched successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to fetch notifications');
   }
@@ -588,7 +788,10 @@ const handleMarkGuestNotificationRead = async (req, res) => {
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
-    const notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true });
+    let notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true });
+    if (!notif) {
+      notif = await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true });
+    }
     
     const io = req.app.get('socketio');
     if (io) {
@@ -609,7 +812,14 @@ router.put('/notifications/:id/read', handleMarkGuestNotificationRead);
 
 const handleMarkGuestNotificationUnread = async (req, res) => {
   try {
+    const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
+
+    let notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: false }, { new: true });
+    if (!notif) {
+      notif = await Notification.findByIdAndUpdate(id, { isRead: false }, { new: true });
+    }
 
     const io = req.app.get('socketio');
     if (io) {
@@ -631,15 +841,43 @@ router.put('/notifications/:id/unread', handleMarkGuestNotificationUnread);
 const handleMarkAllGuestNotificationsRead = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
+    const userEmail = req.user?.email;
+    const userPhone = req.user?.mobile || req.user?.phone;
+    const userName = req.user?.name;
+
+    const notifQuery = [
+      { role: 'guest' },
+      { role: 'all' },
+      { userId: userId },
+      { userId: String(userId) }
+    ];
+    if (userEmail) notifQuery.push({ userId: userEmail });
+    if (userPhone) notifQuery.push({ userId: userPhone });
+
+    try {
+      const bQuery = [{ guestId: userId }, { guestId: String(userId) }];
+      if (userEmail) bQuery.push({ email: userEmail });
+      if (userPhone) bQuery.push({ phone: userPhone });
+      if (userName) bQuery.push({ guest: userName });
+      const guestBookings = await Booking.find({ $or: bQuery });
+      for (const b of guestBookings) {
+        const bId = b.bookingId || String(b._id) || b.id;
+        if (bId) {
+          notifQuery.push({ message: { $regex: bId, $options: 'i' } });
+          notifQuery.push({ title: { $regex: bId, $options: 'i' } });
+        }
+      }
+    } catch (_) {}
+
     await Notification.updateMany(
-      { isRead: false, $or: [{ role: 'guest' }, { userId: userId }] },
+      { $or: notifQuery },
       { isRead: true }
     );
 
     const io = req.app.get('socketio');
     if (io) {
-      emitRealtimeSync(io, 'HS-JAI', 'unread_notifications_count_updated', { userId });
-      emitRealtimeSync(io, 'HS-JAI', 'dashboard_sync', { action: 'all_guest_notifications_read' });
+      emitRealtimeSync(io, 'all', 'unread_notifications_count_updated', { userId });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'all_guest_notifications_read', userId });
     }
 
     return sendSuccess(res, 200, null, 'All guest notifications marked as read');
@@ -1226,4 +1464,580 @@ router.post('/bookings/:id/refund', handleGuestRefundRequest);
 router.get('/refunds', handleGetGuestRefundRequests);
 router.get('/refund-requests', handleGetGuestRefundRequests);
 
+// ==========================================
+// GUEST PAYMENTS & LEDGER
+// ==========================================
+// GET /api/v1/guest/payments - Real MongoDB payment transactions for logged-in guest
+router.get('/payments', async (req, res) => {
+  try {
+    const properties = await Property.find({});
+    const userId = req.user._id || req.user.id;
+
+    const query = [{ guestId: userId }];
+    if (req.user?.email) query.push({ email: req.user.email });
+    if (req.user?.mobile) query.push({ phone: req.user.mobile });
+    if (req.user?.name) query.push({ guest: req.user.name });
+
+    // Fetch all bookings belonging strictly to the logged-in guest
+    const guestBookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
+
+    const bookingIds = guestBookings.map(b => b.bookingId || b._id || b.id).filter(Boolean);
+    const stringIds = guestBookings.map(b => String(b._id)).filter(Boolean);
+
+    // Fetch payment records in Payment collection
+    const paymentQuery = [
+      { bookingId: { $in: [...bookingIds, ...stringIds] } }
+    ];
+    if (req.user?.name) {
+      paymentQuery.push({ guestName: req.user.name });
+    }
+    const loggedPayments = await Payment.find({ $or: paymentQuery }).sort({ createdAt: -1 });
+
+    const paymentList = [];
+    const seenTxnIds = new Set();
+
+    for (const b of guestBookings) {
+      const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
+      const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
+      const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
+      const address = prop ? (prop.settings?.address || prop.address || `${city}, India`) : 'Hitech City, Hyderabad, Telangana';
+      const gstNo = prop?.settings?.gstin || '36AABCS1429B1Z5';
+
+      const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
+      const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
+      const bId = b.bookingId || b._id || b.id;
+
+      const totalAmount = Number(b.amount || b.totalAmount || 0);
+      const balance = Number(b.balance || 0);
+      const isBookingRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
+      const isPartiallyRefunded = b.paymentStatus === 'Partially Refunded' || b.refundStatus === 'Partially Refunded' || b.refundRequest?.status === 'Partially Refunded';
+
+      const matchedPayments = loggedPayments.filter(p =>
+        (p.bookingId && (p.bookingId === b.bookingId || p.bookingId === String(b._id) || p.bookingId === b.id)) ||
+        (p.guestName && p.guestName === (b.guest || req.user.name) && p.roomNumber === (b.roomNumber || extractRoomNumber(b.room)))
+      );
+
+      const roomCharges = Math.round(totalAmount * 0.82);
+      const gstTax = Math.round(totalAmount * 0.18);
+      const services = Array.isArray(b.services) ? b.services : [];
+      const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
+      const discount = Number(b.discount || 0);
+
+      let refundObj = null;
+      if (b.refundRequest || b.refundStatus || isBookingRefunded || isPartiallyRefunded) {
+        refundObj = {
+          status: b.refundStatus || b.refundRequest?.status || (isBookingRefunded ? 'Refunded' : 'Pending'),
+          requestedAmount: Number(b.refundRequest?.requestedAmount || b.refundableAmount || totalAmount),
+          approvedAmount: Number(b.refundRequest?.approvedAmount || (isBookingRefunded ? (b.refundableAmount || totalAmount) : 0)),
+          cancellationFee: Number(b.cancellationFee || 0),
+          reason: b.refundRequest?.reason || b.cancellationReason || 'Booking Cancellation / Early Checkout',
+          refundMethod: b.refundRequest?.refundMethod || 'UPI',
+          upiId: b.refundRequest?.upiId || '',
+          accountNumber: b.refundRequest?.accountNumber || '',
+          bankName: b.refundRequest?.bankName || '',
+          utrNumber: b.refundRequest?.utrNumber || b.refundRequest?.transactionRef || (isBookingRefunded ? `UTR-${Date.now().toString().slice(-8)}` : ''),
+          requestedAt: b.refundRequest?.requestedAt || b.cancelledAt || b.createdAt,
+          processedAt: b.refundRequest?.processedAt || (isBookingRefunded ? b.updatedAt : null)
+        };
+      }
+
+      if (matchedPayments.length > 0) {
+        for (const p of matchedPayments) {
+          const pStatusRaw = (p.status || '').toLowerCase();
+          let finalStatus = 'Successful';
+          if (isBookingRefunded || pStatusRaw === 'refunded') {
+            finalStatus = 'Refunded';
+          } else if (isPartiallyRefunded || pStatusRaw === 'partially refunded') {
+            finalStatus = 'Partially Refunded';
+          } else if (pStatusRaw === 'pending' || b.paymentStatus === 'Pending') {
+            finalStatus = 'Pending';
+          } else if (pStatusRaw === 'processing') {
+            finalStatus = 'Processing';
+          } else if (pStatusRaw === 'failed') {
+            finalStatus = 'Failed';
+          } else if (pStatusRaw === 'settled' || pStatusRaw === 'paid' || b.paymentStatus === 'Paid') {
+            finalStatus = 'Successful';
+          }
+
+          const txnId = p._id ? String(p._id) : `PAY-${bId}`;
+          if (!seenTxnIds.has(txnId)) {
+            seenTxnIds.add(txnId);
+            paymentList.push({
+              id: txnId,
+              paymentId: `PAY-${bId}`,
+              bookingId: bId,
+              guestName: b.guest || req.user.name,
+              hotel: propName,
+              city: city,
+              address: address,
+              gstNo: gstNo,
+              propertyId: b.propertyId || prop?._id || 'HS-JAI',
+              room: b.room || b.roomType || 'Standard Room',
+              roomNumber: b.roomNumber || p.roomNumber || extractRoomNumber(b.room) || '101',
+              amount: Number(p.amount || totalAmount),
+              totalAmount: totalAmount,
+              paidAmount: totalAmount - balance,
+              balance: balance,
+              paymentMethod: p.paymentMethod || b.paymentMethod || 'UPI',
+              status: finalStatus,
+              checkIn: checkIn,
+              checkOut: checkOut,
+              dates: `${checkIn} → ${checkOut}`,
+              nights: Number(b.nights) || 1,
+              createdAt: p.createdAt || b.createdAt || new Date(),
+              folio: {
+                folioId: `FOL-${bId}`,
+                roomCharges,
+                gstTax,
+                services,
+                serviceTotal,
+                discount,
+                totalCharges: totalAmount + serviceTotal - discount
+              },
+              refundInfo: refundObj
+            });
+          }
+        }
+      } else {
+        const isPaid = b.paymentStatus === 'Paid' || b.status === 'Confirmed' || b.status === 'Checked-in' || b.status === 'Checked-out';
+        let status = 'Successful';
+        if (isBookingRefunded) {
+          status = 'Refunded';
+        } else if (isPartiallyRefunded) {
+          status = 'Partially Refunded';
+        } else if (b.status === 'Cancelled' && b.paymentStatus === 'Failed') {
+          status = 'Failed';
+        } else if (b.paymentStatus === 'Pending' || (!isPaid && balance >= totalAmount)) {
+          status = 'Pending';
+        } else if (balance > 0 && balance < totalAmount) {
+          status = 'Successful';
+        }
+
+        const txnId = `PAY-${bId}`;
+        if (!seenTxnIds.has(txnId)) {
+          seenTxnIds.add(txnId);
+          paymentList.push({
+            id: txnId,
+            paymentId: txnId,
+            bookingId: bId,
+            guestName: b.guest || req.user.name,
+            hotel: propName,
+            city: city,
+            address: address,
+            gstNo: gstNo,
+            propertyId: b.propertyId || prop?._id || 'HS-JAI',
+            room: b.room || b.roomType || 'Standard Room',
+            roomNumber: b.roomNumber || extractRoomNumber(b.room) || '101',
+            amount: isPaid ? (totalAmount - balance || totalAmount) : totalAmount,
+            totalAmount: totalAmount,
+            paidAmount: isPaid ? (totalAmount - balance || totalAmount) : 0,
+            balance: balance,
+            paymentMethod: b.paymentMethod || 'UPI',
+            status: status,
+            checkIn: checkIn,
+            checkOut: checkOut,
+            dates: `${checkIn} → ${checkOut}`,
+            nights: Number(b.nights) || 1,
+            createdAt: b.createdAt || new Date(),
+            folio: {
+              folioId: `FOL-${bId}`,
+              roomCharges,
+              gstTax,
+              services,
+              serviceTotal,
+              discount,
+              totalCharges: totalAmount + serviceTotal - discount
+            },
+            refundInfo: refundObj
+          });
+        }
+      }
+    }
+
+    // Sort payments newest first
+    paymentList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    // Calculate Summary Stats
+    const totalPaid = paymentList.reduce((acc, p) => {
+      if (p.status === 'Successful' || p.status === 'Settled' || p.status === 'Paid') {
+        return acc + Number(p.amount || 0);
+      }
+      return acc;
+    }, 0);
+
+    const pendingAmount = guestBookings.reduce((acc, b) => {
+      if (b.status !== 'Cancelled' && b.status !== 'Checked-out') {
+        return acc + Number(b.balance || (b.paymentStatus === 'Pending' ? b.totalAmount || b.amount : 0));
+      }
+      return acc;
+    }, 0);
+
+    const refundedAmount = paymentList.reduce((acc, p) => {
+      if (p.status === 'Refunded' || p.status === 'Partially Refunded') {
+        return acc + Number(p.refundInfo?.approvedAmount || p.refundInfo?.requestedAmount || p.amount || 0);
+      }
+      return acc;
+    }, 0);
+
+    return sendSuccess(res, 200, {
+      summary: {
+        totalPaid,
+        pendingAmount,
+        refundedAmount,
+        totalTransactions: paymentList.length
+      },
+      payments: paymentList
+    }, 'Guest payments and transactions retrieved successfully from MongoDB');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to load guest payments');
+  }
+});
+
+// POST /api/v1/guest/payments/pay-balance
+router.post('/payments/pay-balance', async (req, res) => {
+  try {
+    const { bookingId, amount, paymentMethod = 'UPI' } = req.body;
+    if (!bookingId || amount === undefined || Number(amount) <= 0) {
+      return sendError(res, 400, 'Booking ID and valid amount are required.');
+    }
+
+    const cleanId = String(bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
+    const bookingQuery = [
+      { bookingId: bookingId },
+      { id: bookingId },
+      { bookingId: cleanId },
+      { id: cleanId }
+    ];
+    if (mongoose.Types.ObjectId.isValid(cleanId)) {
+      bookingQuery.unshift({ _id: cleanId });
+    }
+    if (mongoose.Types.ObjectId.isValid(bookingId)) {
+      bookingQuery.unshift({ _id: bookingId });
+    }
+
+    const booking = await Booking.findOne({ $or: bookingQuery });
+    if (!booking) {
+      return sendError(res, 404, 'Booking record not found.');
+    }
+
+    const payAmount = Number(amount);
+    const newBalance = Math.max(0, Number(booking.balance || 0) - payAmount);
+    const currentPaid = Number(booking.paidAmount || (Number(booking.amount || booking.totalAmount || 0) - Number(booking.balance || 0)));
+    const newPaidAmount = currentPaid + payAmount;
+    const isFullyPaid = newBalance === 0;
+
+    booking.balance = newBalance;
+    booking.paidAmount = newPaidAmount;
+    booking.paymentStatus = isFullyPaid ? 'Paid' : 'Partial';
+    if (isFullyPaid && booking.status === 'Pending') {
+      booking.status = 'Confirmed';
+    }
+    await booking.save();
+
+    const propId = booking.propertyId || req.user?.propertyId || 'HS-JAI';
+    const guestName = booking.guest || req.user.name || 'Valued Guest';
+    const refId = booking.bookingId || booking._id || booking.id;
+
+    const newPayment = await Payment.create({
+      bookingId: refId,
+      guestName: guestName,
+      roomNumber: booking.roomNumber || extractRoomNumber(booking.room) || '101',
+      amount: payAmount,
+      paymentMethod: paymentMethod || 'UPI',
+      status: 'Settled',
+      propertyId: propId
+    });
+
+    // Notify Manager
+    await triggerNotification({
+      req,
+      role: 'manager',
+      propertyId: propId,
+      title: 'Payment Received',
+      message: `Guest ${guestName} paid ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} for booking ${refId}. Balance: ₹${newBalance}.`,
+      category: 'Payments',
+      data: { bookingId: booking._id, amount: payAmount, paymentMethod }
+    });
+
+    // Notify Receptionist
+    await triggerNotification({
+      req,
+      role: 'receptionist',
+      propertyId: propId,
+      title: 'Payment Logged',
+      message: `Folio balance payment ₹${payAmount.toLocaleString('en-IN')} received for Room ${booking.room || 'N/A'}.`,
+      category: 'Payments',
+      data: { bookingId: booking._id, amount: payAmount }
+    });
+
+    // Confirm to Guest
+    await triggerNotification({
+      req,
+      userId: req.user._id || req.user.id,
+      role: 'guest',
+      title: 'Payment Successful',
+      message: `Your payment of ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} (Ref: ${refId}) has been processed successfully.`,
+      category: 'Payment Update'
+    });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, propId, 'payment_logged', { payment: newPayment, bookingId: booking._id });
+      emitRealtimeSync(io, propId, 'payment_updated', { bookingId: booking._id, balance: newBalance });
+      emitRealtimeSync(io, propId, 'booking_updated', { booking: booking, action: 'payment' });
+      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_settled' });
+    }
+
+    return sendSuccess(res, 200, {
+      payment: newPayment,
+      booking: booking,
+      newBalance: newBalance
+    }, 'Payment processed successfully and balance updated.');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to process payment');
+  }
+});
+
+// ==========================================
+// GUEST SETTINGS & PREFERENCES ENDPOINTS
+// ==========================================
+
+// GET /api/v1/guest/settings
+router.get('/settings', async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return sendError(res, 404, 'User profile not found');
+    }
+
+    const defaultNotifs = {
+      emailConfirmations: true,
+      smsAlerts: true,
+      pushNotifications: true,
+      promotionalOffers: false,
+      checkInReminders: true
+    };
+
+    const defaultPrefs = {
+      currency: user.currency || 'INR (₹)',
+      language: user.language || 'English (IN)',
+      theme: 'System',
+      biometricLogin: false,
+      hapticFeedback: true
+    };
+
+    return sendSuccess(res, 200, {
+      id: user._id || user.id,
+      name: user.name || '',
+      email: user.email || '',
+      mobile: user.mobile || user.phone || '',
+      city: user.city || 'Hyderabad',
+      address: user.address || '',
+      avatar: user.avatar || null,
+      notificationSettings: {
+        ...defaultNotifs,
+        ...(user.notificationSettings || {})
+      },
+      appPreferences: {
+        ...defaultPrefs,
+        ...(user.appPreferences || {})
+      },
+      securitySettings: {
+        twoFactorAuth: user.securitySettings?.twoFactorAuth || false,
+        lastPasswordChange: user.securitySettings?.lastPasswordChange || user.updatedAt
+      }
+    }, 'Guest settings retrieved successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve settings');
+  }
+});
+
+// PUT /api/v1/guest/settings
+router.put('/settings', async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const {
+      name,
+      mobile,
+      city,
+      address,
+      language,
+      currency,
+      notificationSettings,
+      appPreferences
+    } = req.body;
+
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name.trim();
+    if (mobile !== undefined) updateFields.mobile = mobile.trim();
+    if (city !== undefined) updateFields.city = city.trim();
+    if (address !== undefined) updateFields.address = address.trim();
+    if (language !== undefined) updateFields.language = language;
+    if (currency !== undefined) updateFields.currency = currency;
+
+    if (notificationSettings && typeof notificationSettings === 'object') {
+      for (const [key, val] of Object.entries(notificationSettings)) {
+        updateFields[`notificationSettings.${key}`] = Boolean(val);
+      }
+    }
+
+    if (appPreferences && typeof appPreferences === 'object') {
+      for (const [key, val] of Object.entries(appPreferences)) {
+        updateFields[`appPreferences.${key}`] = val;
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_updated', updatedUser);
+    }
+
+    return sendSuccess(res, 200, {
+      id: updatedUser._id || updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      mobile: updatedUser.mobile,
+      city: updatedUser.city,
+      address: updatedUser.address,
+      avatar: updatedUser.avatar,
+      language: updatedUser.language || updatedUser.appPreferences?.language || 'English (IN)',
+      currency: updatedUser.currency || updatedUser.appPreferences?.currency || 'INR (₹)',
+      notificationSettings: updatedUser.notificationSettings,
+      appPreferences: updatedUser.appPreferences,
+      securitySettings: updatedUser.securitySettings
+    }, 'Guest settings updated successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to update settings');
+  }
+});
+
+// PUT /api/v1/guest/notifications-settings
+router.put('/notifications-settings', async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const settings = req.body || {};
+
+    const updateObj = {};
+    for (const [k, v] of Object.entries(settings)) {
+      updateObj[`notificationSettings.${k}`] = Boolean(v);
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateObj },
+      { new: true }
+    ).select('-password');
+
+    return sendSuccess(res, 200, updatedUser?.notificationSettings || settings, 'Notification preferences updated');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to update notification preferences');
+  }
+});
+
+// POST /api/v1/guest/change-password
+router.post('/change-password', async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return sendError(res, 400, 'Current and new passwords are required');
+    }
+    if (newPassword.length < 6) {
+      return sendError(res, 400, 'New password must be at least 6 characters long');
+    }
+
+    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return sendError(res, 404, 'User account not found');
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return sendError(res, 400, 'Incorrect current password. Please try again.');
+    }
+
+    user.password = newPassword;
+    if (!user.securitySettings) user.securitySettings = {};
+    user.securitySettings.lastPasswordChange = new Date();
+    await user.save();
+
+    await triggerNotification({
+      req,
+      userId: user._id || user.id,
+      role: 'guest',
+      title: 'Security Alert: Password Changed',
+      message: 'Your Hour Stay account password was successfully updated. If this wasn\'t you, please contact support immediately.',
+      category: 'Security'
+    });
+
+    return sendSuccess(res, 200, {}, 'Password changed successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to change password');
+  }
+});
+
+// GET /api/v1/guest/export-data
+router.get('/export-data', async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId).select('-password -otp -otpExpires').lean();
+    const bookings = await Booking.find({ $or: [{ guestId: userId }, { email: req.user.email }] }).lean();
+    const payments = await Payment.find({ guestName: req.user.name }).lean();
+    const feedbacks = await Feedback.find({ $or: [{ userId }, { guestEmail: req.user.email }] }).lean();
+
+    const exportBundle = {
+      userProfile: user,
+      totalBookings: bookings.length,
+      bookings: bookings,
+      totalPayments: payments.length,
+      payments: payments,
+      feedbacks: feedbacks,
+      exportedAt: new Date().toISOString(),
+      service: 'Hour Stay PMS Platform'
+    };
+
+    return sendSuccess(res, 200, exportBundle, 'Guest data bundle exported successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to export account data');
+  }
+});
+
+// POST /api/v1/guest/delete-account-request
+router.post('/delete-account-request', async (req, res) => {
+  try {
+    const { reason = 'User requested account closure' } = req.body;
+    const userId = req.user._id || req.user.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    // Log deletion request / approval
+    await Approval.create({
+      title: `Account Deletion Request: ${user.name}`,
+      description: `Guest ${user.name} (${user.email}) requested account deletion. Reason: ${reason}`,
+      category: 'Guest Account',
+      submittedBy: user.name,
+      status: 'Pending',
+      propertyId: user.propertyId || 'HS-JAI'
+    });
+
+    return sendSuccess(res, 200, {}, 'Your account deletion request has been submitted to support and will be processed within 48 hours.');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to submit account deletion request');
+  }
+});
+
 export default router;
+

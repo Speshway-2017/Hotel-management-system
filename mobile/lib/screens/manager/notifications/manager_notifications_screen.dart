@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/notification_model.dart';
+import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/manager/manager_notification_provider.dart';
+import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
 import 'package:hour_stay_mobile/widgets/server_config_dialog.dart';
 import '../approvals/manager_approvals_screen.dart';
 import '../feedback/manager_feedback_screen.dart';
 import '../reservations/manager_reservations_screen.dart';
+import '../reservations/manager_reservation_detail_screen.dart';
 import '../payments/manager_payments_screen.dart';
 
 class ManagerNotificationsScreen extends StatefulWidget {
@@ -36,8 +39,8 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<ManagerNotificationProvider>();
-      provider.fetchNotifications();
+      context.read<ManagerNotificationProvider>().fetchNotifications();
+      context.read<ReservationProvider>().fetchReservations(silent: true);
     });
   }
 
@@ -778,12 +781,71 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
         Navigator.of(sheetContext).pop();
         Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerPaymentsScreen(isEmbedded: false)));
       };
-    } else if (cat.contains('reserv') || msg.contains('booking') || msg.contains('check-in') || msg.contains('check-out') || title.contains('booking')) {
-      label = 'View Reservations';
+    } else if (cat.contains('reserv') || msg.contains('booking') || msg.contains('check-in') || msg.contains('check-out') || title.contains('booking') || title.contains('reservation')) {
+      label = 'View Reservation';
       icon = Icons.calendar_today_rounded;
       onNavigate = () {
         Navigator.of(sheetContext).pop();
-        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerReservationsScreen()));
+
+        final combinedText = '${notif.title} ${notif.message}';
+        final refMatch = RegExp(r'(?:#|Ref:\s*#?|\b)(BK-[A-Za-z0-9-]+)', caseSensitive: false).firstMatch(combinedText);
+        final bookingCode = refMatch?.group(1);
+
+        final resProv = rootContext.read<ReservationProvider>();
+        ReservationModel? targetReservation;
+
+        if (bookingCode != null) {
+          try {
+            targetReservation = resProv.reservations.cast<ReservationModel?>().firstWhere(
+              (r) => r?.bookingId.toLowerCase() == bookingCode.toLowerCase() ||
+                     r?.id.toLowerCase() == bookingCode.toLowerCase(),
+              orElse: () => null,
+            );
+          } catch (_) {}
+        }
+
+        if (targetReservation == null) {
+          for (final r in resProv.reservations) {
+            if (r.bookingId.isNotEmpty && combinedText.toLowerCase().contains(r.bookingId.toLowerCase())) {
+              targetReservation = r;
+              break;
+            }
+            if (r.id.isNotEmpty && combinedText.toLowerCase().contains(r.id.toLowerCase())) {
+              targetReservation = r;
+              break;
+            }
+          }
+        }
+
+        if (targetReservation != null) {
+          Navigator.of(rootContext).push(
+            MaterialPageRoute(builder: (_) => ManagerReservationDetailScreen(reservation: targetReservation!)),
+          );
+        } else if (bookingCode != null) {
+          final fallbackReservation = ReservationModel(
+            id: bookingCode,
+            bookingId: bookingCode,
+            guest: 'Guest',
+            room: 'Room',
+            roomType: 'Standard Room',
+            status: combinedText.toLowerCase().contains('check-in') || combinedText.toLowerCase().contains('checked-in')
+                ? 'Checked-in'
+                : (combinedText.toLowerCase().contains('check-out') || combinedText.toLowerCase().contains('checked-out')
+                    ? 'Checked-out'
+                    : 'Confirmed'),
+            stayType: 'Standard',
+            checkIn: DateTime.now().toIso8601String(),
+            checkOut: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+            amount: 0.0,
+          );
+          Navigator.of(rootContext).push(
+            MaterialPageRoute(builder: (_) => ManagerReservationDetailScreen(reservation: fallbackReservation)),
+          );
+        } else {
+          Navigator.of(rootContext).push(
+            MaterialPageRoute(builder: (_) => const ManagerReservationsScreen()),
+          );
+        }
       };
     }
 

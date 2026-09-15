@@ -33,12 +33,19 @@ class ReservationModel {
   final String cancellationReason;
   final String cancellationRemarks;
   final Map<String, dynamic>? refundRequest;
+  final String? hotel;
+  final String? city;
+  final int adults;
+  final int children;
+  final int roomsCount;
 
   // Compatibility getters
   String get guestName => guest;
   String get guestEmail => email;
   String get guestPhone => phone;
   String get reservationNumber => bookingId;
+  String get propertyName => hotel ?? 'Hour Stay Luxury Hotel';
+  int get totalGuests => adults + children;
   double get totalAmount => (originalAmount != null && originalAmount! > 0) ? originalAmount! : amount;
 
   // Refund helpers
@@ -57,7 +64,7 @@ class ReservationModel {
     required this.checkIn,
     required this.checkOut,
     this.nights = 1,
-    this.stayType = 'hourly',
+    this.stayType = 'overnight',
     this.hours,
     this.amount = 0.0,
     this.originalAmount,
@@ -80,6 +87,11 @@ class ReservationModel {
     this.cancellationReason = '',
     this.cancellationRemarks = '',
     this.refundRequest,
+    this.hotel,
+    this.city,
+    this.adults = 2,
+    this.children = 0,
+    this.roomsCount = 1,
   });
 
   ReservationModel copyWith({
@@ -114,6 +126,11 @@ class ReservationModel {
     String? cancellationReason,
     String? cancellationRemarks,
     Map<String, dynamic>? refundRequest,
+    String? hotel,
+    String? city,
+    int? adults,
+    int? children,
+    int? roomsCount,
   }) {
     return ReservationModel(
       id: id ?? this.id,
@@ -147,6 +164,11 @@ class ReservationModel {
       cancellationReason: cancellationReason ?? this.cancellationReason,
       cancellationRemarks: cancellationRemarks ?? this.cancellationRemarks,
       refundRequest: refundRequest ?? this.refundRequest,
+      hotel: hotel ?? this.hotel,
+      city: city ?? this.city,
+      adults: adults ?? this.adults,
+      children: children ?? this.children,
+      roomsCount: roomsCount ?? this.roomsCount,
     );
   }
 
@@ -170,6 +192,12 @@ class ReservationModel {
     final rawRefundStatus = json['refundStatus']?.toString() ??
         (refReq != null ? refReq['status']?.toString() : null) ??
         'None';
+
+    final hName = json['hotel']?.toString() ?? json['hotelName']?.toString() ?? json['propertyName']?.toString();
+    final cName = json['city']?.toString();
+    final adCount = int.tryParse(json['adults']?.toString() ?? '2') ?? 2;
+    final chCount = int.tryParse(json['children']?.toString() ?? '0') ?? 0;
+    final rmCount = int.tryParse(json['roomsCount']?.toString() ?? json['rooms']?.toString() ?? '1') ?? 1;
 
     return ReservationModel(
       id: json['id'] ?? json['_id'] ?? '',
@@ -206,6 +234,11 @@ class ReservationModel {
       cancellationReason: json['cancellationReason']?.toString() ?? '',
       cancellationRemarks: json['cancellationRemarks']?.toString() ?? '',
       refundRequest: refReq,
+      hotel: hName,
+      city: cName,
+      adults: adCount,
+      children: chCount,
+      roomsCount: rmCount,
     );
   }
 
@@ -244,6 +277,11 @@ class ReservationModel {
       'cancellationReason': cancellationReason,
       'cancellationRemarks': cancellationRemarks,
       'refundRequest': refundRequest,
+      'hotel': hotel,
+      'city': city,
+      'adults': adults,
+      'children': children,
+      'roomsCount': roomsCount,
     };
   }
 }

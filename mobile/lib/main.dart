@@ -7,6 +7,8 @@ import 'providers/guest/guest_booking_provider.dart';
 import 'providers/guest/guest_feedback_provider.dart';
 import 'providers/guest/guest_folio_provider.dart';
 import 'providers/guest/guest_notification_provider.dart';
+import 'providers/guest/guest_payment_provider.dart';
+import 'providers/guest/guest_settings_provider.dart';
 import 'providers/manager/approval_provider.dart';
 import 'providers/manager/guest_provider.dart';
 import 'providers/manager/manager_feedback_provider.dart';
@@ -72,6 +74,8 @@ class HourStayApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GuestFolioProvider()),
         ChangeNotifierProvider(create: (_) => GuestFeedbackProvider()),
         ChangeNotifierProvider(create: (_) => GuestNotificationProvider()),
+        ChangeNotifierProvider(create: (_) => GuestPaymentProvider()),
+        ChangeNotifierProvider(create: (_) => GuestSettingsProvider()),
       ],
       child: MaterialApp(
         navigatorKey: rootNavigatorKey,
