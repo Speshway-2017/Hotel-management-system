@@ -104,9 +104,18 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
           .fold(0.0, (acc, r) => acc + r.totalAmount);
     }
 
-    // Active Spotlight Reservation for the top card (Spotlights latest/active reservation)
-    final ReservationModel? spotlightReservation = resProvider.reservations.isNotEmpty
-        ? resProvider.reservations.first
+    // Active Spotlight Reservation for the top card (Spotlights latest non-cancelled reservation: checked-in, checked-out, reserved)
+    final validReservations = resProvider.reservations.where((r) {
+      final st = r.status.trim().toLowerCase();
+      return st != 'cancelled' &&
+          st != 'canceled' &&
+          st != 'rejected' &&
+          st != 'no-show' &&
+          st != 'no_show';
+    }).toList();
+
+    final ReservationModel? spotlightReservation = validReservations.isNotEmpty
+        ? validReservations.first
         : (inHouseReservations.isNotEmpty ? inHouseReservations.first : null);
 
     final feedbackCount = feedbackProvider.unreadCount;
@@ -273,12 +282,17 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
                       builder: (context) {
                         final stUpper = activeReservation.status.toUpperCase();
                         final bool isInHouse = ['CHECKED-IN', 'CHECKED_IN', 'ACTIVE', 'STAYING'].contains(stUpper);
+                        final bool isCheckedOut = ['CHECKED-OUT', 'CHECKED_OUT', 'COMPLETED'].contains(stUpper);
                         final String badgeText = isInHouse
                             ? 'ACTIVE IN-HOUSE GUEST'
-                            : (stUpper == 'CONFIRMED' ? 'LATEST RESERVATION' : '$stUpper RESERVATION');
+                            : (isCheckedOut
+                                ? 'CHECKED-OUT STAY'
+                                : (stUpper == 'CONFIRMED' ? 'LATEST RESERVATION' : '$stUpper RESERVATION'));
                         final Color badgeTone = isInHouse
                             ? emerald
-                            : (stUpper == 'CONFIRMED' ? const Color(0xFF38BDF8) : gold);
+                            : (isCheckedOut
+                                ? gold
+                                : (stUpper == 'CONFIRMED' ? const Color(0xFF38BDF8) : gold));
 
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -852,106 +866,31 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
   // --- Booking Card ---
   Widget _buildBookingCard(BuildContext context, ReservationModel res) {
     final isHourly = res.stayType.toLowerCase() == 'hourly';
+    final stLower = res.status.toLowerCase();
+    final isCheckedIn = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'active' || stLower == 'staying';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardBorder, width: 1.0),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCheckedIn ? emerald.withAlpha(80) : cardBorder,
+          width: isCheckedIn ? 1.2 : 1.0,
+        ),
         boxShadow: [
           BoxShadow(
-            color: navy.withAlpha(5),
-            blurRadius: 5,
+            color: navy.withAlpha(6),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          leading: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: isHourly ? const Color(0xFFF3E8FF) : const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(
-                color: isHourly ? purple.withAlpha(50) : const Color(0xFF2563EB).withAlpha(50),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                res.roomNumber.isNotEmpty ? res.roomNumber : '?',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: isHourly ? purple : const Color(0xFF2563EB),
-                  fontSize: 11.5,
-                ),
-              ),
-            ),
-          ),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  res.guestName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: navy,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              StatusBadge(status: res.status),
-            ],
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: isHourly ? purple.withAlpha(15) : navy.withAlpha(10),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        isHourly ? 'Hourly (${res.hours ?? 3}h)' : 'Overnight (${res.nights}n)',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: isHourly ? purple : navy,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      Formatters.currency(res.totalAmount),
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: emerald,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Check-in: ${Formatters.checkInDateTime(res.checkIn)}',
-                  style: const TextStyle(fontSize: 10, color: muted),
-                ),
-              ],
-            ),
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded, color: muted, size: 18),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -959,6 +898,188 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
               ),
             );
           },
+          child: Padding(
+            padding: const EdgeInsets.all(13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Room Badge, Reservation Number & Status Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: isHourly ? const Color(0xFFF3E8FF) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isHourly
+                                  ? purple.withAlpha(50)
+                                  : const Color(0xFF2563EB).withAlpha(50),
+                            ),
+                          ),
+                          child: Text(
+                            'Room ${res.roomNumber.isNotEmpty ? res.roomNumber : '?' }',
+                            style: TextStyle(
+                              color: isHourly ? purple : const Color(0xFF1E40AF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '#${res.reservationNumber}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: muted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    StatusBadge(status: res.status),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Guest Name & Stay Type Pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            res.guestName,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: navy,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            res.roomType.isNotEmpty ? res.roomType : 'Standard Room',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: isHourly ? purple.withAlpha(15) : navy.withAlpha(12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isHourly ? 'Hourly (${res.hours ?? 3}h)' : '${res.nights > 0 ? res.nights : 1}N Stay (24h)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isHourly ? purple : navy,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Timing & Payment Strip
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: cardBorder),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded, size: 12, color: muted),
+                          const SizedBox(width: 4),
+                          Text(
+                            Formatters.date(res.checkIn),
+                            style: const TextStyle(fontSize: 11, color: navy, fontWeight: FontWeight.w600),
+                          ),
+                          if (res.checkOut.isNotEmpty && res.checkOut != res.checkIn) ...[
+                            const Text(' → ', style: TextStyle(fontSize: 10, color: muted)),
+                            Text(
+                              Formatters.date(res.checkOut),
+                              style: const TextStyle(fontSize: 11, color: navy, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (res.paymentStatus.isNotEmpty)
+                        StatusBadge(
+                          status: res.paymentStatus,
+                          fontSize: 9.5,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Bottom Row: Total Amount & Action
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Total: ',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: muted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          Formatters.currency(res.totalAmount),
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: navy,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Row(
+                      children: [
+                        Text(
+                          'View Details',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: purple,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 11, color: purple),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

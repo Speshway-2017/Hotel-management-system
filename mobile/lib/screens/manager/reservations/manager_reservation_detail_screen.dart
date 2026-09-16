@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../models/payment_model.dart';
 import '../../../models/reservation_model.dart';
 import '../../../providers/manager/payment_provider.dart';
 import '../../../providers/manager/reservation_provider.dart';
 import '../../../providers/manager/room_provider.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/status_badge.dart';
+import '../payments/manager_payment_detail_screen.dart';
 
 class ManagerReservationDetailScreen extends StatefulWidget {
   final ReservationModel reservation;
@@ -481,9 +483,48 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
     );
   }
 
+  void _openPaymentDetail() {
+    final payProvider = context.read<PaymentProvider>();
+    PaymentModel? payment;
+    for (final p in payProvider.payments) {
+      if (p.bookingId == _reservation.id ||
+          p.bookingId == _reservation.bookingId ||
+          p.id == _reservation.id ||
+          (_reservation.bookingId.isNotEmpty && p.bookingId.toLowerCase() == _reservation.bookingId.toLowerCase())) {
+        payment = p;
+        break;
+      }
+    }
+
+    payment ??= PaymentModel(
+      id: _reservation.id,
+      bookingId: _reservation.bookingId.isNotEmpty ? _reservation.bookingId : _reservation.id,
+      guestName: _reservation.guestName,
+      roomNumber: _reservation.roomNumber.isNotEmpty ? _reservation.roomNumber : '101',
+      amount: _reservation.totalAmount > 0 ? _reservation.totalAmount : _reservation.amount,
+      paymentMethod: _reservation.paymentMethod.isNotEmpty ? _reservation.paymentMethod : 'UPI',
+      status: _reservation.paymentStatus.isNotEmpty ? _reservation.paymentStatus : 'Settled',
+      propertyId: _reservation.propertyId.isNotEmpty ? _reservation.propertyId : 'HS-9HQ8P',
+      createdAt: _reservation.createdAt.isNotEmpty ? _reservation.createdAt : DateTime.now().toIso8601String(),
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManagerPaymentDetailScreen(payment: payment!),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isVerified = _reservation.idVerification == 'Verified';
+    final stLower = _reservation.status.toLowerCase();
+    final isCancelled = stLower == 'cancelled' || stLower == 'canceled';
+    final isCheckedOut = stLower == 'checked-out' || stLower == 'checked_out' || stLower == 'completed';
+    final isCheckedIn = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'active' || stLower == 'staying';
+    final isConfirmed = stLower == 'confirmed';
+    final payLower = _reservation.paymentStatus.toLowerCase();
+    final isPaid = payLower == 'paid' || payLower == 'settled' || payLower == 'completed' || _reservation.balance <= 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -567,11 +608,12 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                             'Room ${_reservation.roomNumber.isNotEmpty ? _reservation.roomNumber : "Unassigned"}',
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
-                            tooltip: 'Assign / Change Room',
-                            onPressed: _showAssignRoomDialog,
-                          ),
+                          if (!isCancelled && !isCheckedOut)
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                              tooltip: 'Assign / Change Room',
+                              onPressed: _showAssignRoomDialog,
+                            ),
                         ],
                       ),
                       StatusBadge(status: _reservation.status, fontSize: 13),
@@ -616,6 +658,37 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                       StatusBadge(status: _reservation.paymentStatus),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: _openPaymentDetail,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withAlpha(12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.primary.withAlpha(40)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text(
+                            'View Folio & Payment Details',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.primary),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -655,16 +728,17 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                       ],
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: _showVerifyIdDialog,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isVerified ? AppColors.surface : AppColors.primary,
-                      foregroundColor: isVerified ? AppColors.textPrimary : Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      textStyle: const TextStyle(fontSize: 12),
+                  if (!isCancelled && !isCheckedOut)
+                    ElevatedButton(
+                      onPressed: _showVerifyIdDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isVerified ? AppColors.surface : AppColors.primary,
+                        foregroundColor: isVerified ? AppColors.textPrimary : Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: Text(isVerified ? 'Edit ID' : 'Verify ID'),
                     ),
-                    child: Text(isVerified ? 'Edit ID' : 'Verify ID'),
-                  ),
                 ],
               ),
             ),
@@ -705,11 +779,33 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                   'Stay Schedule',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
-                TextButton.icon(
-                  icon: const Icon(Icons.more_time, size: 16),
-                  label: const Text('Extend Stay'),
-                  onPressed: _showExtendStayDialog,
-                ),
+                if (!isCancelled && !isCheckedOut)
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.more_time_rounded, size: 14, color: Color(0xFFF5C06A)),
+                    label: const Text(
+                      'Extend Stay',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.1,
+                        color: Colors.white,
+                      ),
+                    ),
+                    onPressed: _showExtendStayDialog,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D1B2A),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shadowColor: const Color(0x400D1B2A),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Color(0xFFF5C06A), width: 1.0),
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 4),
@@ -731,60 +827,191 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
             const SizedBox(height: 24),
 
             // Manager Operations
-            const Text(
-              'Front Desk & Stay Operations',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (_reservation.status.toLowerCase() != 'confirmed' &&
-                    _reservation.status.toLowerCase() != 'checked-in' &&
-                    _reservation.status.toLowerCase() != 'checked_in')
-                  CustomButton(
-                    text: 'Confirm Booking',
-                    backgroundColor: AppColors.primary,
-                    icon: Icons.check_circle_outline,
-                    onPressed: () => _updateStatus('Confirmed'),
-                  ),
-                if (_reservation.status.toLowerCase() == 'confirmed')
-                  CustomButton(
-                    text: 'Check-In Guest',
-                    backgroundColor: AppColors.success,
-                    icon: Icons.meeting_room,
-                    onPressed: () => _updateStatus('Checked-in'),
-                  ),
-                if (_reservation.status.toLowerCase() == 'checked-in' ||
-                    _reservation.status.toLowerCase() == 'checked_in')
-                  CustomButton(
-                    text: 'Check-Out Guest',
-                    backgroundColor: AppColors.secondary,
-                    icon: Icons.key_off,
-                    onPressed: () => _updateStatus('Checked-out'),
-                  ),
-                CustomButton(
-                  text: 'Settle Folio Payment',
-                  backgroundColor: AppColors.primary,
-                  isOutlined: true,
-                  textColor: AppColors.primary,
-                  icon: Icons.payment,
-                  onPressed: _showSettleFolioDialog,
+            if (isCheckedOut) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withAlpha(15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.success.withAlpha(50)),
                 ),
-                if (_reservation.status.toLowerCase() != 'cancelled' &&
-                    _reservation.status.toLowerCase() != 'checked-out' &&
-                    _reservation.status.toLowerCase() != 'checked_out')
-                  CustomButton(
-                    text: 'Cancel Reservation',
-                    backgroundColor: AppColors.error,
-                    isOutlined: true,
-                    textColor: AppColors.error,
-                    icon: Icons.cancel_outlined,
-                    onPressed: () => _updateStatus('Cancelled'),
-                  ),
-              ],
-            ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: AppColors.success, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This guest has checked out. Stay is completed.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (isCancelled) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withAlpha(15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.error.withAlpha(50)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.cancel_outlined, color: AppColors.error, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This reservation is cancelled. Stay operations, ID verification, and payment settlement are disabled.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (isCheckedIn) ...[
+              const Text(
+                'Front Desk & Stay Operations',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              if (!isPaid)
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Check-Out',
+                        backgroundColor: const Color(0xFF0D1B2A),
+                        textColor: Colors.white,
+                        icon: Icons.key_off_rounded,
+                        onPressed: () => _updateStatus('Checked-out'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Settle Folio',
+                        backgroundColor: const Color(0xFF10B981),
+                        textColor: Colors.white,
+                        icon: Icons.payments_rounded,
+                        onPressed: _showSettleFolioDialog,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                CustomButton(
+                  text: 'Check-Out',
+                  backgroundColor: const Color(0xFF0D1B2A),
+                  textColor: Colors.white,
+                  icon: Icons.key_off_rounded,
+                  onPressed: () => _updateStatus('Checked-out'),
+                ),
+            ] else if (isConfirmed) ...[
+              const Text(
+                'Front Desk & Stay Operations',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              if (!isPaid)
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Check-In Guest',
+                        backgroundColor: const Color(0xFF10B981),
+                        textColor: Colors.white,
+                        icon: Icons.meeting_room_rounded,
+                        onPressed: () => _updateStatus('Checked-in'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Settle Folio',
+                        backgroundColor: const Color(0xFF0D1B2A),
+                        textColor: Colors.white,
+                        icon: Icons.payments_rounded,
+                        onPressed: _showSettleFolioDialog,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                CustomButton(
+                  text: 'Check-In Guest',
+                  backgroundColor: const Color(0xFF10B981),
+                  textColor: Colors.white,
+                  icon: Icons.meeting_room_rounded,
+                  onPressed: () => _updateStatus('Checked-in'),
+                ),
+              const SizedBox(height: 10),
+              CustomButton(
+                text: 'Cancel Reservation',
+                backgroundColor: const Color(0xFFEF4444),
+                isOutlined: true,
+                textColor: const Color(0xFFEF4444),
+                icon: Icons.cancel_outlined,
+                onPressed: () => _updateStatus('Cancelled'),
+              ),
+            ] else ...[
+              const Text(
+                'Front Desk & Stay Operations',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              if (!isPaid)
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Confirm Booking',
+                        backgroundColor: const Color(0xFF5B21B6),
+                        textColor: Colors.white,
+                        icon: Icons.check_circle_outline,
+                        onPressed: () => _updateStatus('Confirmed'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Settle Folio',
+                        backgroundColor: const Color(0xFF0D1B2A),
+                        textColor: Colors.white,
+                        icon: Icons.payments_rounded,
+                        onPressed: _showSettleFolioDialog,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                CustomButton(
+                  text: 'Confirm Booking',
+                  backgroundColor: const Color(0xFF5B21B6),
+                  textColor: Colors.white,
+                  icon: Icons.check_circle_outline,
+                  onPressed: () => _updateStatus('Confirmed'),
+                ),
+              const SizedBox(height: 10),
+              CustomButton(
+                text: 'Cancel Reservation',
+                backgroundColor: const Color(0xFFEF4444),
+                isOutlined: true,
+                textColor: const Color(0xFFEF4444),
+                icon: Icons.cancel_outlined,
+                onPressed: () => _updateStatus('Cancelled'),
+              ),
+            ],
           ],
         ),
       ),

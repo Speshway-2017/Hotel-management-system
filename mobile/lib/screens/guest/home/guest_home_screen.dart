@@ -64,15 +64,19 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
     final user = authProvider.user;
     final allBookings = bookingProvider.bookings;
 
-    // Filter active and upcoming bookings
-    final activeBookings = allBookings.where((b) {
-      final st = b.status.toLowerCase();
-      return st != 'checked_out' && st != 'checked-out' && st != 'cancelled' && st != 'completed';
+    // Filter valid bookings (exclude cancelled/rejected/no-show)
+    final validBookings = allBookings.where((b) {
+      final st = b.status.trim().toLowerCase();
+      return st != 'cancelled' &&
+          st != 'canceled' &&
+          st != 'rejected' &&
+          st != 'no-show' &&
+          st != 'no_show';
     }).toList();
 
     ReservationModel? inHouseStay;
-    for (final b in allBookings) {
-      final st = b.status.toLowerCase();
+    for (final b in validBookings) {
+      final st = b.status.trim().toLowerCase();
       if (st == 'checked_in' || st == 'checked-in' || st == 'active' || st == 'staying') {
         inHouseStay = b;
         break;
@@ -80,17 +84,28 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
     }
 
     ReservationModel? upcomingBooking = bookingProvider.upcomingStay;
+    if (upcomingBooking != null) {
+      final st = upcomingBooking.status.trim().toLowerCase();
+      if (st == 'cancelled' || st == 'canceled' || st == 'rejected' || st == 'no-show' || st == 'no_show') {
+        upcomingBooking = null;
+      }
+    }
     if (upcomingBooking == null) {
-      for (final b in allBookings) {
-        final st = b.status.toLowerCase();
-        if (st == 'confirmed' || st == 'paid' || st == 'reserved') {
+      for (final b in validBookings) {
+        final st = b.status.trim().toLowerCase();
+        if (st == 'confirmed' || st == 'paid' || st == 'reserved' || st == 'pending' || st == 'booked') {
           upcomingBooking = b;
           break;
         }
       }
     }
 
-    final spotlightStay = inHouseStay ?? upcomingBooking ?? (activeBookings.isNotEmpty ? activeBookings.first : null);
+    final spotlightStay = inHouseStay ?? upcomingBooking ?? (validBookings.isNotEmpty ? validBookings.first : null);
+
+    final activeBookings = validBookings.where((b) {
+      final st = b.status.trim().toLowerCase();
+      return st != 'checked_out' && st != 'checked-out' && st != 'completed';
+    }).toList();
 
     // KPI Metrics calculation
     final totalStays = bookingProvider.totalStays > 0 ? bookingProvider.totalStays : allBookings.length;
@@ -267,12 +282,17 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                       builder: (context) {
                         final stUpper = spotlightStay.status.toUpperCase();
                         final bool isInHouse = ['CHECKED-IN', 'CHECKED_IN', 'ACTIVE', 'STAYING'].contains(stUpper);
+                        final bool isCheckedOut = ['CHECKED-OUT', 'CHECKED_OUT', 'COMPLETED'].contains(stUpper);
                         final String badgeText = isInHouse
                             ? 'CURRENT ACTIVE STAY'
-                            : (stUpper == 'CONFIRMED' ? 'UPCOMING RESERVATION' : '$stUpper RESERVATION');
+                            : (isCheckedOut
+                                ? 'COMPLETED STAY'
+                                : (stUpper == 'CONFIRMED' ? 'UPCOMING RESERVATION' : '$stUpper RESERVATION'));
                         final Color badgeTone = isInHouse
                             ? emerald
-                            : (stUpper == 'CONFIRMED' ? const Color(0xFF38BDF8) : gold);
+                            : (isCheckedOut
+                                ? gold
+                                : (stUpper == 'CONFIRMED' ? const Color(0xFF38BDF8) : gold));
 
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

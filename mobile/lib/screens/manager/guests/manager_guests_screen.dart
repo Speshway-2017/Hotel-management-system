@@ -20,7 +20,6 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
   static const Color navy = Color(0xFF0D1B2A);
   static const Color navyLight = Color(0xFF1B2A4A);
   static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleBg = Color(0xFFF3E8FF);
   static const Color gold = Color(0xFFF5C06A);
   static const Color cream = Color(0xFFFFF7E6);
   static const Color white = Color(0xFFFFFFFF);
@@ -86,7 +85,7 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
           g.bookingId.toLowerCase().contains(q);
 
       final statusStr = g.status.toLowerCase();
-      final isCheckedIn = statusStr.contains('in') && statusStr.contains('check');
+      final isCheckedIn = (statusStr.contains('in') && statusStr.contains('check')) || statusStr == 'staying';
       final isCheckedOut = statusStr.contains('out') && statusStr.contains('check');
 
       bool matchesStatus = true;
@@ -119,6 +118,8 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
     }).length;
     final confirmedCount = guests.where((g) => g.status.toLowerCase() == 'confirmed').length;
     final checkedOutCount = guests.where((g) => g.status.toLowerCase().contains('out')).length;
+    final pendingCount = guests.where((g) => g.status.toLowerCase() == 'pending').length;
+    final cancelledCount = guests.where((g) => g.status.toLowerCase() == 'cancelled' || g.status.toLowerCase() == 'canceled').length;
 
     final isLoading = guestProvider.isLoading && guests.isEmpty;
     final hasError = guestProvider.errorMessage != null && guests.isEmpty;
@@ -139,15 +140,6 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
                 : CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      // 1. KPI Pulse Summary Cards (4 in a single row)
-                      SliverToBoxAdapter(
-                        child: _buildKpiSection(
-                          totalCount: totalCount,
-                          inHouseCount: inHouseCount,
-                          confirmedCount: confirmedCount,
-                          checkedOutCount: checkedOutCount,
-                        ),
-                      ),
 
                       // 2. Search Bar and Filters
                       SliverToBoxAdapter(
@@ -163,6 +155,8 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
                                 inHouseCount: inHouseCount,
                                 confirmedCount: confirmedCount,
                                 checkedOutCount: checkedOutCount,
+                                pendingCount: pendingCount,
+                                cancelledCount: cancelledCount,
                               ),
                             ],
                           ),
@@ -248,186 +242,6 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
           letterSpacing: -0.2,
         ),
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 14),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: emerald.withAlpha(30),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: emerald.withAlpha(80), width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: emerald,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'CRM Active',
-                style: TextStyle(
-                  color: emerald,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // --- 1. KPI Summary Cards in a Single Row ---
-  Widget _buildKpiSection({
-    required int totalCount,
-    required int inHouseCount,
-    required int confirmedCount,
-    required int checkedOutCount,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Total',
-              value: '$totalCount',
-              subtitle: 'History',
-              icon: Icons.people_outline_rounded,
-              color: navy,
-              bgColor: cream,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'In-House',
-              value: '$inHouseCount',
-              subtitle: 'Resident',
-              icon: Icons.hotel_rounded,
-              color: emerald,
-              bgColor: emeraldBg,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Confirmed',
-              value: '$confirmedCount',
-              subtitle: 'Upcoming',
-              icon: Icons.event_available_rounded,
-              color: purple,
-              bgColor: purpleBg,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Past',
-              value: '$checkedOutCount',
-              subtitle: 'Out',
-              icon: Icons.history_rounded,
-              color: amber,
-              bgColor: amberBg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniMetric({
-    required String label,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor.withAlpha(120),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withAlpha(60),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3.5),
-                decoration: BoxDecoration(
-                  color: white,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, size: 11, color: color),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: color == navy ? navy : color,
-                letterSpacing: -0.3,
-                height: 1.0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF334155),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -471,82 +285,108 @@ class _ManagerGuestsScreenState extends State<ManagerGuestsScreen> {
   }
 
   // --- 3. Filter Chips (Status & Payment) ---
+  int _getStatusCount(String status, int totalCount, int inHouseCount, int confirmedCount, int checkedOutCount, int pendingCount, int cancelledCount) {
+    if (status == 'All') return totalCount;
+    if (status == 'Checked-in') return inHouseCount;
+    if (status == 'Confirmed') return confirmedCount;
+    if (status == 'Checked-out') return checkedOutCount;
+    if (status == 'Pending') return pendingCount;
+    if (status == 'Cancelled') return cancelledCount;
+    return 0;
+  }
+
   Widget _buildStatusFilters({
     required int totalCount,
     required int inHouseCount,
     required int confirmedCount,
     required int checkedOutCount,
+    required int pendingCount,
+    required int cancelledCount,
   }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: _statusFilters.map((status) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.hardEdge,
+        padding: EdgeInsets.zero,
+        itemCount: _statusFilters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final status = _statusFilters[index];
           final isSelected = _selectedStatus == status;
+          final count = _getStatusCount(status, totalCount, inHouseCount, confirmedCount, checkedOutCount, pendingCount, cancelledCount);
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: InkWell(
-              onTap: () => setState(() => _selectedStatus = status),
-              borderRadius: BorderRadius.circular(16),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected ? navy : white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? navy : cardBorder,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: navy.withAlpha(35),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          )
-                        ]
-                      : [],
+          Color? dotColor;
+          if (status == 'Checked-in') dotColor = emerald;
+          if (status == 'Confirmed') dotColor = purple;
+          if (status == 'Pending') dotColor = amber;
+          if (status == 'Checked-out') dotColor = blue;
+          if (status == 'Cancelled') dotColor = ruby;
+
+          return InkWell(
+            onTap: () => setState(() => _selectedStatus = status),
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                color: isSelected ? navy : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? navy : cardBorder,
+                  width: 1.2,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (status == 'Checked-in') ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(right: 5),
-                        decoration: const BoxDecoration(color: emerald, shape: BoxShape.circle),
-                      ),
-                    ] else if (status == 'Confirmed') ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(right: 5),
-                        decoration: const BoxDecoration(color: purple, shape: BoxShape.circle),
-                      ),
-                    ] else if (status == 'Pending') ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(right: 5),
-                        decoration: const BoxDecoration(color: amber, shape: BoxShape.circle),
-                      ),
-                    ],
-                    Text(
-                      status,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: navy.withAlpha(35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (dotColor != null) ...[
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? cream : navy,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? gold : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? gold : const Color(0xFF475569),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? navy : const Color(0xFF64748B),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }

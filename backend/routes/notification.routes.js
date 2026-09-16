@@ -165,6 +165,16 @@ router.get('/', protect, async (req, res) => {
           { propertyId: 'HS-9HQ8P' }
         ]
       };
+    } else if (userRole === 'guest') {
+      const uIdStr = String(userId);
+      const guestQueries = [
+        { userId: uIdStr },
+        { userId: req.user.id },
+        { userId: req.user._id }
+      ];
+      if (req.user.email) guestQueries.push({ userId: req.user.email });
+      if (req.user.phone) guestQueries.push({ userId: req.user.phone });
+      query = { $or: guestQueries };
     } else {
       query = {
         $or: [
@@ -235,6 +245,16 @@ router.get('/unread-count', protect, async (req, res) => {
           { propertyId: 'HS-9HQ8P' }
         ]
       };
+    } else if (userRole === 'guest') {
+      const uIdStr = String(userId);
+      const guestQueries = [
+        { userId: uIdStr },
+        { userId: req.user.id },
+        { userId: req.user._id }
+      ];
+      if (req.user.email) guestQueries.push({ userId: req.user.email });
+      if (req.user.phone) guestQueries.push({ userId: req.user.phone });
+      query = { $or: guestQueries };
     } else {
       query = {
         $or: [
@@ -260,7 +280,7 @@ router.get('/unread-count', protect, async (req, res) => {
   }
 });
 
-// 3. Mark notification as read
+// 3. Mark notification as read (strictly scoped to target notification ID)
 const handleMarkNotificationRead = async (req, res) => {
   try {
     const id = req.params.id;
@@ -269,18 +289,13 @@ const handleMarkNotificationRead = async (req, res) => {
 
     const [updated] = await Promise.all([
       Notification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true }),
-      ManagerNotification.updateMany({ $or: idQuery }, { isRead: true }).catch(() => null)
+      (req.user.role === 'manager' || req.user.role === 'admin' || req.user.role === 'super-admin')
+        ? ManagerNotification.updateMany({ $or: idQuery }, { isRead: true }).catch(() => null)
+        : Promise.resolve()
     ]);
 
     if (!updated) {
       return res.status(200).json({ success: true, data: { id, isRead: true } });
-    }
-
-    if (updated.title && updated.message) {
-      await Promise.all([
-        Notification.updateMany({ title: updated.title, message: updated.message }, { isRead: true }).catch(() => null),
-        ManagerNotification.updateMany({ title: updated.title, message: updated.message }, { isRead: true }).catch(() => null)
-      ]);
     }
 
     const io = req.app.get('socketio');
@@ -309,14 +324,13 @@ const handleMarkNotificationUnread = async (req, res) => {
 
     const [updated] = await Promise.all([
       Notification.findOneAndUpdate({ $or: idQuery }, { isRead: false }, { new: true }),
-      ManagerNotification.updateMany({ $or: idQuery }, { isRead: false }).catch(() => null)
+      (req.user.role === 'manager' || req.user.role === 'admin' || req.user.role === 'super-admin')
+        ? ManagerNotification.updateMany({ $or: idQuery }, { isRead: false }).catch(() => null)
+        : Promise.resolve()
     ]);
 
-    if (updated?.title && updated?.message) {
-      await Promise.all([
-        Notification.updateMany({ title: updated.title, message: updated.message }, { isRead: false }).catch(() => null),
-        ManagerNotification.updateMany({ title: updated.title, message: updated.message }, { isRead: false }).catch(() => null)
-      ]);
+    if (!updated) {
+      return res.status(200).json({ success: true, data: { id, isRead: false } });
     }
 
     const io = req.app.get('socketio');
@@ -336,7 +350,7 @@ router.post('/:id/unread', protect, handleMarkNotificationUnread);
 router.patch('/:id/unread', protect, handleMarkNotificationUnread);
 router.put('/:id/unread', protect, handleMarkNotificationUnread);
 
-// 4. Mark all as read
+// 4. Mark all as read (strictly scoped to user's own notifications)
 const handleMarkAllNotificationsRead = async (req, res) => {
   try {
     const userRole = req.user.role;
@@ -345,30 +359,45 @@ const handleMarkAllNotificationsRead = async (req, res) => {
 
     let filter;
     if (userRole === 'super-admin' || userRole === 'admin') {
-      filter = { isRead: false };
+      filter = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: 'admin' },
+          { role: 'super-admin' }
+        ]
+      };
     } else if (userRole === 'manager') {
       filter = {
         isRead: false,
         $or: [
           { userId },
-          { role: 'manager' },
-          { role: 'admin' },
-          { role: null },
-          { role: { $exists: false } },
-          { propertyId: propId },
-          { propertyId: 'HS-JAI' },
-          { propertyId: 'HS-9HQ8P' },
-          { propertyId: null },
-          { propertyId: { $exists: false } }
+          { role: 'manager' }
+        ]
+      };
+    } else if (userRole === 'receptionist') {
+      filter = {
+        isRead: false,
+        $or: [
+          { userId },
+          { role: 'receptionist' }
+        ]
+      };
+    } else if (userRole === 'guest') {
+      const uIdStr = String(userId);
+      filter = {
+        isRead: false,
+        $or: [
+          { userId: uIdStr },
+          { userId: req.user.id },
+          { userId: req.user._id },
+          { userId: req.user.email }
         ]
       };
     } else {
       filter = {
         isRead: false,
-        $or: [
-          { userId },
-          { role: userRole }
-        ]
+        userId
       };
     }
 

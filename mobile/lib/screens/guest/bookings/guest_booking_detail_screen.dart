@@ -8,6 +8,7 @@ import 'package:hour_stay_mobile/widgets/custom_button.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
 import '../feedback/guest_add_feedback_screen.dart';
 import '../folio/guest_folio_screen.dart';
+import 'package:hour_stay_mobile/services/pdf_invoice_service.dart';
 
 class GuestBookingDetailScreen extends StatefulWidget {
   final ReservationModel booking;
@@ -908,11 +909,23 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
   Widget _buildDetailRow(String label, String value, {bool isBold = false, Color valueColor = const Color(0xFF0D1B2A)}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
         Text(
-          value,
-          style: TextStyle(fontSize: 12.5, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, color: valueColor),
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: valueColor,
+            ),
+          ),
         ),
       ],
     );
@@ -926,17 +939,25 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
       orElse: () => _booking,
     );
 
-    final isCancelled = currentBooking.isCancelled;
-    final isStayActive = !isCancelled &&
-        (currentBooking.status.toLowerCase() == 'checked_in' ||
-            currentBooking.status.toLowerCase() == 'confirmed' ||
-            currentBooking.status.toLowerCase() == 'paid');
+    final statusLower = currentBooking.status.toLowerCase();
+    final isCompleted = statusLower == 'checked_out' ||
+        statusLower == 'checked-out' ||
+        statusLower == 'completed' ||
+        statusLower == 'settled' ||
+        statusLower == 'departed' ||
+        statusLower == 'finished';
 
-    final canCancelBeforeCheckIn = !isCancelled &&
-        currentBooking.status.toLowerCase() != 'checked_in' &&
-        currentBooking.status.toLowerCase() != 'checked-in' &&
-        currentBooking.status.toLowerCase() != 'checked_out' &&
-        currentBooking.status.toLowerCase() != 'completed';
+    final isCurrent = statusLower == 'checked_in' || statusLower == 'checked-in';
+    final isCancelled = currentBooking.isCancelled || statusLower == 'cancelled';
+    final isUpcoming = !isCancelled && !isCurrent && !isCompleted;
+
+    final isStayActive = !isCancelled &&
+        !isCompleted &&
+        (isCurrent ||
+            statusLower == 'confirmed' ||
+            statusLower == 'paid');
+
+    final canCancelBeforeCheckIn = isUpcoming;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -1008,7 +1029,8 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  // Digital Folio & Invoice Button
+
+                  // 1. Digital Folio & Invoice Button
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -1021,7 +1043,7 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                       ),
                       icon: const Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF0D1B2A)),
                       label: const Text(
-                        'Digital Folio & Invoice',
+                        'Digital Folio',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                       ),
                       onPressed: () {
@@ -1035,6 +1057,48 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                         );
                       },
                     ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // 2. Direct Download PDF & Share Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D1B2A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            elevation: 1,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.download_rounded, size: 15, color: Color(0xFFF5C06A)),
+                          label: const Text(
+                            'Download PDF',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          onPressed: () => PdfInvoiceService.downloadOrPrintInvoice(context, booking: currentBooking),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0D1B2A),
+                            side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.share_outlined, size: 15, color: Color(0xFF0D1B2A)),
+                          label: const Text(
+                            'Share Receipt',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () => PdfInvoiceService.shareInvoice(context, booking: currentBooking),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1403,8 +1467,8 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Write Review Button if checked_out
-            if (currentBooking.status.toLowerCase() == 'checked_out') ...[
+            // Write Review Button if completed / checked-out
+            if (isCompleted) ...[
               CustomButton(
                 text: 'Leave a Review for this Stay',
                 backgroundColor: AppColors.primary,

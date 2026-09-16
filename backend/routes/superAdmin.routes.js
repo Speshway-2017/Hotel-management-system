@@ -612,6 +612,30 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
             { $set: { status: 'Refunded' } }
           );
         }
+
+        let targetGuestId = linkedBk?.guestId || linkedBk?.userId || null;
+        const targetEmail = linkedBk?.email || linkedBk?.guestEmail || null;
+        if (!targetGuestId && targetEmail) {
+          try {
+            const u = await User.findOne({ email: targetEmail });
+            if (u) targetGuestId = String(u._id || u.id);
+          } catch (_) {}
+        }
+        if (targetGuestId || targetEmail) {
+          await triggerNotification({
+            req,
+            role: 'guest',
+            userId: targetGuestId || targetEmail,
+            title: `Stay Refund Request: ${finalAction}`,
+            message: `Your refund request of ₹${Number(updated.amount || linkedBk?.refundableAmount || 0).toLocaleString('en-IN')} for Booking ${updated.bookingId || linkedBk?.bookingId} is now ${finalAction}. ${decisionReason ? '(' + decisionReason + ')' : ''}`,
+            category: 'Refund Update',
+            data: {
+              bookingId: linkedBk?._id || linkedBk?.bookingId || updated.bookingId,
+              refundStatus: finalAction,
+              decisionReason: decisionReason || ''
+            }
+          });
+        }
       } catch (bkErr) {
         console.warn('Sync refund status to booking error:', bkErr.message);
       }

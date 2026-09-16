@@ -6,7 +6,8 @@ import 'package:hour_stay_mobile/providers/manager/approval_provider.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
 
 class ManagerApprovalsScreen extends StatefulWidget {
-  const ManagerApprovalsScreen({super.key});
+  final bool isEmbedded;
+  const ManagerApprovalsScreen({super.key, this.isEmbedded = false});
 
   @override
   State<ManagerApprovalsScreen> createState() => _ManagerApprovalsScreenState();
@@ -47,6 +48,55 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
     super.dispose();
   }
 
+  PreferredSizeWidget _buildAppBar(ApprovalProvider provider) {
+    return AppBar(
+      backgroundColor: navy,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+        onPressed: () => Navigator.of(context).maybePop(),
+      ),
+      title: const Text(
+        'Manager Approvals',
+        style: TextStyle(
+          color: white,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.2,
+        ),
+      ),
+      actions: [
+        if (provider.pendingCount > 0)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: gold.withAlpha(35),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: gold, width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.pending_actions_rounded, color: gold, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  '${provider.pendingCount} Pending',
+                  style: const TextStyle(
+                    color: gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ApprovalProvider>();
@@ -77,6 +127,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
 
     return Scaffold(
       backgroundColor: background,
+      appBar: widget.isEmbedded ? null : _buildAppBar(provider),
       body: Column(
         children: [
           // 1. Search & Filter Header
@@ -98,7 +149,7 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
                               physics: const AlwaysScrollableScrollPhysics(
                                 parent: BouncingScrollPhysics(),
                               ),
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, widget.isEmbedded ? 100 : 24),
                               itemCount: filteredList.length,
                               separatorBuilder: (_, _) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
@@ -194,93 +245,98 @@ class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
           ),
 
           // Filter Chips Horizontal Scroll
-          SizedBox(
-            height: 46,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              itemCount: filterOptions.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final opt = filterOptions[index];
-                final key = opt['key'] as String;
-                final label = opt['label'] as String;
-                final count = opt['count'] as int;
-                final isSelected = _selectedFilter == key;
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                clipBehavior: Clip.hardEdge,
+                padding: EdgeInsets.zero,
+                itemCount: filterOptions.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final opt = filterOptions[index];
+                  final key = opt['key'] as String;
+                  final label = opt['label'] as String;
+                  final count = opt['count'] as int;
+                  final isSelected = _selectedFilter == key;
 
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedFilter = key;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? navy : background,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? gold : cardBorder,
-                        width: isSelected ? 1.5 : 1,
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedFilter = key;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isSelected ? navy : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? navy : cardBorder,
+                          width: 1.2,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: navy.withAlpha(35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: navy.withAlpha(25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (key == 'pending' && count > 0) ...[
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: gold,
+                                shape: BoxShape.circle,
                               ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (key == 'pending' && count > 0) ...[
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: gold,
-                              shape: BoxShape.circle,
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                        ],
-                        Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                            color: isSelected ? white : const Color(0xFF475569),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: isSelected ? gold : cardBorder,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$count',
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            label,
                             style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? navy : const Color(0xFF64748B),
+                              fontSize: 12.5,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              color: isSelected ? cream : navy,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected ? gold : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$count',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? navy : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
         ],
       ),
     );

@@ -41,7 +41,18 @@ class GuestNotificationProvider with ChangeNotifier {
         if (target == 'bookings' && (cat.contains('book') || cat.contains('reserv') || cat.contains('stay') || cat.contains('check') || cat.contains('room') || type.contains('book') || type.contains('check') || type.contains('stay') || title.contains('booking') || title.contains('reservation') || title.contains('check-in') || title.contains('checked in') || title.contains('check-out') || title.contains('checked out') || title.contains('room assigned') || msg.contains('booking') || msg.contains('reservation') || msg.contains('check-in') || msg.contains('checked in') || msg.contains('check-out') || msg.contains('checked out') || msg.contains('room assigned'))) {
           return true;
         }
-        if (target == 'payments' && (cat.contains('pay') || cat.contains('bill') || cat.contains('folio') || type.contains('pay') || msg.contains('paid') || msg.contains('payment') || title.contains('payment'))) {
+        if (target == 'payments' &&
+            (cat.contains('pay') ||
+                cat.contains('bill') ||
+                cat.contains('folio') ||
+                cat.contains('refund') ||
+                type.contains('pay') ||
+                type.contains('refund') ||
+                msg.contains('paid') ||
+                msg.contains('payment') ||
+                msg.contains('refund') ||
+                title.contains('payment') ||
+                title.contains('refund'))) {
           return true;
         }
         if (target == 'announcements' && (cat.contains('announc') || cat.contains('alert') || cat.contains('promo') || type.contains('announc') || cat.contains('general'))) {

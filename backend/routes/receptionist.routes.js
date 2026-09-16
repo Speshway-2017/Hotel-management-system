@@ -1269,12 +1269,6 @@ const handleMarkReceptionistNotifRead = async (req, res) => {
     ]);
 
     const updated = updated1 || updated2;
-    if (updated?.title && updated?.message) {
-      await Promise.all([
-        ReceptionistNotification.updateMany({ title: updated.title, message: updated.message }, { isRead: true }).catch(() => null),
-        Notification.updateMany({ title: updated.title, message: updated.message }, { isRead: true }).catch(() => null)
-      ]);
-    }
 
     const io = req.app.get('socketio');
     if (io) {
@@ -1313,12 +1307,6 @@ const handleMarkReceptionistNotifUnread = async (req, res) => {
     ]);
 
     const updated = updated1 || updated2;
-    if (updated?.title && updated?.message) {
-      await Promise.all([
-        ReceptionistNotification.updateMany({ title: updated.title, message: updated.message }, { isRead: false }).catch(() => null),
-        Notification.updateMany({ title: updated.title, message: updated.message }, { isRead: false }).catch(() => null)
-      ]);
-    }
 
     const io = req.app.get('socketio');
     if (io) {

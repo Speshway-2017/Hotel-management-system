@@ -27,7 +27,6 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
   static const Color background = Color(0xFFF8FAFC);
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFECFDF5);
   static const Color ruby = Color(0xFFE53935);
   static const Color rubyBg = Color(0xFFFEF2F2);
   static const Color amber = Color(0xFFF59E0B);
@@ -97,7 +96,7 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
                   const SizedBox(height: 20),
 
                   // 4. Help & Support Section
-                  _buildHelpSupportSection(),
+                  _buildHelpSupportSection(settingsProvider),
                   const SizedBox(height: 24),
 
                   // 5. Logout Section
@@ -407,40 +406,6 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
               }
             },
           ),
-          _buildDivider(),
-
-          // Active Session & Device Information
-          _buildActionTile(
-            icon: Icons.devices_rounded,
-            iconColor: emerald,
-            title: 'Active Sessions & Device',
-            subtitle: 'Current Device: Mobile App • Secure JWT active',
-            trailingText: 'Active',
-            onTap: () => _showSessionDetailsDialog(user),
-          ),
-          _buildDivider(),
-
-          // Export Account Data (GDPR / Privacy)
-          _buildActionTile(
-            icon: Icons.cloud_download_outlined,
-            iconColor: navyLight,
-            title: 'Export Account Data',
-            subtitle: 'Download complete history of bookings, payments & folios',
-            trailingText: 'JSON',
-            onTap: () => _exportData(settings),
-          ),
-          _buildDivider(),
-
-          // Request Account Deletion
-          _buildActionTile(
-            icon: Icons.person_remove_outlined,
-            iconColor: ruby,
-            title: 'Delete Account Request',
-            subtitle: 'Permanently close account and erase personal data',
-            trailingText: 'Danger',
-            textColor: ruby,
-            onTap: () => _showDeleteAccountDialog(settings),
-          ),
         ],
       ),
     );
@@ -449,7 +414,9 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
   // ==========================================
   // 4. HELP & SUPPORT SECTION
   // ==========================================
-  Widget _buildHelpSupportSection() {
+  Widget _buildHelpSupportSection(GuestSettingsProvider settings) {
+    final hotel = settings.hotelProfile;
+
     return Container(
       decoration: BoxDecoration(
         color: white,
@@ -479,18 +446,8 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
             iconColor: purple,
             title: '24/7 Front Desk Concierge',
             subtitle: 'Call manager desk for instant room support',
-            trailingText: '+91 1800-HOUR',
-            onTap: () => _showConciergeContactModal(),
-          ),
-          _buildDivider(),
-
-          _buildActionTile(
-            icon: Icons.chat_bubble_outline_rounded,
-            iconColor: emerald,
-            title: 'WhatsApp Concierge Desk',
-            subtitle: 'Live chat with hotel staff for hourly extensions',
-            trailingText: 'Online',
-            onTap: () => _showWhatsAppDialog(),
+            trailingText: hotel.phone.isNotEmpty ? hotel.phone : 'Helpdesk',
+            onTap: () => _showConciergeContactModal(hotel),
           ),
           _buildDivider(),
 
@@ -1141,183 +1098,10 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
     );
   }
 
-  // Active Session Details Dialog
-  void _showSessionDetailsDialog(UserModel? user) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.security_rounded, color: emerald, size: 22),
-            SizedBox(width: 10),
-            Text(
-              'Session Security',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: navy),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSessionRow('Account ID', user?.id ?? 'N/A'),
-            const SizedBox(height: 8),
-            _buildSessionRow('Session Status', 'Authenticated (JWT Active)'),
-            const SizedBox(height: 8),
-            _buildSessionRow('Role', 'Valued Guest Member'),
-            const SizedBox(height: 8),
-            _buildSessionRow('Encryption', 'TLS 1.3 AES-256'),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: emeraldBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: emerald, size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'This device is verified and secured.',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: emerald),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w700, color: navy)),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSessionRow(String label, String val) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12.5, color: muted, fontWeight: FontWeight.w500)),
-        Text(val, style: const TextStyle(fontSize: 12.5, color: navy, fontWeight: FontWeight.w700)),
-      ],
-    );
-  }
-
-  // Export Account Data
-  void _exportData(GuestSettingsProvider settings) async {
-    _showToast('Exporting your account data from MongoDB...');
-    final res = await settings.exportAccountData();
-    if (!mounted) return;
-    if (res.success && res.data != null) {
-      final data = res.data as Map<String, dynamic>;
-      final bookingsCount = data['totalBookings'] ?? 0;
-      final paymentsCount = data['totalPayments'] ?? 0;
-
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded, color: emerald, size: 24),
-              SizedBox(width: 10),
-              Text('Data Export Ready', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: navy)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Your complete Hour Stay profile package has been bundled:'),
-              const SizedBox(height: 10),
-              Text('• Total Stays & Bookings: $bookingsCount', style: const TextStyle(fontWeight: FontWeight.w600, color: navy)),
-              Text('• Payment Invoices & Folios: $paymentsCount', style: const TextStyle(fontWeight: FontWeight.w600, color: navy)),
-              Text('• Export Timestamp: ${data["exportedAt"] ?? "Now"}', style: const TextStyle(fontSize: 12, color: muted)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w700, color: purple)),
-            ),
-          ],
-        ),
-      );
-    } else {
-      _showToast(res.message ?? 'Export failed');
-    }
-  }
-
-  // Delete Account Request
-  void _showDeleteAccountDialog(GuestSettingsProvider settings) {
-    final reasonCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: ruby, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'Delete Account',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: ruby),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Are you sure you want to request account deletion? All personal reservations, reward points, and profile data will be permanently wiped.',
-              style: TextStyle(fontSize: 13, color: navy),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonCtrl,
-              decoration: InputDecoration(
-                hintText: 'Reason for leaving (optional)',
-                hintStyle: const TextStyle(fontSize: 12, color: muted),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, color: muted)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              final res = await settings.requestAccountDeletion(reason: reasonCtrl.text.trim());
-              if (!mounted) return;
-              _showToast(res.message ?? 'Request submitted to support team');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ruby,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Submit Request', style: TextStyle(fontWeight: FontWeight.w700, color: white)),
-          ),
-        ],
-      ),
-    );
-  }
 
   // Concierge Modal
-  void _showConciergeContactModal() {
+  void _showConciergeContactModal(GuestHotelProfile hotel) {
     showModalBottomSheet(
       context: context,
       backgroundColor: white,
@@ -1346,11 +1130,29 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
               style: TextStyle(fontSize: 13, color: muted),
             ),
             const SizedBox(height: 16),
-            _buildContactRow(Icons.phone, 'Toll Free Support', '+91 1800 266 4687'),
+            _buildContactRow(
+              Icons.phone,
+              'Support Contact Number',
+              hotel.phone.isNotEmpty ? hotel.phone : '+91 1800 266 4687',
+            ),
             const SizedBox(height: 10),
-            _buildContactRow(Icons.email, 'Concierge Email', 'concierge@hourstay.com'),
+            _buildContactRow(
+              Icons.email,
+              'Support / Reservation Email',
+              hotel.email.isNotEmpty ? hotel.email : 'concierge@hourstay.com',
+            ),
             const SizedBox(height: 10),
-            _buildContactRow(Icons.pin_drop, 'Reception Desk', 'Extension #0 / #100'),
+            _buildContactRow(
+              Icons.apartment_rounded,
+              'Hotel Property',
+              hotel.hotelName.isNotEmpty ? hotel.hotelName : 'Speshway Luxury Hotel',
+            ),
+            const SizedBox(height: 10),
+            _buildContactRow(
+              Icons.pin_drop,
+              'Property Address',
+              hotel.fullAddress,
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -1383,42 +1185,25 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
           child: Icon(icon, color: purple, size: 16),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 11.5, color: muted)),
-            Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: navy)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11.5, color: muted)),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: navy),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  void _showWhatsAppDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.chat_rounded, color: emerald, size: 22),
-            SizedBox(width: 10),
-            Text('WhatsApp Concierge', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: navy)),
-          ],
-        ),
-        content: const Text(
-          'Connect with our dedicated Hour Stay guest support bot on WhatsApp at +91 98765 43210 for instant answers to booking tariffs and hourly extensions.',
-          style: TextStyle(fontSize: 13.5, color: navy),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w700, color: emerald)),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   // FAQ Bottom Sheet
   void _showFaqBottomSheet() {

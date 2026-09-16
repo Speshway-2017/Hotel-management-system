@@ -6,11 +6,9 @@ import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/manager/manager_notification_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
 import 'package:hour_stay_mobile/widgets/server_config_dialog.dart';
-import '../approvals/manager_approvals_screen.dart';
 import '../feedback/manager_feedback_screen.dart';
-import '../reservations/manager_reservations_screen.dart';
 import '../reservations/manager_reservation_detail_screen.dart';
-import '../payments/manager_payments_screen.dart';
+import '../manager_layout.dart';
 
 class ManagerNotificationsScreen extends StatefulWidget {
   const ManagerNotificationsScreen({super.key});
@@ -190,7 +188,18 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
         if (target == 'reservations' && (c.contains('reserv') || c.contains('book') || t.contains('reserv') || t.contains('book'))) {
           return true;
         }
-        if (target == 'approvals' && (c.contains('approval') || t.contains('approval'))) {
+        if (target == 'approvals' &&
+            (c.contains('approval') ||
+                t.contains('approval') ||
+                c.contains('override') ||
+                c.contains('discount') ||
+                n.title.toLowerCase().contains('approval') ||
+                n.title.toLowerCase().contains('refund request') ||
+                n.title.toLowerCase().contains('override') ||
+                n.title.toLowerCase().contains('discount') ||
+                n.message.toLowerCase().contains('approval') ||
+                n.message.toLowerCase().contains('for approval') ||
+                n.message.toLowerCase().contains('override'))) {
           return true;
         }
         if (target == 'payments' && (c.contains('pay') || c.contains('bill') || t.contains('pay'))) {
@@ -261,87 +270,92 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
           ),
 
           // 2. Category Filter Chips (Horizontal Scroll)
-          SizedBox(
-            height: 46,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              itemCount: categories.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final cat = categories[index];
-                final count = getCategoryCount(cat);
-                final isSelected = provider.selectedCategory.toLowerCase() == cat.toLowerCase();
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                clipBehavior: Clip.hardEdge,
+                padding: EdgeInsets.zero,
+                itemCount: categories.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final cat = categories[index];
+                  final count = getCategoryCount(cat);
+                  final isSelected = provider.selectedCategory.toLowerCase() == cat.toLowerCase();
 
-                return InkWell(
-                  onTap: () => provider.setCategory(cat),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? navy : background,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? gold : cardBorder,
-                        width: isSelected ? 1.5 : 1,
+                  return InkWell(
+                    onTap: () => provider.setCategory(cat),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isSelected ? navy : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? navy : cardBorder,
+                          width: 1.2,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: navy.withAlpha(35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: navy.withAlpha(25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (cat == 'Unread' && count > 0) ...[
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: gold,
-                              shape: BoxShape.circle,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (cat == 'Unread' && count > 0) ...[
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: gold,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                        ],
-                        Text(
-                          cat,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                            color: isSelected ? white : const Color(0xFF475569),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: isSelected ? gold : cardBorder,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$count',
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            cat,
                             style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? navy : const Color(0xFF64748B),
+                              fontSize: 12.5,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              color: isSelected ? cream : navy,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected ? gold : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$count',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? navy : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
         ],
       ),
     );
@@ -752,38 +766,96 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
   }
 
   Widget _buildContextualActionButton(BuildContext rootContext, BuildContext sheetContext, NotificationModel notif) {
-    final cat = notif.category.toLowerCase();
-    final msg = notif.message.toLowerCase();
-    final title = notif.title.toLowerCase();
+    final cat = notif.category.toLowerCase().trim();
+    final msg = notif.message.toLowerCase().trim();
+    final title = notif.title.toLowerCase().trim();
 
     String label = '';
     IconData icon = Icons.arrow_forward_rounded;
     VoidCallback? onNavigate;
 
-    if (cat.contains('approval') || msg.contains('approval') || title.contains('approval')) {
-      label = 'View Approvals Desk';
-      icon = Icons.verified_user_rounded;
-      onNavigate = () {
-        Navigator.of(sheetContext).pop();
-        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerApprovalsScreen()));
-      };
-    } else if (cat.contains('guest') || cat.contains('feedback') || msg.contains('feedback') || msg.contains('review')) {
-      label = 'View Guest Feedback';
+    // 1. Feedback / Reviews
+    final isFeedback = cat == 'guest experience' ||
+        cat.contains('feedback') ||
+        cat.contains('review') ||
+        title.contains('feedback') ||
+        title.contains('review') ||
+        title.contains('rating');
+
+    // 2. Payments / Billing
+    final isPayment = !isFeedback && (
+        cat.contains('payment') ||
+        cat.contains('billing') ||
+        cat.contains('folio') ||
+        cat.contains('finance') ||
+        title.contains('payment') ||
+        title.contains('paid') ||
+        title.contains('invoice') ||
+        title.contains('folio balance') ||
+        title.contains('bill settled')
+    );
+
+    // 3. True Manager Approvals (Discount requests, price overrides, refund approval requests)
+    final isApproval = !isFeedback && !isPayment && (
+        cat == 'approval' ||
+        cat == 'approvals' ||
+        cat.contains('override') ||
+        cat.contains('discount') ||
+        title.contains('approval request') ||
+        title.contains('pending approval') ||
+        title.contains('requires approval') ||
+        title.contains('discount request') ||
+        title.contains('price override') ||
+        title.contains('refund request') ||
+        title.contains('refund approval') ||
+        title.contains('leave request') ||
+        msg.contains('requires your approval') ||
+        msg.contains('submitted for approval') ||
+        msg.contains('awaiting manager approval') ||
+        msg.contains('price override') ||
+        msg.contains('discount request')
+    );
+
+    if (isFeedback) {
+      label = 'View Feedback';
       icon = Icons.hotel_class_rounded;
       onNavigate = () {
         Navigator.of(sheetContext).pop();
-        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerFeedbackScreen()));
+        Navigator.of(rootContext).push(
+          MaterialPageRoute(builder: (_) => const ManagerFeedbackScreen()),
+        );
       };
-    } else if (cat.contains('pay') || cat.contains('bill') || msg.contains('payment') || msg.contains('folio') || msg.contains('refund')) {
-      label = 'View Payments & Folios';
+    } else if (isPayment) {
+      label = 'View Payments';
       icon = Icons.account_balance_wallet_rounded;
       onNavigate = () {
         Navigator.of(sheetContext).pop();
-        Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => const ManagerPaymentsScreen(isEmbedded: false)));
+        if (Navigator.of(rootContext).canPop()) {
+          Navigator.of(rootContext).pop(4);
+        } else {
+          Navigator.of(rootContext).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ManagerLayout(initialIndex: 4)),
+            (route) => false,
+          );
+        }
       };
-    } else if (cat.contains('reserv') || msg.contains('booking') || msg.contains('check-in') || msg.contains('check-out') || title.contains('booking') || title.contains('reservation')) {
-      label = 'View Reservation';
-      icon = Icons.calendar_today_rounded;
+    } else if (isApproval) {
+      label = 'View Approvals';
+      icon = Icons.verified_user_rounded;
+      onNavigate = () {
+        Navigator.of(sheetContext).pop();
+        if (Navigator.of(rootContext).canPop()) {
+          Navigator.of(rootContext).pop(3);
+        } else {
+          Navigator.of(rootContext).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ManagerLayout(initialIndex: 3)),
+            (route) => false,
+          );
+        }
+      };
+    } else {
+      label = 'View Bookings';
+      icon = Icons.calendar_month_rounded;
       onNavigate = () {
         Navigator.of(sheetContext).pop();
 
@@ -792,64 +864,47 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
         final bookingCode = refMatch?.group(1);
 
         final resProv = rootContext.read<ReservationProvider>();
-        ReservationModel? targetReservation;
+        ReservationModel? targetBooking;
 
         if (bookingCode != null) {
           try {
-            targetReservation = resProv.reservations.cast<ReservationModel?>().firstWhere(
-              (r) => r?.bookingId.toLowerCase() == bookingCode.toLowerCase() ||
-                     r?.id.toLowerCase() == bookingCode.toLowerCase(),
+            targetBooking = resProv.reservations.cast<ReservationModel?>().firstWhere(
+              (b) => b?.bookingId.toLowerCase() == bookingCode.toLowerCase() ||
+                     b?.id.toLowerCase() == bookingCode.toLowerCase(),
               orElse: () => null,
             );
           } catch (_) {}
         }
 
-        if (targetReservation == null) {
-          for (final r in resProv.reservations) {
-            if (r.bookingId.isNotEmpty && combinedText.toLowerCase().contains(r.bookingId.toLowerCase())) {
-              targetReservation = r;
+        if (targetBooking == null) {
+          for (final b in resProv.reservations) {
+            if (b.bookingId.isNotEmpty && combinedText.toLowerCase().contains(b.bookingId.toLowerCase())) {
+              targetBooking = b;
               break;
             }
-            if (r.id.isNotEmpty && combinedText.toLowerCase().contains(r.id.toLowerCase())) {
-              targetReservation = r;
+            if (b.id.isNotEmpty && combinedText.toLowerCase().contains(b.id.toLowerCase())) {
+              targetBooking = b;
               break;
             }
           }
         }
 
-        if (targetReservation != null) {
+        if (targetBooking != null) {
           Navigator.of(rootContext).push(
-            MaterialPageRoute(builder: (_) => ManagerReservationDetailScreen(reservation: targetReservation!)),
+            MaterialPageRoute(builder: (_) => ManagerReservationDetailScreen(reservation: targetBooking!)),
           );
-        } else if (bookingCode != null) {
-          final fallbackReservation = ReservationModel(
-            id: bookingCode,
-            bookingId: bookingCode,
-            guest: 'Guest',
-            room: 'Room',
-            roomType: 'Standard Room',
-            status: combinedText.toLowerCase().contains('check-in') || combinedText.toLowerCase().contains('checked-in')
-                ? 'Checked-in'
-                : (combinedText.toLowerCase().contains('check-out') || combinedText.toLowerCase().contains('checked-out')
-                    ? 'Checked-out'
-                    : 'Confirmed'),
-            stayType: 'Standard',
-            checkIn: DateTime.now().toIso8601String(),
-            checkOut: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
-            amount: 0.0,
-          );
-          Navigator.of(rootContext).push(
-            MaterialPageRoute(builder: (_) => ManagerReservationDetailScreen(reservation: fallbackReservation)),
-          );
+        } else if (Navigator.of(rootContext).canPop()) {
+          Navigator.of(rootContext).pop(1);
         } else {
-          Navigator.of(rootContext).push(
-            MaterialPageRoute(builder: (_) => const ManagerReservationsScreen()),
+          Navigator.of(rootContext).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ManagerLayout(initialIndex: 1)),
+            (route) => false,
           );
         }
       };
     }
 
-    if (label.isEmpty || onNavigate == null) {
+    if (label.isEmpty) {
       return const SizedBox.shrink();
     }
 

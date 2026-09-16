@@ -13,6 +13,7 @@ import { notifyFeedbackEvent, triggerNotification } from '../utils/notification.
 import { calculateStayNights } from '../utils/dateUtils.js';
 import { extractRoomNumber } from '../utils/roomHelper.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { findPropertySafely } from '../utils/propertyCache.js';
 
 const router = express.Router();
 
@@ -590,7 +591,8 @@ const syncGuestBookingNotifications = async (user) => {
     for (const b of guestBookings) {
       const bId = b.bookingId || String(b._id) || b.id;
       const hotelName = b.hotel || b.hotelName || b.propertyName || 'Hour Stay Hotel & Suites';
-      const roomInfo = b.roomNumber ? `Room ${b.roomNumber} (${b.room || b.roomType || 'Standard Room'})` : (b.room || b.roomType || 'Standard Room');
+      const roomNum = b.roomNumber || '';
+      const roomInfo = roomNum ? `Room ${roomNum} (${b.room || b.roomType || 'Standard Room'})` : (b.room || b.roomType || 'Standard Room');
       const checkIn = b.checkIn || b.checkInDate || 'Today';
       const checkOut = b.checkOut || b.checkOutDate || 'Tomorrow';
       const status = (b.status || '').toLowerCase();
@@ -1827,6 +1829,71 @@ router.get('/settings', async (req, res) => {
       hapticFeedback: true
     };
 
+    // Fetch Admin Hotel Profile details (support phone, email, hotel name, location)
+    let property = null;
+    if (user.propertyId && user.propertyId !== 'all') {
+      property = await findPropertySafely(user.propertyId, user);
+    }
+    if (!property) {
+      const latestBooking = await Booking.findOne({
+        $or: [
+          { guestId: String(userId) },
+          { guestId: userId },
+          { guestEmail: user.email },
+          { guestMobile: user.mobile || user.phone || '___' }
+        ]
+      }).sort({ createdAt: -1 });
+      if (latestBooking?.propertyId) {
+        property = await findPropertySafely(latestBooking.propertyId);
+      }
+    }
+    if (!property) {
+      property = await Property.findOne({
+        $or: [
+          { _id: 'HS-9HQ8P' },
+          { id: 'HS-9HQ8P' }
+        ]
+      });
+    }
+    if (!property || (!property.settings?.reservationEmail && !property.settings?.email && !property.settings?.address)) {
+      const configuredProp = await Property.findOne({
+        $or: [
+          { 'settings.reservationEmail': { $exists: true, $nin: ['', null] } },
+          { 'settings.email': { $exists: true, $nin: ['', null] } },
+          { 'settings.address': { $exists: true, $nin: ['', null] } }
+        ]
+      });
+      if (configuredProp) {
+        property = configuredProp;
+      }
+    }
+    if (!property) {
+      property = await Property.findOne({ status: 'Active' }) || await Property.findOne();
+    }
+
+    const propSettings = property?.settings || {};
+    const hotelPhone = (propSettings.contactNumber || propSettings.phone || property?.phone || '+91 1800 266 4687').trim();
+    const hotelEmail = (propSettings.reservationEmail || propSettings.email || property?.email || 'concierge@hourstay.com').trim();
+    const hotelName = (propSettings.hotelName || propSettings.name || property?.name || 'Speshway Luxury Hotel').trim();
+    const hotelAddress = (propSettings.address || property?.address || 'Banjara Hills, Road No. 12').trim();
+    const hotelCity = (propSettings.city || property?.city || 'Hyderabad, Telangana').trim();
+    const hotelState = (propSettings.state || '').trim();
+    const hotelCountry = (propSettings.country || 'India').trim();
+    const hotelPincode = (propSettings.pincode || '').trim();
+
+    const hotelProfile = {
+      propertyId: property?._id || property?.id || '',
+      hotelName,
+      phone: hotelPhone,
+      email: hotelEmail,
+      address: hotelAddress,
+      city: hotelCity,
+      state: hotelState,
+      country: hotelCountry,
+      pincode: hotelPincode,
+      website: propSettings.website || ''
+    };
+
     return sendSuccess(res, 200, {
       id: user._id || user.id,
       name: user.name || '',
@@ -1835,6 +1902,7 @@ router.get('/settings', async (req, res) => {
       city: user.city || 'Hyderabad',
       address: user.address || '',
       avatar: user.avatar || null,
+      hotelProfile,
       notificationSettings: {
         ...defaultNotifs,
         ...(user.notificationSettings || {})

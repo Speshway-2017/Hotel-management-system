@@ -17,6 +17,7 @@ class _ManagerFeedbackScreenState extends State<ManagerFeedbackScreen> {
   static const Color purple = Color(0xFF5B21B6);
   static const Color purpleBg = Color(0xFFF3E8FF);
   static const Color gold = Color(0xFFF5C06A);
+  static const Color cream = Color(0xFFFFF7E6);
   static const Color white = Color(0xFFFFFFFF);
   static const Color muted = Color(0xFF8A8F98);
   static const Color background = Color(0xFFF8FAFC);
@@ -94,12 +95,6 @@ class _ManagerFeedbackScreenState extends State<ManagerFeedbackScreen> {
       return matchesSearch && matchesRating;
     }).toList();
 
-    // Summary KPIs calculation
-    final totalCount = feedbacks.length;
-    final avgRating = feedbackProvider.averageRating;
-    final fiveStarCount = feedbacks.where((f) => f.rating >= 4.5).length;
-    final needsActionCount = feedbacks.where((f) => f.rating < 3.0).length;
-
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
@@ -132,15 +127,6 @@ class _ManagerFeedbackScreenState extends State<ManagerFeedbackScreen> {
                 : CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      // 1. KPI Cards Row (4 cards matching Hour Stay pattern)
-                      SliverToBoxAdapter(
-                        child: _buildKpiSection(
-                          totalCount: totalCount,
-                          avgRating: avgRating,
-                          fiveStarCount: fiveStarCount,
-                          needsActionCount: needsActionCount,
-                        ),
-                      ),
 
                       // 2. Search Bar & Rating Filter Chips (Status navigation tabs removed)
                       SliverToBoxAdapter(
@@ -151,7 +137,7 @@ class _ManagerFeedbackScreenState extends State<ManagerFeedbackScreen> {
                             children: [
                               _buildSearchBar(),
                               const SizedBox(height: 10),
-                              _buildRatingFilterChips(),
+                              _buildRatingFilterChips(feedbacks),
                             ],
                           ),
                         ),
@@ -221,160 +207,6 @@ class _ManagerFeedbackScreenState extends State<ManagerFeedbackScreen> {
     );
   }
 
-  // --- 1. KPI Pulse Summary Section (4 cards in a row) ---
-  Widget _buildKpiSection({
-    required int totalCount,
-    required double avgRating,
-    required int fiveStarCount,
-    required int needsActionCount,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Row(
-        children: [
-          // Total Reviews
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Total',
-              value: '$totalCount',
-              subtitle: 'Feedbacks',
-              icon: Icons.rate_review_rounded,
-              color: navy,
-              bgColor: const Color(0xFFF1F5F9),
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // Average Rating
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Avg Score',
-              value: avgRating > 0 ? '${avgRating.toStringAsFixed(1)}★' : '0.0★',
-              subtitle: 'Rating',
-              icon: Icons.star_rounded,
-              color: amber,
-              bgColor: amberBg,
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // 5 Stars Count
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Top 5★',
-              value: '$fiveStarCount',
-              subtitle: 'Positive',
-              icon: Icons.thumb_up_rounded,
-              color: emerald,
-              bgColor: emeraldBg,
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // Needs Action
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Action',
-              value: '$needsActionCount',
-              subtitle: 'Critical',
-              icon: Icons.warning_amber_rounded,
-              color: needsActionCount > 0 ? ruby : purple,
-              bgColor: needsActionCount > 0 ? rubyBg : purpleBg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniMetric({
-    required String label,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor.withAlpha(120),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withAlpha(60),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3.5),
-                decoration: BoxDecoration(
-                  color: white,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, size: 11, color: color),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: color == navy ? navy : color,
-                letterSpacing: -0.3,
-                height: 1.0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF334155),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // --- 2. Search Bar ---
   Widget _buildSearchBar() {
     return Container(
@@ -423,62 +255,95 @@ class _ManagerFeedbackScreenState extends State<ManagerFeedbackScreen> {
   }
 
   // --- Rating Filter Chips ---
-  Widget _buildRatingFilterChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: _ratingFilters.map((filter) {
+  int _getRatingCount(String filter, List<FeedbackModel> feedbacks) {
+    if (filter == 'All') return feedbacks.length;
+    return feedbacks.where((f) {
+      if (filter == '5★ Top') return f.rating >= 4.5;
+      if (filter == '4★ Good') return f.rating >= 3.5 && f.rating < 4.5;
+      if (filter == '3★ Average') return f.rating >= 2.5 && f.rating < 3.5;
+      if (filter == '≤2★ Critical') return f.rating < 2.5;
+      return true;
+    }).length;
+  }
+
+  Widget _buildRatingFilterChips(List<FeedbackModel> feedbacks) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.hardEdge,
+        padding: EdgeInsets.zero,
+        itemCount: _ratingFilters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = _ratingFilters[index];
           final isSelected = _selectedRatingFilter == filter;
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: InkWell(
-              onTap: () => setState(() => _selectedRatingFilter = filter),
-              borderRadius: BorderRadius.circular(10),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected ? navy : white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected ? navy : cardBorder,
-                    width: 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: navy.withAlpha(40),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
+          final count = _getRatingCount(filter, feedbacks);
+
+          return InkWell(
+            onTap: () => setState(() => _selectedRatingFilter = filter),
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                color: isSelected ? navy : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? navy : cardBorder,
+                  width: 1.2,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (filter.contains('★')) ...[
-                      Icon(
-                        Icons.star_rounded,
-                        size: 13,
-                        color: isSelected ? gold : amber,
-                      ),
-                      const SizedBox(width: 3),
-                    ],
-                    Text(
-                      filter,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: navy.withAlpha(35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (filter.contains('★')) ...[
+                    Icon(
+                      Icons.star_rounded,
+                      size: 14,
+                      color: isSelected ? gold : amber,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    filter,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? cream : navy,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? gold : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? white : const Color(0xFF475569),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? navy : const Color(0xFF64748B),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }

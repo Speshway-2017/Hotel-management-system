@@ -172,8 +172,6 @@ class _LoginScreenState extends State<LoginScreen> {
             mode: _currentMode,
             initialEmail: _email,
             initialOtp: _otp,
-            showHomeButton: _currentMode != AuthMode.login,
-            onHomePressed: () => _navigateTo(AuthMode.login),
             onNavigateToRegister: () => _navigateTo(AuthMode.register),
             onNavigateToLogin: () => _navigateTo(AuthMode.login),
             onNavigateToForgot: () => _navigateTo(AuthMode.forgot),

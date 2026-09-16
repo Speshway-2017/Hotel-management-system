@@ -189,7 +189,18 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
         if (target == 'bookings' && (c.contains('book') || c.contains('reserv') || c.contains('stay') || c.contains('check') || c.contains('room') || t.contains('book') || t.contains('check') || t.contains('stay') || title.contains('booking') || title.contains('reservation') || title.contains('check-in') || title.contains('checked in') || title.contains('check-out') || title.contains('checked out') || title.contains('room assigned') || msg.contains('booking') || msg.contains('reservation') || msg.contains('check-in') || msg.contains('checked in') || msg.contains('check-out') || msg.contains('checked out') || msg.contains('room assigned'))) {
           return true;
         }
-        if (target == 'payments' && (c.contains('pay') || c.contains('bill') || c.contains('folio') || t.contains('pay') || msg.contains('paid') || msg.contains('payment') || title.contains('payment'))) {
+        if (target == 'payments' &&
+            (c.contains('pay') ||
+                c.contains('bill') ||
+                c.contains('folio') ||
+                c.contains('refund') ||
+                t.contains('pay') ||
+                t.contains('refund') ||
+                msg.contains('paid') ||
+                msg.contains('payment') ||
+                msg.contains('refund') ||
+                title.contains('payment') ||
+                title.contains('refund'))) {
           return true;
         }
         if (target == 'announcements' && (c.contains('announc') || c.contains('alert') || c.contains('promo') || t.contains('announc') || c.contains('general'))) {
@@ -254,87 +265,92 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
           ),
 
           // 2. Category Filter Chips (Horizontal Scroll)
-          SizedBox(
-            height: 46,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              itemCount: categories.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final cat = categories[index];
-                final count = getCategoryCount(cat);
-                final isSelected = provider.selectedCategory.toLowerCase() == cat.toLowerCase();
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                clipBehavior: Clip.hardEdge,
+                padding: EdgeInsets.zero,
+                itemCount: categories.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final cat = categories[index];
+                  final count = getCategoryCount(cat);
+                  final isSelected = provider.selectedCategory.toLowerCase() == cat.toLowerCase();
 
-                return InkWell(
-                  onTap: () => provider.setCategory(cat),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? navy : background,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? gold : cardBorder,
-                        width: isSelected ? 1.5 : 1,
+                  return InkWell(
+                    onTap: () => provider.setCategory(cat),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isSelected ? navy : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? navy : cardBorder,
+                          width: 1.2,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: navy.withAlpha(35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: navy.withAlpha(25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (cat == 'Unread' && count > 0) ...[
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: gold,
-                              shape: BoxShape.circle,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (cat == 'Unread' && count > 0) ...[
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: gold,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                        ],
-                        Text(
-                          cat,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                            color: isSelected ? white : const Color(0xFF475569),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: isSelected ? gold : cardBorder,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$count',
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            cat,
                             style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? navy : const Color(0xFF64748B),
+                              fontSize: 12.5,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              color: isSelected ? cream : navy,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected ? gold : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$count',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? navy : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
         ],
       ),
     );
@@ -837,7 +853,16 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
           );
         }
       };
-    } else if (cat.contains('pay') || cat.contains('bill') || cat.contains('folio') || msg.contains('payment') || msg.contains('folio') || msg.contains('receipt')) {
+    } else if (cat.contains('pay') ||
+        cat.contains('bill') ||
+        cat.contains('folio') ||
+        cat.contains('refund') ||
+        msg.contains('payment') ||
+        msg.contains('folio') ||
+        msg.contains('receipt') ||
+        msg.contains('refund') ||
+        title.contains('refund') ||
+        title.contains('payment')) {
       label = 'View Digital Folio & Bills';
       icon = Icons.account_balance_wallet_rounded;
       onNavigate = () {
