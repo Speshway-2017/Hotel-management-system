@@ -11,6 +11,7 @@ import '../folio/guest_folio_screen.dart';
 import '../search/guest_search_screen.dart';
 import 'guest_booking_detail_screen.dart';
 
+
 class GuestBookingsScreen extends StatefulWidget {
   final int initialTabIndex;
   final ValueChanged<int>? onNavigateTab;
@@ -368,14 +369,17 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
       {'index': 3, 'label': 'Cancelled', 'count': cancelledCount, 'isLive': false},
     ];
 
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: tabs.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 42,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          clipBehavior: Clip.hardEdge,
+          itemCount: tabs.length,
+          separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final tab = tabs[index];
           final tabIndex = tab['index'] as int;
@@ -454,8 +458,9 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   // =========================================================================
   // BOOKINGS LIST VIEW PER TAB
@@ -1022,62 +1027,35 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
 
   // --- COMPLETED ACTIONS ---
   Widget _buildCompletedActions(BuildContext context, ReservationModel b) {
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            // 1. Write Feedback / Review
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: navy,
-                  foregroundColor: white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.star_rate_rounded, size: 16, color: gold),
-                label: const Text(
-                  'Feedback',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => GuestAddFeedbackScreen(reservationId: b.id),
-                    ),
-                  );
-                },
-              ),
+        // 1. Write Feedback / Review
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: navy,
+              foregroundColor: white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            const SizedBox(width: 8),
-            // 2. Rebook
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: navy,
-                  foregroundColor: white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: gold),
-                  ),
-                ),
-                icon: const Icon(Icons.replay_rounded, size: 16, color: gold),
-                label: const Text(
-                  'Rebook',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-                onPressed: () => _navigateToSearch(context),
-              ),
+            icon: const Icon(Icons.star_rate_rounded, size: 16, color: gold),
+            label: const Text(
+              'Feedback',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
             ),
-          ],
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GuestAddFeedbackScreen(reservationId: b.id),
+                ),
+              );
+            },
+          ),
         ),
-        const SizedBox(height: 8),
-        // 3. Invoice Button
-        SizedBox(
-          width: double.infinity,
+        const SizedBox(width: 8),
+        // 2. Digital Folio
+        Expanded(
           child: OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               foregroundColor: navy,
@@ -1085,12 +1063,23 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
               padding: const EdgeInsets.symmetric(vertical: 9),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            icon: const Icon(Icons.download_rounded, size: 15, color: navy),
+            icon: const Icon(Icons.receipt_long_outlined, size: 15, color: navy),
             label: const Text(
-              'View & Download Stay Invoice',
+              'Digital Folio',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            onPressed: () => _showInvoiceDialog(context, b),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GuestFolioScreen(
+                    booking: b,
+                    bookingId: b.id,
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -1356,181 +1345,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
     );
   }
 
-  // =========================================================================
-  // DIGITAL TAX INVOICE MODAL DIALOG
-  // =========================================================================
-  void _showInvoiceDialog(BuildContext context, ReservationModel booking) {
-    final subtotal = (booking.totalAmount / 1.12).roundToDouble();
-    final gstTax = (booking.totalAmount - subtotal).roundToDouble();
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          contentPadding: const EdgeInsets.all(20),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Logo & Invoice Ref
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(text: 'Hour ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: navy)),
-                              TextSpan(text: 'Stay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: gold)),
-                            ],
-                          ),
-                        ),
-                        const Text('TAX INVOICE & RECEIPT', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: muted, letterSpacing: 0.8)),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: emeraldBg,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'PAID IN FULL',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: emerald),
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 20, color: cardBorder),
-
-                // Invoice Meta
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Invoice To:', style: TextStyle(fontSize: 11, color: muted)),
-                        Text(booking.guestName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: navy)),
-                        if (booking.guestEmail.isNotEmpty)
-                          Text(booking.guestEmail, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Invoice #:', style: TextStyle(fontSize: 11, color: muted)),
-                        Text('INV-${booking.reservationNumber}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy)),
-                        Text(Formatters.checkInDateTime(booking.checkIn), style: const TextStyle(fontSize: 11, color: muted)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Property & Room
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: background,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: cardBorder),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(booking.propertyName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: navy)),
-                      Text('Room ${booking.roomNumber} • ${booking.roomType}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                      Text('GSTIN: 08AABCH1234F1Z8 • HS-HQ Hotel Group', style: const TextStyle(fontSize: 10, color: muted)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Itemized Breakdown Table
-                const Text('Tariff Itemization', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy)),
-                const SizedBox(height: 6),
-                _buildInvoiceItemRow('Room Tariff (${booking.stayType == "hourly" ? "${booking.hours ?? 3}h" : "${booking.nights}n"})', Formatters.currency(subtotal)),
-                const SizedBox(height: 4),
-                _buildInvoiceItemRow('CGST (6.0%)', Formatters.currency(gstTax / 2)),
-                const SizedBox(height: 4),
-                _buildInvoiceItemRow('SGST (6.0%)', Formatters.currency(gstTax / 2)),
-                const Divider(height: 16, color: cardBorder),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Total Net Paid', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: navy)),
-                    Text(
-                      Formatters.currency(booking.totalAmount),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: purple),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Payment Method:', style: TextStyle(fontSize: 11, color: muted)),
-                    Text(booking.paymentMethod.isNotEmpty ? booking.paymentMethod : 'UPI / Online', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: navy)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Actions: Share / Print / Close
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: navy,
-                          foregroundColor: white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.download_rounded, size: 16),
-                        label: const Text('Download PDF', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Invoice INV-${booking.reservationNumber}.pdf downloaded!'),
-                              backgroundColor: emerald,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Close', style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildInvoiceItemRow(String title, String amount) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
-        Text(amount, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: navy)),
-      ],
-    );
-  }
 
   // =========================================================================
   // CANCELLATION MODAL DIALOG
@@ -2261,6 +2076,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
   Widget _buildModalInfoRow(String label, String value, {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 12.5, color: muted)),
         const SizedBox(width: 8),
@@ -2273,8 +2089,6 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
               color: valueColor ?? navy,
             ),
             textAlign: TextAlign.right,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

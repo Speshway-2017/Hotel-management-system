@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
+import 'package:hour_stay_mobile/models/payment_model.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
+import 'package:hour_stay_mobile/providers/manager/payment_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
 import 'package:hour_stay_mobile/widgets/server_config_dialog.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
+import '../payments/manager_payment_detail_screen.dart';
 import 'manager_create_reservation_screen.dart';
 import 'manager_reservation_detail_screen.dart';
 
 class ManagerReservationsScreen extends StatefulWidget {
-  const ManagerReservationsScreen({super.key});
+  final bool isEmbedded;
+  const ManagerReservationsScreen({super.key, this.isEmbedded = false});
 
   @override
   State<ManagerReservationsScreen> createState() => _ManagerReservationsScreenState();
@@ -27,6 +31,8 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color emerald = Color(0xFF10B981);
   static const Color ruby = Color(0xFFE53935);
+  static const Color amber = Color(0xFFD97706);
+  static const Color blue = Color(0xFF2563EB);
 
   String _selectedFilter = 'all';
   String _searchQuery = '';
@@ -47,6 +53,28 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: navy,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+        onPressed: () => Navigator.of(context).maybePop(),
+      ),
+      title: const Text(
+        'Reservations & Stays',
+        style: TextStyle(
+          color: white,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
   }
 
   @override
@@ -103,8 +131,9 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
 
     return Scaffold(
       backgroundColor: background,
+      appBar: widget.isEmbedded ? null : _buildAppBar(),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 76),
+        padding: EdgeInsets.only(bottom: widget.isEmbedded ? 76 : 16),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
@@ -236,21 +265,25 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
           const SizedBox(height: 10),
 
           // Scrollable Status Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+          SizedBox(
+            height: 42,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              clipBehavior: Clip.hardEdge,
+              padding: EdgeInsets.zero,
               children: [
                 _buildModernFilterChip('All', 'all', getCount('all')),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 _buildModernFilterChip('Confirmed', 'confirmed', getCount('confirmed')),
-                const SizedBox(width: 6),
-                _buildModernFilterChip('Checked In', 'checked_in', getCount('checked_in'), activeColor: emerald),
-                const SizedBox(width: 6),
-                _buildModernFilterChip('Pending', 'pending', getCount('pending'), activeColor: const Color(0xFFD97706)),
-                const SizedBox(width: 6),
-                _buildModernFilterChip('Checked Out', 'checked_out', getCount('checked_out'), activeColor: const Color(0xFF2563EB)),
-                const SizedBox(width: 6),
-                _buildModernFilterChip('Cancelled', 'cancelled', getCount('cancelled'), activeColor: ruby),
+                const SizedBox(width: 8),
+                _buildModernFilterChip('Checked In', 'checked_in', getCount('checked_in'), dotColor: emerald),
+                const SizedBox(width: 8),
+                _buildModernFilterChip('Pending', 'pending', getCount('pending'), dotColor: amber),
+                const SizedBox(width: 8),
+                _buildModernFilterChip('Checked Out', 'checked_out', getCount('checked_out'), dotColor: blue),
+                const SizedBox(width: 8),
+                _buildModernFilterChip('Cancelled', 'cancelled', getCount('cancelled'), dotColor: ruby),
               ],
             ),
           ),
@@ -263,7 +296,7 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
     String label,
     String value,
     int count, {
-    Color activeColor = purple,
+    Color? dotColor,
   }) {
     final isSelected = _selectedFilter == value;
 
@@ -271,21 +304,21 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
       onTap: () => setState(() => _selectedFilter = value),
       borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor : background,
+          color: isSelected ? navy : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? activeColor : cardBorder,
-            width: 1,
+            color: isSelected ? navy : cardBorder,
+            width: 1.2,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: activeColor.withAlpha(50),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
+                    color: navy.withAlpha(35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : null,
@@ -293,28 +326,38 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (dotColor != null) ...[
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12.5,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? white : const Color(0xFF475569),
+                color: isSelected ? cream : navy,
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? white.withAlpha(40) : white,
+                color: isSelected ? gold : const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(10),
-                border: isSelected ? null : Border.all(color: cardBorder),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? white : const Color(0xFF64748B),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? navy : const Color(0xFF64748B),
                 ),
               ),
             ),
@@ -537,19 +580,30 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
                         ),
                       ],
                     ),
-                    const Row(
-                      children: [
-                        Text(
-                          'View Folio',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: purple,
-                          ),
+                    InkWell(
+                      onTap: () => _openPaymentDetailForReservation(res),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: purple.withAlpha(15),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        SizedBox(width: 2),
-                        Icon(Icons.chevron_right_rounded, size: 16, color: purple),
-                      ],
+                        child: const Row(
+                          children: [
+                            Text(
+                              'View Folio',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: purple,
+                              ),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(Icons.chevron_right_rounded, size: 16, color: purple),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -557,6 +611,38 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _openPaymentDetailForReservation(ReservationModel res) {
+    final payProvider = context.read<PaymentProvider>();
+    PaymentModel? payment;
+    for (final p in payProvider.payments) {
+      if (p.bookingId == res.id ||
+          p.bookingId == res.bookingId ||
+          p.id == res.id ||
+          (res.bookingId.isNotEmpty && p.bookingId.toLowerCase() == res.bookingId.toLowerCase())) {
+        payment = p;
+        break;
+      }
+    }
+
+    payment ??= PaymentModel(
+      id: res.id,
+      bookingId: res.bookingId.isNotEmpty ? res.bookingId : res.id,
+      guestName: res.guestName,
+      roomNumber: res.roomNumber.isNotEmpty ? res.roomNumber : '101',
+      amount: res.totalAmount > 0 ? res.totalAmount : res.amount,
+      paymentMethod: res.paymentMethod.isNotEmpty ? res.paymentMethod : 'UPI',
+      status: res.paymentStatus.isNotEmpty ? res.paymentStatus : 'Settled',
+      propertyId: res.propertyId.isNotEmpty ? res.propertyId : 'HS-9HQ8P',
+      createdAt: res.createdAt.isNotEmpty ? res.createdAt : DateTime.now().toIso8601String(),
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManagerPaymentDetailScreen(payment: payment!),
       ),
     );
   }

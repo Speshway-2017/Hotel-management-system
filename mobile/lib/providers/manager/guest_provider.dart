@@ -14,7 +14,10 @@ class GuestProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   int get totalGuests => _guests.length;
-  int get inHouseCount => _guests.where((g) => g.status.toLowerCase().contains('check') && g.status.toLowerCase().contains('in')).length;
+  int get inHouseCount => _guests.where((g) {
+    final st = g.status.toLowerCase();
+    return (st.contains('check') && st.contains('in')) || st == 'staying';
+  }).length;
 
   GuestProvider() {
     _registerSocketListeners();

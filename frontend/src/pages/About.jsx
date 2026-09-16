@@ -162,17 +162,19 @@ function About() {
         </div>
       </section>
 
-      {/* 3. Why Hour Stay Section */}
-      <section className="bg-cream py-20 border-t border-navy/5">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="text-center mb-16">
-            <span className="text-xs font-bold uppercase tracking-widest text-purple">Core Pillars</span>
-            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
+      {/* 3. Why Hour Stay Section (Core Pillars) */}
+      <section className="bg-cream/40 py-20 border-t border-navy/5">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-[#5B21B6] bg-[#F3E8FF] px-3 py-1 rounded-full mb-2">
+              Core Pillars
+            </span>
+            <h2 className="mt-1 font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#0D1B2A]">
               Why Indian hotels run on Hour Stay
             </h2>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
             {[
               {
                 icon: LayoutGrid,
@@ -207,12 +209,26 @@ function About() {
             ].map((p, idx) => {
               const PillarIcon = p.icon;
               return (
-                <div key={idx} className="card-guest border border-navy/5 bg-white p-6 text-left shadow-soft hover:-translate-y-1 transition-all duration-300">
-                  <span className="inline-flex size-10 items-center justify-center rounded-lg bg-purple/10 text-purple mb-4">
-                    <PillarIcon className="size-5" />
-                  </span>
-                  <h3 className="font-display text-lg font-bold text-navy">{p.title}</h3>
-                  <p className="mt-2 text-xs sm:text-sm text-[#4A4F58] font-ui leading-relaxed">{p.desc}</p>
+                <div
+                  key={idx}
+                  className="group relative rounded-2xl p-[1.5px] bg-gradient-to-br from-[#E9D5FF]/80 via-[#FCE7F3]/70 to-[#DDD6FE]/80 shadow-[0_4px_16px_rgba(91,33,182,0.06)] hover:shadow-[0_10px_24px_rgba(91,33,182,0.12)] transition-all duration-300 hover:-translate-y-1"
+                >
+                  <div className="bg-white rounded-[14.5px] p-5 sm:p-6 h-full flex flex-col text-left">
+                    {/* Small pastel-purple rounded icon box */}
+                    <div className="size-9 sm:size-10 rounded-xl bg-[#F3E8FF] text-[#5B21B6] flex items-center justify-center mb-3.5 group-hover:scale-105 transition-transform duration-300 shadow-[0_2px_8px_rgba(91,33,182,0.08)]">
+                      <PillarIcon className="size-4 sm:size-4.5 text-[#5B21B6]" />
+                    </div>
+
+                    {/* Bold Playfair Display title */}
+                    <h3 className="font-display text-base sm:text-lg font-bold text-[#0D1B2A] tracking-tight mb-1.5">
+                      {p.title}
+                    </h3>
+
+                    {/* Short Inter description in muted gray */}
+                    <p className="font-sans text-xs sm:text-[13px] text-[#8A8F98] leading-relaxed">
+                      {p.desc}
+                    </p>
+                  </div>
                 </div>
               );
             })}

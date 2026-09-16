@@ -5,6 +5,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../models/guest_payment_model.dart';
 import '../../../providers/guest/guest_payment_provider.dart';
 import '../folio/guest_folio_screen.dart';
+import '../../../services/pdf_invoice_service.dart';
 
 class GuestPaymentsScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -445,74 +446,78 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
           const SizedBox(height: 10),
 
           // Horizontal Navigation Filter Chips
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filters.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final filter = _filters[index];
-                final isSelected = _selectedFilter == filter;
-                final count = _getFilterCount(filter, allPayments);
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                clipBehavior: Clip.hardEdge,
+                padding: EdgeInsets.zero,
+                itemCount: _filters.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final filter = _filters[index];
+                  final isSelected = _selectedFilter == filter;
+                  final count = _getFilterCount(filter, allPayments);
 
-                return InkWell(
-                  onTap: () => setState(() => _selectedFilter = filter),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: isSelected ? navy : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? navy : cardBorder,
-                        width: 1.2,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: navy.withAlpha(35),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          filter,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                            color: isSelected ? cream : navy,
-                          ),
+                  return InkWell(
+                    onTap: () => setState(() => _selectedFilter = filter),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isSelected ? navy : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? navy : cardBorder,
+                          width: 1.2,
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isSelected ? gold : const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$count',
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: navy.withAlpha(35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            filter,
                             style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: isSelected ? navy : const Color(0xFF64748B),
+                              fontSize: 12.5,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              color: isSelected ? cream : navy,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected ? gold : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$count',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? navy : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -918,25 +923,82 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
 
                 const SizedBox(height: 12),
 
-                // 6. Action Bar
+                // 6. Action Bar: Full-Width Row across the card (Share, Download PDF, View Folio)
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _navigateToFolio(context, payment),
-                      icon: const Icon(Icons.receipt_long_rounded, size: 14, color: navy),
-                      label: const Text(
-                        'View Receipt / Folio',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: navy,
+                    // 1. Share
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => PdfInvoiceService.shareInvoice(context, payment: payment),
+                        icon: const Icon(Icons.share_outlined, size: 14, color: navy),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Share',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: navy,
+                            ),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          side: const BorderSide(color: cardBorder, width: 1.1),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                          backgroundColor: background,
                         ),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        side: const BorderSide(color: cardBorder),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    ),
+                    const SizedBox(width: 6),
+                    // 2. Download PDF
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => PdfInvoiceService.downloadOrPrintInvoice(context, payment: payment),
+                        icon: const Icon(Icons.download_rounded, size: 15, color: navy),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'PDF',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: navy,
+                            ),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          side: const BorderSide(color: cardBorder, width: 1.1),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                          backgroundColor: background,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // 3. Digital Folio
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _navigateToFolio(context, payment),
+                        icon: const Icon(Icons.receipt_long_rounded, size: 15, color: white),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Digital Folio',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: white,
+                            ),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: navy,
+                          foregroundColor: white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                        ),
                       ),
                     ),
                   ],

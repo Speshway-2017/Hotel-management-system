@@ -43,6 +43,30 @@ class PaymentModel {
     );
   }
 
+  PaymentModel copyWith({
+    String? id,
+    String? bookingId,
+    String? guestName,
+    String? roomNumber,
+    double? amount,
+    String? paymentMethod,
+    String? status,
+    String? propertyId,
+    String? createdAt,
+  }) {
+    return PaymentModel(
+      id: id ?? this.id,
+      bookingId: bookingId ?? this.bookingId,
+      guestName: guestName ?? this.guestName,
+      roomNumber: roomNumber ?? this.roomNumber,
+      amount: amount ?? this.amount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      status: status ?? this.status,
+      propertyId: propertyId ?? this.propertyId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'bookingId': bookingId,

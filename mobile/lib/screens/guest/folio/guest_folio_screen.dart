@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/folio_model.dart';
@@ -9,6 +8,7 @@ import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_folio_provider.dart';
 import 'package:hour_stay_mobile/widgets/empty_state.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
+import 'package:hour_stay_mobile/services/pdf_invoice_service.dart';
 
 class GuestFolioScreen extends StatefulWidget {
   final ReservationModel? booking;
@@ -674,27 +674,52 @@ class _GuestFolioScreenState extends State<GuestFolioScreen> {
                         ),
                       ],
                     ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: navy,
-                        foregroundColor: white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _activeBooking = b;
-                        });
-                      },
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('View Folio', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
-                        ],
-                      ),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        IconButton.outlined(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: cardBorder),
+                            padding: const EdgeInsets.all(6),
+                            minimumSize: const Size(34, 34),
+                          ),
+                          icon: const Icon(Icons.share_outlined, size: 15, color: navy),
+                          tooltip: 'Share Receipt',
+                          onPressed: () => PdfInvoiceService.shareInvoice(context, booking: b),
+                        ),
+                        IconButton.outlined(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: cardBorder),
+                            padding: const EdgeInsets.all(6),
+                            minimumSize: const Size(34, 34),
+                          ),
+                          icon: const Icon(Icons.download_rounded, size: 16, color: navy),
+                          tooltip: 'Download PDF',
+                          onPressed: () => PdfInvoiceService.downloadOrPrintInvoice(context, booking: b),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: navy,
+                            foregroundColor: white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _activeBooking = b;
+                            });
+                          },
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('Digital Folio', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                              SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_ios_rounded, size: 11, color: gold),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -783,56 +808,20 @@ class _GuestFolioScreenState extends State<GuestFolioScreen> {
 
   // --- Actions ---
   void _handleDownloadPdf(BuildContext context, ReservationModel? booking, FolioModel? folio, GuestPaymentModel? payment) {
-    HapticFeedback.lightImpact();
-    final folioId = folio?.folioId ??
-        payment?.folio?.folioId ??
-        'FOL-${booking != null ? (booking.bookingId.isNotEmpty ? booking.bookingId : booking.id) : (payment != null ? (payment.bookingId.isNotEmpty ? payment.bookingId : payment.paymentId) : "1001")}';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.download_done_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Digital Folio & Invoice ($folioId) downloaded successfully.',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: emeraldDark,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    PdfInvoiceService.downloadOrPrintInvoice(
+      context,
+      booking: booking,
+      folio: folio,
+      payment: payment,
     );
   }
 
   void _handleShareFolio(BuildContext context, ReservationModel? booking, FolioModel? folio, GuestPaymentModel? payment) {
-    HapticFeedback.lightImpact();
-    final folioId = folio?.folioId ??
-        payment?.folio?.folioId ??
-        'FOL-${booking != null ? (booking.bookingId.isNotEmpty ? booking.bookingId : booking.id) : (payment != null ? (payment.bookingId.isNotEmpty ? payment.bookingId : payment.paymentId) : "1001")}';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.share_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Invoice link for $folioId copied to clipboard.',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: navy,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    PdfInvoiceService.shareInvoice(
+      context,
+      booking: booking,
+      folio: folio,
+      payment: payment,
     );
   }
 }

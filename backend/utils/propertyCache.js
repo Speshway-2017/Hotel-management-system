@@ -9,16 +9,7 @@ const CACHE_TTL_MS = 30000; // 30 seconds TTL
  * Invalidate cached property data
  */
 export function invalidatePropertyCache(propId = null) {
-  if (!propId) {
-    propertyCache.clear();
-    return;
-  }
-  const cleanId = String(propId).trim();
-  for (const key of propertyCache.keys()) {
-    if (key.includes(cleanId) || key === 'default') {
-      propertyCache.delete(key);
-    }
-  }
+  propertyCache.clear();
 }
 
 /**

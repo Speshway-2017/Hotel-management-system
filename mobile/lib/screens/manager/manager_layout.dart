@@ -22,18 +22,20 @@ import 'reservations/manager_reservations_screen.dart';
 import 'rooms/manager_rooms_screen.dart';
 
 class ManagerLayout extends StatefulWidget {
-  const ManagerLayout({super.key});
+  final int initialIndex;
+  const ManagerLayout({super.key, this.initialIndex = 0});
 
   @override
   State<ManagerLayout> createState() => _ManagerLayoutState();
 }
 
 class _ManagerLayoutState extends State<ManagerLayout> {
-  int _currentIndex = 0;
+  late int _currentIndex;
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
@@ -49,6 +51,24 @@ class _ManagerLayoutState extends State<ManagerLayout> {
     context.read<GuestProvider>().fetchGuests();
     context.read<ManagerFeedbackProvider>().fetchAll();
     context.read<StaffProvider>().fetchAll();
+  }
+
+  void _switchTab(int tabIndex) {
+    if (!mounted) return;
+    setState(() => _currentIndex = tabIndex);
+    if (tabIndex == 0) {
+      context.read<ReservationProvider>().fetchAll(silent: true);
+      context.read<PaymentProvider>().fetchAll(silent: true);
+      context.read<RoomProvider>().fetchAll(silent: true);
+    } else if (tabIndex == 1) {
+      context.read<ReservationProvider>().fetchAll(silent: true);
+    } else if (tabIndex == 2) {
+      context.read<RoomProvider>().fetchAll(silent: true);
+    } else if (tabIndex == 3) {
+      context.read<ApprovalProvider>().fetchAll(silent: true);
+    } else if (tabIndex == 4) {
+      context.read<PaymentProvider>().fetchAll(silent: true);
+    }
   }
 
   Widget _buildAvatarImageWidget({
@@ -106,9 +126,9 @@ class _ManagerLayoutState extends State<ManagerLayout> {
 
   final List<Widget> _bottomNavScreens = const [
     ManagerDashboardScreen(),
-    ManagerReservationsScreen(),
+    ManagerReservationsScreen(isEmbedded: true),
     ManagerRoomsScreen(),
-    ManagerApprovalsScreen(),
+    ManagerApprovalsScreen(isEmbedded: true),
     ManagerPaymentsScreen(isEmbedded: true),
   ];
 
@@ -231,9 +251,13 @@ class _ManagerLayoutState extends State<ManagerLayout> {
             ),
             tooltip: 'Notifications',
             onPressed: () {
-              Navigator.of(context).push(
+              Navigator.of(context).push<int>(
                 MaterialPageRoute(builder: (_) => const ManagerNotificationsScreen()),
-              );
+              ).then((tabIndex) {
+                if (tabIndex != null) {
+                  _switchTab(tabIndex);
+                }
+              });
             },
           ),
           // Profile Avatar Icon with Dropdown Menu

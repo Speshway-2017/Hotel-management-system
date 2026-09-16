@@ -27,11 +27,8 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
   static const Color background = Color(0xFFF8FAFC);
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFECFDF5);
   static const Color blue = Color(0xFF2563EB);
-  static const Color blueBg = Color(0xFFEFF6FF);
   static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleBg = Color(0xFFF3E8FF);
   static const Color ruby = Color(0xFFEF4444);
 
   String _statusFilter = 'all';
@@ -277,74 +274,28 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-
-          // 4 Uniform KPI Summary Cards in a Single Row
-          Row(
-            children: [
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Total',
-                  value: '$totalCount',
-                  subtitle: 'Rooms',
-                  icon: Icons.hotel_rounded,
-                  color: navy,
-                  bgColor: cream,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Available',
-                  value: '$availableCount',
-                  subtitle: 'Clean',
-                  icon: Icons.check_circle_rounded,
-                  color: emerald,
-                  bgColor: emeraldBg,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Occupied',
-                  value: '$occupiedCount',
-                  subtitle: 'In-House',
-                  icon: Icons.meeting_room_rounded,
-                  color: purple,
-                  bgColor: purpleBg,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Reserved',
-                  value: '$reservedCount',
-                  subtitle: 'Booked',
-                  icon: Icons.bookmark_added_rounded,
-                  color: blue,
-                  bgColor: blueBg,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
           // Horizontal Quick Filter Pills (Available, Occupied, Reserved)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+          SizedBox(
+            height: 42,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              clipBehavior: Clip.hardEdge,
+              padding: EdgeInsets.zero,
               children: [
-                _buildKPIFilterChip('All Rooms', 'all', totalCount, navy),
-                const SizedBox(width: 6),
-                _buildKPIFilterChip('Available', 'available', availableCount, emerald),
-                const SizedBox(width: 6),
-                _buildKPIFilterChip('Occupied', 'occupied', occupiedCount, navy),
-                const SizedBox(width: 6),
-                _buildKPIFilterChip('Reserved', 'reserved', reservedCount, blue),
+                _buildKPIFilterChip('All Rooms', 'all', totalCount),
+                const SizedBox(width: 8),
+                _buildKPIFilterChip('Available', 'available', availableCount, dotColor: emerald),
+                const SizedBox(width: 8),
+                _buildKPIFilterChip('Occupied', 'occupied', occupiedCount, dotColor: purple),
+                const SizedBox(width: 8),
+                _buildKPIFilterChip('Reserved', 'reserved', reservedCount, dotColor: blue),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
           // Floor & Room Type Quick Dropdown Filters
           Row(
@@ -451,116 +402,33 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
     );
   }
 
-  Widget _buildMiniMetric({
-    required String label,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
+  Widget _buildKPIFilterChip(
+    String label,
+    String value,
+    int count, {
+    Color? dotColor,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor.withAlpha(120),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withAlpha(60),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3.5),
-                decoration: BoxDecoration(
-                  color: white,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, size: 11, color: color),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: color == navy ? navy : color,
-                letterSpacing: -0.3,
-                height: 1.0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF334155),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKPIFilterChip(String label, String value, int count, Color color) {
     final isSelected = _statusFilter == value;
 
     return InkWell(
       onTap: () => setState(() => _statusFilter = value),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? color : background,
-          borderRadius: BorderRadius.circular(18),
+          color: isSelected ? navy : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? color : cardBorder,
-            width: 1,
+            color: isSelected ? navy : cardBorder,
+            width: 1.2,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withAlpha(45),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
+                    color: navy.withAlpha(35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : null,
@@ -568,28 +436,38 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (dotColor != null) ...[
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12.5,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? white : const Color(0xFF475569),
+                color: isSelected ? cream : navy,
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? white.withAlpha(40) : white,
+                color: isSelected ? gold : const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(10),
-                border: isSelected ? null : Border.all(color: cardBorder),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? white : const Color(0xFF64748B),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? navy : const Color(0xFF64748B),
                 ),
               ),
             ),
@@ -640,19 +518,34 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 8.5, vertical: 3.5),
                           decoration: BoxDecoration(
-                            color: navy,
+                            color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: gold.withAlpha(120)),
-                          ),
-                          child: Text(
-                            'Room ${room.roomNumber}',
-                            style: const TextStyle(
-                              color: gold,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                            border: Border.all(
+                              color: const Color(0xFF2563EB).withAlpha(50),
+                              width: 1.0,
                             ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.door_front_door_outlined,
+                                size: 13,
+                                color: Color(0xFF1E40AF),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Room ${room.roomNumber}',
+                                style: const TextStyle(
+                                  color: Color(0xFF1E40AF),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -898,19 +791,34 @@ class _ManagerRoomsScreenState extends State<ManagerRoomsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
-                        color: navy,
+                        color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: gold.withAlpha(120)),
-                      ),
-                      child: Text(
-                        room.roomNumber,
-                        style: const TextStyle(
-                          color: gold,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
+                        border: Border.all(
+                          color: const Color(0xFF2563EB).withAlpha(50),
+                          width: 1.0,
                         ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.door_front_door_outlined,
+                            size: 11.5,
+                            color: Color(0xFF1E40AF),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            room.roomNumber,
+                            style: const TextStyle(
+                              color: Color(0xFF1E40AF),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     StatusBadge(

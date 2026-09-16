@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
-import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/screens/manager/reservations/manager_reservation_detail_screen.dart';
 import 'package:hour_stay_mobile/screens/manager/reservations/manager_create_reservation_screen.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
@@ -24,7 +23,6 @@ class _ManagerTodayOperationsScreenState
   // Hour Stay Theme Tokens
   static const Color navy = Color(0xFF0D1B2A);
   static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleBg = Color(0xFFF3E8FF);
   static const Color gold = Color(0xFFF5C06A);
   static const Color cream = Color(0xFFFFF7E6);
   static const Color white = Color(0xFFFFFFFF);
@@ -32,11 +30,9 @@ class _ManagerTodayOperationsScreenState
   static const Color background = Color(0xFFF8FAFC);
   static const Color cardBorder = Color(0xFFE2E8F0);
   static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFDCFCE7);
   static const Color ruby = Color(0xFFEF4444);
   static const Color rubyBg = Color(0xFFFEE2E2);
   static const Color amber = Color(0xFFD97706);
-  static const Color amberBg = Color(0xFFFEF3C7);
   static const Color blue = Color(0xFF2563EB);
   static const Color blueBg = Color(0xFFDBEAFE);
 
@@ -62,10 +58,7 @@ class _ManagerTodayOperationsScreenState
   }
 
   Future<void> _refreshAllData() async {
-    await Future.wait([
-      context.read<ReservationProvider>().fetchAll(),
-      context.read<RoomProvider>().fetchAll(),
-    ]);
+    await context.read<ReservationProvider>().fetchAll();
   }
 
   // Robust check if a date string represents today
@@ -74,10 +67,8 @@ class _ManagerTodayOperationsScreenState
   @override
   Widget build(BuildContext context) {
     final resProvider = context.watch<ReservationProvider>();
-    final roomProvider = context.watch<RoomProvider>();
 
     final allReservations = resProvider.reservations;
-    final allRooms = roomProvider.rooms;
 
     // 1. Today's Arrivals (Total check-ins scheduled for today)
     final arrivals = allReservations.where((r) {
@@ -117,11 +108,6 @@ class _ManagerTodayOperationsScreenState
       final st = r.status.toLowerCase();
       return st == 'checked-in' || st == 'checked_in' || st == 'active' || st == 'staying';
     }).toList();
-
-    // 6. Available Rooms
-    final availableRooms = allRooms
-        .where((r) => r.status.toLowerCase() == 'available')
-        .toList();
 
     final isLoading = resProvider.isLoading && allReservations.isEmpty;
     final hasError = resProvider.errorMessage != null && allReservations.isEmpty;
@@ -187,17 +173,6 @@ class _ManagerTodayOperationsScreenState
                 : CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      // 1. KPI Cards: 3 Cards Per Row (2 Rows = 6 Cards Total)
-                      SliverToBoxAdapter(
-                        child: _buildKpiGrid(
-                          arrivalsCount: arrivals.length,
-                          departuresCount: departures.length,
-                          inHouseCount: inHouse.length,
-                          pendingInCount: pendingIn.length,
-                          pendingOutCount: pendingOut.length,
-                          availableRoomsCount: availableRooms.length,
-                        ),
-                      ),
 
                       // 2. Search Bar & Below Navigation Tabs
                       SliverToBoxAdapter(
@@ -255,193 +230,6 @@ class _ManagerTodayOperationsScreenState
           letterSpacing: -0.2,
         ),
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 14),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: emerald.withAlpha(30),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: emerald.withAlpha(80), width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: emerald,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'Live Turn',
-                style: TextStyle(
-                  color: emerald,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // --- 1. KPI Cards Grid (Uniform Mini Metrics) ---
-  Widget _buildKpiGrid({
-    required int arrivalsCount,
-    required int departuresCount,
-    required int inHouseCount,
-    required int pendingInCount,
-    required int pendingOutCount,
-    required int availableRoomsCount,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-      child: Column(
-        children: [
-          // Row 1: Arrivals, Departures, In-House, Available (4 Cards in single row)
-          Row(
-            children: [
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Arrivals',
-                  value: '$arrivalsCount',
-                  subtitle: 'Today',
-                  icon: Icons.login_rounded,
-                  color: purple,
-                  bgColor: purpleBg,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Departures',
-                  value: '$departuresCount',
-                  subtitle: 'Today',
-                  icon: Icons.logout_rounded,
-                  color: amber,
-                  bgColor: amberBg,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'In-House',
-                  value: '$inHouseCount',
-                  subtitle: 'Active',
-                  icon: Icons.hotel_rounded,
-                  color: navy,
-                  bgColor: cream,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _buildMiniMetric(
-                  label: 'Available',
-                  value: '$availableRoomsCount',
-                  subtitle: 'Rooms',
-                  icon: Icons.meeting_room_rounded,
-                  color: emerald,
-                  bgColor: emeraldBg,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniMetric({
-    required String label,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor.withAlpha(120),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withAlpha(60),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3.5),
-                decoration: BoxDecoration(
-                  color: white,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, size: 11, color: color),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: color == navy ? navy : color,
-                letterSpacing: -0.3,
-                height: 1.0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF334155),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -493,78 +281,91 @@ class _ManagerTodayOperationsScreenState
     required int pendingOutCount,
   }) {
     final tabs = [
-      {'key': 'Arrivals', 'label': 'Arrivals', 'count': arrivalsCount},
-      {'key': 'Departures', 'label': 'Departures', 'count': departuresCount},
-      {'key': 'In-House', 'label': 'In-House', 'count': inHouseCount},
-      {'key': 'Pending-In', 'label': 'Pending-In', 'count': pendingInCount},
-      {'key': 'Pending-Out', 'label': 'Pending-Out', 'count': pendingOutCount},
+      {'key': 'Arrivals', 'label': 'Arrivals', 'count': arrivalsCount, 'dot': emerald},
+      {'key': 'Departures', 'label': 'Departures', 'count': departuresCount, 'dot': ruby},
+      {'key': 'In-House', 'label': 'In-House', 'count': inHouseCount, 'dot': purple},
+      {'key': 'Pending-In', 'label': 'Pending-In', 'count': pendingInCount, 'dot': amber},
+      {'key': 'Pending-Out', 'label': 'Pending-Out', 'count': pendingOutCount, 'dot': const Color(0xFFEA580C)},
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: tabs.map((tab) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.hardEdge,
+        padding: EdgeInsets.zero,
+        itemCount: tabs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final tab = tabs[index];
           final isSelected = _selectedTab == tab['key'];
           final count = tab['count'] as int;
+          final dotColor = tab['dot'] as Color?;
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: InkWell(
-              onTap: () => setState(() => _selectedTab = tab['key'] as String),
-              borderRadius: BorderRadius.circular(18),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: isSelected ? navy : white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isSelected ? navy : cardBorder,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: navy.withAlpha(35),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          )
-                        ]
-                      : [],
+          return InkWell(
+            onTap: () => setState(() => _selectedTab = tab['key'] as String),
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                color: isSelected ? navy : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? navy : cardBorder,
+                  width: 1.2,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      tab['label'] as String,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? gold : const Color(0xFF475569),
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: isSelected ? white.withAlpha(30) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? white : navy,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: navy.withAlpha(35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (dotColor != null) ...[
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    tab['label'] as String,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? cream : navy,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? gold : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? navy : const Color(0xFF64748B),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }

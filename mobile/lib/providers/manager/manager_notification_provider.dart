@@ -37,7 +37,18 @@ class ManagerNotificationProvider with ChangeNotifier {
         if (target == 'reservations' && (cat.contains('reserv') || cat.contains('book') || type.contains('reserv') || type.contains('book'))) {
           return true;
         }
-        if (target == 'approvals' && (cat.contains('approval') || type.contains('approval'))) {
+        if (target == 'approvals' &&
+            (cat.contains('approval') ||
+                type.contains('approval') ||
+                cat.contains('override') ||
+                cat.contains('discount') ||
+                n.title.toLowerCase().contains('approval') ||
+                n.title.toLowerCase().contains('refund request') ||
+                n.title.toLowerCase().contains('override') ||
+                n.title.toLowerCase().contains('discount') ||
+                n.message.toLowerCase().contains('approval') ||
+                n.message.toLowerCase().contains('for approval') ||
+                n.message.toLowerCase().contains('override'))) {
           return true;
         }
         if (target == 'payments' && (cat.contains('pay') || cat.contains('bill') || type.contains('pay'))) {

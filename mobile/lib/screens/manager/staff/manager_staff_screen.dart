@@ -429,15 +429,6 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                 : CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      // 1. Same Top KPI Cards Row for both tabs
-                      SliverToBoxAdapter(
-                        child: _buildStaffKpiSection(
-                          totalCount: totalCount,
-                          activeCount: activeCount,
-                          leaveCount: leaveCount,
-                          attendanceCount: attendanceCount,
-                        ),
-                      ),
 
                       // 2. Exact same Search Bar design as all screens
                       SliverToBoxAdapter(
@@ -463,7 +454,12 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
-                            child: _buildStaffStatusFilterChips(),
+                            child: _buildStaffStatusFilterChips(
+                              totalCount: totalCount,
+                              activeCount: activeCount,
+                              leaveCount: leaveCount,
+                              attendanceCount: attendanceCount,
+                            ),
                           ),
                         ),
 
@@ -737,65 +733,6 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
     );
   }
 
-  // --- Same Top KPI Row for both tabs ---
-  Widget _buildStaffKpiSection({
-    required int totalCount,
-    required int activeCount,
-    required int leaveCount,
-    required int attendanceCount,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Total',
-              value: '$totalCount',
-              subtitle: 'Staff',
-              icon: Icons.people_alt_rounded,
-              color: navy,
-              bgColor: cream,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Active',
-              value: '$activeCount',
-              subtitle: 'On Duty',
-              icon: Icons.check_circle_outline_rounded,
-              color: emerald,
-              bgColor: emeraldBg,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Leave',
-              value: '$leaveCount',
-              subtitle: 'Off Duty',
-              icon: Icons.event_busy_rounded,
-              color: amber,
-              bgColor: amberBg,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _buildMiniMetric(
-              label: 'Attendance',
-              value: '$attendanceCount',
-              subtitle: 'Present',
-              icon: Icons.how_to_reg_rounded,
-              color: purple,
-              bgColor: purpleBg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // --- Exact same Search Bar design as all screens ---
   Widget _buildSearchBar() {
     return Container(
@@ -839,56 +776,99 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
   }
 
   // --- Staff Status Filter Chips ---
-  Widget _buildStaffStatusFilterChips() {
-    final filters = ['All', 'Active', 'Leave', 'Attendance'];
+  Widget _buildStaffStatusFilterChips({
+    required int totalCount,
+    required int activeCount,
+    required int leaveCount,
+    required int attendanceCount,
+  }) {
+    final filters = [
+      {'key': 'All', 'label': 'All Staff', 'count': totalCount, 'dot': null},
+      {'key': 'Active', 'label': 'Active', 'count': activeCount, 'dot': emerald},
+      {'key': 'Leave', 'label': 'On Leave', 'count': leaveCount, 'dot': amber},
+      {'key': 'Attendance', 'label': 'Present Today', 'count': attendanceCount, 'dot': purple},
+    ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: filters.map((st) {
-          final isSelected = _staffStatusFilter == st;
-          Color c = purple;
-          if (st == 'Active') c = emerald;
-          if (st == 'Leave') c = amber;
-          if (st == 'Attendance') c = purple;
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.hardEdge,
+        padding: EdgeInsets.zero,
+        itemCount: filters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final item = filters[index];
+          final key = item['key'] as String;
+          final label = item['label'] as String;
+          final count = item['count'] as int;
+          final dotColor = item['dot'] as Color?;
+          final isSelected = _staffStatusFilter == key;
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: InkWell(
-              onTap: () => setState(() => _staffStatusFilter = st),
-              borderRadius: BorderRadius.circular(20),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isSelected ? c : white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? c : cardBorder,
-                    width: 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: c.withAlpha(60),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
+          return InkWell(
+            onTap: () => setState(() => _staffStatusFilter = key),
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                color: isSelected ? navy : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? navy : cardBorder,
+                  width: 1.2,
                 ),
-                child: Text(
-                  st,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? white : navy,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: navy.withAlpha(35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (dotColor != null) ...[
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? cream : navy,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? gold : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected ? navy : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }
@@ -1489,95 +1469,6 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Shared Mini Metric Component ---
-  Widget _buildMiniMetric({
-    required String label,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor.withAlpha(120),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withAlpha(60),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(4),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3.5),
-                decoration: BoxDecoration(
-                  color: white,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, size: 11, color: color),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: color == navy ? navy : color,
-                letterSpacing: -0.3,
-                height: 1.0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF334155),
-            ),
           ),
         ],
       ),

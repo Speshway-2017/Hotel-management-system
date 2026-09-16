@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/staff_model.dart';
 import 'package:hour_stay_mobile/providers/manager/staff_provider.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
@@ -78,6 +79,26 @@ class _ManagerStaffDetailScreenState extends State<ManagerStaffDetailScreen> {
     if (s.contains('general')) return '09:00 AM – 06:00 PM';
     if (s.contains('rotational') || s.contains('rotating')) return 'Flexible / Rotating Hours';
     return '09:00 AM – 06:00 PM';
+  }
+
+  String _formatDateString(String dateStr) {
+    if (dateStr.isEmpty) return 'Today';
+    try {
+      final now = DateTime.now();
+      final todayStr =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      if (dateStr.startsWith(todayStr)) return 'Today';
+
+      final yesterday = now.subtract(const Duration(days: 1));
+      final yestStr =
+          "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
+      if (dateStr.startsWith(yestStr)) return 'Yesterday';
+
+      final dt = DateTime.parse(dateStr);
+      return Formatters.date(dt.toIso8601String());
+    } catch (_) {
+      return dateStr;
+    }
   }
 
   void _copyToClipboard(String text, String label) {
@@ -716,7 +737,7 @@ class _ManagerStaffDetailScreenState extends State<ManagerStaffDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              att.date,
+                              _formatDateString(att.date),
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy),
                             ),
                             Text(

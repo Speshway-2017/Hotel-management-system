@@ -326,7 +326,7 @@
     "settings": {
       "logo": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788155962/hourstay_hms_assets/k9uc3exlyql4tcrqemnm.jpg",
       "address": "Plot No. 45, Hitech City Road, Madhapur",
-      "phone": "9876543210",
+      "phone": "1800 266 4687",
       "email": "reservations@speshwayluxuryhotel.com",
       "gstin": "36AAAAA1111A1Z1",
       "classification": "3-Star",
@@ -374,7 +374,7 @@
       "state": "Telangana",
       "country": "India",
       "pincode": "500081",
-      "website": "",
+      "website": "booknstay.speshway.site",
       "amenities": [
         "Premium rooms",
         "high-speed Wi-Fi",
@@ -404,7 +404,7 @@
         "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152859/hourstay_hms_assets/lwlxmgzzdc1nvfllbywl.jpg"
       ],
       "reservationEmail": "reservations@speshwayluxuryhotel.com",
-      "contactNumber": "9876543210",
+      "contactNumber": "1800 266 4687",
       "policies": "Free cancellation up to 24 hours before check-in. Cancellations within 24 hours may be subject to a cancellation charge.",
       "roomTypes": [
         {
@@ -490,7 +490,7 @@
       ]
     },
     "createdAt": "2026-08-18T06:50:34.910Z",
-    "updatedAt": "2026-09-02T06:10:27.622Z"
+    "updatedAt": "2026-09-16T05:31:19.688Z"
   },
   {
     "_id": "HS-0L43K",

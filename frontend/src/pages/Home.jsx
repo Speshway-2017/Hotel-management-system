@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { inr, searchResults, blogPosts } from "@/data/hs-data";
 import { InsightsStackedCarousel } from "@/components/hs/InsightsStackedCarousel";
+import { CategoryLayeredCards } from "@/components/hs/CategoryLayeredCards";
 
 // Import Slider Images
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -85,40 +86,6 @@ const slides = [
     tagline: "Serene Coconut Palms & Canals"
   }
 ];
-
-const propertyTypes = [
-  {
-    name: "Hotels",
-    description: "City business hotels, airport transit stays, and commercial lodging hubs.",
-    tag: "Business & Transit",
-    icon: Hotel
-  },
-  {
-    name: "Resorts",
-    description: "Sprawling leisure retreats, beachfront getaways, and hillside spa locations.",
-    tag: "Experiential Luxury",
-    icon: Sparkles
-  },
-  {
-    name: "Boutique Havelis",
-    description: "Historic palaces, heritage properties, and design-forward boutique villas.",
-    tag: "Cultural Heritage",
-    icon: Landmark
-  },
-  {
-    name: "Lodges & Stays",
-    description: "Mid-scale highway retreats, pilgrimage accommodation, and homestays.",
-    tag: "Comfort Stays",
-    icon: ShieldCheck
-  },
-  {
-    name: "Multi-Property Chains",
-    description: "Consolidated enterprise control across multiple cities and property codes.",
-    tag: "Enterprise Scale",
-    icon: Users
-  }
-];
-
 
 
 function Home() {
@@ -367,45 +334,8 @@ function Home() {
         </div>
       </section>
 
-      {/* Property Types Section */}
-      <section className="bg-cream py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="text-center">
-            <span className="text-xs font-bold uppercase tracking-widest text-purple">Flexible Framework</span>
-            <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
-              Powering every category of Indian stays
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
-              From historic royal palaces to modern transit suites, Hour Stay provides custom operational models for diverse property architectures.
-            </p>
-          </div>
-
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
-            {propertyTypes.map((p) => {
-              const Icon = p.icon;
-              return (
-                <div
-                  key={p.name}
-                  className="group relative rounded-xl border border-navy/5 bg-white p-6 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-gold/30 hover:shadow-lift"
-                >
-                  <div className="inline-flex size-12 items-center justify-center rounded-lg bg-cream text-navy transition-colors group-hover:bg-gold group-hover:text-navy">
-                    <Icon className="size-6" />
-                  </div>
-                  <span className="mt-4 block text-[10px] font-bold uppercase tracking-widest text-purple">
-                    {p.tag}
-                  </span>
-                  <h3 className="mt-1 font-display text-lg font-bold text-navy group-hover:text-purple transition-colors">
-                    {p.name}
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-[#4A4F58] font-ui">
-                    {p.description}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      {/* Property Types / Categories Section */}
+      <CategoryLayeredCards />
 
       {/* Why Hour Stay (Built for India) Section */}
       <section className="bg-white border-y border-navy/5 py-24">
@@ -677,63 +607,119 @@ function Home() {
             </p>
           </div>
 
-          {/* Timeline Grid */}
-          <div className="mt-16 grid gap-8 md:grid-cols-5 relative">
-            
-            {/* Connecting line */}
-            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-cream hidden md:block -translate-y-1/2 z-0" />
+          {/* Infographic Hanging Cards Layout */}
+          <div className="mt-16 pb-6 relative">
+            {/* Horizontal card container: scrollable on mobile/tablet, overlapping staggered row on desktop */}
+            <div className="flex flex-row overflow-x-auto lg:overflow-visible pb-8 pt-4 px-4 sm:px-6 lg:px-0 lg:justify-center items-start snap-x snap-mandatory scrollbar-none">
+              {[
+                {
+                  step: "01",
+                  label: "STEP 01",
+                  title: "Instant Booking",
+                  desc: "Guest books on your website and receives confirmation via SMS & WhatsApp.",
+                  accent: "#F5C06A",
+                  zIndex: "z-50",
+                  offset: "lg:translate-y-0",
+                },
+                {
+                  step: "02",
+                  label: "STEP 02",
+                  title: "Mobile Pre-Check-in",
+                  desc: "Upload Aadhaar/Passport IDs prior to travel, filling out details from their phone.",
+                  accent: "#5B21B6",
+                  zIndex: "z-40",
+                  offset: "lg:translate-y-7",
+                },
+                {
+                  step: "03",
+                  label: "STEP 03",
+                  title: "Lobby Key Handover",
+                  desc: "Receptionist confirms details, issues room key. Handover takes 45 seconds.",
+                  accent: "#0D1B2A",
+                  zIndex: "z-30",
+                  offset: "lg:translate-y-0",
+                },
+                {
+                  step: "04",
+                  label: "STEP 04",
+                  title: "In-Stay Requests",
+                  desc: "Scan room QR code to order coffee, request linen, or call room service.",
+                  accent: "#10B981",
+                  zIndex: "z-20",
+                  offset: "lg:translate-y-7",
+                },
+                {
+                  step: "05",
+                  label: "STEP 05",
+                  title: "UPI Checkout",
+                  desc: "Settle folio balances via UPI and receive GST-compliant invoices on WhatsApp.",
+                  accent: "#FF6B8B",
+                  zIndex: "z-10",
+                  offset: "lg:translate-y-0",
+                }
+              ].map((t, idx) => (
+                <div
+                  key={t.step}
+                  className={`
+                    flex-shrink-0 w-[240px] sm:w-[250px] lg:w-[225px] xl:w-[240px]
+                    snap-center
+                    ${idx > 0 ? "ml-4 sm:ml-5 lg:-ml-5 xl:-ml-6" : "ml-0"}
+                    ${t.zIndex}
+                    ${t.offset}
+                    group relative bg-white rounded-t-lg rounded-b-3xl
+                    border border-slate-200/90
+                    shadow-[0_4px_20px_rgba(13,27,42,0.06)]
+                    hover:shadow-[0_20px_40px_rgba(13,27,42,0.14)]
+                    hover:-translate-y-3 hover:z-50
+                    transition-all duration-300 ease-out
+                    flex flex-col min-h-[350px]
+                  `}
+                >
+                  {/* Colored horizontal accent strip across top edge */}
+                  <div
+                    className="h-2.5 w-full rounded-t-lg transition-colors duration-300"
+                    style={{ backgroundColor: t.accent }}
+                  />
 
-            {[
-              {
-                step: "01",
-                title: "Instant Booking",
-                desc: "Guest books on your website and receives confirmation via SMS & WhatsApp.",
-                icon: Smartphone
-              },
-              {
-                step: "02",
-                title: "Mobile Pre-Check-in",
-                desc: "Upload Aadhaar/Passport IDs prior to travel, filling out details from their phone.",
-                icon: FileText
-              },
-              {
-                step: "03",
-                title: "Lobby Key Handover",
-                desc: "Receptionist confirms details, issues room key. Handover takes 45 seconds.",
-                icon: ShieldCheck
-              },
-              {
-                step: "04",
-                title: "In-Stay Requests",
-                desc: "Scan room QR code to order coffee, request linen, or call room service.",
-                icon: MessageSquare
-              },
-              {
-                step: "05",
-                title: "UPI Checkout",
-                desc: "Settle folio balances via UPI and receive GST-compliant invoices on WhatsApp.",
-                icon: CreditCard
-              }
-            ].map((t, idx) => {
-              const Icon = t.icon;
-              return (
-                <div key={idx} className="relative z-10 flex flex-col items-center text-center group">
-                  <div className="inline-flex size-14 items-center justify-center rounded-full bg-cream border border-navy/5 text-navy group-hover:bg-purple group-hover:text-cream transition-all duration-300 shadow-soft">
-                    <Icon className="size-6 text-current" />
+                  {/* Card Content with generous internal padding */}
+                  <div className="p-6 sm:p-7 flex flex-col flex-1 justify-between text-left">
+                    <div>
+                      {/* Step Label & Top Accent Indicator */}
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="font-sans text-[11px] font-bold tracking-widest uppercase text-navy/60">
+                          {t.label}
+                        </span>
+                        <span
+                          className="size-2 rounded-full"
+                          style={{ backgroundColor: t.accent }}
+                        />
+                      </div>
+
+                      {/* Step Title in Playfair Display */}
+                      <h3 className="font-display text-lg sm:text-xl font-bold text-navy tracking-tight leading-snug mb-3">
+                        {t.title}
+                      </h3>
+
+                      {/* Short Description in Inter */}
+                      <p className="font-sans text-xs sm:text-sm text-[#4A4F58] leading-relaxed">
+                        {t.desc}
+                      </p>
+                    </div>
+
+                    {/* Subtle aesthetic card footer */}
+                    <div className="pt-4 mt-6 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-sans font-semibold tracking-wider text-slate-400">
+                        Phase 0{idx + 1}
+                      </span>
+                      <div
+                        className="h-1 w-6 rounded-full transition-all duration-300 group-hover:w-10"
+                        style={{ backgroundColor: t.accent }}
+                      />
+                    </div>
                   </div>
-                  <span className="mt-4 block font-display text-xs font-bold text-purple tracking-widest uppercase">
-                    Step {t.step}
-                  </span>
-                  <h3 className="mt-2 font-display text-lg font-bold text-navy">
-                    {t.title}
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-[#4A4F58] font-ui max-w-[200px]">
-                    {t.desc}
-                  </p>
                 </div>
-              );
-            })}
-
+              ))}
+            </div>
           </div>
         </div>
       </section>

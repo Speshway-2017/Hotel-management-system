@@ -20,8 +20,6 @@ class AuthCard extends StatefulWidget {
   final String? initialOtp;
   final Widget? footer;
   final Widget? extraContent;
-  final bool showHomeButton;
-  final VoidCallback? onHomePressed;
   final AuthSubmitCallback onSubmit;
   final VoidCallback? onResendOtp;
   final VoidCallback? onNavigateToRegister;
@@ -37,8 +35,6 @@ class AuthCard extends StatefulWidget {
     this.initialOtp,
     this.footer,
     this.extraContent,
-    this.showHomeButton = false,
-    this.onHomePressed,
     required this.onSubmit,
     this.onResendOtp,
     this.onNavigateToRegister,
@@ -517,27 +513,6 @@ class _AuthCardState extends State<AuthCard> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top Bar / Optional Back Home
-              if (widget.showHomeButton)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: widget.onHomePressed ?? () => Navigator.of(context).maybePop(),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        '← HOME',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0x660D1B2A),
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
               // Centered Logo (Icon Only, 44x44 matching web <Logo compact={true} removeBg={true} />)
               Center(
                 child: Padding(
