@@ -18,6 +18,7 @@ import '../operations/manager_today_operations_screen.dart';
 import '../reservations/manager_create_reservation_screen.dart';
 import '../reservations/manager_reservation_detail_screen.dart';
 import '../staff/manager_staff_screen.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerDashboardScreen extends StatefulWidget {
   const ManagerDashboardScreen({super.key});
@@ -27,16 +28,6 @@ class ManagerDashboardScreen extends StatefulWidget {
 }
 
 class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
-  // Hour Stay Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
 
   @override
   void initState() {

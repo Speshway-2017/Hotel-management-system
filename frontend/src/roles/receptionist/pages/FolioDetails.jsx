@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -203,13 +203,6 @@ function ReceptionFolioDetailsPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
-      <Crumbs
-        items={[
-          { label: "Payments Ledger", to: "/reception/payments" },
-          { label: `Folio #${id}` }
-        ]}
-      />
-      
       {/* Page header navigation override */}
       <PageHeader />
 

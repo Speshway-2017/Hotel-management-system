@@ -6,6 +6,7 @@ import '../../../models/guest_payment_model.dart';
 import '../../../providers/guest/guest_payment_provider.dart';
 import '../folio/guest_folio_screen.dart';
 import '../../../services/pdf_invoice_service.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestPaymentsScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -17,29 +18,6 @@ class GuestPaymentsScreen extends StatefulWidget {
 }
 
 class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
-  // Hour Stay Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color navyLight = Color(0xFF1B2A4A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleBg = Color(0xFFEDE9FE);
-  static const Color purpleLight = Color(0xFF7C3AED);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFDCFCE7);
-  static const Color emeraldDark = Color(0xFF065F46);
-  static const Color ruby = Color(0xFFE53935);
-  static const Color rubyBg = Color(0xFFFEE2E2);
-  static const Color rubyDark = Color(0xFF991B1B);
-  static const Color amber = Color(0xFFD97706);
-  static const Color amberBg = Color(0xFFFEF3C7);
-  static const Color amberDark = Color(0xFF92400E);
-  static const Color blue = Color(0xFF2563EB);
-  static const Color blueBg = Color(0xFFDBEAFE);
 
   String _searchQuery = '';
   String _selectedFilter = 'All';

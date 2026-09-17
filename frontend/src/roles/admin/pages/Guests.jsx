@@ -34,7 +34,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
         <div className="h-6 flex items-start">
           <p className="text-[9.5px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
-        <h3 className="mt-1 font-display text-lg font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[9.5px] text-muted-foreground truncate">
         {hint}
@@ -120,6 +120,8 @@ function GuestsCrmPage() {
         const roomDisplay = rNum ? `Room ${rNum}` : (latest?.room ? (String(latest.room).startsWith('Room') ? latest.room : `Room ${latest.room}`) : '—');
         const roomType = latest?.roomType || (latest?.room && String(latest.room).includes('·') ? String(latest.room).split('·')[1]?.trim() : 'Deluxe Room');
         
+        const guestTariff = latest ? Number(latest.totalAmount || latest.amount || 0) : guestBookings.reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0);
+        
         return {
           ...u,
           id: u._id || u.id,
@@ -128,6 +130,7 @@ function GuestsCrmPage() {
           email: u.email || "—",
           phone: u.mobile || u.phone || "—",
           stays: guestBookings.length,
+          tariff: guestTariff > 0 ? guestTariff : guestBookings.reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0),
           balance: guestBookings.reduce((sum, b) => sum + (b.balance || 0), 0),
           room: rNum || '—',
           roomDisplay,
@@ -150,6 +153,7 @@ function GuestsCrmPage() {
           const rNum = extractRoomNumber(latest);
           const roomDisplay = rNum ? `Room ${rNum}` : (latest?.room ? (String(latest.room).startsWith('Room') ? latest.room : `Room ${latest.room}`) : '—');
           const roomType = latest?.roomType || (latest?.room && String(latest.room).includes('·') ? String(latest.room).split('·')[1]?.trim() : 'Deluxe Room');
+          const guestTariff = latest ? Number(latest.totalAmount || latest.amount || 0) : guestBookings.reduce((sum, bk) => sum + Number(bk.totalAmount || bk.amount || 0), 0);
           
           extraGuestsMap[gNameLower] = {
             id: b._id || b.id || `GST-${Date.now()}`,
@@ -164,6 +168,7 @@ function GuestsCrmPage() {
             tier: "Regular",
             type: "Regular",
             stays: guestBookings.length,
+            tariff: guestTariff > 0 ? guestTariff : guestBookings.reduce((sum, bk) => sum + Number(bk.totalAmount || bk.amount || 0), 0),
             spend: guestBookings.reduce((sum, bk) => sum + (bk.amount || 0), 0),
             balance: guestBookings.reduce((sum, bk) => sum + (bk.balance || 0), 0),
             room: rNum || '—',
@@ -397,7 +402,7 @@ function GuestsCrmPage() {
                   <th className="py-3 px-4">Current/Last Stay</th>
                   <th className="py-3 px-4">Room</th>
                   <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("stays")}>Total Stays</th>
-                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("balance")}>Balance</th>
+                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("tariff")}>Tariff</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
                 </tr>
@@ -433,8 +438,8 @@ function GuestsCrmPage() {
                       {g.room && g.room !== '—' ? (String(g.room).startsWith('Room') ? g.room : `Room ${g.room}`) : '—'}
                     </td>
                     <td className="py-3.5 px-4 text-center align-middle font-bold">{g.stays} {g.stays === 1 ? 'Stay' : 'Stays'}</td>
-                    <td className={`py-3.5 px-4 text-left align-middle font-black ${g.balance > 0 ? "text-destructive" : "text-success"}`}>
-                      ₹{(g.balance || 0).toLocaleString()}
+                    <td className="py-3.5 px-4 text-left align-middle font-bold text-navy">
+                      ₹{Number(g.tariff !== undefined ? g.tariff : (g.spend || g.balance || 0)).toLocaleString("en-IN")}
                     </td>
                     <td className="py-3.5 px-4 text-center align-middle">
                       <Tag tone={g.status === "Staying-In" ? "success" : g.status === "Expected" ? "warning" : "neutral"}>
@@ -501,7 +506,7 @@ function GuestsCrmPage() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
           <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col">
             <div className="p-4.5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-semibold text-navy text-sm">Add Note: {noteTargetGuest.name}</h3>
+              <h3 className="font-semibold text-slate-800 text-sm">Add Note: {noteTargetGuest.name}</h3>
               <Button
                 variant="ghost"
                 size="icon"

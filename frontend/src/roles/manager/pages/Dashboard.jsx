@@ -33,7 +33,7 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
           <div className="h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
-          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none whitespace-nowrap">{value}</h3>
+          <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
@@ -412,7 +412,7 @@ function ManagerDashboard() {
             <div className="p-4 border-b border-muted/60 bg-gradient-to-r from-navy/5 via-transparent to-purple/5 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                <h3 className="font-bold text-xs uppercase tracking-wider text-navy">Quick Manager Actions</h3>
+                <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800">Quick Manager Actions</h3>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy/5 text-navy-deep border border-navy/10">Fast Access</span>
             </div>

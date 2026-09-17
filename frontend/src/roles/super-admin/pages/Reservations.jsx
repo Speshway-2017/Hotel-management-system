@@ -250,7 +250,15 @@ function SuperAdminReservations() {
               <tbody className="divide-y font-sans">
                 {filteredReservations.map((r) => {
                   const pay = getPaymentStatus(r.amount, r.balance);
-                  const isCancellable = r.status === "Confirmed" || r.status === "Pending";
+                  const statusLower = String(r.status || '').toLowerCase().trim();
+                  const isTerminal = 
+                    statusLower === "checked-out" || 
+                    statusLower === "checked out" || 
+                    statusLower === "checked_out" || 
+                    statusLower === "completed" || 
+                    statusLower === "cancelled" || 
+                    statusLower === "canceled";
+                  const isCancellable = !isTerminal && (r.status === "Confirmed" || r.status === "Pending");
 
                   return (
                     <tr key={r.id || r._id} className="hover:bg-muted/15 transition-colors">

@@ -256,3 +256,9 @@ export function PaymentActionIcon({ label = "Payment", title = "View Payment Det
 }
 export const PaymentActionButton = PaymentActionIcon;
 
+export function FeedbackActionIcon({ label = "Feedback", title = "Submit Stay Feedback", ...props }) {
+  return <ActionIcon icon={Star} label={label} title={title} variant="warning" {...props} />;
+}
+export const FeedbackActionButton = FeedbackActionIcon;
+
+

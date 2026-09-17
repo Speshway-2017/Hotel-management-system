@@ -29,7 +29,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
-          <h3 className="mt-2.5 font-display text-base font-black text-navy leading-none">{value}</h3>
+          <h3 className="mt-2.5 font-sans tracking-tight tabular-nums text-base font-bold text-slate-800 leading-none">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
@@ -346,7 +346,7 @@ function AdminChannelsPage() {
             
             <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-navy text-sm">{selectedLogs.name} API Sync Audit logs</h3>
+                <h3 className="font-bold text-slate-800 text-sm">{selectedLogs.name} API Sync Audit logs</h3>
                 <p className="text-[10px] text-muted-foreground uppercase font-semibold mt-0.5">Channel Commission: {selectedLogs.commission}%</p>
               </div>
               <Button

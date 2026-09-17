@@ -15,6 +15,7 @@ import {
   Percent,
   Info,
   Phone,
+  Mail,
   ShieldCheck,
   Building
 } from "lucide-react";
@@ -213,6 +214,12 @@ function ViewReservation() {
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Contact Phone</span>
                   <p className="font-semibold text-muted-foreground mt-0.5 flex items-center gap-1.5">
                     <Phone className="size-3 text-purple" /> {booking.phone || "—"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Email Address</span>
+                  <p className="font-semibold text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                    <Mail className="size-3 text-purple" /> {booking.email || "—"}
                   </p>
                 </div>
                 <div>

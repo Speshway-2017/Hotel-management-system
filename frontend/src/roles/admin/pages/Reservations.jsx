@@ -91,7 +91,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
         <div className="h-8 flex items-start">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
-        <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[10px] text-muted-foreground truncate">
         {hint}
@@ -562,7 +562,7 @@ function ReservationsPage() {
           ) : paginatedData.length === 0 ? (
             <div className="p-16 text-center">
               <CalendarCheck className="size-12 text-muted-foreground/45 mx-auto mb-3" />
-              <h3 className="font-semibold text-navy">No reservations found</h3>
+              <h3 className="font-semibold text-slate-800">No reservations found</h3>
               <p className="text-xs text-muted-foreground mt-1">Try modifying your filter settings or create a new booking.</p>
             </div>
           ) : (
@@ -663,37 +663,56 @@ function ReservationsPage() {
                           </td>
                           <td className="py-3.5 pl-3 pr-4 text-left align-middle min-w-[240px] whitespace-nowrap">
                             <ActionGroup align="left">
-                              {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
-                                <CheckInActionButton
-                                  onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
-                                />
-                              )}
-                              {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
-                                <>
-                                  <ExtendStayButton
-                                    booking={res}
-                                    onClick={() => navigate({ to: `/admin/reservations/extend/${res._id || res.id || res.bookingId}` })}
-                                  />
-                                  <CheckOutActionButton
-                                    onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
-                                  />
-                                </>
-                              )}
-                              <ViewActionButton
-                                onClick={() => navigate({ to: `/admin/reservations/view/${res._id || res.id}` })}
-                              />
-                              {res.status !== "Checked-out" && res.status !== "Checked Out" && (
-                                <>
-                                  <EditActionButton
-                                    onClick={() => navigate({ to: `/admin/reservations/edit/${res._id || res.id}` })}
-                                  />
-                                  <DeleteActionButton
-                                    label="Cancel"
-                                    title="Cancel Reservation"
-                                    onClick={() => handleDelete(res._id)}
-                                  />
-                                </>
-                              )}
+                              {(() => {
+                                const statusLower = String(res.status || '').toLowerCase().trim();
+                                const isTerminal = 
+                                  statusLower === "checked-out" || 
+                                  statusLower === "checked out" || 
+                                  statusLower === "checked_out" || 
+                                  statusLower === "completed" || 
+                                  statusLower === "cancelled" || 
+                                  statusLower === "canceled";
+
+                                if (isTerminal) {
+                                  return (
+                                    <ViewActionButton
+                                      onClick={() => navigate({ to: `/admin/reservations/view/${res._id || res.id}` })}
+                                    />
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
+                                      <CheckInActionButton
+                                        onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
+                                      />
+                                    )}
+                                    {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
+                                      <>
+                                        <ExtendStayButton
+                                          booking={res}
+                                          onClick={() => navigate({ to: `/admin/reservations/extend/${res._id || res.id || res.bookingId}` })}
+                                        />
+                                        <CheckOutActionButton
+                                          onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
+                                        />
+                                      </>
+                                    )}
+                                    <ViewActionButton
+                                      onClick={() => navigate({ to: `/admin/reservations/view/${res._id || res.id}` })}
+                                    />
+                                    <EditActionButton
+                                      onClick={() => navigate({ to: `/admin/reservations/edit/${res._id || res.id}` })}
+                                    />
+                                    <DeleteActionButton
+                                      label="Cancel"
+                                      title="Cancel Reservation"
+                                      onClick={() => handleDelete(res._id)}
+                                    />
+                                  </>
+                                );
+                              })()}
                             </ActionGroup>
                           </td>
                         </tr>
@@ -736,7 +755,7 @@ function ReservationsPage() {
         /* Scheduler Reservation Calendar Component */
         <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-muted">
-            <h3 className="font-display font-black text-navy text-md">Room Scheduler Grid</h3>
+            <h3 className="font-sans tracking-tight tabular-nums font-bold text-slate-800 text-md">Room Scheduler Grid</h3>
             <div className="flex items-center gap-2 select-none">
               <Button size="icon" variant="ghost" className="size-8 cursor-pointer" onClick={handlePrevWeek} title="Previous Week">
                 <ChevronLeft className="size-4" />
@@ -824,7 +843,7 @@ function ReservationsPage() {
       {/* Waitlist Management Section */}
       <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
         <div className="pb-3 border-b border-muted flex items-center justify-between">
-          <h3 className="font-display font-black text-navy text-sm">Waitlisted Stays & Approvals</h3>
+          <h3 className="font-sans tracking-tight tabular-nums font-bold text-slate-800 text-sm">Waitlisted Stays & Approvals</h3>
           <span className="rounded-full bg-warning/10 text-warning px-2.5 py-0.5 text-[10px] font-bold border border-warning/20">
             {waitlist.length} Pending Approval
           </span>
@@ -837,7 +856,7 @@ function ReservationsPage() {
             {waitlist.map((item) => (
               <div key={item.id} className="p-4 rounded-xl border border-muted flex items-start justify-between gap-3 hover:bg-muted/15 transition-all">
                 <div>
-                  <h4 className="font-semibold text-navy text-sm">{item.guest}</h4>
+                  <h4 className="font-semibold text-slate-800 text-sm">{item.guest}</h4>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{item.phone} · Category: <span className="font-semibold">{item.roomType}</span></p>
                   <p className="text-[10px] text-muted-foreground mt-1">Requested Dates: {item.dates}</p>
                 </div>
@@ -875,7 +894,7 @@ function ReservationsPage() {
             {/* Header */}
             <div className="p-5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-navy-deep">Stay Diagnostic & Actions Panel</h3>
+                <h3 className="text-sm font-bold text-slate-800-deep">Stay Diagnostic & Actions Panel</h3>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Booking Reference: <strong className="text-navy">{selectedRes._id || selectedRes.id}</strong></p>
               </div>
               <Button size="icon" variant="ghost" className="size-8 rounded-full" onClick={() => setIsDrawerOpen(false)}>

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { PageHeader, Panel, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
@@ -28,45 +28,45 @@ function AddGuestPage() {
     state: "",
     country: "India",
     address: "",
-    type: "Regular", // Regular | VIP | Corporate
-    preferences: "",
-    idDocType: "Aadhaar Card",
-    idDocNumber: "",
-    notes: ""
+    notes: "",
+    type: "regular",
+    idType: "aadhaar",
+    idNumber: "",
+    emergencyContact: "",
+    status: "active"
   });
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.id]: e.target.value
-    });
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error("Please fill in guest name, email, and phone contact.");
+    if (!formData.name || !formData.phone) {
+      toast.error("Please fill in required fields (Name and Phone).");
       return;
     }
 
     setLoading(true);
     try {
-      await superAdminService.createUser({
+      // 1. First format custom metadata and ID info
+      const notesWithId = `[ID: ${formData.idType.toUpperCase()} - ${formData.idNumber || 'None'}] ${formData.notes || ''}`.trim();
+      
+      const payload = {
         name: formData.name,
         email: formData.email,
-        mobile: formData.phone,
-        password: "Password123!",
-        role: "guest",
+        phone: formData.phone,
         city: formData.city,
         state: formData.state,
         country: formData.country,
         address: formData.address,
+        notes: notesWithId,
         type: formData.type,
-        preferences: formData.preferences,
-        idDocType: formData.idDocType,
-        idDocNumber: formData.idDocNumber,
-        notes: formData.notes
-      });
+        status: formData.status
+      };
+
+      await superAdminService.createGuest(payload);
       
       toast.success(`Guest profile for ${formData.name} created!`);
       navigate({ to: "/admin/guests" });
@@ -80,11 +80,6 @@ function AddGuestPage() {
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
       <div className="space-y-3.5">
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Guests", to: "/admin/guests" },
-          { label: "Add Guest" }
-        ]} />
         <PageHeader
           title="Register Guest Profile"
           subtitle="Define personal dossiers, preferences, and secure regulatory documents."

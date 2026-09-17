@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Crumbs, Tag } from "@/components/hs/kit";
+import { Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { adminService } from "@/services/admin";
 import { superAdminService } from "@/services/superAdmin";
@@ -18,55 +18,41 @@ export const Route = createFileRoute("/admin/rooms/view/$id")({
 function ViewRoomPage() {
   const params = Route.useParams();
   const targetId = params?.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
-
   const navigate = useNavigate();
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchRoom() {
-      setLoading(true);
-      setError("");
       try {
-        const res = await adminService.getRooms();
-        if (res.success && res.data && res.data.length > 0) {
-          const decoded = decodeURIComponent(String(targetId)).toLowerCase();
-          const matched = res.data.find(r => 
-            (r._id && String(r._id).toLowerCase() === decoded) || 
-            (r.id && String(r.id).toLowerCase() === decoded) || 
-            (r.roomNumber && String(r.roomNumber).toLowerCase() === decoded) ||
-            (r.category && String(r.category).toLowerCase() === decoded)
-          );
+        setLoading(true);
+        let data = null;
+        try {
+          data = await adminService.getRoom(targetId);
+        } catch (e) {
+          console.warn("adminService.getRoom failed, falling back to all rooms:", e);
+        }
 
-          if (matched) {
-            setRoom(matched);
-            setLoading(false);
-            return;
-          }
+        if (!data) {
+          const all = await adminService.getRooms();
+          const list = Array.isArray(all) ? all : (all?.data || all?.rooms || []);
+          data = list.find(r => (r._id || r.id) === targetId);
+        }
+
+        if (!data) {
+          const saRooms = await superAdminService.getRooms();
+          const list = Array.isArray(saRooms) ? saRooms : (saRooms?.data || saRooms?.rooms || []);
+          data = list.find(r => (r._id || r.id) === targetId);
+        }
+
+        if (data) {
+          setRoom(data);
         }
       } catch (err) {
-        setError(err.message || "Failed to fetch room from backend.");
+        console.error("Failed to load room data:", err);
+      } finally {
+        setLoading(false);
       }
-
-      // Dynamic fallback room object construction
-      const decodedTarget = decodeURIComponent(String(targetId));
-      const cleanNum = decodedTarget.match(/\d+/)?.[0] || "101";
-      const fallbackRoom = {
-        _id: targetId,
-        roomNumber: cleanNum,
-        category: decodedTarget.includes("Room") || decodedTarget.includes("Suite") ? decodedTarget : "Standard Room",
-        floor: `Floor ${cleanNum[0] || '1'}`,
-        capacity: "2 Adults",
-        bedType: "King Bed",
-        status: "Available",
-        baseRate: 3500,
-        ratePlan: "Standard Plan",
-        amenities: ["Air Conditioning", "High-speed Wi-Fi", "Flat Screen TV", "Room Service"],
-        description: `Premium accommodation particulars for ${decodedTarget}. Styled with modern hotel interior designs.`
-      };
-      setRoom(fallbackRoom);
-      setLoading(false);
     }
 
     if (targetId) {
@@ -79,11 +65,6 @@ function ViewRoomPage() {
   if (loading) {
     return (
       <div className="space-y-6 text-left font-sans animate-fade-in font-ui p-6">
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: "View Room" }
-        ]} />
         <div className="py-12 text-center">
           <div className="mx-auto size-8 rounded-full border-4 border-navy border-t-transparent animate-spin mb-3" />
           <p className="text-xs font-bold text-navy/60">Loading room specifications from MongoDB...</p>
@@ -95,12 +76,8 @@ function ViewRoomPage() {
   if (!room) {
     return (
       <div className="space-y-6 text-left font-sans animate-fade-in font-ui p-6">
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: "View Room" }
-        ]} />
-        <PageHeader title="Room Not Found" subtitle="The requested room record does not exist or was removed from MongoDB." />
+        <div className="text-sm font-bold text-navy">Room Not Found</div>
+        <p className="text-xs text-muted-foreground">The requested room record does not exist or was removed from MongoDB.</p>
       </div>
     );
   }
@@ -121,19 +98,7 @@ function ViewRoomPage() {
   const roomImages = Array.isArray(room.images) ? room.images.filter(Boolean) : [];
 
   return (
-    <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
-      <div>
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: `Room ${room.roomNumber}` }
-        ]} />
-        <PageHeader
-          title={`Room ${room.roomNumber} Details`}
-          subtitle="Detailed specifications, photos, active rate plan, and live operational status from MongoDB."
-        />
-      </div>
-
+    <div className="space-y-4 text-left font-sans animate-fade-in font-ui">
       <div className="max-w-2xl space-y-6">
 
         {/* Dynamic Room Images Gallery */}

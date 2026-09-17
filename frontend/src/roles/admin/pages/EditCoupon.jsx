@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea, FormField } from "@/components/hs/FormFields";
 import { adminService } from "@/services/admin";
@@ -170,13 +170,6 @@ function EditCoupon() {
 
   return (
     <div className="space-y-6 text-left max-w-6xl pb-16">
-      <Crumbs
-        items={[
-          { label: "Coupons", to: "/admin/coupons" },
-          { label: `Edit Coupon: ${formData.code}` }
-        ]}
-      />
-
       <PageHeader
         title={`Edit Coupon: ${formData.code}`}
         subtitle="Modify discount configuration, validity window, usage caps, and property scope."

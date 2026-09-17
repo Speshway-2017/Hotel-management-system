@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -106,13 +106,6 @@ function ReceptionReservationDetailsPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
-      <Crumbs
-        items={[
-          { label: "Reservations", to: "/reception/reservations" },
-          { label: booking ? `Reservation #${booking.bookingId || id}` : "Reservation Details" }
-        ]}
-      />
-      
       {/* Dynamic navbar header override */}
       <PageHeader />
 
@@ -143,7 +136,7 @@ function ReceptionReservationDetailsPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Stay Dates</p>
-                  <p className="font-semibold text-sm text-navy">{booking.checkIn} - {booking.checkOut} ({booking.nights} Nights)</p>
+                  <p className="font-semibold text-sm text-navy">{booking.checkIn} - {booking.checkOut} ({booking.nights || 1} {Number(booking.nights) === 1 ? 'Night' : 'Nights'})</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Booking Source Channel</p>

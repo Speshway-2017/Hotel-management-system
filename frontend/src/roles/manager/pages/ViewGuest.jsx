@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -154,13 +154,6 @@ function ManagerViewGuest() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs
-        items={[
-          { label: "Guests Directory", to: "/manager/guests" },
-          { label: guestProfile ? guestProfile.name : "Guest CRM Profile" }
-        ]}
-      />
-
       <PageHeader
         title={guestProfile ? `${guestProfile.name}'s Profile` : "Guest CRM Profile"}
         subtitle="Stay metrics, dynamic room preferences, and feedback tracking ledger."

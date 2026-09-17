@@ -706,6 +706,39 @@ td {
   border-left-color: var(--accent-color, #0d1b2a) !important;
 }
 
+/* Enforce modern, clean sans font style with refined weight and softened color for numbers, dates, and metrics across all dashboard KPI cards */
+.PremiumStatCard h3,
+.PremiumStatCard h4,
+.PremiumStatCard p.text-2xl,
+.PremiumStatCard [class*="text-lg"],
+.PremiumStatCard [class*="text-xl"],
+.PremiumStatCard [class*="text-2xl"],
+.StatCard h3,
+.StatCard h4,
+.StatCard p,
+.dashboard-theme .PremiumStatCard h3,
+.dashboard-theme .PremiumStatCard h4 {
+  font-family: var(--font-sans, "Inter", ui-sans-serif, system-ui, sans-serif) !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -0.01em !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+}
+
+.dark .PremiumStatCard h3,
+.dark .PremiumStatCard h4,
+.dark .PremiumStatCard p.text-2xl,
+.dark .PremiumStatCard [class*="text-lg"],
+.dark .PremiumStatCard [class*="text-xl"],
+.dark .PremiumStatCard [class*="text-2xl"],
+.dark .StatCard h3,
+.dark .StatCard h4,
+.dark .StatCard p,
+.dark .dashboard-theme .PremiumStatCard h3,
+.dark .dashboard-theme .PremiumStatCard h4 {
+  color: #f1f5f9 !important;
+}
+
 /* Card shadow overrides using #FEF9F1 for glowing soft warm shadows in dashboard */
 .dashboard-theme .shadow-soft,
 .dashboard-theme .PremiumStatCard,

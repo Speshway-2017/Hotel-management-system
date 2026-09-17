@@ -49,74 +49,92 @@ class AppColors {
   static const Color purpleBg = Color(0xFFEDE9FE);
 
   static Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
+    final s = status.toLowerCase().trim().replaceAll('_', '-').replaceAll(' ', '-');
+    switch (s) {
       case 'confirmed':
-      case 'available':
-      case 'active':
-      case 'settled':
-      case 'paid':
+      case 'booked':
+      case 'pre-checked':
       case 'approved':
-      case 'present':
-        return success;
+        return const Color(0xFF1D4ED8); // Royal Sapphire Blue
+      case 'check-in':
       case 'checked-in':
-      case 'checked_in':
       case 'occupied':
       case 'staying':
-        return accent;
+      case 'in-house':
+      case 'active':
+      case 'present':
+        return const Color(0xFF059669); // Emerald Green
+      case 'check-out':
+      case 'checked-out':
+      case 'completed':
+      case 'settled':
+      case 'paid':
+      case 'refunded':
+        return const Color(0xFF7C3AED); // Amethyst Purple
+      case 'available':
+        return const Color(0xFF10B981); // Mint Green
       case 'pending':
       case 'reserved':
       case 'cleaning':
-        return warning;
-      case 'checked-out':
-      case 'checked_out':
-      case 'completed':
-      case 'refunded':
-        return purple;
+      case 'partial':
+      case 'unpaid':
+        return const Color(0xFFD97706); // Warm Amber
       case 'cancelled':
+      case 'canceled':
       case 'rejected':
       case 'blocked':
       case 'maintenance':
       case 'absent':
       case 'no-show':
-        return danger;
+      case 'overdue':
+        return const Color(0xFFDC2626); // Ruby Red
       default:
-        return textSecondary;
+        return const Color(0xFF64748B); // Slate Muted
     }
   }
 
   static Color getStatusBgColor(String status) {
-    switch (status.toLowerCase()) {
+    final s = status.toLowerCase().trim().replaceAll('_', '-').replaceAll(' ', '-');
+    switch (s) {
       case 'confirmed':
-      case 'available':
-      case 'active':
-      case 'settled':
-      case 'paid':
+      case 'booked':
+      case 'pre-checked':
       case 'approved':
-      case 'present':
-        return successBg;
+        return const Color(0xFFEFF6FF); // Sapphire Light Blue Tint
+      case 'check-in':
       case 'checked-in':
-      case 'checked_in':
       case 'occupied':
       case 'staying':
-        return infoBg;
+      case 'in-house':
+      case 'active':
+      case 'present':
+        return const Color(0xFFECFDF5); // Emerald Light Mint Tint
+      case 'check-out':
+      case 'checked-out':
+      case 'completed':
+      case 'settled':
+      case 'paid':
+      case 'refunded':
+        return const Color(0xFFF5F3FF); // Amethyst Light Purple Tint
+      case 'available':
+        return const Color(0xFFF0FDF4); // Light Green Tint
       case 'pending':
       case 'reserved':
       case 'cleaning':
-        return warningBg;
-      case 'checked-out':
-      case 'checked_out':
-      case 'completed':
-      case 'refunded':
-        return purpleBg;
+      case 'partial':
+      case 'unpaid':
+        return const Color(0xFFFEF3C7); // Warm Amber Tint
       case 'cancelled':
+      case 'canceled':
       case 'rejected':
       case 'blocked':
       case 'maintenance':
       case 'absent':
       case 'no-show':
-        return dangerBg;
+      case 'overdue':
+        return const Color(0xFFFEE2E2); // Ruby Light Red Tint
       default:
-        return const Color(0xFFF1F5F9);
+        return const Color(0xFFF1F5F9); // Neutral Slate Tint
     }
   }
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { FormField, Textarea } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -149,13 +149,6 @@ function ManagerViewApproval() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs
-        items={[
-          { label: "Approvals", to: "/manager/approvals" },
-          { label: request ? `Approval: ${request.id}` : "Approval Details" }
-        ]}
-      />
-
       <PageHeader
         title={request ? `Approval Request: ${request.id}` : "Approval Details"}
         subtitle="Audit operational exceptions, check values change, and log authorization decisions."

@@ -4,6 +4,7 @@ import '../../../models/feedback_model.dart';
 import '../../../models/reservation_model.dart';
 import '../../../providers/guest/guest_booking_provider.dart';
 import '../../../providers/guest/guest_feedback_provider.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestAddFeedbackScreen extends StatefulWidget {
   final String? reservationId;
@@ -22,18 +23,6 @@ class GuestAddFeedbackScreen extends StatefulWidget {
 }
 
 class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
-  // Hour Stay Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color navyLight = Color(0xFF1B2A4A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color ruby = Color(0xFFE53935);
 
   final _commentController = TextEditingController();
   final _formKey = GlobalKey<FormState>();

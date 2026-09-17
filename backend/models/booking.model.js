@@ -229,15 +229,50 @@ class BookingInstance {
   }
 }
 
+const matchBookingQuery = (b, query = {}) => {
+  if (!query || Object.keys(query).length === 0) return true;
+  if (query.propertyId && query.propertyId !== 'all' && b.propertyId !== query.propertyId) return false;
+  if (query.guestId && b.guestId !== query.guestId) return false;
+  if (query.status) {
+    if (typeof query.status === 'object') {
+      if (query.status.$nin && Array.isArray(query.status.$nin) && query.status.$nin.includes(b.status)) return false;
+      if (query.status.$in && Array.isArray(query.status.$in) && !query.status.$in.includes(b.status)) return false;
+      if (query.status.$ne && b.status === query.status.$ne) return false;
+    } else if (b.status !== query.status) {
+      return false;
+    }
+  }
+  if (query.email) {
+    if (query.email instanceof RegExp) {
+      if (!query.email.test(b.email || '')) return false;
+    } else if (typeof query.email === 'object' && query.email.$regex) {
+      const reg = new RegExp(query.email.$regex, query.email.$options || 'i');
+      if (!reg.test(b.email || '')) return false;
+    } else if (String(b.email || '').toLowerCase() !== String(query.email).toLowerCase()) {
+      return false;
+    }
+  }
+  if (query.phone) {
+    if (query.phone instanceof RegExp) {
+      if (!query.phone.test(b.phone || '')) return false;
+    } else if (typeof query.phone === 'object' && query.phone.$regex) {
+      const reg = new RegExp(query.phone.$regex, query.phone.$options || 'i');
+      if (!reg.test(b.phone || '')) return false;
+    } else if (String(b.phone || '').replace(/[^0-9]/g, '') !== String(query.phone).replace(/[^0-9]/g, '')) {
+      return false;
+    }
+  }
+  if (query.$or && Array.isArray(query.$or)) {
+    const matched = query.$or.some(subQ => matchBookingQuery(b, subQ));
+    if (!matched) return false;
+  }
+  return true;
+};
+
 const MockBooking = {
   find: async (query = {}) => {
     let list = readBookings();
-    if (query.propertyId) {
-      list = list.filter(b => b.propertyId === query.propertyId);
-    }
-    if (query.status) {
-      list = list.filter(b => b.status === query.status);
-    }
+    list = list.filter(b => matchBookingQuery(b, query));
     return list.map(b => new BookingInstance(b));
   },
   findOne: async (query) => {
@@ -410,12 +445,7 @@ const MockBooking = {
   },
   countDocuments: async (query = {}) => {
     let list = readBookings();
-    if (query.propertyId) {
-      list = list.filter(b => b.propertyId === query.propertyId);
-    }
-    if (query.status) {
-      list = list.filter(b => b.status === query.status);
-    }
+    list = list.filter(b => matchBookingQuery(b, query));
     return list.length;
   }
 };

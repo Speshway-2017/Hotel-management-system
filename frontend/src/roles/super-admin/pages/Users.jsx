@@ -158,7 +158,7 @@ function SuperAdminGuests() {
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Guests</span>
             <span className="p-2 rounded-lg bg-navy/5 text-navy"><User className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-navy font-display">{guestDirectory.length}</p>
+          <p className="mt-2 text-2xl font-extrabold text-navy font-sans tracking-tight tabular-nums">{guestDirectory.length}</p>
           <span className="text-[11px] text-muted-foreground">Registered profile accounts</span>
         </div>
 
@@ -167,7 +167,7 @@ function SuperAdminGuests() {
             <span className="text-xs font-semibold text-purple uppercase tracking-wider">Active Members</span>
             <span className="p-2 rounded-lg bg-purple/10 text-purple"><ShieldCheck className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-purple font-display">
+          <p className="mt-2 text-2xl font-extrabold text-purple font-sans tracking-tight tabular-nums">
             {guestDirectory.filter((g) => g.status === "Active").length}
           </p>
           <span className="text-[11px] text-muted-foreground">In good standing</span>
@@ -178,7 +178,7 @@ function SuperAdminGuests() {
             <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Total Completed Stays</span>
             <span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><Sparkles className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-display">
+          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-sans tracking-tight tabular-nums">
             {guestDirectory.reduce((sum, g) => sum + g.totalStays, 0)}
           </p>
           <span className="text-[11px] text-muted-foreground">Lifetime bookings aggregated</span>
@@ -230,16 +230,6 @@ function SuperAdminGuests() {
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadData(false)}
-              className="h-9 px-3 rounded-lg text-xs"
-              title="Refresh Directory"
-            >
-              <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
           </div>
         </div>
 

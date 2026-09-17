@@ -26,7 +26,7 @@ function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColo
           <div className="h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
-          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none whitespace-nowrap">{value}</h3>
+          <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
@@ -550,7 +550,7 @@ function SuperAdminDashboard() {
                 <Building2 className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <h4 className="font-bold text-[11px] text-navy group-hover:text-purple transition-colors truncate">Onboard Property</h4>
+                <h4 className="font-bold text-[11px] text-slate-800 group-hover:text-purple transition-colors truncate">Onboard Property</h4>
                 <p className="text-[9px] text-muted-foreground truncate">Register hotel profile & rooms</p>
               </div>
             </Link>
@@ -564,7 +564,7 @@ function SuperAdminDashboard() {
                 <TrendingUp className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <h4 className="font-bold text-[11px] text-navy group-hover:text-purple transition-colors truncate">Manage Subscriptions</h4>
+                <h4 className="font-bold text-[11px] text-slate-800 group-hover:text-purple transition-colors truncate">Manage Subscriptions</h4>
                 <p className="text-[9px] text-muted-foreground truncate">Pricing plans & billing</p>
               </div>
             </Link>
@@ -578,7 +578,7 @@ function SuperAdminDashboard() {
                 <Percent className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <h4 className="font-bold text-[11px] text-navy group-hover:text-purple transition-colors truncate">Promo Coupons</h4>
+                <h4 className="font-bold text-[11px] text-slate-800 group-hover:text-purple transition-colors truncate">Promo Coupons</h4>
                 <p className="text-[9px] text-muted-foreground truncate">Coupon codes & discounts</p>
               </div>
             </Link>
@@ -714,7 +714,7 @@ function SuperAdminDashboard() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
           <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
             <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-bold text-navy text-sm">Provide Rejection Reason</h3>
+              <h3 className="font-bold text-slate-800 text-sm">Provide Rejection Reason</h3>
               <button
                 className="text-muted-foreground hover:text-navy cursor-pointer"
                 onClick={() => setRejectionModalId(null)}

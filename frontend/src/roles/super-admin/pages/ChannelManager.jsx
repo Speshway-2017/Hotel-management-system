@@ -145,28 +145,28 @@ function SuperAdminChannelManager() {
         {/* Total Connected Channels */}
         <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#5B21B6" }}>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total Connected Channels</span>
-          <h4 className="font-display font-black text-2xl text-navy mt-2">3 / 4</h4>
+          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-slate-800 mt-2">3 / 4</h4>
           <p className="text-[10px] text-muted-foreground mt-1">MakeMyTrip, Goibibo, Booking</p>
         </div>
 
         {/* Active Properties */}
         <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#4E7C59" }}>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Active Properties</span>
-          <h4 className="font-display font-black text-2xl text-navy mt-2">6 Properties</h4>
+          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-slate-800 mt-2">6 Properties</h4>
           <p className="text-[10px] text-muted-foreground mt-1">Global group integration</p>
         </div>
 
         {/* Last Successful Sync */}
         <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#F5C06A" }}>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Last Successful Sync</span>
-          <h4 className="font-display font-black text-2xl text-navy mt-2">2 min ago</h4>
+          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-slate-800 mt-2">2 min ago</h4>
           <p className="text-[10px] text-muted-foreground mt-1">Via central XML gateway</p>
         </div>
 
         {/* Sync Issues */}
         <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#FF6B8B" }}>
           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Sync Issues Flagged</span>
-          <h4 className="font-display font-black text-2xl text-error mt-2">2 Mismatches</h4>
+          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-error mt-2">2 Mismatches</h4>
           <p className="text-[10px] text-muted-foreground mt-1">Requires immediate manual audit</p>
         </div>
       </div>
@@ -295,7 +295,7 @@ function SuperAdminChannelManager() {
             <div className="flex items-center justify-between pb-4 border-b border-muted">
               <div className="flex items-center gap-2">
                 <Activity className="size-4.5 text-purple" />
-                <h3 className="font-display font-bold text-lg text-navy">
+                <h3 className="font-display font-bold text-lg text-slate-800">
                   {modalType === "view" ? `${selectedChannel.name} Connectivity Report` : `Configure ${selectedChannel.name} Connection`}
                 </h3>
               </div>

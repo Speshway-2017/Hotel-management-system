@@ -625,7 +625,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:40:50.570Z",
-    "updatedAt": "2026-09-16T05:26:05.159Z"
+    "updatedAt": "2026-09-17T10:19:32.516Z"
   },
   {
     "id": "lfir6yhyu3b",
@@ -650,12 +650,10 @@
     "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
-    "fcmTokens": [
-      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
-    ],
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-16T11:28:58.471Z"
+    "updatedAt": "2026-09-17T10:08:47.401Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -809,13 +807,15 @@
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
-    "idDocNumber": "5356 7645 8547",
+    "idDocNumber": "5333 4664 8567",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": null,
-    "fcmTokens": [],
+    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
+    "fcmTokens": [
+      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
+    ],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-16T08:49:21.774Z"
+    "updatedAt": "2026-09-17T10:29:42.444Z"
   },
   {
     "id": "omk6dktv7lj",
@@ -863,39 +863,13 @@
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
-    "idDocNumber": "6536 7834 8788",
+    "idDocNumber": "4654 6864 9765",
     "loyaltyPoints": 0,
     "notes": "",
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-09-07T05:58:33.215Z",
-    "updatedAt": "2026-09-15T09:12:51.489Z"
-  },
-  {
-    "id": "roetf6hsy6c4218o9trtx9",
-    "_id": "roetf6hsy6c4218o9trtx9",
-    "name": "Rajesh Sharma",
-    "email": "manager@hourstay.com",
-    "password": "$2a$10$Xnyy.qjCAK7wC1HYODewieFEWUqDXIh3wzjOLqQBGplUa2VZ.fhq.",
-    "role": "manager",
-    "mobile": "9876543210",
-    "propertyId": "HS-JAI",
-    "status": "Active",
-    "dept": "Front Desk",
-    "shift": "Morning (06:00 - 14:00)",
-    "avatar": null,
-    "city": "",
-    "state": "",
-    "country": "India",
-    "address": "",
-    "type": "Regular",
-    "preferences": "",
-    "idDocType": "Aadhaar Card",
-    "idDocNumber": "",
-    "loyaltyPoints": 0,
-    "notes": "",
-    "createdAt": "2026-09-08T05:16:33.982Z",
-    "updatedAt": "2026-09-08T11:50:17.881Z"
+    "updatedAt": "2026-09-17T09:24:15.597Z"
   },
   {
     "id": "yl9oyu10cs",
@@ -1062,5 +1036,33 @@
     "fcmTokens": [],
     "createdAt": "2026-09-16T11:31:43.029Z",
     "updatedAt": "2026-09-16T11:31:43.179Z"
+  },
+  {
+    "id": "4ee628cl28x",
+    "_id": "4ee628cl28x",
+    "name": "Mounika",
+    "email": "mouni@gmail.com",
+    "password": "$2a$10$Kf99oa/UhKOTMD3KT0dU1uKClePsLy5NVU9SRSNW8UT8dkGJbfoUq",
+    "role": "guest",
+    "mobile": "4536464766",
+    "propertyId": null,
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "5667 7546 7646",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-09-03T09:46:59.613Z",
+    "updatedAt": "2026-09-17T08:47:07.717Z"
   }
 ]

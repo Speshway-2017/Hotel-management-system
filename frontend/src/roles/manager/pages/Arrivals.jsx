@@ -46,7 +46,7 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
           <div className="h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
-          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none whitespace-nowrap">{value}</h3>
+          <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none whitespace-nowrap">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">

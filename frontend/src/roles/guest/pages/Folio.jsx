@@ -302,7 +302,7 @@ function GuestFolioPage() {
                   <th className="py-3 px-4 text-right whitespace-nowrap">Paid Amount</th>
                   <th className="py-3 px-4 text-right whitespace-nowrap">Balance</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Payment Status</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap min-w-[80px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
@@ -343,8 +343,8 @@ function GuestFolioPage() {
                         {f.paymentStatus}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[80px]" onClick={(e) => e.stopPropagation()}>
-                      <ActionGroup align="right">
+                    <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[80px]" onClick={(e) => e.stopPropagation()}>
+                      <ActionGroup align="left">
                         <ViewActionIcon
                           title="View Folio Details"
                           onClick={(e) => {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/providers/manager/staff_provider.dart';
 import 'package:hour_stay_mobile/widgets/custom_text_field.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerAddStaffScreen extends StatefulWidget {
   const ManagerAddStaffScreen({super.key});
@@ -11,14 +12,6 @@ class ManagerAddStaffScreen extends StatefulWidget {
 }
 
 class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
-  // Hour Stay Theme Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color ruby = Color(0xFFEF4444);
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();

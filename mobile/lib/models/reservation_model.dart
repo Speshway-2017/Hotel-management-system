@@ -46,7 +46,7 @@ class ReservationModel {
   String get reservationNumber => bookingId;
   String get propertyName => hotel ?? 'Hour Stay Luxury Hotel';
   int get totalGuests => adults + children;
-  double get totalAmount => (originalAmount != null && originalAmount! > 0) ? originalAmount! : amount;
+  double get totalAmount => amount;
 
   // Refund helpers
   bool get hasRefundRequest => refundRequest != null || (refundStatus != 'None' && refundStatus.isNotEmpty);
@@ -199,6 +199,34 @@ class ReservationModel {
     final chCount = int.tryParse(json['children']?.toString() ?? '0') ?? 0;
     final rmCount = int.tryParse(json['roomsCount']?.toString() ?? json['rooms']?.toString() ?? '1') ?? 1;
 
+    final origAmt = double.tryParse(json['originalAmount']?.toString() ?? '');
+    final discAmt = double.tryParse(json['discountAmount']?.toString() ?? '');
+    double parsedAmount = double.tryParse(json['amount']?.toString() ?? json['totalAmount']?.toString() ?? json['netAmount']?.toString() ?? json['paidAmount']?.toString() ?? '0') ?? 0.0;
+    if (parsedAmount == 0.0 && origAmt != null && origAmt > 0) {
+      if (discAmt != null && discAmt > 0) {
+        parsedAmount = (origAmt - discAmt).clamp(0.0, double.infinity);
+      } else {
+        parsedAmount = origAmt;
+      }
+    }
+
+    final cInStr = json['checkIn'] ?? json['checkInDate'] ?? '';
+    final cOutStr = json['checkOut'] ?? json['checkOutDate'] ?? '';
+    int parsedNights = int.tryParse(json['nights']?.toString() ?? '') ?? 0;
+    if (cInStr.toString().isNotEmpty && cOutStr.toString().isNotEmpty) {
+      try {
+        final cInDt = DateTime.tryParse(cInStr.toString().trim());
+        final cOutDt = DateTime.tryParse(cOutStr.toString().trim());
+        if (cInDt != null && cOutDt != null) {
+          final diff = cOutDt.difference(cInDt).inDays;
+          if (diff > 0) {
+            parsedNights = diff;
+          }
+        }
+      } catch (_) {}
+    }
+    if (parsedNights <= 0) parsedNights = 1;
+
     return ReservationModel(
       id: json['id'] ?? json['_id'] ?? '',
       bookingId: json['bookingId'] ?? json['reservationNumber'] ?? json['id'] ?? json['_id'] ?? '',
@@ -208,14 +236,14 @@ class ReservationModel {
       room: rStr,
       roomNumber: rNum,
       roomType: json['roomType'] ?? json['type'] ?? 'Standard Room',
-      checkIn: json['checkIn'] ?? json['checkInDate'] ?? '',
-      checkOut: json['checkOut'] ?? json['checkOutDate'] ?? '',
-      nights: int.tryParse(json['nights']?.toString() ?? '1') ?? 1,
+      checkIn: cInStr.toString(),
+      checkOut: cOutStr.toString(),
+      nights: parsedNights,
       stayType: sType,
       hours: hrs,
-      amount: double.tryParse(json['originalAmount']?.toString() ?? json['amount']?.toString() ?? json['totalAmount']?.toString() ?? '0') ?? 0.0,
-      originalAmount: double.tryParse(json['originalAmount']?.toString() ?? ''),
-      discountAmount: double.tryParse(json['discountAmount']?.toString() ?? ''),
+      amount: parsedAmount,
+      originalAmount: origAmt,
+      discountAmount: discAmt,
       couponCode: json['couponCode']?.toString(),
       balance: double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0,
       status: json['status'] ?? 'Confirmed',

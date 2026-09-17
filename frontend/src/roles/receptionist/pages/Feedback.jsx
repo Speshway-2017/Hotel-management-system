@@ -52,7 +52,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a", icon: Ic
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           {Icon && <Icon className="size-4 text-muted-foreground/60" />}
         </div>
-        <h3 className="mt-1.5 font-display text-xl font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-xl font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[10px] font-semibold text-muted-foreground truncate">
         {hint}
@@ -340,13 +340,6 @@ export function ReceptionistFeedbackPage() {
           >
             <Plus className="size-4" /> Record Guest Feedback
           </Button>
-          <button
-            onClick={() => loadData(false)}
-            className="size-9 rounded-xl border border-navy/10 bg-white hover:bg-cream/40 text-navy flex items-center justify-center transition-colors shadow-soft cursor-pointer"
-            title="Refresh Feedback"
-          >
-            <RefreshCw className="size-4 text-purple" />
-          </button>
         </div>
       </div>
 
@@ -428,7 +421,7 @@ export function ReceptionistFeedbackPage() {
         <div className="bg-white rounded-2xl border border-navy/10 p-16 text-center space-y-4 shadow-soft">
           <MessageSquare className="size-12 text-navy/20 mx-auto" />
           <div>
-            <h3 className="font-display text-base font-bold text-navy">No Feedback Records Found</h3>
+            <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">No Feedback Records Found</h3>
             <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">
               Click "Record Guest Feedback" to enter checkout reviews directly at front desk.
             </p>
@@ -582,7 +575,7 @@ export function ReceptionistFeedbackPage() {
             <div className="flex items-center justify-between border-b border-navy/5 pb-4">
               <div>
                 <span className="text-[10px] uppercase font-bold text-purple tracking-widest block">Front Desk Entry</span>
-                <h3 className="font-display font-bold text-xl text-navy">Record Guest Feedback</h3>
+                <h3 className="font-sans tracking-tight tabular-nums font-bold text-xl text-slate-800">Record Guest Feedback</h3>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -698,7 +691,7 @@ export function ReceptionistFeedbackPage() {
             <div className="flex items-center justify-between border-b border-navy/5 pb-4">
               <div>
                 <span className="text-[10px] uppercase font-bold text-purple tracking-widest block">Front Desk Dossier</span>
-                <h3 className="font-display font-bold text-xl text-navy">
+                <h3 className="font-sans tracking-tight tabular-nums font-bold text-xl text-slate-800">
                   Feedback from {selectedFeedback.guestName || selectedFeedback.guest}
                 </h3>
               </div>
@@ -734,7 +727,7 @@ export function ReceptionistFeedbackPage() {
 
             {/* Guest Comment */}
             <div className="space-y-2">
-              <h4 className="font-bold text-xs text-navy uppercase tracking-wider">Guest Remarks</h4>
+              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Guest Remarks</h4>
               <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 text-xs text-navy leading-relaxed italic">
                 "{selectedFeedback.comment || selectedFeedback.comments}"
               </div>

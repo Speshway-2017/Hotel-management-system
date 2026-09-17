@@ -11,6 +11,7 @@ import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/screens/guest/bookings/guest_booking_detail_screen.dart';
 import 'package:hour_stay_mobile/services/api_service.dart';
 import 'package:hour_stay_mobile/widgets/empty_state.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestSearchScreen extends StatefulWidget {
   const GuestSearchScreen({super.key});
@@ -20,22 +21,10 @@ class GuestSearchScreen extends StatefulWidget {
 }
 
 class _GuestSearchScreenState extends State<GuestSearchScreen> {
-  // Hour Stay Brand Design System Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color navyLight = Color(0xFF1B2A4A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color ruby = Color(0xFFE53935);
-
   // Search & Filter Controllers & States
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedStatus = 'all'; // 'all', 'available', 'occupied', 'reserved'
   String _selectedCategory = 'all';
   String _selectedPropertyId = 'all';
   String _sortBy = 'recommended'; // 'recommended', 'price_asc', 'price_desc', 'rating'
@@ -58,6 +47,16 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   List<RoomModel> _rooms = [];
   bool _isLoading = false;
   String? _errorMessage;
+
+  // Predefined Categories
+  static const List<Map<String, dynamic>> _categoriesList = [
+    {'key': 'all', 'label': 'All Categories', 'icon': Icons.grid_view_rounded},
+    {'key': 'standard', 'label': 'Standard Room', 'icon': Icons.single_bed_rounded},
+    {'key': 'deluxe', 'label': 'Deluxe Room', 'icon': Icons.hotel_rounded},
+    {'key': 'executive', 'label': 'Executive Suite', 'icon': Icons.king_bed_rounded},
+    {'key': 'penthouse', 'label': 'Penthouse', 'icon': Icons.apartment_rounded},
+    {'key': 'villa', 'label': 'Luxury Villa', 'icon': Icons.villa_rounded},
+  ];
 
   @override
   void initState() {
@@ -155,17 +154,33 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // Filtered rooms
   List<RoomModel> get _filteredRooms {
     var list = _rooms.where((room) {
-      // 1. Availability filter
+      // 1. Status Navigation Tab Filter (all, available, occupied, reserved)
+      if (_selectedStatus != 'all') {
+        final st = room.status.toLowerCase().trim();
+        final op = room.operationalStatus.toLowerCase().trim();
+        if (_selectedStatus == 'available') {
+          final isAvail = st == 'available' || (room.isAvailable && st != 'occupied' && st != 'reserved');
+          if (!isAvail) return false;
+        } else if (_selectedStatus == 'occupied') {
+          final isOcc = st == 'occupied' || op == 'occupied' || (room.guest != null && room.guest!.isNotEmpty && !room.isAvailable);
+          if (!isOcc) return false;
+        } else if (_selectedStatus == 'reserved') {
+          final isRes = st == 'reserved' || room.isReserved || op == 'reserved';
+          if (!isRes) return false;
+        }
+      }
+
+      // 2. Availability toggle filter
       if (_onlyAvailable && !room.isAvailable) {
         return false;
       }
 
-      // 2. Property filter
+      // 3. Property filter
       if (_selectedPropertyId != 'all') {
         if (room.propertyId != _selectedPropertyId) return false;
       }
 
-      // 3. Category filter
+      // 4. Category filter (from category filter bar beside search bar)
       if (_selectedCategory != 'all') {
         final cat = room.category.toLowerCase();
         final sel = _selectedCategory.toLowerCase();
@@ -176,17 +191,17 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         if (!isMatch) return false;
       }
 
-      // 4. Max Price filter
+      // 5. Max Price filter
       final price = _calculateRoomPrice(room);
       if (price > _maxPrice) return false;
 
-      // 5. Breakfast filter
+      // 6. Breakfast filter
       if (_onlyBreakfast) {
         final hasBreakfast = room.amenities.any((a) => a.toLowerCase().contains('breakfast') || a.toLowerCase().contains('dining'));
         if (!hasBreakfast) return false;
       }
 
-      // 6. Selected Amenities filter
+      // 7. Selected Amenities filter
       if (_selectedAmenities.isNotEmpty) {
         for (final amenity in _selectedAmenities) {
           final has = room.amenities.any((a) => a.toLowerCase().contains(amenity.toLowerCase()));
@@ -194,7 +209,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         }
       }
 
-      // 7. Search query filter (matches Category, Room Number, City, Property Name, Floor, Amenities)
+      // 8. Search query filter (matches Category, Room Number, City, Property Name, Floor, Amenities)
       if (_searchQuery.trim().isNotEmpty) {
         final q = _searchQuery.toLowerCase().trim();
         final matchesCat = room.category.toLowerCase().contains(q);
@@ -227,6 +242,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
     setState(() {
       _searchController.clear();
       _searchQuery = '';
+      _selectedStatus = 'all';
       _selectedCategory = 'all';
       _selectedPropertyId = 'all';
       _sortBy = 'recommended';
@@ -241,6 +257,43 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       _roomsCount = 1;
     });
     _loadPropertiesAndRooms();
+  }
+
+  String _getCategoryDisplayName(String key) {
+    if (key == 'all') return 'All Categories';
+    final match = _categoriesList.firstWhere(
+      (c) => c['key'] == key,
+      orElse: () => {'key': key, 'label': key},
+    );
+    return match['label'] as String;
+  }
+
+  int _getCategoryRoomCount(String categoryKey) {
+    if (categoryKey == 'all') return _rooms.length;
+    final sel = categoryKey.toLowerCase();
+    return _rooms.where((r) {
+      final cat = r.category.toLowerCase();
+      return (sel == 'penthouse' && cat.contains('pent')) ||
+          (sel == 'villa' && (cat.contains('villa') || cat.contains('luxury'))) ||
+          cat.contains(sel) ||
+          sel.contains(cat);
+    }).length;
+  }
+
+  int _getStatusRoomCount(String statusKey) {
+    if (statusKey == 'all') return _rooms.length;
+    return _rooms.where((r) {
+      final st = r.status.toLowerCase().trim();
+      final op = r.operationalStatus.toLowerCase().trim();
+      if (statusKey == 'available') {
+        return st == 'available' || (r.isAvailable && st != 'occupied' && st != 'reserved');
+      } else if (statusKey == 'occupied') {
+        return st == 'occupied' || op == 'occupied' || (r.guest != null && r.guest!.isNotEmpty && !r.isAvailable);
+      } else if (statusKey == 'reserved') {
+        return st == 'reserved' || r.isReserved || op == 'reserved';
+      }
+      return false;
+    }).length;
   }
 
   @override
@@ -261,7 +314,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
               child: _buildSearchHeader(),
             ),
 
-            // 2. Results Header & Sorting Bar
+            // 2. Results Header & Summary Bar
             SliverToBoxAdapter(
               child: _buildResultsSummaryBar(filtered.length),
             ),
@@ -305,7 +358,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                   child: EmptyState(
                     icon: Icons.search_off_rounded,
                     title: 'No Matching Rooms Found',
-                    message: 'We could not find any rooms matching your search dates and filter criteria. Try adjusting filters or resetting your parameters.',
+                    message: 'We could not find any rooms matching your search criteria. Try adjusting your status or category filters.',
                     actionText: 'Reset Filters',
                     onAction: _resetAllFilters,
                   ),
@@ -346,45 +399,56 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // A. Full-Width Search Input
+          // A. Search Input + Room Category Filter Bar (Beside Search Bar)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cardBorder),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: navy,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search city, hotel, room type, WiFi...',
-                  hintStyle: const TextStyle(
-                    color: muted,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.normal,
+            child: Row(
+              children: [
+                // Search Input Field
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cardBorder),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: navy,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Search city, hotel, room, WiFi...',
+                        hintStyle: const TextStyle(
+                          color: muted,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: muted, size: 16),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
                   ),
-                  prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, color: muted, size: 16),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
-              ),
+                const SizedBox(width: 8),
+
+                // Category Filter Bar Button
+                _buildCategoryFilterBar(),
+              ],
             ),
           ),
           const SizedBox(height: 10),
@@ -480,33 +544,238 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
           ),
           const SizedBox(height: 12),
 
-          // C. Horizontal Category Navigation Tabs
-          _buildCategoryNavChips(),
+          // C. Filter Navigation Tabs (All Rooms, Available, Occupied, Reserved)
+          _buildStatusNavTabs(),
         ],
       ),
     );
   }
 
-  int _getCategoryRoomCount(String categoryKey) {
-    if (categoryKey == 'all') return _rooms.length;
-    final sel = categoryKey.toLowerCase();
-    return _rooms.where((r) {
-      final cat = r.category.toLowerCase();
-      return (sel == 'penthouse' && cat.contains('pent')) ||
-          (sel == 'villa' && (cat.contains('villa') || cat.contains('luxury'))) ||
-          cat.contains(sel) ||
-          sel.contains(cat);
-    }).length;
+  // Room Category Filter Button (Beside Search Bar)
+  Widget _buildCategoryFilterBar() {
+    final isFiltered = _selectedCategory != 'all';
+    final selectedLabel = _getCategoryDisplayName(_selectedCategory);
+
+    return InkWell(
+      onTap: _showCategoryFilterSheet,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isFiltered ? navy : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isFiltered ? gold : cardBorder,
+            width: 1.2,
+          ),
+          boxShadow: isFiltered
+              ? [
+                  BoxShadow(
+                    color: navy.withAlpha(40),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 17,
+              color: isFiltered ? gold : purple,
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 100),
+              child: Text(
+                isFiltered ? selectedLabel : 'Category',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isFiltered ? FontWeight.w800 : FontWeight.w700,
+                  color: isFiltered ? cream : navy,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: isFiltered ? gold : muted,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildCategoryNavChips() {
-    final categories = [
-      {'key': 'all', 'label': 'All Rooms'},
-      {'key': 'standard', 'label': 'Standard Room'},
-      {'key': 'deluxe', 'label': 'Deluxe Room'},
-      {'key': 'executive', 'label': 'Executive Suite'},
-      {'key': 'penthouse', 'label': 'Penthouse'},
-      {'key': 'villa', 'label': 'Luxury Villa'},
+  // Category Filter Bottom Sheet
+  void _showCategoryFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle Bar
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: cardBorder,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Header: Icon + Title + Close Button
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: purple.withAlpha(25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: purple.withAlpha(60)),
+                        ),
+                        child: const Icon(Icons.category_rounded, color: purple, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Room Category',
+                              style: TextStyle(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w800,
+                                color: navy,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Select a category to refine room results',
+                              style: TextStyle(fontSize: 12, color: muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20, color: muted),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Category Options
+                  ..._categoriesList.map((cat) {
+                    final key = cat['key'] as String;
+                    final label = cat['label'] as String;
+                    final icon = cat['icon'] as IconData;
+                    final count = _getCategoryRoomCount(key);
+                    final isSelected = _selectedCategory == key;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = key;
+                          });
+                          Navigator.pop(ctx);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isSelected ? navy : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected ? navy : cardBorder,
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                icon,
+                                size: 20,
+                                color: isSelected ? gold : purple,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSelected ? cream : navy,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? gold : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$count rooms',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSelected ? navy : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                              if (isSelected) ...[
+                                const SizedBox(width: 8),
+                                const Icon(Icons.check_circle_rounded, color: gold, size: 18),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Filter Navigation Tabs (All Rooms, Available, Occupied, Reserved)
+  Widget _buildStatusNavTabs() {
+    const statuses = [
+      {'key': 'all', 'label': 'All Rooms', 'icon': Icons.grid_view_rounded},
+      {'key': 'available', 'label': 'Available', 'icon': Icons.check_circle_outline_rounded},
+      {'key': 'occupied', 'label': 'Occupied', 'icon': Icons.person_rounded},
+      {'key': 'reserved', 'label': 'Reserved', 'icon': Icons.event_seat_rounded},
     ];
 
     return Padding(
@@ -518,19 +787,20 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
           physics: const BouncingScrollPhysics(),
           clipBehavior: Clip.hardEdge,
           padding: EdgeInsets.zero,
-          itemCount: categories.length,
+          itemCount: statuses.length,
           separatorBuilder: (context, index) => const SizedBox(width: 8),
           itemBuilder: (context, index) {
-            final cat = categories[index];
-            final key = cat['key']!;
-            final label = cat['label']!;
-            final count = _getCategoryRoomCount(key);
-            final isSelected = _selectedCategory == key;
+            final st = statuses[index];
+            final key = st['key'] as String;
+            final label = st['label'] as String;
+            final icon = st['icon'] as IconData;
+            final count = _getStatusRoomCount(key);
+            final isSelected = _selectedStatus == key;
 
             return InkWell(
               onTap: () {
                 setState(() {
-                  _selectedCategory = key;
+                  _selectedStatus = key;
                 });
               },
               borderRadius: BorderRadius.circular(20),
@@ -557,6 +827,12 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(
+                      icon,
+                      size: 15,
+                      color: isSelected ? gold : purple,
+                    ),
+                    const SizedBox(width: 6),
                     Text(
                       label,
                       style: TextStyle(
@@ -595,15 +871,56 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // 2. RESULTS SUMMARY BAR
   // ==========================================
   Widget _buildResultsSummaryBar(int count) {
+    String statusTitle = 'Rooms';
+    if (_selectedStatus == 'available') {
+      statusTitle = 'Available Rooms';
+    } else if (_selectedStatus == 'occupied') {
+      statusTitle = 'Occupied Rooms';
+    } else if (_selectedStatus == 'reserved') {
+      statusTitle = 'Reserved Rooms';
+    }
+
+    String catTag = '';
+    if (_selectedCategory != 'all') {
+      catTag = ' • ${_getCategoryDisplayName(_selectedCategory)}';
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Text(
-        '$count Available Rooms',
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          color: navy,
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            '$count $statusTitle$catTag',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: navy,
+            ),
+          ),
+          if (_selectedCategory != 'all' || _selectedStatus != 'all' || _searchQuery.isNotEmpty)
+            InkWell(
+              onTap: _resetAllFilters,
+              borderRadius: BorderRadius.circular(12),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 14, color: purple),
+                    SizedBox(width: 4),
+                    Text(
+                      'Clear',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: purple,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

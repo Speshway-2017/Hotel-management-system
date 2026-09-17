@@ -10,6 +10,7 @@ import '../feedback/guest_add_feedback_screen.dart';
 import '../folio/guest_folio_screen.dart';
 import '../search/guest_search_screen.dart';
 import 'guest_booking_detail_screen.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 
 class GuestBookingsScreen extends StatefulWidget {
@@ -28,25 +29,6 @@ class GuestBookingsScreen extends StatefulWidget {
 
 class _GuestBookingsScreenState extends State<GuestBookingsScreen>
     with SingleTickerProviderStateMixin {
-  // Hour Stay Brand Palette Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleBg = Color(0xFFEDE9FE);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color goldBg = Color(0xFFFEF3C7);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFDCFCE7);
-  static const Color ruby = Color(0xFFE53935);
-  static const Color rubyBg = Color(0xFFFEE2E2);
-  static const Color amber = Color(0xFFD97706);
-  static const Color amberBg = Color(0xFFFEF3C7);
-  static const Color blue = Color(0xFF2563EB);
-  static const Color blueBg = Color(0xFFDBEAFE);
 
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();

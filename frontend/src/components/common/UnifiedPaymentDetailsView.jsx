@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { PageHeader, Panel, Tag, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
@@ -104,12 +104,6 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
   if (!payment) {
     return (
       <div className="space-y-6 text-left">
-        <Crumbs
-          items={[
-            { label: "Payments", to: `/${role}/payments` },
-            { label: `Payment Details` }
-          ]}
-        />
         <div className="p-8 text-center space-y-4">
           <p className="text-sm font-bold text-navy">Payment record not found.</p>
         </div>
@@ -121,13 +115,6 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
-      <Crumbs
-        items={[
-          { label: "Payments", to: `/${role}/payments` },
-          { label: `Payment #${payment._id || id}` }
-        ]}
-      />
-      
       {/* Top Bar with Actions */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-muted pb-4">
         <div>

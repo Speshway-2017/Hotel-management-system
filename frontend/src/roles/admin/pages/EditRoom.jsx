@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -299,19 +298,7 @@ function EditRoomPage() {
   };
 
   return (
-    <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
-      <div>
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: `Edit Room ${roomNumber || targetId}` }
-        ]} />
-        <PageHeader
-          title={`Edit Room ${roomNumber || targetId}`}
-          subtitle="Modify room category, pricing structure, rate plan, photos, and operational status."
-        />
-      </div>
-
+    <div className="space-y-4 text-left font-sans animate-fade-in font-ui">
       <div className="max-w-2xl">
         <div className="bg-white rounded-2xl border border-navy/10 shadow-soft overflow-hidden">
           <form onSubmit={handleSubmit} className="p-6 space-y-5 text-left">

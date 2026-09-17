@@ -5,6 +5,7 @@ import '../../../core/constants/api_endpoints.dart';
 import '../../../models/user_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/guest/guest_settings_provider.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestSettingsScreen extends StatefulWidget {
   const GuestSettingsScreen({super.key});
@@ -14,22 +15,6 @@ class GuestSettingsScreen extends StatefulWidget {
 }
 
 class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
-  // Hour Stay Brand Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color navyLight = Color(0xFF1B2A4A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleLight = Color(0xFF7C3AED);
-  static const Color purpleBg = Color(0xFFEDE9FE);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF64748B);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color ruby = Color(0xFFE53935);
-  static const Color rubyBg = Color(0xFFFEF2F2);
-  static const Color amber = Color(0xFFF59E0B);
 
   @override
   void initState() {

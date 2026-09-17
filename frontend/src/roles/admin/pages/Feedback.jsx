@@ -55,7 +55,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a", icon: Ic
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           {Icon && <Icon className="size-4 text-muted-foreground/60" />}
         </div>
-        <h3 className="mt-1.5 font-display text-xl font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-xl font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[10px] font-semibold text-muted-foreground truncate">
         {hint}
@@ -314,12 +314,6 @@ function AdminFeedbackPage() {
             Monitor real-time guest reviews, satisfaction ratings, and manage property responses across MongoDB.
           </p>
         </div>
-        <button
-          onClick={() => loadData(false)}
-          className="px-3 py-1.5 rounded-xl border border-navy/10 bg-white hover:bg-cream/40 text-navy text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-soft cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className="size-3.5 text-purple" /> Refresh Feed
-        </button>
       </div>
 
       {/* Summary Statistics */}
@@ -416,7 +410,7 @@ function AdminFeedbackPage() {
         <div className="bg-white rounded-2xl border border-navy/10 p-16 text-center space-y-4 shadow-soft">
           <MessageSquare className="size-12 text-navy/20 mx-auto" />
           <div>
-            <h3 className="font-display text-base font-bold text-navy">No Feedback Records Found</h3>
+            <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">No Feedback Records Found</h3>
             <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">
               No reviews match the selected filters or search parameters.
             </p>
@@ -580,7 +574,7 @@ function AdminFeedbackPage() {
             <div className="flex items-center justify-between border-b border-navy/5 pb-4">
               <div>
                 <span className="text-[10px] uppercase font-bold text-purple tracking-widest block">Review Dossier</span>
-                <h3 className="font-display font-bold text-xl text-navy">
+                <h3 className="font-sans tracking-tight tabular-nums font-bold text-xl text-slate-800">
                   Feedback from {selectedFeedback.guestName || selectedFeedback.guest}
                 </h3>
               </div>
@@ -616,7 +610,7 @@ function AdminFeedbackPage() {
 
             {/* Sub-Ratings Matrix */}
             <div className="space-y-2">
-              <h4 className="font-bold text-xs text-navy uppercase tracking-wider">Rating Breakdown</h4>
+              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Rating Breakdown</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Cleanliness", val: selectedFeedback.ratings?.cleanliness || selectedFeedback.rating || 5 },
@@ -637,7 +631,7 @@ function AdminFeedbackPage() {
 
             {/* Guest Comment */}
             <div className="space-y-2">
-              <h4 className="font-bold text-xs text-navy uppercase tracking-wider">Guest Remarks</h4>
+              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Guest Remarks</h4>
               <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 text-xs text-navy leading-relaxed italic">
                 "{selectedFeedback.comment || selectedFeedback.comments}"
               </div>
@@ -645,7 +639,7 @@ function AdminFeedbackPage() {
 
             {/* Status Selector */}
             <div className="space-y-2">
-              <h4 className="font-bold text-xs text-navy uppercase tracking-wider">Publication Status</h4>
+              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Publication Status</h4>
               <div className="flex flex-wrap gap-2">
                 {["Published", "Pending", "Resolved", "Archived"].map((st) => (
                   <button

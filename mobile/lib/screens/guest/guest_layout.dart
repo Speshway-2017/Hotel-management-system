@@ -18,6 +18,7 @@ import 'payments/guest_payments_screen.dart';
 import 'profile/guest_profile_screen.dart';
 import 'search/guest_search_screen.dart';
 import 'settings/guest_settings_screen.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestLayout extends StatefulWidget {
   const GuestLayout({super.key});
@@ -29,12 +30,6 @@ class GuestLayout extends StatefulWidget {
 class _GuestLayoutState extends State<GuestLayout> {
   int _currentIndex = 0;
 
-  // Hour Stay Design Palette
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color badgeRed = Color(0xFFE53935);
 
   @override
   void initState() {

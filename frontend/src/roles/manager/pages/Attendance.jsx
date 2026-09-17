@@ -30,7 +30,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
         <div className="h-8 flex items-start">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
-        <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[10px] text-muted-foreground truncate">
         {hint}
@@ -275,7 +275,7 @@ function ManagerAttendancePage() {
         {paginatedAttendance.length === 0 ? (
           <div className="p-16 text-center">
             <FileSpreadsheet className="size-12 text-muted-foreground/45 mx-auto mb-3" />
-            <h3 className="font-semibold text-navy">No attendance records found</h3>
+            <h3 className="font-semibold text-slate-800">No attendance records found</h3>
             <p className="text-xs text-muted-foreground mt-1">Try changing target date or filter preferences.</p>
           </div>
         ) : (

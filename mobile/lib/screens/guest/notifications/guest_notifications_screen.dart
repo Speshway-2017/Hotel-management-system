@@ -9,6 +9,7 @@ import '../bookings/guest_bookings_screen.dart';
 import '../bookings/guest_booking_detail_screen.dart';
 import '../feedback/guest_feedback_screen.dart';
 import '../folio/guest_folio_screen.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestNotificationsScreen extends StatefulWidget {
   const GuestNotificationsScreen({super.key});
@@ -18,16 +19,6 @@ class GuestNotificationsScreen extends StatefulWidget {
 }
 
 class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
-  // Hour Stay Brand Design Tokens matching Manager Mobile
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -374,7 +365,7 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
       child: InkWell(
         onTap: () {
           if (isUnread) {
-            provider.markAsRead(notif.id);
+            provider.markAsRead(notif.id, title: notif.title, message: notif.message);
           }
           _showNotificationDetailSheet(context, notif, provider);
         },
@@ -510,8 +501,11 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     onSelected: (action) {
                       if (action == 'toggle') {
-                        provider.toggleReadStatus(notif.id);
+                        provider.toggleReadStatus(notif.id, title: notif.title, message: notif.message);
                       } else if (action == 'view') {
+                        if (isUnread) {
+                          provider.markAsRead(notif.id, title: notif.title, message: notif.message);
+                        }
                         _showNotificationDetailSheet(context, notif, provider);
                       }
                     },
@@ -562,6 +556,11 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
     NotificationModel notif,
     GuestNotificationProvider provider,
   ) {
+    // Automatically mark as read as soon as it is opened
+    if (!notif.isRead) {
+      provider.markAsRead(notif.id, title: notif.title, message: notif.message);
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -570,8 +569,17 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
         return Consumer<GuestNotificationProvider>(
           builder: (context, prov, _) {
             final updatedNotif = prov.notifications.firstWhere(
-              (n) => n.id == notif.id,
-              orElse: () => notif,
+              (n) => (n.id.isNotEmpty && n.id == notif.id) ||
+                     (n.title.trim() == notif.title.trim() && n.message.trim() == notif.message.trim()),
+              orElse: () => notif.isRead ? notif : NotificationModel(
+                id: notif.id,
+                title: notif.title,
+                message: notif.message,
+                category: notif.category,
+                isRead: true,
+                propertyId: notif.propertyId,
+                createdAt: notif.createdAt,
+              ),
             );
             final isUnread = !updatedNotif.isRead;
             final catColor = _getCategoryAccentColor(
@@ -721,7 +729,10 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: navy,
-                            side: const BorderSide(color: cardBorder, width: 1.5),
+                            side: BorderSide(
+                              color: isUnread ? emerald.withAlpha(120) : cardBorder,
+                              width: 1.5,
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -734,10 +745,18 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
                           ),
                           label: Text(
                             isUnread ? 'Mark Read' : 'Mark Unread',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: isUnread ? emerald : navy,
+                            ),
                           ),
                           onPressed: () {
-                            prov.toggleReadStatus(updatedNotif.id);
+                            prov.toggleReadStatus(
+                              updatedNotif.id,
+                              title: updatedNotif.title,
+                              message: updatedNotif.message,
+                            );
                           },
                         ),
                       ),

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { PageHeader, Panel, Tag, Crumbs, Notice } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -282,7 +282,6 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
   if (!booking) {
     return (
       <div className="p-8 max-w-2xl mx-auto font-ui text-left space-y-4">
-        <Crumbs items={[{ label: returnLabel, to: returnUrl }, { label: "Verification Record Missing" }]} />
         <Notice tone="error" title="Reservation Record Missing">
           The requested booking details could not be retrieved. Please check the reservation ledger.
         </Notice>
@@ -299,15 +298,9 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
 
   return (
     <div className="space-y-6 text-left font-ui animate-fade-in max-w-6xl mx-auto pb-12">
-      {/* Header & Breadcrumb */}
+      {/* Header & Title */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-navy/10 pb-4">
         <div className="space-y-2">
-          <Crumbs
-            items={[
-              { label: returnLabel, to: returnUrl },
-              { label: "Website Booking ID Verification & Check-In" }
-            ]}
-          />
           <h1 className="font-display text-2xl font-black text-navy flex items-center gap-2.5">
             <ShieldCheck className="size-6 text-emerald-600 shrink-0" />
             Guest Verification & Check-In

@@ -17,6 +17,75 @@ import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 
 const router = express.Router();
 
+// Helper to identify first-booking welcome coupons
+const isWelcomeCoupon = (coupon) => {
+  if (!coupon) return false;
+  if (coupon.firstBookingOnly === true || coupon.isFirstBookingOnly === true) return true;
+  const code = String(coupon.code || '').trim().toUpperCase();
+  const title = String(coupon.title || '').trim().toUpperCase();
+  const desc = String(coupon.description || '').toLowerCase();
+  return (
+    code.startsWith('WELCOME') ||
+    code.includes('WELCOME') ||
+    title.includes('WELCOME') ||
+    desc.includes('first booking') ||
+    desc.includes('first direct') ||
+    desc.includes('first-time') ||
+    desc.includes('first stay')
+  );
+};
+
+// Helper to extract user identity for coupon eligibility
+const extractUserIdentity = async (req) => {
+  let userId = req.query?.guestId || req.query?.userId || req.body?.guestId || req.body?.userId || null;
+  let email = req.query?.email || req.body?.email || null;
+  let phone = req.query?.phone || req.body?.phone || null;
+
+  if (req.headers && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    try {
+      const token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      if (decoded && decoded.id) {
+        userId = userId || decoded.id;
+        const u = await User.findById(decoded.id).select('email mobile name');
+        if (u) {
+          email = email || u.email;
+          phone = phone || u.mobile;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return { userId, email, phone };
+};
+
+// Check if a guest/user has already made 1 or more previous bookings
+const checkHasPreviousBookings = async ({ userId, email, phone }) => {
+  const orConditions = [];
+  if (userId) {
+    orConditions.push({ guestId: String(userId) });
+  }
+  if (email && String(email).trim()) {
+    const cleanEmail = String(email).trim();
+    orConditions.push({ email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } });
+  }
+  if (phone && String(phone).trim()) {
+    const cleanPhone = String(phone).trim().replace(/[^0-9]/g, '');
+    if (cleanPhone.length >= 7) {
+      orConditions.push({ phone: { $regex: new RegExp(cleanPhone.slice(-10)) } });
+    }
+  }
+
+  if (orConditions.length === 0) return false;
+
+  const count = await Booking.countDocuments({
+    $or: orConditions,
+    status: { $nin: ['Cancelled', 'Rejected'] }
+  });
+
+  return count > 0;
+};
+
 // GET /api/v1/public/branding
 router.get('/branding', async (req, res) => {
   try {
@@ -127,10 +196,19 @@ router.get('/properties/:id/rooms', async (req, res) => {
       dbRooms = await Room.find().sort({ roomNumber: 1 });
     }
 
-    // Fetch active bookings to evaluate date-range availability
+    // Fetch active bookings to evaluate date-range availability & room status
     const activeBookings = await Booking.find({
-      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
+      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in', 'Checked In', 'Staying', 'Pre-checked', 'Reserved'] }
     });
+
+    const parseTime = (dateStr) => {
+      if (!dateStr) return null;
+      const t = new Date(dateStr).getTime();
+      return isNaN(t) ? null : t;
+    };
+
+    const reqIn = parseTime(checkIn);
+    const reqOut = parseTime(checkOut);
 
     const mapped = dbRooms.map((rm) => {
       const rate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3000);
@@ -149,25 +227,46 @@ router.get('/properties/:id/rooms', async (req, res) => {
         : [];
       const capacityStr = String(rm.capacity || "2 Adults");
 
-      // Check if room is reserved for requested date range
-      let reservedForDates = false;
-      if (checkIn && checkOut) {
-        const reqIn = new Date(checkIn).getTime();
-        const reqOut = new Date(checkOut).getTime();
+      // Check for matching active booking
+      let matchedBooking = null;
+      let isOccupied = false;
+      let isReserved = false;
 
-        reservedForDates = activeBookings.some(b => {
-          const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
-          const matchesRoom = (b.roomId && String(b.roomId) === String(rm._id)) || (bRoomNum === rm.roomNumber);
-          if (!matchesRoom) return false;
+      for (const b of activeBookings) {
+        if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') continue;
 
-          const bIn = new Date(b.checkIn).getTime();
-          const bOut = new Date(b.checkOut).getTime();
+        const bRoomNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : null) || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
+        const matchesRoom = (b.roomId && String(b.roomId) === String(rm._id)) ||
+                            (bRoomNum && String(bRoomNum).trim() === String(rm.roomNumber).trim()) ||
+                            (b.room && String(b.room).includes(String(rm.roomNumber)));
+        if (!matchesRoom) continue;
 
-          return (reqIn < bOut && reqOut > bIn);
-        });
+        const bIn = parseTime(b.checkIn);
+        const bOut = parseTime(b.checkOut);
+
+        const dateOverlap = (!reqIn || !reqOut || !bIn || !bOut) ? true : (reqIn < bOut && reqOut > bIn);
+        if (dateOverlap) {
+          matchedBooking = b;
+          if (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying') {
+            isOccupied = true;
+          } else {
+            isReserved = true;
+          }
+        }
       }
 
-      const isAvailable = (rm.status === "Available" || rm.status === "Vacant Clean" || !rm.status) && !reservedForDates;
+      let displayStatus = rm.status || "Available";
+      if (rm.status !== 'Blocked') {
+        if (isOccupied || rm.status === 'Occupied') {
+          displayStatus = 'Occupied';
+        } else if (isReserved || rm.status === 'Reserved') {
+          displayStatus = 'Reserved';
+        } else if (rm.status === 'Available' || rm.status === 'Vacant Clean' || !rm.status) {
+          displayStatus = 'Available';
+        }
+      }
+
+      const isAvailable = displayStatus === "Available";
 
       return {
         id: rm._id ? String(rm._id) : (rm.id || `RM-${rm.roomNumber}`),
@@ -183,8 +282,13 @@ router.get('/properties/:id/rooms', async (req, res) => {
         currentRate: rate,
         dailyRate: rate,
         ratePlan: ratePlan || 'Standard Plan',
-        status: reservedForDates ? "Reserved" : rm.status || "Available",
+        status: displayStatus,
+        operationalStatus: rm.status || "Available",
+        isReserved: displayStatus === "Reserved",
         isAvailable: isAvailable,
+        guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : '',
+        checkIn: matchedBooking ? matchedBooking.checkIn : '',
+        checkOut: matchedBooking ? matchedBooking.checkOut : '',
         amenities: amenitiesArr,
         description: rm.description || `Luxury ${rm.category} located on ${rm.floor || 'Floor 1'}.`,
         floor: rm.floor || "Floor 1",
@@ -438,12 +542,25 @@ router.post('/bookings', async (req, res) => {
       const cleanCode = String(requestedCouponCode).trim().toUpperCase();
       const coupon = await Coupon.findOne({ code: cleanCode, status: 'Active' });
       if (coupon) {
+        // Enforce first-booking only restriction for Welcome-related promo codes
+        let isEligible = true;
+        if (isWelcomeCoupon(coupon)) {
+          const hasPrevious = await checkHasPreviousBookings({
+            userId: guestId,
+            email: cleanEmail,
+            phone: cleanPhone
+          });
+          if (hasPrevious) {
+            isEligible = false;
+          }
+        }
+
         const todayStr = new Date().toISOString().split('T')[0];
         const isDateValid = (!coupon.validFrom || todayStr >= coupon.validFrom) && (!coupon.validUntil || todayStr <= coupon.validUntil);
         const isUsageValid = !coupon.usageLimit || coupon.usageLimit === 0 || (coupon.usedCount || 0) < coupon.usageLimit;
         const isMinAmountValid = !coupon.minBookingAmount || amt >= coupon.minBookingAmount;
 
-        if (isDateValid && isUsageValid && isMinAmountValid) {
+        if (isEligible && isDateValid && isUsageValid && isMinAmountValid) {
           if (coupon.discountType === 'percentage') {
             discountAmount = Math.round((amt * coupon.discountValue) / 100);
             if (coupon.maxDiscount && coupon.maxDiscount > 0 && discountAmount > coupon.maxDiscount) {
@@ -493,10 +610,10 @@ router.post('/bookings', async (req, res) => {
       originalAmount: Number(req.body.originalAmount || amt),
       couponCode: appliedCoupon ? appliedCoupon.code : (req.body.couponCode || null),
       discountAmount: discountAmount || Number(req.body.discountAmount || 0),
-      amount: Number(req.body.originalAmount || amt),
-      totalAmount: Number(req.body.originalAmount || amt),
+      amount: finalAmount,
+      totalAmount: finalAmount,
       netAmount: finalAmount,
-      paidAmount: Number(req.body.originalAmount || amt),
+      paidAmount: finalAmount,
       specialRequests: specialRequests || '',
       source: 'Website Direct',
       status: 'Confirmed'
@@ -505,12 +622,15 @@ router.post('/bookings', async (req, res) => {
     // Automatically log verified payment in ledger for real-time manager/receptionist consoles
     let newPayment = null;
     try {
-      const paymentAmount = Number(newBooking.totalAmount || newBooking.amount || amt);
+      const paymentAmount = finalAmount;
       newPayment = await Payment.create({
         bookingId: newBooking.bookingId,
         guestName: gName,
         roomNumber: assignedRoomNumber ? String(assignedRoomNumber) : '101',
         amount: paymentAmount,
+        originalAmount: Number(req.body.originalAmount || amt),
+        discountAmount: discountAmount || Number(req.body.discountAmount || 0),
+        couponCode: appliedCoupon ? appliedCoupon.code : (req.body.couponCode || null),
         paymentMethod: req.body.paymentMethod || 'UPI',
         status: 'Settled',
         propertyId: targetPropId,
@@ -713,12 +833,21 @@ router.get('/coupons', async (req, res) => {
     const coupons = await Coupon.find(query);
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Filter only active, not expired, and not usage-exhausted coupons
+    // Check if current user / guest has previous bookings (2nd booking onwards)
+    const userIdent = await extractUserIdentity(req);
+    const hasPrevious = await checkHasPreviousBookings(userIdent);
+
+    // Filter only active, not expired, not usage-exhausted, and eligible for booking count
     const validCoupons = coupons.filter(c => {
       if (c.status !== 'Active') return false;
       if (c.validFrom && todayStr < c.validFrom) return false;
       if (c.validUntil && todayStr > c.validUntil) return false;
       if (c.usageLimit && c.usageLimit > 0 && (c.usedCount || 0) >= c.usageLimit) return false;
+
+      // If guest has previous bookings (2nd booking onwards), do NOT show welcome-related promo codes
+      if (hasPrevious && isWelcomeCoupon(c)) {
+        return false;
+      }
       return true;
     }).map(c => ({
       id: c._id || c.id,
@@ -731,7 +860,8 @@ router.get('/coupons', async (req, res) => {
       maxDiscount: c.maxDiscount || 0,
       minBookingAmount: c.minBookingAmount || 0,
       validFrom: c.validFrom,
-      validUntil: c.validUntil
+      validUntil: c.validUntil,
+      firstBookingOnly: isWelcomeCoupon(c)
     }));
 
     return sendSuccess(res, 200, validCoupons, 'Available public promo coupons retrieved');
@@ -757,6 +887,19 @@ router.post('/coupons/validate', async (req, res) => {
 
     if (coupon.status !== 'Active') {
       return sendError(res, 400, `Coupon '${cleanCode}' is currently inactive.`);
+    }
+
+    // Check Welcome / First Booking constraint
+    if (isWelcomeCoupon(coupon)) {
+      const userIdent = await extractUserIdentity(req);
+      const hasPrevious = await checkHasPreviousBookings(userIdent);
+      if (hasPrevious) {
+        return sendError(
+          res,
+          400,
+          `Promo code '${cleanCode}' is exclusively valid for 1st-time bookings. It cannot be applied to subsequent bookings.`
+        );
+      }
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -801,7 +944,8 @@ router.post('/coupons/validate', async (req, res) => {
         discountType: coupon.discountType,
         discountValue: coupon.discountValue,
         maxDiscount: coupon.maxDiscount || 0,
-        minBookingAmount: coupon.minBookingAmount || 0
+        minBookingAmount: coupon.minBookingAmount || 0,
+        firstBookingOnly: isWelcomeCoupon(coupon)
       },
       originalAmount: amountNum,
       discountAmount,

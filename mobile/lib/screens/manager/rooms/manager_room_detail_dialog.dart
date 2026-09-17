@@ -7,6 +7,7 @@ import 'package:hour_stay_mobile/screens/manager/reservations/manager_create_res
 import 'package:hour_stay_mobile/screens/manager/reservations/manager_reservation_detail_screen.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
 import '../../../core/utils/formatters.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerRoomDetailDialog extends StatefulWidget {
   final RoomModel room;
@@ -39,17 +40,6 @@ class ManagerRoomDetailDialog extends StatefulWidget {
 }
 
 class _ManagerRoomDetailDialogState extends State<ManagerRoomDetailDialog> {
-  // Hour Stay Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color blue = Color(0xFF2563EB);
-  static const Color ruby = Color(0xFFEF4444);
 
   late String _currentStatus;
   bool _isUpdating = false;

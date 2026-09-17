@@ -23,7 +23,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
       <div className="flex items-start justify-between">
         <div className="min-w-0 pr-1">
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-tight truncate">{label}</p>
-          <h3 className="mt-1.5 font-display text-sm sm:text-base font-black text-navy leading-none truncate">{value}</h3>
+          <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-sm sm:text-base font-bold text-slate-800 leading-none truncate">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted/65 text-navy ml-1.5">
@@ -343,20 +343,6 @@ export function UnifiedPaymentsView({ role = "admin" }) {
   if (isRecordPageActive) {
     return (
       <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
-        {/* Breadcrumb & Navigation Header */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setIsRecordPageActive(false)}
-            className="flex items-center gap-2 text-xs font-bold text-navy hover:text-navy-deep transition-colors cursor-pointer py-1.5 px-3 rounded-xl bg-white border border-muted shadow-soft"
-          >
-            <ArrowLeft className="size-3.5" /> Back to Payments & Folios
-          </button>
-          <div className="text-[11px] font-semibold text-muted-foreground">
-            Financial Ledger / <span className="text-navy font-bold">Record Payment</span>
-          </div>
-        </div>
-
         {/* Page Title Card */}
         <div className="bg-white border border-muted rounded-2xl p-5 shadow-soft">
           <div className="flex items-start justify-between">
@@ -419,7 +405,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
             {/* Guest & Reservation Details */}
             <div className="bg-white border border-muted rounded-2xl p-5 shadow-soft space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                 <User className="size-3.5 text-navy" /> Guest & Folio Details
               </h3>
               <div className="space-y-3.5">
@@ -467,7 +453,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
             {/* Payment Method Selector */}
             <div className="bg-white border border-muted rounded-2xl p-5 shadow-soft space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                 <Wallet className="size-3.5 text-navy" /> Payment Method
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -501,7 +487,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
             {/* Status & Remarks */}
             <div className="bg-white border border-muted rounded-2xl p-5 shadow-soft space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-navy flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                 <CheckCircle2 className="size-3.5 text-navy" /> Settlement Status & Notes
               </h3>
               <div className="grid grid-cols-3 gap-2.5">
@@ -546,7 +532,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
           <div className="space-y-5">
             <div className="bg-white border border-muted rounded-2xl p-5 shadow-soft space-y-4 sticky top-6">
               <div className="flex items-center justify-between pb-3 border-b border-muted">
-                <h3 className="font-bold text-navy text-sm font-display">Invoice & Ledger Preview</h3>
+                <h3 className="font-bold text-slate-800 text-sm font-sans tracking-tight tabular-nums">Invoice & Ledger Preview</h3>
                 <Tag tone={newPayment.status === "Settled" ? "success" : newPayment.status === "Refunded" ? "error" : "warning"}>
                   {newPayment.status || "Settled"}
                 </Tag>
@@ -806,32 +792,64 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                       </td>
                       <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[140px]">
                         <ActionGroup align="left">
-                          <ViewActionButton
-                            onClick={() => navigate(`/${role}/payments/${p._id}`)}
-                            title="View Payment Details"
-                          />
-                          {!(p.status === "Settled" || p.status === "Paid" || p.status === "Success") && (
-                            <EditActionButton
-                              onClick={() => handleOpenEditModal(p)}
-                              title="Edit Payment Record"
-                            />
-                          )}
-                          <DownloadActionButton
-                            onClick={() => handleDownloadSingleReceipt(p)}
-                            title="Download Payment Receipt"
-                          />
-                          {(p.status === "Pending" || p.status === "Partial") && (
-                            <ActionButton
-                              icon={Check}
-                              variant="success"
-                              onClick={() => handleQuickStatusChange(p, "Settled")}
-                              title="Mark as Settled"
-                            />
-                          )}
-                          <DeleteActionButton
-                            onClick={() => handleDeletePayment(p._id)}
-                            title="Delete Payment Record"
-                          />
+                          {(() => {
+                            const statusLower = String(p.status || '').toLowerCase().trim();
+                            const isSettledOrRefunded = 
+                              statusLower === "settled" || 
+                              statusLower === "paid" || 
+                              statusLower === "success" || 
+                              statusLower === "refunded" || 
+                              statusLower === "refund" || 
+                              statusLower === "completed";
+
+                            if (isSettledOrRefunded) {
+                              return (
+                                <>
+                                  <ViewActionButton
+                                    onClick={() => navigate(`/${role}/payments/${p._id}`)}
+                                    title="View Payment Details"
+                                  />
+                                  <DownloadActionButton
+                                    onClick={() => handleDownloadSingleReceipt(p)}
+                                    title="Download Payment Receipt"
+                                  />
+                                  <DeleteActionButton
+                                    onClick={() => handleDeletePayment(p._id)}
+                                    title="Delete Payment Record"
+                                  />
+                                </>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <ViewActionButton
+                                  onClick={() => navigate(`/${role}/payments/${p._id}`)}
+                                  title="View Payment Details"
+                                />
+                                <EditActionButton
+                                  onClick={() => handleOpenEditModal(p)}
+                                  title="Edit Payment Record"
+                                />
+                                <DownloadActionButton
+                                  onClick={() => handleDownloadSingleReceipt(p)}
+                                  title="Download Payment Receipt"
+                                />
+                                {(p.status === "Pending" || p.status === "Partial") && (
+                                  <ActionButton
+                                    icon={Check}
+                                    variant="success"
+                                    onClick={() => handleQuickStatusChange(p, "Settled")}
+                                    title="Mark as Settled"
+                                  />
+                                )}
+                                <DeleteActionButton
+                                  onClick={() => handleDeletePayment(p._id)}
+                                  title="Delete Payment Record"
+                                />
+                              </>
+                            );
+                          })()}
                         </ActionGroup>
                       </td>
                     </tr>
@@ -879,7 +897,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
             
             <div className="p-4.5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-navy text-sm">Edit Payment Record</h3>
+                <h3 className="font-bold text-slate-800 text-sm">Edit Payment Record</h3>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Modify ledger details for {editingPayment.guestName}</p>
               </div>
               <Button

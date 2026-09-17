@@ -88,10 +88,20 @@ function Booking() {
       .catch(() => {});
 
     // Fetch active available promo coupons for website and merge with admin-created coupons
-    const loadCoupons = async () => {
+    const loadCoupons = async (targetEmail, targetPhone) => {
       let serverCoupons = [];
+      const cu = authService.getCurrentUser();
+      const activeEmail = targetEmail !== undefined ? targetEmail : (currentUser?.email || email);
+      const activePhone = targetPhone !== undefined ? targetPhone : (currentUser?.mobile || phone);
+      const guestId = cu?._id || cu?.id;
+
       try {
-        const res = await publicService.getCoupons(activeId);
+        const res = await publicService.getCoupons({
+          propertyId: activeId,
+          email: activeEmail,
+          phone: activePhone,
+          guestId
+        });
         if (res && res.success && Array.isArray(res.data)) {
           serverCoupons = res.data;
         }
@@ -121,7 +131,8 @@ function Booking() {
               maxDiscount: Number(c.maxDiscount) || 0,
               minBookingAmount: Number(c.minBookingAmount) || 0,
               validFrom: c.validFrom,
-              validUntil: c.validUntil
+              validUntil: c.validUntil,
+              firstBookingOnly: String(c.code || '').toUpperCase().includes('WELCOME')
             }));
           }
         }
@@ -139,6 +150,39 @@ function Booking() {
 
     loadCoupons();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (email || phone) {
+        const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
+        const cu = authService.getCurrentUser();
+        publicService.getCoupons({
+          propertyId: activeId,
+          email: email || cu?.email,
+          phone: phone || cu?.mobile,
+          guestId: cu?._id || cu?.id
+        }).then(res => {
+          if (res && res.success && Array.isArray(res.data)) {
+            setAvailableCoupons(res.data);
+            // If applied coupon was a welcome coupon and user already has previous bookings, remove it
+            if (appliedCoupon && (appliedCoupon.firstBookingOnly || String(appliedCoupon.code || '').toUpperCase().includes('WELCOME'))) {
+              const stillValid = res.data.some(c => c.code?.toUpperCase() === appliedCoupon.code?.toUpperCase());
+              if (!stillValid) {
+                setAppliedCoupon(null);
+                setDiscountAmount(0);
+                setCouponCodeInput("");
+                setCouponFeedback({
+                  type: 'error',
+                  text: `Promo code "${appliedCoupon.code}" is exclusively valid for 1st-time bookings only.`
+                });
+              }
+            }
+          }
+        }).catch(() => {});
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [email, phone]);
 
   const checkInDate = localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0];
   const checkOutDate = localStorage.getItem('booking_check_out') || new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -170,11 +214,19 @@ function Booking() {
     setValidatingCoupon(true);
     setCouponFeedback(null);
 
+    const cu = authService.getCurrentUser();
+    const guestEmail = email || cu?.email;
+    const guestPhone = phone || cu?.mobile;
+    const guestId = cu?._id || cu?.id;
+
     try {
       const res = await publicService.validateCoupon({
         code: targetCode,
         bookingAmount: grossTotal,
-        propertyId: propId
+        propertyId: propId,
+        email: guestEmail,
+        phone: guestPhone,
+        guestId
       });
 
       if (res && res.success && res.data && res.data.valid) {
@@ -191,6 +243,19 @@ function Booking() {
         throw new Error(res?.message || 'Coupon could not be validated on server');
       }
     } catch (err) {
+      const serverMsg = err.response?.data?.message || err.message;
+
+      // If server returned an explicit rejection (e.g., first-booking restriction), show server message directly
+      if (err.response?.data?.message) {
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
+        setCouponFeedback({
+          type: 'error',
+          text: err.response.data.message
+        });
+        return;
+      }
+
       // Fallback: check availableCoupons / local cache for valid coupon
       const localMatch = availableCoupons.find(c => c.code?.toUpperCase() === targetCode);
       if (localMatch) {
@@ -230,7 +295,7 @@ function Booking() {
       setDiscountAmount(0);
       setCouponFeedback({
         type: 'error',
-        text: err.response?.data?.message || err.message || `Invalid coupon code '${targetCode}'.`
+        text: serverMsg || `Invalid coupon code '${targetCode}'.`
       });
     } finally {
       setValidatingCoupon(false);

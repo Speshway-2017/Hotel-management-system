@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createFileRoute, useNavigate, useParams, Link } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
@@ -99,12 +99,6 @@ export function ViewCouponPage() {
   if (error || !coupon) {
     return (
       <div className="space-y-6 text-left pb-16">
-        <Crumbs
-          items={[
-            { label: "Coupons", to: "/admin/coupons" },
-            { label: "Coupon Details" }
-          ]}
-        />
         <PageHeader
           title="Coupon Details"
           subtitle="View promotional campaign parameters"
@@ -128,13 +122,6 @@ export function ViewCouponPage() {
 
   return (
     <div className="space-y-6 text-left pb-16">
-      <Crumbs
-        items={[
-          { label: "Coupons", to: "/admin/coupons" },
-          { label: coupon ? coupon.code : "Coupon Details" }
-        ]}
-      />
-
       {/* 1. Page Header with Edit Action */}
       <PageHeader
         title={`Coupon: ${coupon.code}`}
