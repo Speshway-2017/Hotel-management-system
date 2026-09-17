@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Crumbs } from "@/components/hs/kit";
+
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -196,18 +196,6 @@ function AddRoomPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
-      <div>
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: "Add New Room" }
-        ]} />
-        <PageHeader
-          title="Configure New Room"
-          subtitle="Register a new room asset, base tariff rates, rate plan, photos, and operational status."
-        />
-      </div>
-
       <div className="max-w-2xl">
         <div className="bg-white rounded-2xl border border-navy/10 shadow-soft overflow-hidden">
           <form onSubmit={handleSubmit} className="p-6 space-y-5 text-left">

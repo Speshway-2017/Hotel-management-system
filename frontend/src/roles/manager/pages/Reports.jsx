@@ -69,7 +69,7 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
           <div className="h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
-          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none whitespace-nowrap">{value}</h3>
+          <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none whitespace-nowrap">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
@@ -466,7 +466,7 @@ function ReportsDashboard() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-muted pb-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="size-4 text-brand" />
-                  <h4 className="font-semibold text-navy text-sm font-display">Revenue Performance Trend</h4>
+                  <h4 className="font-semibold text-slate-800 text-sm font-sans tracking-tight tabular-nums">Revenue Performance Trend</h4>
                 </div>
                 <div className="flex gap-1 bg-[#F5F5F0]/60 p-0.5 rounded-lg text-[10px]">
                   {["daily", "weekly", "monthly"].map(mode => (
@@ -512,7 +512,7 @@ function ReportsDashboard() {
             <div className="lg:col-span-1 bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
               <div className="flex items-center gap-2 border-b border-muted pb-3">
                 <Layers className="size-4 text-brand" />
-                <h4 className="font-semibold text-navy text-sm font-display">Occupancy Flow %</h4>
+                <h4 className="font-semibold text-slate-800 text-sm font-sans tracking-tight tabular-nums">Occupancy Flow %</h4>
               </div>
 
               <div className="h-64 w-full">
@@ -542,7 +542,7 @@ function ReportsDashboard() {
             <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 flex flex-col justify-between lg:col-span-1">
               <div className="flex items-center gap-2 border-b border-muted pb-3">
                 <Users className="size-4 text-brand" />
-                <h4 className="font-semibold text-navy text-sm font-display">Booking Source Channels</h4>
+                <h4 className="font-semibold text-slate-800 text-sm font-sans tracking-tight tabular-nums">Booking Source Channels</h4>
               </div>
 
               <div className="h-44 w-full">
@@ -583,7 +583,7 @@ function ReportsDashboard() {
             <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 lg:col-span-2">
               <div className="flex items-center gap-2 border-b border-muted pb-3">
                 <Layers className="size-4 text-brand" />
-                <h4 className="font-semibold text-navy text-sm font-display">Room Categories Performance</h4>
+                <h4 className="font-semibold text-slate-800 text-sm font-sans tracking-tight tabular-nums">Room Categories Performance</h4>
               </div>
 
               <div className="overflow-x-auto text-left">

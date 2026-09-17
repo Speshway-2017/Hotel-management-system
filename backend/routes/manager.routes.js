@@ -1943,6 +1943,7 @@ router.get('/notifications', async (req, res) => {
 const handleMarkNotificationRead = async (req, res) => {
   try {
     const id = req.params.id;
+    const { title: reqTitle, message: reqMsg } = req.body || {};
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
@@ -1953,8 +1954,8 @@ const handleMarkNotificationRead = async (req, res) => {
     ]);
 
     const targetDoc = doc1 || doc2;
-    const title = targetDoc?.title;
-    const message = targetDoc?.message;
+    const title = targetDoc?.title || reqTitle;
+    const message = targetDoc?.message || reqMsg;
 
     // Update in both collections by ID
     const updatePromises = [
@@ -1992,6 +1993,7 @@ router.put('/notifications/:id/read', handleMarkNotificationRead);
 const handleMarkNotificationUnread = async (req, res) => {
   try {
     const id = req.params.id;
+    const { title: reqTitle, message: reqMsg } = req.body || {};
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
@@ -2001,8 +2003,8 @@ const handleMarkNotificationUnread = async (req, res) => {
     ]);
 
     const targetDoc = doc1 || doc2;
-    const title = targetDoc?.title;
-    const message = targetDoc?.message;
+    const title = targetDoc?.title || reqTitle;
+    const message = targetDoc?.message || reqMsg;
 
     const updatePromises = [
       ManagerNotification.updateMany({ $or: idQuery }, { isRead: false }).catch(() => null),

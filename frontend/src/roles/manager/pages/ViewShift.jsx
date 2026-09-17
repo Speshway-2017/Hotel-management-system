@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -155,13 +155,6 @@ function ManagerViewShift() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs
-        items={[
-          { label: "Staff & Shifts", to: "/manager/shifts" },
-          { label: shiftName ? `${shiftName} Details` : "Shift Details" }
-        ]}
-      />
-
       <PageHeader
         title={shiftName ? `${shiftName} Details` : "Shift Details"}
         subtitle="Timings overview, assigned duties parameters, and rostered active personnel."

@@ -347,51 +347,66 @@ function ReservationsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
                         <ActionGroup align="left">
-                          {/* Check-In Button */}
-                          {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
-                            <CheckInActionButton
-                              onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber, res)}
-                            />
-                          )}
+                          {(() => {
+                            const statusLower = String(res.status || '').toLowerCase().trim();
+                            const isTerminal = 
+                              statusLower === "checked-out" || 
+                              statusLower === "checked out" || 
+                              statusLower === "checked_out" || 
+                              statusLower === "completed" || 
+                              statusLower === "cancelled" || 
+                              statusLower === "canceled";
 
-                          {/* Check-Out Button & Extend Button */}
-                          {(res.status === "Checked In" || res.status === "Checked-in" || res.status === "Staying" || res.status === "Staying-In") && (
-                            <>
-                              <ExtendStayButton
-                                size="xs"
-                                label="Extend"
-                                booking={res}
-                                onClick={() => navigate(`/reception/reservations/extend/${res.id || res._id || res.bookingId}`)}
-                              />
-                              <CheckOutActionButton
-                                onClick={() => handleCheckOut(res.id || res._id || res.bookingId)}
-                              />
-                            </>
-                          )}
+                            if (isTerminal) {
+                              return (
+                                <ViewActionButton
+                                  onClick={() => navigate(`/reception/reservations/${res.id || res._id}`)}
+                                  title="View Reservation Details"
+                                />
+                              );
+                            }
 
-                          {/* Completed indicator for Checked-out stays */}
-                          {(res.status === "Checked Out" || res.status === "Checked-out") && (
-                            <span className="text-[11px] font-bold text-slate-400 px-1.5 py-0.5">
-                              Completed
-                            </span>
-                          )}
+                            return (
+                              <>
+                                {/* Check-In Button */}
+                                {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
+                                  <CheckInActionButton
+                                    onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber, res)}
+                                  />
+                                )}
 
-                          {/* View Details */}
-                          <ViewActionButton
-                            onClick={() => navigate(`/reception/reservations/${res.id || res._id}`)}
-                            title="View Reservation Details"
-                          />
+                                {/* Check-Out Button & Extend Button */}
+                                {(res.status === "Checked In" || res.status === "Checked-in" || res.status === "Staying" || res.status === "Staying-In") && (
+                                  <>
+                                    <ExtendStayButton
+                                      size="xs"
+                                      label="Extend"
+                                      booking={res}
+                                      onClick={() => navigate(`/reception/reservations/extend/${res.id || res._id || res.bookingId}`)}
+                                    />
+                                    <CheckOutActionButton
+                                      onClick={() => handleCheckOut(res.id || res._id || res.bookingId)}
+                                    />
+                                  </>
+                                )}
 
-                          {/* Cancel */}
-                          {res.status !== "Checked Out" && res.status !== "Checked-out" && res.status !== "Cancelled" && (
-                            <ActionButton
-                              icon={XCircle}
-                              label="Cancel"
-                              variant="danger"
-                              onClick={() => handleCancelBooking(res.id || res._id)}
-                              title="Cancel Booking"
-                            />
-                          )}
+                                {/* View Details */}
+                                <ViewActionButton
+                                  onClick={() => navigate(`/reception/reservations/${res.id || res._id}`)}
+                                  title="View Reservation Details"
+                                />
+
+                                {/* Cancel */}
+                                <ActionButton
+                                  icon={XCircle}
+                                  label="Cancel"
+                                  variant="danger"
+                                  onClick={() => handleCancelBooking(res.id || res._id)}
+                                  title="Cancel Booking"
+                                />
+                              </>
+                            );
+                          })()}
                         </ActionGroup>
                       </td>
                     </tr>

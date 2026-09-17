@@ -158,8 +158,15 @@ class GuestNotificationProvider with ChangeNotifier {
     }
   }
 
-  Future<void> markAsRead(String id) async {
-    final index = _notifications.indexWhere((n) => n.id == id);
+  Future<void> markAsRead(String id, {String? title, String? message}) async {
+    int index = -1;
+    if (id.isNotEmpty) {
+      index = _notifications.indexWhere((n) => n.id == id);
+    }
+    if (index == -1 && title != null && message != null) {
+      index = _notifications.indexWhere((n) => n.title.trim() == title.trim() && n.message.trim() == message.trim());
+    }
+
     if (index != -1 && !_notifications[index].isRead) {
       final old = _notifications[index];
       _notifications[index] = NotificationModel(
@@ -174,18 +181,35 @@ class GuestNotificationProvider with ChangeNotifier {
       notifyListeners();
     }
 
+    final targetId = index != -1 ? _notifications[index].id : id;
+    final targetTitle = index != -1 ? _notifications[index].title : title;
+    final targetMsg = index != -1 ? _notifications[index].message : message;
+
+    final body = {
+      if (targetTitle != null && targetTitle.isNotEmpty) 'title': targetTitle,
+      if (targetMsg != null && targetMsg.isNotEmpty) 'message': targetMsg,
+    };
+
     try {
-      final response = await ApiService.post('${ApiEndpoints.guestNotifications}/$id/read');
+      final endpointId = targetId.isNotEmpty ? targetId : 'general';
+      final response = await ApiService.post('${ApiEndpoints.guestNotifications}/$endpointId/read', body);
       if (!response.success) {
-        await ApiService.patch('${ApiEndpoints.guestNotifications}/$id/read');
+        await ApiService.patch('${ApiEndpoints.guestNotifications}/$endpointId/read', body);
       }
     } catch (_) {
-      fetchNotifications(silent: true);
+      // Keep optimistic update
     }
   }
 
-  Future<void> markAsUnread(String id) async {
-    final index = _notifications.indexWhere((n) => n.id == id);
+  Future<void> markAsUnread(String id, {String? title, String? message}) async {
+    int index = -1;
+    if (id.isNotEmpty) {
+      index = _notifications.indexWhere((n) => n.id == id);
+    }
+    if (index == -1 && title != null && message != null) {
+      index = _notifications.indexWhere((n) => n.title.trim() == title.trim() && n.message.trim() == message.trim());
+    }
+
     if (index != -1 && _notifications[index].isRead) {
       final old = _notifications[index];
       _notifications[index] = NotificationModel(
@@ -200,26 +224,43 @@ class GuestNotificationProvider with ChangeNotifier {
       notifyListeners();
     }
 
+    final targetId = index != -1 ? _notifications[index].id : id;
+    final targetTitle = index != -1 ? _notifications[index].title : title;
+    final targetMsg = index != -1 ? _notifications[index].message : message;
+
+    final body = {
+      if (targetTitle != null && targetTitle.isNotEmpty) 'title': targetTitle,
+      if (targetMsg != null && targetMsg.isNotEmpty) 'message': targetMsg,
+    };
+
     try {
-      final response = await ApiService.post('${ApiEndpoints.guestNotifications}/$id/unread');
+      final endpointId = targetId.isNotEmpty ? targetId : 'general';
+      final response = await ApiService.post('${ApiEndpoints.guestNotifications}/$endpointId/unread', body);
       if (!response.success) {
-        await ApiService.patch('${ApiEndpoints.guestNotifications}/$id/unread');
+        await ApiService.patch('${ApiEndpoints.guestNotifications}/$endpointId/unread', body);
       }
     } catch (_) {
-      fetchNotifications(silent: true);
+      // Keep optimistic update
     }
   }
 
-  Future<void> toggleReadStatus(String id) async {
-    final notif = _notifications.firstWhere(
-      (n) => n.id == id,
-      orElse: () => NotificationModel(id: '', title: '', message: ''),
-    );
-    if (notif.id.isEmpty) return;
-    if (notif.isRead) {
-      await markAsUnread(id);
+  Future<void> toggleReadStatus(String id, {String? title, String? message}) async {
+    int index = -1;
+    if (id.isNotEmpty) {
+      index = _notifications.indexWhere((n) => n.id == id);
+    }
+    if (index == -1 && title != null && message != null) {
+      index = _notifications.indexWhere((n) => n.title.trim() == title.trim() && n.message.trim() == message.trim());
+    }
+    if (index != -1) {
+      final notif = _notifications[index];
+      if (notif.isRead) {
+        await markAsUnread(notif.id, title: notif.title, message: notif.message);
+      } else {
+        await markAsRead(notif.id, title: notif.title, message: notif.message);
+      }
     } else {
-      await markAsRead(id);
+      await markAsRead(id, title: title, message: message);
     }
   }
 
@@ -243,7 +284,7 @@ class GuestNotificationProvider with ChangeNotifier {
         await ApiService.patch('${ApiEndpoints.guestNotifications}/read-all');
       }
     } catch (_) {
-      fetchNotifications(silent: true);
+      // Keep optimistic state
     }
   }
 

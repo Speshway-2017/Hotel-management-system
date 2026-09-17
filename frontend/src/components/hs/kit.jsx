@@ -356,6 +356,8 @@ export {
   MarkRefundedActionIcon,
   MarkRefundedActionButton,
   PaymentActionIcon,
-  PaymentActionButton
+  PaymentActionButton,
+  FeedbackActionIcon,
+  FeedbackActionButton
 } from "./ActionButtons";
 

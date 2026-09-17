@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/models/room_model.dart';
 import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerCreateReservationScreen extends StatefulWidget {
   final String? preselectedRoomNumber;
@@ -20,17 +21,6 @@ class ManagerCreateReservationScreen extends StatefulWidget {
 }
 
 class _ManagerCreateReservationScreenState extends State<ManagerCreateReservationScreen> {
-  // Hour Stay Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color ruby = Color(0xFFEF4444);
 
   final _formKey = GlobalKey<FormState>();
 

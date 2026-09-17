@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { User, Mail, Phone, Building, Calendar, ShieldCheck, Sparkles } from "lucide-react";
@@ -84,13 +84,6 @@ function ViewGuest() {
 
   return (
     <div className="space-y-6 text-left font-ui">
-      <Crumbs
-        items={[
-          { label: "Guests Directory", to: "/super-admin/users" },
-          { label: guest ? guest.name : "Guest Profile" }
-        ]}
-      />
-
       <PageHeader
         title={guest ? `Guest Profile: ${guest.name}` : "Guest Profile"}
         subtitle="Verified guest account details, contact coordinates, and lifetime visit metrics."

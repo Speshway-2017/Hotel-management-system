@@ -76,7 +76,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
         <div className="h-8 flex items-start">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
-        <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[10px] text-muted-foreground truncate">
         {hint}
@@ -707,7 +707,7 @@ function RoomsRatesPage() {
             {paginatedRooms.length === 0 ? (
               <div className="p-16 text-center">
                 <Bed className="size-12 text-muted-foreground/45 mx-auto mb-3" />
-                <h3 className="font-semibold text-navy">No rooms matching filters found</h3>
+                <h3 className="font-semibold text-slate-800">No rooms matching filters found</h3>
                 <p className="text-xs text-muted-foreground mt-1">Adjust search parameters or configure new rooms.</p>
               </div>
             ) : (
@@ -850,7 +850,7 @@ function RoomsRatesPage() {
                 <div key={type._id || type.category} className="bg-white border border-muted rounded-xl p-5 shadow-soft flex flex-col justify-between space-y-4 text-left">
                   <div className="space-y-3 text-left">
                     <div className="flex justify-between items-center border-b border-muted/50 pb-2.5">
-                      <h4 className="font-display font-black text-navy text-md">{type.category}</h4>
+                      <h4 className="font-sans tracking-tight tabular-nums font-bold text-slate-800 text-md">{type.category}</h4>
                       <Tag tone={type.status === "Active" ? "success" : "neutral"} className="py-0.5 select-none">
                         {type.status || "Active"}
                       </Tag>
@@ -957,7 +957,7 @@ function RoomsRatesPage() {
         <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 font-ui">
           <div className="flex items-center justify-between pb-3 border-b border-muted">
             <div>
-              <h3 className="font-display font-black text-navy text-md">Live Room Availability Timeline</h3>
+              <h3 className="font-sans tracking-tight tabular-nums font-bold text-slate-800 text-md">Live Room Availability Timeline</h3>
               <p className="text-[9px] text-muted-foreground mt-0.5">Active daily status logs of scoped rooms and categories.</p>
             </div>
             <div className="flex items-center gap-2 select-none">
@@ -1058,7 +1058,7 @@ function RoomsRatesPage() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in font-sans">
           <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col">
             <div className="p-5 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-display font-black text-navy text-sm">Room {selectedItem.roomNumber} Status Override</h3>
+              <h3 className="font-sans tracking-tight tabular-nums font-bold text-slate-800 text-sm">Room {selectedItem.roomNumber} Status Override</h3>
               <Button size="icon" variant="ghost" className="size-8" onClick={() => setIsChangeStatusOpen(false)}>
                 <X className="size-4" />
               </Button>

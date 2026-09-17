@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { notificationsService } from "@/services/notifications";
-import { Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
+import { Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -98,8 +98,6 @@ function AdminNotificationDetailsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs items={[{ label: "Alert Center", to: "/admin/notifications" }, { label: "Incident Diagnostic Details" }]} />
-
       <div className="max-w-3xl">
         <Panel title="Diagnostic Report Overview" description={`Incident ID: ${ntf.id}`}>
           <div className="p-6 space-y-6 text-xs text-navy leading-relaxed">

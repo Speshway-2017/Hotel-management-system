@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -141,11 +141,6 @@ function EditGuestPage() {
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
       <div className="space-y-3.5">
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Guests", to: "/admin/guests" },
-          { label: "Edit Guest" }
-        ]} />
         <PageHeader
           title="Edit Guest Profile"
           subtitle="Modify details, preferences, and secure identification logs."

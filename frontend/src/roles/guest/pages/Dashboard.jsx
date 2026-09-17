@@ -10,6 +10,7 @@ import { subscribeRealtimeSync } from "@/services/socket";
 import { apiClient } from "@/services/apiClient";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
+import { ActionGroup, ViewActionIcon, FeedbackActionIcon } from "@/components/hs/kit";
 
 export const Route = createFileRoute("/guest/")({
   head: () => ({
@@ -33,7 +34,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
           <div className="h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
-          <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none truncate">{value}</h3>
+          <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums truncate">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
@@ -51,6 +52,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 function GuestDashboardPage() {
   const [data, setData] = useState(null);
   const [feedbackCount, setFeedbackCount] = useState(0);
+  const [feedbackBookingIds, setFeedbackBookingIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -91,9 +93,14 @@ function GuestDashboardPage() {
         });
       }
 
+      const fbSet = new Set();
       if (fbRes && fbRes.success && Array.isArray(fbRes.data)) {
         setFeedbackCount(fbRes.data.length);
+        fbRes.data.forEach(f => {
+          if (f.bookingId) fbSet.add(String(f.bookingId));
+        });
       }
+      setFeedbackBookingIds(fbSet);
     } catch (err) {
       console.error("Failed to load guest dashboard:", err);
       setError("Failed to load guest dashboard metrics from server.");
@@ -130,7 +137,7 @@ function GuestDashboardPage() {
     return (
       <div className="bg-white rounded-2xl p-12 border border-rose-200 text-center space-y-4 shadow-soft">
         <AlertCircle className="size-10 text-rose-500 mx-auto" />
-        <h3 className="font-display text-lg font-bold text-navy">Unable to Load Dashboard</h3>
+        <h3 className="font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800">Unable to Load Dashboard</h3>
         <p className="text-xs text-rose-600 font-semibold max-w-md mx-auto">{error}</p>
         <button
           onClick={fetchDashboardData}
@@ -146,6 +153,7 @@ function GuestDashboardPage() {
   const recentBookings = data?.recentBookings || [];
   const upcoming = stats.upcomingBooking;
   const currentStay = stats.currentStay;
+  const activeBooking = currentStay || upcoming || stats.activeBooking || (recentBookings.length > 0 ? recentBookings[0] : null);
 
   return (
     <div className="space-y-6 text-left font-ui">
@@ -153,9 +161,9 @@ function GuestDashboardPage() {
       {/* KPI Cards Grid (Manager/Admin UI Style) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <PremiumStatCard
-          label="Upcoming Booking"
-          value={upcoming ? upcoming.checkIn : "None"}
-          hint={upcoming ? `${upcoming.hotel} (${upcoming.city})` : "Plan next stay"}
+          label={upcoming ? "Upcoming Booking" : currentStay ? "Active Stay" : "Upcoming Booking"}
+          value={upcoming ? upcoming.checkIn : currentStay ? currentStay.checkIn : "None"}
+          hint={upcoming ? `${upcoming.hotel} (${upcoming.city})` : currentStay ? `${currentStay.hotel} · Checked-in` : "Plan next stay"}
           icon={Calendar}
           accentColor="#FF7A59"
         />
@@ -189,39 +197,59 @@ function GuestDashboardPage() {
         />
       </div>
 
-      {/* Featured Upcoming Reservation or No Active Booking Callout */}
-      {upcoming ? (
+      {/* Featured Active (Checked-in) or Upcoming Reservation Banner */}
+      {activeBooking ? (
         <div className="bg-[#FFF7E6] border border-[#F5C06A]/40 rounded-2xl p-6 sm:p-8 text-[#0D1B2A] shadow-soft relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
             <Sparkles className="size-48 text-[#5B21B6]" />
           </div>
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-xl">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F5C06A]/25 text-[#92400E] text-[10px] font-bold uppercase tracking-wider border border-[#F5C06A]/50">
-                <Clock className="size-3 text-[#B45309]" /> Confirmed Reservation
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                activeBooking.status === 'Checked-in'
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : activeBooking.status === 'Confirmed' || activeBooking.status === 'Paid'
+                  ? 'bg-[#F5C06A]/25 text-[#92400E] border-[#F5C06A]/50'
+                  : 'bg-purple/15 text-purple border-purple/30'
+              }`}>
+                {activeBooking.status === 'Checked-in' ? (
+                  <>
+                    <CheckCircle2 className="size-3 text-emerald-700" /> Active Checked-in Stay
+                  </>
+                ) : (
+                  <>
+                    <Clock className="size-3 text-[#B45309]" /> Confirmed Reservation
+                  </>
+                )}
               </span>
-              <h3 className="font-display text-2xl font-bold text-[#0D1B2A]">{upcoming.hotel}</h3>
+              <h3 className="font-sans tracking-tight tabular-nums text-2xl font-bold text-[#0D1B2A]">{activeBooking.hotel}</h3>
               <p className="text-xs text-[#0D1B2A]/75 flex items-center gap-2 font-medium">
-                <MapPin className="size-3.5 text-[#5B21B6]" /> {upcoming.city} · {upcoming.room}
+                <MapPin className="size-3.5 text-[#5B21B6]" /> {activeBooking.city} · {activeBooking.room}
               </p>
               <div className="pt-2 text-xs font-semibold text-[#0D1B2A]/80 flex flex-wrap gap-4">
-                <span>Check-in: <strong className="text-[#5B21B6] font-bold">{upcoming.checkIn}</strong></span>
-                <span>Check-out: <strong className="text-[#5B21B6] font-bold">{upcoming.checkOut}</strong></span>
-                <span>Ref: <strong className="text-[#5B21B6] font-mono font-bold">{upcoming.bookingId}</strong></span>
+                <span>Check-in: <strong className="text-[#5B21B6] font-bold">{activeBooking.checkIn}</strong></span>
+                <span>Check-out: <strong className="text-[#5B21B6] font-bold">{activeBooking.checkOut}</strong></span>
+                <span>Ref: <strong className="text-[#5B21B6] font-mono font-bold">{activeBooking.bookingId}</strong></span>
               </div>
             </div>
 
             <div className="shrink-0 flex flex-col items-start md:items-end gap-3">
               <div className="text-left md:text-right">
                 <span className="text-[10px] text-[#0D1B2A]/60 uppercase tracking-wider block font-bold">Total Paid</span>
-                <span className="font-display text-2xl font-bold text-[#B45309]">{inr(upcoming.amount)}</span>
+                <span className="font-display text-2xl font-bold text-[#B45309]">{inr(activeBooking.amount)}</span>
               </div>
-              <a
-                href="/guest/bookings"
-                className="px-5 py-2.5 bg-[#5B21B6] text-white rounded-xl text-xs font-bold hover:bg-[#5B21B6]/90 transition-colors shadow-soft inline-flex items-center gap-2"
-              >
-                Manage Booking <ArrowRight className="size-3.5" />
-              </a>
+              {(() => {
+                const bId = activeBooking.bookingId || activeBooking.id || activeBooking._id;
+                const bRef = bId ? (String(bId).startsWith('BK') ? String(bId) : `BK${bId}`) : '';
+                return (
+                  <a
+                    href={`/guest/bookings?id=${bRef || bId}`}
+                    className="px-5 py-2.5 bg-[#5B21B6] text-white rounded-xl text-xs font-bold hover:bg-[#5B21B6]/90 transition-colors shadow-soft inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    Manage Booking <ArrowRight className="size-3.5" />
+                  </a>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -232,7 +260,7 @@ function GuestDashboardPage() {
               <Calendar className="size-6" />
             </div>
             <div>
-              <h3 className="font-display text-base font-bold text-navy">No Active Booking</h3>
+              <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">No Active Booking</h3>
               <p className="text-xs text-navy/60 mt-0.5">
                 You don't have an active or upcoming stay reservation right now.
               </p>
@@ -253,7 +281,7 @@ function GuestDashboardPage() {
       <div className="bg-white rounded-2xl border border-navy/5 p-6 shadow-soft space-y-4">
         <div className="flex items-center justify-between border-b border-navy/5 pb-4">
           <div>
-            <h3 className="font-display text-base font-bold text-navy">Recent Bookings Summary</h3>
+            <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">Recent Bookings Summary</h3>
             <p className="text-xs text-navy/60 mt-0.5">Real-time reservation ledger fetched dynamically from MongoDB</p>
           </div>
           <a
@@ -268,7 +296,7 @@ function GuestDashboardPage() {
           <div className="py-12 text-center space-y-4 border border-dashed border-navy/10 rounded-xl bg-cream/20">
             <Hotel className="size-10 text-navy/20 mx-auto" />
             <div>
-              <h4 className="font-display text-base font-bold text-navy">No Bookings Found</h4>
+              <h4 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">No Bookings Found</h4>
               <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">
                 You don't have any reservations recorded yet. Explore our luxury hotels and book your next stay!
               </p>
@@ -294,12 +322,23 @@ function GuestDashboardPage() {
                   <th className="py-3 px-4 whitespace-nowrap">Stay Dates</th>
                   <th className="py-3 px-4 text-right whitespace-nowrap">Tariff</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap min-w-[100px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
-                {recentBookings.slice(0, 10).map((b) => (
-                  <tr key={b.id} className="hover:bg-muted/15 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-purple whitespace-nowrap">{b.bookingId}</td>
+                {recentBookings.slice(0, 10).map((b) => {
+                  const bId = b.bookingId || b.id || b._id;
+                  const bRef = bId ? (String(bId).startsWith('BK') ? String(bId) : `BK${bId}`) : '';
+                  const statusLower = (b.status || '').toLowerCase();
+                  const isCheckedOut = statusLower === 'checked-out' || statusLower === 'checked out' || statusLower === 'completed';
+                  const isCancelled = statusLower === 'cancelled';
+                  const hasFb = Boolean(b.hasFeedback || feedbackBookingIds.has(String(bId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id)) || feedbackBookingIds.has(String(b.bookingId)));
+
+                  return (
+                    <tr key={b.id || b._id || b.bookingId} className="hover:bg-muted/15 transition-colors cursor-pointer" onClick={() => window.location.href = `/guest/bookings?id=${bRef || bId}`}>
+                      <td className="py-3.5 px-4 font-mono font-bold text-purple whitespace-nowrap">
+                        <span className="hover:underline">{b.bookingId || bRef}</span>
+                      </td>
                     <td className="py-3.5 px-4 font-bold text-navy whitespace-nowrap">{b.hotel || "Speshway Hotel & Suites"}</td>
                     <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">{b.city || "Hyderabad"}</td>
                     <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">{b.room || "Standard Suite"}</td>
@@ -311,13 +350,38 @@ function GuestDashboardPage() {
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : b.status === 'Checked-in'
                           ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : b.status === 'Checked-out' || b.status === 'Completed'
+                          ? 'bg-purple/10 text-purple border border-purple/20'
+                          : b.status === 'Cancelled'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
                           : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
-                        {b.status}
+                        {b.status || 'Confirmed'}
                       </span>
                     </td>
-                  </tr>
-                ))}
+                    <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[100px]" onClick={(e) => e.stopPropagation()}>
+                      <ActionGroup align="left">
+                        <ViewActionIcon
+                          title="View Booking Details"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/guest/bookings?id=${bRef || bId}`;
+                          }}
+                        />
+                        {isCheckedOut && !hasFb && (
+                          <FeedbackActionIcon
+                            title="Give Stay Feedback"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
+                            }}
+                          />
+                        )}
+                      </ActionGroup>
+                    </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -331,7 +395,7 @@ function GuestDashboardPage() {
             <MessageSquareHeart className="size-6" />
           </div>
           <div>
-            <h4 className="font-display text-base font-bold text-navy">Share Your Stay Feedback</h4>
+            <h4 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">Share Your Stay Feedback</h4>
             <p className="text-xs text-muted-foreground mt-0.5">
               Help us maintain luxury hospitality standards. Rate your recent room cleanliness, service, and amenities.
             </p>

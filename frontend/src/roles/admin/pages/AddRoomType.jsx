@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Crumbs, Panel } from "@/components/hs/kit";
+import { Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -151,18 +151,6 @@ function AddRoomTypePage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
-      <div>
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: "Add Room Type" }
-        ]} />
-        <PageHeader
-          title="Add New Room Type"
-          subtitle="Configure a new accommodation category, base rate tariffs, max occupancy, and amenities."
-        />
-      </div>
-
       <div className="max-w-2xl">
         <Panel title="Room Type Specifications Form" description="Assign operational category parameters and room allocations.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">

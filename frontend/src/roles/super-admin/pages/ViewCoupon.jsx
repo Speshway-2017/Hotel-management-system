@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { Ticket, Calendar, Settings, List, Edit2, Percent, DollarSign, TrendingUp, CheckCircle2 } from "lucide-react";
@@ -40,13 +39,6 @@ export function ViewCoupon() {
 
   return (
     <div className="space-y-6 text-left pb-16">
-      <Crumbs
-        items={[
-          { label: "Coupons", to: "/super-admin/coupons" },
-          { label: coupon ? coupon.code : "Coupon Details" }
-        ]}
-      />
-
       <PageHeader
         title={coupon ? `Promo Coupon: ${coupon.code}` : "Coupon Details"}
         subtitle="Operational parameters, discount slabs, plans coverage, and utilization index."

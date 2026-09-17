@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -112,8 +112,6 @@ function ReceptionistNotificationDetailsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in p-6 text-navy font-sans">
-      <Crumbs items={[{ label: "Alert Center", to: "/reception/notifications" }, { label: "Incident Diagnostic Details" }]} />
-
       <div className="max-w-3xl">
         <Panel title="Diagnostic Report Overview" description={`Incident ID: ${ntf.id}`}>
           <div className="p-6 space-y-6 text-xs text-navy leading-relaxed">

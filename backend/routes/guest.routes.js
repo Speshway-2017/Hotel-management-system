@@ -47,6 +47,37 @@ router.get('/rooms', async (req, res) => {
   }
 });
 
+export const getBookingEffectiveAmounts = (b) => {
+  const discountAmount = Number(b.discountAmount || b.discount || 0);
+  let rawAmount = Number(b.amount || b.totalAmount || 0);
+  let originalAmount = Number(b.originalAmount || 0);
+  let netAmount = b.netAmount !== undefined && b.netAmount !== null ? Number(b.netAmount) : 0;
+
+  let totalAmount = rawAmount;
+
+  if (discountAmount > 0) {
+    if (netAmount > 0) {
+      totalAmount = netAmount;
+      if (originalAmount <= totalAmount) {
+        originalAmount = totalAmount + discountAmount;
+      }
+    } else if (originalAmount > 0 && originalAmount > rawAmount) {
+      totalAmount = rawAmount;
+    } else if (originalAmount > 0 && originalAmount === rawAmount) {
+      totalAmount = rawAmount;
+      originalAmount = rawAmount + discountAmount;
+    } else {
+      originalAmount = totalAmount + discountAmount;
+    }
+  } else {
+    if (originalAmount <= 0) {
+      originalAmount = totalAmount;
+    }
+  }
+
+  return { totalAmount, originalAmount, discountAmount, couponCode: b.couponCode || null };
+};
+
 router.get('/bookings', async (req, res) => {
   try {
     const properties = await Property.find({});
@@ -82,7 +113,7 @@ router.get('/bookings', async (req, res) => {
       const bId = b.bookingId || b._id || b.id;
       const fb = feedbackMap.get(String(bId)) || feedbackMap.get(String(b._id)) || feedbackMap.get(String(b.bookingId));
       
-      const totalAmount = Number(b.amount || b.totalAmount || 0);
+      const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
       const balance = Number(b.balance || 0);
       const paidAmount = (b.paymentStatus === 'Paid' || b.status === 'Confirmed' || b.status === 'Checked-out' || b.status === 'Cancelled') 
         ? Math.max(0, totalAmount - balance) 
@@ -120,10 +151,13 @@ router.get('/bookings', async (req, res) => {
         propertyId: b.propertyId || prop?._id || prop?.id || 'HS-JAI',
         checkIn: checkIn,
         checkOut: checkOut,
-        nights: Number(b.nights) || calculateStayNights(checkIn, checkOut),
+        nights: calculateStayNights(checkIn, checkOut) || Number(b.nights) || 1,
         dates: `${checkIn} → ${checkOut}`,
         amount: totalAmount,
         totalAmount: totalAmount,
+        originalAmount: originalAmount,
+        discountAmount: discountAmount,
+        couponCode: couponCode,
         paidAmount: paidAmount,
         balance: balance,
         status: b.status || 'Confirmed',
@@ -166,6 +200,7 @@ router.get('/dashboard', async (req, res) => {
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
       const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
       const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
+      const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
 
       return {
         id: b.bookingId || b._id || b.id,
@@ -177,9 +212,13 @@ router.get('/dashboard', async (req, res) => {
         room: b.room || b.roomType || 'Standard Room',
         checkIn: checkIn,
         checkOut: checkOut,
-        nights: Number(b.nights) || calculateStayNights(checkIn, checkOut),
+        nights: calculateStayNights(checkIn, checkOut) || Number(b.nights) || 1,
         dates: `${checkIn} → ${checkOut}`,
-        amount: Number(b.amount || b.totalAmount || 0),
+        amount: totalAmount,
+        totalAmount: totalAmount,
+        originalAmount: originalAmount,
+        discountAmount: discountAmount,
+        couponCode: couponCode,
         status: b.status || 'Confirmed',
         paymentStatus: b.paymentStatus || 'Paid',
         balance: Number(b.balance || 0),
@@ -189,6 +228,7 @@ router.get('/dashboard', async (req, res) => {
 
     const upcomingBooking = mapped.find(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending') || null;
     const currentStay = mapped.find(b => b.status === 'Checked-in') || null;
+    const activeBooking = currentStay || upcomingBooking || (mapped.length > 0 ? mapped[0] : null);
     const totalStays = mapped.length;
     const totalSpent = mapped.reduce((acc, b) => acc + Number(b.amount || 0), 0);
 
@@ -196,6 +236,7 @@ router.get('/dashboard', async (req, res) => {
       stats: {
         upcomingBooking,
         currentStay,
+        activeBooking,
         totalStays,
         totalSpent
       },
@@ -227,7 +268,8 @@ router.get('/folio', async (req, res) => {
       const address = prop ? (prop.settings?.address || prop.address || `${city}, India`) : 'Hitech City, Hyderabad, Telangana';
       const gstNo = prop?.settings?.gstin || '36AABCS1429B1Z5';
 
-      const baseAmount = Number(b.amount || b.totalAmount || 0);
+      const { totalAmount, originalAmount, discountAmount } = getBookingEffectiveAmounts(b);
+      const baseAmount = totalAmount;
       const roomCharges = Math.round(baseAmount * 0.82);
       const gstTax = Math.round(baseAmount * 0.18);
       
@@ -236,8 +278,8 @@ router.get('/folio', async (req, res) => {
         : [];
       
       const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
-      const discount = Number(b.discount || 0);
-      const totalCharges = baseAmount + serviceTotal - discount;
+      const discount = discountAmount || Number(b.discount || 0);
+      const totalCharges = baseAmount + serviceTotal;
       const paidAmount = b.paymentStatus === 'Paid' || b.status === 'Confirmed' ? baseAmount : Number(b.paidAmount || 0);
       const balance = Math.max(0, totalCharges - paidAmount);
       const paymentStatus = balance === 0 ? 'Settled' : (paidAmount > 0 ? 'Pending Balance' : 'Unpaid');
@@ -787,14 +829,22 @@ router.get('/notifications', async (req, res) => {
 const handleMarkGuestNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
+    const { title: reqTitle, message: reqMsg } = req.body || {};
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
-    let notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true });
-    if (!notif) {
-      notif = await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true });
+    let notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true }).catch(() => null);
+    if (!notif && isObjectId) {
+      notif = await Notification.findByIdAndUpdate(id, { isRead: true }, { new: true }).catch(() => null);
     }
     
+    const title = notif?.title || reqTitle;
+    const message = notif?.message || reqMsg;
+
+    if (title && message) {
+      await Notification.updateMany({ title, message }, { isRead: true }).catch(() => null);
+    }
+
     const io = req.app.get('socketio');
     if (io) {
       const targetProp = notif?.propertyId || 'HS-JAI';
@@ -815,12 +865,20 @@ router.put('/notifications/:id/read', handleMarkGuestNotificationRead);
 const handleMarkGuestNotificationUnread = async (req, res) => {
   try {
     const { id } = req.params;
+    const { title: reqTitle, message: reqMsg } = req.body || {};
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
-    let notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: false }, { new: true });
-    if (!notif) {
-      notif = await Notification.findByIdAndUpdate(id, { isRead: false }, { new: true });
+    let notif = await Notification.findOneAndUpdate({ $or: idQuery }, { isRead: false }, { new: true }).catch(() => null);
+    if (!notif && isObjectId) {
+      notif = await Notification.findByIdAndUpdate(id, { isRead: false }, { new: true }).catch(() => null);
+    }
+
+    const title = notif?.title || reqTitle;
+    const message = notif?.message || reqMsg;
+
+    if (title && message) {
+      await Notification.updateMany({ title, message }, { isRead: false }).catch(() => null);
     }
 
     const io = req.app.get('socketio');
@@ -1288,7 +1346,7 @@ const handleGetSingleBooking = async (req, res) => {
       checkIn,
       checkOut,
       dates: `${checkIn} → ${checkOut}`,
-      nights: Number(booking.nights) || 1,
+      nights: calculateStayNights(checkIn, checkOut) || Number(booking.nights) || 1,
       totalAmount,
       amount: totalAmount,
       paidAmount,
@@ -1509,7 +1567,7 @@ router.get('/payments', async (req, res) => {
       const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
       const bId = b.bookingId || b._id || b.id;
 
-      const totalAmount = Number(b.amount || b.totalAmount || 0);
+      const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
       const balance = Number(b.balance || 0);
       const isBookingRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
       const isPartiallyRefunded = b.paymentStatus === 'Partially Refunded' || b.refundStatus === 'Partially Refunded' || b.refundRequest?.status === 'Partially Refunded';
@@ -1523,7 +1581,7 @@ router.get('/payments', async (req, res) => {
       const gstTax = Math.round(totalAmount * 0.18);
       const services = Array.isArray(b.services) ? b.services : [];
       const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
-      const discount = Number(b.discount || 0);
+      const discount = discountAmount || Number(b.discount || 0);
 
       let refundObj = null;
       if (b.refundRequest || b.refundStatus || isBookingRefunded || isPartiallyRefunded) {
@@ -1561,6 +1619,16 @@ router.get('/payments', async (req, res) => {
             finalStatus = 'Successful';
           }
 
+          // Ensure payment amount reflects actual discounted amount if a promo was used
+          let effectivePayAmount = Number(p.amount || totalAmount);
+          if (discountAmount > 0) {
+            if (originalAmount > 0 && effectivePayAmount === originalAmount && effectivePayAmount > totalAmount) {
+              effectivePayAmount = totalAmount;
+            } else if (effectivePayAmount > totalAmount) {
+              effectivePayAmount = totalAmount;
+            }
+          }
+
           const txnId = p._id ? String(p._id) : `PAY-${bId}`;
           if (!seenTxnIds.has(txnId)) {
             seenTxnIds.add(txnId);
@@ -1576,8 +1644,11 @@ router.get('/payments', async (req, res) => {
               propertyId: b.propertyId || prop?._id || 'HS-JAI',
               room: b.room || b.roomType || 'Standard Room',
               roomNumber: b.roomNumber || p.roomNumber || extractRoomNumber(b.room) || '101',
-              amount: Number(p.amount || totalAmount),
+              amount: effectivePayAmount,
               totalAmount: totalAmount,
+              originalAmount: originalAmount,
+              discountAmount: discountAmount,
+              couponCode: couponCode,
               paidAmount: totalAmount - balance,
               balance: balance,
               paymentMethod: p.paymentMethod || b.paymentMethod || 'UPI',
@@ -1594,7 +1665,7 @@ router.get('/payments', async (req, res) => {
                 services,
                 serviceTotal,
                 discount,
-                totalCharges: totalAmount + serviceTotal - discount
+                totalCharges: totalAmount + serviceTotal
               },
               refundInfo: refundObj
             });

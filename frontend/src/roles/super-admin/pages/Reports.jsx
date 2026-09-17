@@ -65,7 +65,7 @@ function FinanceStatCard({ label, value, hint, icon: Icon, accentColor = "#0f172
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight truncate" title={label}>{label}</p>
-          <h4 className="mt-2.5 font-display text-sm font-black text-navy leading-none whitespace-nowrap">{value}</h4>
+          <h4 className="mt-2.5 font-sans tracking-tight tabular-nums text-sm font-bold text-slate-800 leading-none whitespace-nowrap">{value}</h4>
         </div>
         {Icon && (
           <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
@@ -405,7 +405,7 @@ function SuperAdminReports() {
         <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-black/5 backdrop-blur-sm flex justify-center items-start py-8 sm:py-16 animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(13,27,42,0.15)] relative border border-muted my-auto">
             <div className="flex items-center justify-between pb-4 border-b border-muted">
-              <h3 className="font-display font-bold text-lg text-navy flex items-center gap-2">
+              <h3 className="font-display font-bold text-lg text-slate-800 flex items-center gap-2">
                 <Receipt className="size-5 text-purple" />
                 <span>Commission Statement</span>
               </h3>

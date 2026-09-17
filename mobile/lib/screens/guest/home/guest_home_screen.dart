@@ -14,6 +14,7 @@ import '../feedback/guest_feedback_screen.dart';
 import '../folio/guest_folio_screen.dart';
 import '../search/guest_search_screen.dart';
 import '../settings/guest_settings_screen.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class GuestHomeScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigateTab;
@@ -28,16 +29,6 @@ class GuestHomeScreen extends StatefulWidget {
 }
 
 class _GuestHomeScreenState extends State<GuestHomeScreen> {
-  // Hour Stay Design Tokens matching Manager Dashboard
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
 
   @override
   void initState() {
@@ -889,109 +880,33 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
     );
   }
 
-  // --- 7. Recent Booking Card matching Manager Dashboard Style ---
+  // --- 7. Recent Booking Card matching Premium Card Style ---
   Widget _buildBookingCard(BuildContext context, ReservationModel res) {
     final isHourly = res.stayType.toLowerCase() == 'hourly';
+    final isCurrent = res.status.toLowerCase() == 'checked-in' || res.status.toLowerCase() == 'checked_in';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardBorder, width: 1.0),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCurrent ? emerald.withAlpha(90) : cardBorder,
+          width: isCurrent ? 1.5 : 1.0,
+        ),
         boxShadow: [
           BoxShadow(
-            color: navy.withAlpha(5),
-            blurRadius: 5,
+            color: isCurrent ? emerald.withAlpha(15) : navy.withAlpha(6),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          leading: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: isHourly ? const Color(0xFFF3E8FF) : const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(
-                color: isHourly ? purple.withAlpha(50) : const Color(0xFF2563EB).withAlpha(50),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                res.roomNumber.isNotEmpty ? res.roomNumber : '?',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: isHourly ? purple : const Color(0xFF2563EB),
-                  fontSize: 11.5,
-                ),
-              ),
-            ),
-          ),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Room ${res.roomNumber.isNotEmpty ? res.roomNumber : '—'} (${res.roomType})',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: navy,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              StatusBadge(status: res.status),
-            ],
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: isHourly ? purple.withAlpha(15) : navy.withAlpha(10),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        isHourly ? 'Hourly (${res.hours ?? 3}h)' : 'Overnight (${res.nights}n)',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: isHourly ? purple : navy,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      Formatters.currency(res.totalAmount),
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: emerald,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Check-in: ${Formatters.checkInDateTime(res.checkIn)}',
-                  style: const TextStyle(fontSize: 10, color: muted),
-                ),
-              ],
-            ),
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded, color: muted, size: 18),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -999,6 +914,147 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
               ),
             );
           },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Room Badge, Booking Reference & Status Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: isHourly ? const Color(0xFFF3E8FF) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isHourly
+                                  ? purple.withAlpha(50)
+                                  : const Color(0xFF2563EB).withAlpha(50),
+                            ),
+                          ),
+                          child: Text(
+                            res.roomNumber.isNotEmpty ? 'Room ${res.roomNumber}' : 'Room —',
+                            style: TextStyle(
+                              color: isHourly ? purple : const Color(0xFF1E40AF),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '#${res.reservationNumber.isNotEmpty ? res.reservationNumber : res.bookingId}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: muted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    StatusBadge(status: res.status),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Hotel Name, Room Category & Duration Pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            res.propertyName.isNotEmpty ? res.propertyName : 'Hour Stay Luxury Hotel',
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: navy,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            res.roomType.isNotEmpty ? res.roomType : 'Standard Room',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isHourly ? purple.withAlpha(15) : navy.withAlpha(10),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isHourly
+                            ? 'Hourly (${res.hours ?? 3}h)'
+                            : '${res.nights > 0 ? res.nights : 1}N Stay (24h)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isHourly ? purple : navy,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Schedule & Tariff Footer Container
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: cardBorder),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.login_rounded, size: 13, color: Color(0xFF64748B)),
+                          const SizedBox(width: 4),
+                          Text(
+                            Formatters.checkInDateTime(res.checkIn),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: navy,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        Formatters.currency(res.totalAmount),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: emerald,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

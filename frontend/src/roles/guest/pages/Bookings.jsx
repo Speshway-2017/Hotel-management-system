@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { inr } from "@/data/hs-data";
 import { calculateStayNights } from "@/utils/dateUtils";
 import { Button } from "@/components/ui/button";
-import { ActionGroup, ActionIcon, ViewActionIcon } from "@/components/hs/kit";
+import { ActionGroup, ActionIcon, ViewActionIcon, FeedbackActionIcon } from "@/components/hs/kit";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { authService } from "@/services/auth";
 
@@ -79,8 +79,14 @@ function GuestBookingsPage() {
       }
       setBookings(list);
 
-      if (initialSelectedId) {
-        const matched = list.find(b => (b.id === initialSelectedId || b.bookingId === initialSelectedId));
+      const currentParams = new URLSearchParams(window.location.search);
+      const targetId = currentParams.get('id') || currentParams.get('view') || initialSelectedId;
+      if (targetId) {
+        const cleanTarget = String(targetId).toUpperCase();
+        const matched = list.find(b => {
+          const bId = String(b.bookingId || b.id || b._id || '').toUpperCase();
+          return bId === cleanTarget || `BK${bId}` === cleanTarget || bId === cleanTarget.replace(/^BK/, '');
+        });
         if (matched) setSelectedBooking(matched);
       }
     } catch (err) {
@@ -102,10 +108,16 @@ function GuestBookingsPage() {
 
   const handleSelectBooking = (b) => {
     if (b) {
-      const newUrl = window.location.pathname + '?id=' + (b.bookingId || b.id);
+      const bId = b.bookingId || b.id || b._id;
+      const bRef = bId ? (String(bId).startsWith('BK') ? String(bId) : `BK${bId}`) : '';
+      const newUrl = window.location.pathname + '?id=' + bRef;
       window.history.pushState({}, '', newUrl);
+      window.dispatchEvent(new Event('popstate'));
+      window.dispatchEvent(new Event('locationchange'));
     } else {
       window.history.pushState({}, '', window.location.pathname);
+      window.dispatchEvent(new Event('popstate'));
+      window.dispatchEvent(new Event('locationchange'));
     }
     setSelectedBooking(b);
   };
@@ -177,12 +189,24 @@ function GuestBookingsPage() {
       const id = params.get('id') || params.get('view');
       if (!id) {
         setSelectedBooking(null);
+      } else {
+        const cleanTarget = String(id).toUpperCase();
+        setBookings(current => {
+          const matched = current.find(b => {
+            const bId = String(b.bookingId || b.id || b._id || '').toUpperCase();
+            return bId === cleanTarget || `BK${bId}` === cleanTarget || bId === cleanTarget.replace(/^BK/, '');
+          });
+          if (matched) setSelectedBooking(matched);
+          return current;
+        });
       }
     };
 
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('locationchange', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('locationchange', handlePopState);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -242,18 +266,6 @@ function GuestBookingsPage() {
 
     return (
       <div className="space-y-4 text-left font-ui">
-        {/* Breadcrumbs Navigation */}
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          <button
-            onClick={() => handleSelectBooking(null)}
-            className="transition-colors hover:text-foreground cursor-pointer font-medium"
-          >
-            My Bookings
-          </button>
-          <span aria-hidden>/</span>
-          <span className="text-foreground font-semibold">Booking #{b.id || b.bookingId || b._id}</span>
-        </nav>
-        
         {/* Detailed Booking Page Card */}
         <div className="bg-white rounded-2xl border border-navy/10 p-6 sm:p-8 shadow-soft space-y-6">
           
@@ -348,7 +360,7 @@ function GuestBookingsPage() {
                 <p>Check-out: <strong className="text-purple">{b.checkOut || b.dates?.split('→')[1]}</strong> (11:00 AM)</p>
                 <p className="text-navy/60 font-medium">
                   {(() => {
-                    const stayN = Number(b.nights) || calculateStayNights(b.checkIn, b.checkOut);
+                    const stayN = calculateStayNights(b.checkIn, b.checkOut) || Number(b.nights) || 1;
                     return `Duration: ${stayN} ${stayN === 1 ? 'Night' : 'Nights'}`;
                   })()}
                 </p>
@@ -651,7 +663,7 @@ function GuestBookingsPage() {
                   <th className="py-3 px-4 text-right whitespace-nowrap">Tariff</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Payment</th>
                   <th className="py-3 px-4 text-center whitespace-nowrap">Status</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap min-w-[120px]">Actions</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap min-w-[140px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
@@ -662,6 +674,8 @@ function GuestBookingsPage() {
                   const isUpcoming = (statusLower === 'confirmed' || statusLower === 'paid' || statusLower === 'pending') && !isCheckedOut && !isCancelled;
                   const refundSubmitted = Boolean(b.refundRequest || b.refundStatus);
                   const refundStatusText = b.refundStatus || b.refundRequest?.status || 'Pending';
+                  const bId = b.bookingId || b.id || b._id;
+                  const hasFb = Boolean(b.hasFeedback || feedbackBookingIds.has(String(bId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id)) || feedbackBookingIds.has(String(b.bookingId)));
 
                   return (
                     <tr 
@@ -726,8 +740,27 @@ function GuestBookingsPage() {
                           {b.status || 'Confirmed'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap min-w-[120px]" onClick={(e) => e.stopPropagation()}>
-                        <ActionGroup align="right">
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[140px]" onClick={(e) => e.stopPropagation()}>
+                        <ActionGroup align="left">
+                          <ViewActionIcon
+                            title="View Booking Details"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectBooking(b);
+                            }}
+                          />
+
+                          {/* Feedback Action Icon only when booking status is checked-out and guest has not given feedback */}
+                          {isCheckedOut && !hasFb && (
+                            <FeedbackActionIcon
+                              title="Give Stay Feedback"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
+                              }}
+                            />
+                          )}
+
                           {/* Cancellation Action for Upcoming stays before check-in */}
                           {isUpcoming && (
                             <ActionIcon
@@ -762,35 +795,6 @@ function GuestBookingsPage() {
                             </button>
                           )}
 
-                          {/* Feedback icon for checked out bookings */}
-                          {isCheckedOut && (
-                            (b.hasFeedback || feedbackBookingIds.has(String(b.bookingId)) || feedbackBookingIds.has(String(b.id)) || feedbackBookingIds.has(String(b._id))) ? (
-                              <ActionIcon
-                                icon={CheckCircle2}
-                                variant="success"
-                                title="Feedback already submitted"
-                                disabled
-                              />
-                            ) : (
-                              <ActionIcon
-                                icon={Star}
-                                variant="warning"
-                                title="Add Stay Feedback"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.location.href = `/guest/feedback/add?bookingId=${b.bookingId || b.id || b._id}`;
-                                }}
-                              />
-                            )
-                          )}
-
-                          <ViewActionIcon
-                            title="View Booking Details"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectBooking(b);
-                            }}
-                          />
                         </ActionGroup>
                       </td>
                     </tr>

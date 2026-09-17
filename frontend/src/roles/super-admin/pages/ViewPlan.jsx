@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Shield, Settings, List } from "lucide-react";
@@ -38,13 +38,6 @@ function ViewPlan() {
 
   return (
     <div className="space-y-6 text-left">
-      <Crumbs
-        items={[
-          { label: "Plans & Billing", to: "/super-admin/subscription" },
-          { label: plan ? plan.name : "Plan Details" }
-        ]}
-      />
-
       <PageHeader
         title={plan ? `Subscription Plan: ${plan.name}` : "Plan Details"}
         subtitle="Tier rates configuration, access permissions limits, and feature permissions index."

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows, Panel, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Panel } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
@@ -301,13 +301,6 @@ function ManagerViewReport() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans">
-      <Crumbs
-        items={[
-          { label: "Reports", to: "/manager/reports" },
-          { label: reportTitle || "Report Details" }
-        ]}
-      />
-
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <PageHeader

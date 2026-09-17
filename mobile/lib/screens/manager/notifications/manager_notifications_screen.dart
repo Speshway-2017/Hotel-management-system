@@ -10,6 +10,8 @@ import '../feedback/manager_feedback_screen.dart';
 import '../reservations/manager_reservation_detail_screen.dart';
 import '../manager_layout.dart';
 
+import 'package:hour_stay_mobile/colours.dart';
+
 class ManagerNotificationsScreen extends StatefulWidget {
   const ManagerNotificationsScreen({super.key});
 
@@ -18,17 +20,6 @@ class ManagerNotificationsScreen extends StatefulWidget {
 }
 
 class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen> {
-  // Hour Stay Brand Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color ruby = Color(0xFFE53935);
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -379,7 +370,7 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
       child: InkWell(
         onTap: () {
           if (isUnread) {
-            provider.markAsRead(notif.id);
+            provider.markAsRead(notif.id, title: notif.title, message: notif.message);
           }
           _showNotificationDetailSheet(context, notif, provider);
         },
@@ -515,8 +506,11 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     onSelected: (action) {
                       if (action == 'toggle') {
-                        provider.toggleReadStatus(notif.id);
+                        provider.toggleReadStatus(notif.id, title: notif.title, message: notif.message);
                       } else if (action == 'view') {
+                        if (isUnread) {
+                          provider.markAsRead(notif.id, title: notif.title, message: notif.message);
+                        }
                         _showNotificationDetailSheet(context, notif, provider);
                       }
                     },
@@ -567,6 +561,11 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
     NotificationModel notif,
     ManagerNotificationProvider provider,
   ) {
+    // Automatically mark as read as soon as it is opened
+    if (!notif.isRead) {
+      provider.markAsRead(notif.id, title: notif.title, message: notif.message);
+    }
+
     final catColor = _getCategoryAccentColor(notif.category);
     final catBg = _getCategoryBgColor(notif.category);
     final catIcon = _getCategoryIcon(notif.category);
@@ -578,10 +577,19 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
       builder: (ctx) {
         return Consumer<ManagerNotificationProvider>(
           builder: (context, prov, _) {
-            // Find updated notification state
+            // Find updated notification state safely
             final updatedNotif = prov.notifications.firstWhere(
-              (n) => n.id == notif.id,
-              orElse: () => notif,
+              (n) => (n.id.isNotEmpty && n.id == notif.id) ||
+                     (n.title.trim() == notif.title.trim() && n.message.trim() == notif.message.trim()),
+              orElse: () => notif.isRead ? notif : NotificationModel(
+                id: notif.id,
+                title: notif.title,
+                message: notif.message,
+                category: notif.category,
+                isRead: true,
+                propertyId: notif.propertyId,
+                createdAt: notif.createdAt,
+              ),
             );
             final isUnread = !updatedNotif.isRead;
 
@@ -716,7 +724,10 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: navy,
-                            side: const BorderSide(color: cardBorder, width: 1.5),
+                            side: BorderSide(
+                              color: isUnread ? emerald.withAlpha(120) : cardBorder,
+                              width: 1.5,
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -729,10 +740,18 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
                           ),
                           label: Text(
                             isUnread ? 'Mark Read' : 'Mark Unread',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: isUnread ? emerald : navy,
+                            ),
                           ),
                           onPressed: () {
-                            prov.toggleReadStatus(updatedNotif.id);
+                            prov.toggleReadStatus(
+                              updatedNotif.id,
+                              title: updatedNotif.title,
+                              message: updatedNotif.message,
+                            );
                           },
                         ),
                       ),

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Crumbs, Tag, Notice } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { 
@@ -221,11 +221,6 @@ function ViewGuestPage() {
   if (error || !guest) {
     return (
       <div className="p-6 text-left">
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Guests", to: "/admin/guests" },
-          { label: "Not Found" }
-        ]} />
         <div className="mt-6">
           <Notice tone="error" title="Dossier Sync Error">{error || "Failed to load guest data."}</Notice>
         </div>
@@ -238,11 +233,6 @@ function ViewGuestPage() {
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
       <div className="space-y-3.5">
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Guests", to: "/admin/guests" },
-          { label: guest.name }
-        ]} />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <PageHeader
             title={`Guest Dossier — ${guest.name}`}

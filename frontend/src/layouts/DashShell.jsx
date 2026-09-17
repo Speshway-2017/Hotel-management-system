@@ -327,7 +327,23 @@ export function DashShell({ role, children }) {
   }, [pathname, role]);
 
   const location = useLocation();
-  const searchStr = location.search || "";
+  const [urlSearch, setUrlSearch] = useState(() => typeof window !== 'undefined' ? window.location.search : '');
+
+  useEffect(() => {
+    const handleUrlUpdate = () => {
+      if (typeof window !== 'undefined') {
+        setUrlSearch(window.location.search);
+      }
+    };
+    window.addEventListener('popstate', handleUrlUpdate);
+    window.addEventListener('locationchange', handleUrlUpdate);
+    return () => {
+      window.removeEventListener('popstate', handleUrlUpdate);
+      window.removeEventListener('locationchange', handleUrlUpdate);
+    };
+  }, []);
+
+  const searchStr = typeof window !== 'undefined' && window.location.search ? window.location.search : (typeof location.search === 'string' ? location.search : "");
   const isActive = (to) => {
     const [cleanTo, queryString] = to.split('?');
     if (queryString) {
@@ -833,6 +849,15 @@ export function DashShell({ role, children }) {
                   };
                 }
                 if (path.startsWith("/guest/bookings")) {
+                  const queryParams = new URLSearchParams(searchStr);
+                  const bookingIdParam = queryParams.get('id') || queryParams.get('view') || (path.startsWith('/guest/bookings/') ? path.split('/guest/bookings/')[1] : null);
+                  if (bookingIdParam) {
+                    const bRef = bookingIdParam.startsWith('BK') ? bookingIdParam : `BK${bookingIdParam}`;
+                    return {
+                      title: `Booking #${bRef}`,
+                      subtitle: "Detailed reservation breakdown, schedule and hotel services."
+                    };
+                  }
                   return {
                     title: "My Bookings",
                     subtitle: "Upcoming, completed and cancelled stays."
@@ -848,6 +873,12 @@ export function DashShell({ role, children }) {
                   return {
                     title: "Request Stay Refund",
                     subtitle: "Submit early checkout, cancellation, or stay adjustment refund requests directly to hotel staff."
+                  };
+                }
+                if (path.startsWith("/guest/feedback/add") || path.startsWith("/guest/feedback/new")) {
+                  return {
+                    title: "Add Feedback",
+                    subtitle: "Share your stay experience and rate your room and amenities."
                   };
                 }
                 if (path.startsWith("/guest/feedback") || path.startsWith("/guest/reviews")) {
@@ -937,16 +968,29 @@ export function DashShell({ role, children }) {
                   </div>
                 );
               }
-              const isNotificationDetails = pathname.match(/^\/(admin|super-admin|manager)\/notifications\/([^\/]+)$/);
+              const isNotificationDetails = pathname.match(/^\/(admin|super-admin|manager|reception|guest)\/notifications\/([^\/]+)$/);
               if (isNotificationDetails) {
                 const prefix = isNotificationDetails[1];
                 const parentUrl = `/${prefix}/notifications`;
+                const roleHome = prefix === "super-admin" ? "/super-admin" : (prefix === "manager" ? "/manager" : (prefix === "reception" ? "/reception" : (prefix === "guest" ? "/guest" : "/admin")));
                 return (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
-                    <Link to={parentUrl} className="hover:text-navy transition-colors">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap">
+                    <Link 
+                      to={roleHome} 
+                      style={{ color: '#2563eb' }}
+                      className="hover:underline transition-colors font-medium cursor-pointer"
+                    >
+                      Dashboard
+                    </Link>
+                    <span className="text-muted-foreground/45">/</span>
+                    <Link 
+                      to={parentUrl} 
+                      style={{ color: '#2563eb' }}
+                      className="hover:underline transition-colors font-medium cursor-pointer"
+                    >
                       Notifications
                     </Link>
-                    <span className="text-muted-foreground/50">/</span>
+                    <span className="text-muted-foreground/45">/</span>
                     <span className="text-navy font-bold">Notification Details</span>
                   </div>
                 );
@@ -972,25 +1016,60 @@ export function DashShell({ role, children }) {
                   { label: "Extend Stay" }
                 ],
                 "/admin/rooms": [
-                  { label: "Operations", to: "/admin/reservations" },
                   { label: "Rooms & Rates" }
                 ],
+                "/admin/rooms/add": [
+                  { label: "Rooms & Rates", to: "/admin/rooms" },
+                  { label: "Add Room" }
+                ],
+                "/admin/rooms/add-type": [
+                  { label: "Rooms & Rates", to: "/admin/rooms" },
+                  { label: "Create Room Category" }
+                ],
+                "/admin/rooms/edit": [
+                  { label: "Rooms & Rates", to: "/admin/rooms" },
+                  { label: "Edit Room" }
+                ],
+                "/admin/rooms/edit-type": [
+                  { label: "Rooms & Rates", to: "/admin/rooms" },
+                  { label: "Edit Room Category" }
+                ],
+                "/admin/rooms/view": [
+                  { label: "Rooms & Rates", to: "/admin/rooms" },
+                  { label: "Room Details" }
+                ],
                 "/admin/guests": [
-                  { label: "Operations", to: "/admin/reservations" },
-                  { label: "Guests" }
+                  { label: "Guests CRM" }
+                ],
+                "/admin/guests/add": [
+                  { label: "Guests CRM", to: "/admin/guests" },
+                  { label: "Add Guest" }
+                ],
+                "/admin/guests/edit": [
+                  { label: "Guests CRM", to: "/admin/guests" },
+                  { label: "Edit Guest" }
+                ],
+                "/admin/guests/view": [
+                  { label: "Guests CRM", to: "/admin/guests" },
+                  { label: "Guest Details" }
                 ],
                 "/admin/billing": [
-                  { label: "Finance", to: "/admin/billing" },
                   { label: "Billing & Invoices" }
+                ],
+                "/admin/subscription": [
+                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Subscription" }
                 ],
                 "/admin/payments": [{ label: "Payments" }],
                 "/admin/payments/:id": [{ label: "Payments", to: "/admin/payments" }, { label: "Payment Details" }],
                 "/admin/approvals": [
-                  { label: "Management", to: "/admin/staff" },
                   { label: "Approvals" }
                 ],
+                "/admin/approvals/view": [
+                  { label: "Approvals", to: "/admin/approvals" },
+                  { label: "Approval Request Details" }
+                ],
                 "/admin/approvals/view/:id": [
-                  { label: "Management", to: "/admin/staff" },
                   { label: "Approvals", to: "/admin/approvals" },
                   { label: "Approval Request Details" }
                 ],
@@ -1130,16 +1209,21 @@ export function DashShell({ role, children }) {
                 "/guest/refund/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
                 "/guest/refund-request": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
                 "/guest/refund-request/:id": [{ label: "Digital Folio", to: "/guest/folio" }, { label: "Request Refund" }],
-                "/guest/feedback": [{ label: "Guest Feedback" }],
-                "/guest/reviews": [{ label: "Guest Feedback" }],
+                "/guest/feedback": [{ label: "Feedback" }],
+                "/guest/feedback/add": [{ label: "Feedback", to: "/guest/feedback" }, { label: "Add Feedback" }],
+                "/guest/feedback/new": [{ label: "Feedback", to: "/guest/feedback" }, { label: "Add Feedback" }],
+                "/guest/reviews": [{ label: "Feedback" }],
                 "/guest/invoices": [{ label: "Invoices" }],
                 "/guest/settings": [{ label: "Settings" }],
                 "/guest/profile": [{ label: "Profile" }],
                 "/guest/notifications": [{ label: "Notifications" }]
               };
-              const cleanPathname = pathname.replace(/\/view\/[^\/]+$/, "/view")
+              const cleanPathname = pathname.replace(/\/subscription\/requests\/view\/[^\/]+$/, "/super-admin/subscription/requests/view")
+                                            .replace(/\/view\/[^\/]+$/, "/view")
                                             .replace(/\/edit\/[^\/]+$/, "/edit")
+                                            .replace(/\/edit-type\/[^\/]+$/, "/edit-type")
                                             .replace(/\/extend\/[^\/]+$/, "/extend")
+                                            .replace(/\/payments\/[^\/]+$/, "/payments/:id")
                                             .replace(/\/reception\/check-in\/[^\/]+$/, "/reception/check-in/:id")
                                             .replace(/\/reception\/check-out\/[^\/]+$/, "/reception/check-out/:id")
                                             .replace(/\/reception\/folio\/[^\/]+$/, "/reception/folio/:id")
@@ -1152,18 +1236,26 @@ export function DashShell({ role, children }) {
                                             .replace(/\/guest\/bookings\/[^\/]+$/, "/guest/bookings/:id");
               let segments = mappings[cleanPathname];
               const queryParams = new URLSearchParams(searchStr);
-              const hasDetailParam = queryParams.has('id') || queryParams.has('view');
+              const bookingIdParam = queryParams.get('id') || queryParams.get('view') || (pathname.startsWith('/guest/bookings/') ? pathname.split('/guest/bookings/')[1] : null);
+              const hasDetailParam = Boolean(bookingIdParam) || queryParams.has('id') || queryParams.has('view');
 
-              if (cleanPathname === "/guest/folio/:id" || (cleanPathname === "/guest/folio" && hasDetailParam)) {
+              if (cleanPathname === "/guest/folio/:id" || (cleanPathname === "/guest/folio" && (queryParams.has('id') || queryParams.has('view')))) {
                 segments = [
                   { label: "Digital Folio", to: "/guest/folio" },
                   { label: "Folio Details" }
                 ];
-              } else if (cleanPathname === "/guest/bookings/:id" || (cleanPathname === "/guest/bookings" && hasDetailParam)) {
-                segments = [
-                  { label: "My Bookings", to: "/guest/bookings" },
-                  { label: "Booking Details" }
-                ];
+              } else if (cleanPathname === "/guest/bookings/:id" || cleanPathname === "/guest/bookings") {
+                if (bookingIdParam) {
+                  const bRef = bookingIdParam.startsWith('BK') ? bookingIdParam : `BK${bookingIdParam}`;
+                  segments = [
+                    { label: "My Bookings", to: "/guest/bookings" },
+                    { label: `Booking #${bRef}` }
+                  ];
+                } else {
+                  segments = [
+                    { label: "My Bookings" }
+                  ];
+                }
               }
 
               if (segments) {

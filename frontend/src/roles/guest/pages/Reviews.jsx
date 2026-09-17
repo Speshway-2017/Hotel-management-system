@@ -55,8 +55,7 @@ function GuestReviewsPage() {
   const [categories, setCategories] = useState({
     cleanliness: 5,
     service: 5,
-    room: 5,
-    food: 5
+    room: 5
   });
   const [comments, setComments] = useState("");
   const [formError, setFormError] = useState("");
@@ -186,13 +185,6 @@ function GuestReviewsPage() {
     }
   };
 
-  // Stats
-  const totalReviews = reviews.length;
-  const avgRating = totalReviews > 0
-    ? (reviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0) / totalReviews).toFixed(1)
-    : "5.0";
-  const respondedCount = reviews.filter(r => r.response && r.response.trim().length > 0).length;
-
   return (
     <div className="space-y-6 text-left font-ui">
       {/* Top Header */}
@@ -212,13 +204,6 @@ function GuestReviewsPage() {
           >
             <Plus className="size-4" /> Share Feedback
           </Button>
-          <button
-            onClick={() => fetchData(false)}
-            className="size-10 rounded-xl border border-navy/10 bg-white hover:bg-cream/40 text-navy flex items-center justify-center transition-colors shadow-soft cursor-pointer"
-            title="Refresh Feed"
-          >
-            <RefreshCw className="size-4 text-purple" />
-          </button>
         </div>
       </div>
 
@@ -234,49 +219,6 @@ function GuestReviewsPage() {
           </button>
         </div>
       )}
-
-      {/* Overview KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-navy/10 p-5 rounded-2xl shadow-soft flex items-center gap-4">
-          <div className="size-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-            <Star className="size-6 fill-amber-400 text-amber-500" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-navy/50 uppercase tracking-wider block">Average Rating</span>
-            <span className="font-display text-2xl font-bold text-navy leading-none">{avgRating} / 5.0</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-navy/10 p-5 rounded-2xl shadow-soft flex items-center gap-4">
-          <div className="size-12 rounded-xl bg-purple/10 text-purple flex items-center justify-center shrink-0">
-            <MessageSquare className="size-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-navy/50 uppercase tracking-wider block">Total Reviews</span>
-            <span className="font-display text-2xl font-bold text-navy leading-none">{totalReviews}</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-navy/10 p-5 rounded-2xl shadow-soft flex items-center gap-4">
-          <div className="size-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <ShieldCheck className="size-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-navy/50 uppercase tracking-wider block">Verified Stays</span>
-            <span className="font-display text-2xl font-bold text-navy leading-none">100%</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-navy/10 p-5 rounded-2xl shadow-soft flex items-center gap-4">
-          <div className="size-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <MessageSquareText className="size-6" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-navy/50 uppercase tracking-wider block">Hotel Replies</span>
-            <span className="font-display text-2xl font-bold text-navy leading-none">{respondedCount}</span>
-          </div>
-        </div>
-      </div>
 
       {/* Feedback Submission Modal */}
       {showForm && (
@@ -370,14 +312,13 @@ function GuestReviewsPage() {
 
               {/* Sub-Category Pill Matrix */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-navy block">Rate Specific Amenities</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: "cleanliness", label: "Cleanliness & Hygiene" },
-                    { id: "service", label: "Staff & Hospitality" },
-                    { id: "room", label: "Room & Comfort" },
-                    { id: "food", label: "Dining & Breakfast" }
-                  ].map((cat) => (
+                 <label className="text-xs font-bold text-navy block">Rate Specific Amenities</label>
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                   {[
+                     { id: "cleanliness", label: "Cleanliness & Hygiene" },
+                     { id: "service", label: "Staff & Hospitality" },
+                     { id: "room", label: "Room & Comfort" }
+                   ].map((cat) => (
                     <div key={cat.id} className="p-3 bg-white border border-navy/10 rounded-xl space-y-1.5">
                       <span className="text-[11px] font-bold text-navy block">{cat.label}</span>
                       <div className="flex items-center gap-1">
@@ -518,9 +459,6 @@ function GuestReviewsPage() {
                         </span>
                         <span className="px-2 py-0.5 rounded-md bg-cream/40 border border-navy/5 text-navy/80">
                           Room: <strong>{r.ratings.room || rating}/5</strong>
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-cream/40 border border-navy/5 text-navy/80">
-                          Dining: <strong>{r.ratings.food || rating}/5</strong>
                         </span>
                       </div>
                     )}

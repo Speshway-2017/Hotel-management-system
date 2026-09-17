@@ -17,6 +17,7 @@ function AddReservation() {
   const searchParams = new URLSearchParams(window.location.search);
   const [guest, setGuest] = useState(searchParams.get("guest") || "");
   const [phone, setPhone] = useState(searchParams.get("phone") || "");
+  const [email, setEmail] = useState(searchParams.get("email") || "");
   const [idProofType, setIdProofType] = useState(searchParams.get("idProofType") || "Aadhaar Card");
   const [idProofNumber, setIdProofNumber] = useState(searchParams.get("idProofNumber") || "");
   const [room, setRoom] = useState(searchParams.get("room") || "");
@@ -168,6 +169,7 @@ function AddReservation() {
       const payload = {
         guest,
         phone,
+        email,
         idProofType,
         idProofNumber,
         room: roomNum ? `${roomNum} · ${roomType}` : room,
@@ -229,6 +231,16 @@ function AddReservation() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 XXXXX XXXXX"
+                />
+              </FormField>
+
+              <FormField label="Email Address" id="email">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="guest@example.com"
                 />
               </FormField>
 

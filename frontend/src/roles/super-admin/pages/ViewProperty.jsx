@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
@@ -64,13 +64,6 @@ function ViewProperty() {
 
   return (
     <div className="space-y-6">
-      <Crumbs
-        items={[
-          { label: "Properties", to: "/super-admin/properties" },
-          { label: property ? property.name : "Property Overview" }
-        ]}
-      />
-
       <PageHeader
         title={property ? property.name : "Property Overview"}
         subtitle="Audit layouts, staff configurations, and yield performance metrics."

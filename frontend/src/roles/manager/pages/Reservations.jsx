@@ -45,7 +45,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
         <div className="h-8 flex items-start">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
-        <h3 className="mt-1.5 font-display text-lg font-black text-navy leading-none">{value}</h3>
+        <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>
       </div>
       <div className="mt-auto pt-2 text-[10px] text-muted-foreground truncate">
         {hint}
@@ -391,7 +391,7 @@ function ManagerReservationsPage() {
         {paginatedData.length === 0 ? (
           <div className="p-16 text-center">
             <CalendarCheck className="size-12 text-muted-foreground/45 mx-auto mb-3" />
-            <h3 className="font-semibold text-navy">No reservations matching filters</h3>
+            <h3 className="font-semibold text-slate-800">No reservations matching filters</h3>
             <p className="text-xs text-muted-foreground mt-1">Try resetting search query options or status filters.</p>
           </div>
         ) : (
@@ -467,39 +467,58 @@ function ManagerReservationsPage() {
                       </td>
                       <td className="py-3.5 pl-3 pr-4 text-left align-middle min-w-[280px] whitespace-nowrap">
                         <ActionGroup align="left">
-                          {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
-                            <CheckInActionButton
-                              onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
-                            />
-                          )}
+                          {(() => {
+                            const statusLower = String(res.status || '').toLowerCase().trim();
+                            const isTerminal = 
+                              statusLower === "checked-out" || 
+                              statusLower === "checked out" || 
+                              statusLower === "checked_out" || 
+                              statusLower === "completed" || 
+                              statusLower === "cancelled" || 
+                              statusLower === "canceled";
 
-                          {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
-                            <>
-                              <ExtendStayButton
-                                booking={res}
-                                onClick={() => navigate({ to: `/manager/reservations/extend/${res._id || res.id || res.bookingId}` })}
-                              />
-                              <CheckOutActionButton
-                                onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
-                              />
-                            </>
-                          )}
+                            if (isTerminal) {
+                              return (
+                                <ViewActionButton
+                                  onClick={() => navigate({ to: `/manager/reservations/view/${res._id || res.id}` })}
+                                />
+                              );
+                            }
 
-                          <ViewActionButton
-                            onClick={() => navigate({ to: `/manager/reservations/view/${res._id || res.id}` })}
-                          />
+                            return (
+                              <>
+                                {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
+                                  <CheckInActionButton
+                                    onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
+                                  />
+                                )}
 
-                          {res.status !== "Checked-out" && res.status !== "Checked Out" && res.status !== "Cancelled" && (
-                            <>
-                              <EditActionButton
-                                onClick={() => navigate({ to: `/manager/reservations/edit/${res._id || res.id}` })}
-                              />
-                              <DeleteActionButton
-                                label="Cancel"
-                                onClick={() => handleCancel(res._id || res.id)}
-                              />
-                            </>
-                          )}
+                                {(res.status === "Checked-in" || res.status === "Checked In" || res.status === "Staying" || res.status === "Staying-In") && (
+                                  <>
+                                    <ExtendStayButton
+                                      booking={res}
+                                      onClick={() => navigate({ to: `/manager/reservations/extend/${res._id || res.id || res.bookingId}` })}
+                                    />
+                                    <CheckOutActionButton
+                                      onClick={() => handleStatusChange(res._id || res.id, "Checked-out")}
+                                    />
+                                  </>
+                                )}
+
+                                <ViewActionButton
+                                  onClick={() => navigate({ to: `/manager/reservations/view/${res._id || res.id}` })}
+                                />
+
+                                <EditActionButton
+                                  onClick={() => navigate({ to: `/manager/reservations/edit/${res._id || res.id}` })}
+                                />
+                                <DeleteActionButton
+                                  label="Cancel"
+                                  onClick={() => handleCancel(res._id || res.id)}
+                                />
+                              </>
+                            );
+                          })()}
                         </ActionGroup>
                       </td>
                     </tr>

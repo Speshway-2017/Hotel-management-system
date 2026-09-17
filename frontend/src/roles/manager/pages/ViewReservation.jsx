@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -75,13 +75,6 @@ function ManagerViewReservation() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <Crumbs
-        items={[
-          { label: "Reservations", to: "/manager/reservations" },
-          { label: booking ? `Reservation #${booking.bookingId || id}` : "Reservation Details" }
-        ]}
-      />
-
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <PageHeader
           title={booking ? `Reservation Details: ${booking._id || booking.id}` : "Reservation Details"}

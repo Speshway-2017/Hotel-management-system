@@ -17,19 +17,25 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = AppColors.getStatusColor(status);
+    final bgColor = AppColors.getStatusBgColor(status);
+
+    String displayStatus = status.replaceAll('_', ' ').replaceAll('-', ' ').trim();
+    displayStatus = Formatters.capitalize(displayStatus);
+
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color.withAlpha(35),
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withAlpha(100), width: 1),
+        border: Border.all(color: color.withAlpha(70), width: 1),
       ),
       child: Text(
-        Formatters.capitalize(status),
+        displayStatus.isNotEmpty ? displayStatus : Formatters.capitalize(status),
         style: TextStyle(
           color: color,
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
         ),
       ),
     );

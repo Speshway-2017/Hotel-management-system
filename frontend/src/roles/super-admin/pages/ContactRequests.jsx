@@ -187,7 +187,7 @@ export function ContactRequestsPage() {
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Inquiries</span>
             <span className="p-2 rounded-lg bg-navy/5 text-navy"><MessageSquare className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-navy font-display">{stats.total}</p>
+          <p className="mt-2 text-2xl font-extrabold text-navy font-sans tracking-tight tabular-nums">{stats.total}</p>
           <span className="text-[11px] text-muted-foreground">All client messages</span>
         </div>
 
@@ -196,7 +196,7 @@ export function ContactRequestsPage() {
             <span className="text-xs font-semibold text-purple uppercase tracking-wider">New Requests</span>
             <span className="p-2 rounded-lg bg-purple/10 text-purple"><Sparkles className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-purple font-display">{stats.newCount}</p>
+          <p className="mt-2 text-2xl font-extrabold text-purple font-sans tracking-tight tabular-nums">{stats.newCount}</p>
           <span className="text-[11px] text-muted-foreground">Awaiting initial review</span>
         </div>
 
@@ -205,7 +205,7 @@ export function ContactRequestsPage() {
             <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">In Progress</span>
             <span className="p-2 rounded-lg bg-amber-50 text-amber-600"><Clock className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-amber-600 font-display">{stats.inProgressCount}</p>
+          <p className="mt-2 text-2xl font-extrabold text-amber-600 font-sans tracking-tight tabular-nums">{stats.inProgressCount}</p>
           <span className="text-[11px] text-muted-foreground">Follow-up ongoing</span>
         </div>
 
@@ -214,7 +214,7 @@ export function ContactRequestsPage() {
             <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Resolved</span>
             <span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><CheckCircle2 className="size-4" /></span>
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-display">{stats.resolvedCount}</p>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-sans tracking-tight tabular-nums">{stats.resolvedCount}</p>
           <span className="text-[11px] text-muted-foreground">Onboarded / Closed</span>
         </div>
       </div>
@@ -246,16 +246,6 @@ export function ContactRequestsPage() {
                 {st === "all" ? "All Inquiries" : st}
               </button>
             ))}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadContacts(false)}
-              className="h-9 px-3 rounded-lg text-xs"
-              title="Refresh inquiries feed"
-            >
-              <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
           </div>
         </div>
 

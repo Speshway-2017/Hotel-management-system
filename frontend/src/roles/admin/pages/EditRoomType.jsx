@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Crumbs, Panel } from "@/components/hs/kit";
+import { Panel } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -230,18 +230,6 @@ function EditRoomTypePage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
-      <div>
-        <Crumbs items={[
-          { label: "Workspace", to: "/admin" },
-          { label: "Rooms & Rates", to: "/admin/rooms" },
-          { label: `Edit Room Type — ${category || targetId}` }
-        ]} />
-        <PageHeader
-          title={`Edit Room Type: ${category || targetId}`}
-          subtitle="Modify category parameters, base tariff rates, occupancy rules, amenities, and room number assignments."
-        />
-      </div>
-
       <div className="max-w-2xl">
         <Panel title="Edit Room Type Parameters Form" description="Pre-filled with existing category specifications from MongoDB.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">

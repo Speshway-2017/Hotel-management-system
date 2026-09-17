@@ -1,13 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
+import { CalendarPlus } from "lucide-react";
 
 function EditReservation() {
   const params = useParams() || {};
@@ -16,10 +17,12 @@ function EditReservation() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [booking, setBooking] = useState(null);
 
   // Form states
   const [guest, setGuest] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [idProofType, setIdProofType] = useState("Aadhaar Card");
   const [idProofNumber, setIdProofNumber] = useState("");
   const [room, setRoom] = useState("");
@@ -35,163 +38,168 @@ function EditReservation() {
 
   const [availableRoomsList, setAvailableRoomsList] = useState([]);
 
-  useEffect(() => {
-    const loadBooking = async () => {
-      if (!id) return;
-      setLoading(true);
-      setError(null);
+  const loadBooking = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const cleanId = decodeURIComponent(String(id)).trim().toLowerCase();
+      const [superRes, mgrRes] = await Promise.all([
+        superAdminService.getReservations().catch(() => ({ success: false })),
+        managerService.getReservations().catch(() => ({ success: false }))
+      ]);
+
+      let allReservations = [];
+      if (superRes.success && Array.isArray(superRes.data)) allReservations.push(...superRes.data);
+      if (mgrRes.success && Array.isArray(mgrRes.data)) allReservations.push(...mgrRes.data);
+
+      const match = allReservations.find(r => 
+        String(r._id).toLowerCase() === cleanId || 
+        String(r.id).toLowerCase() === cleanId || 
+        String(r.bookingId).toLowerCase() === cleanId
+      );
+      let assignedNum = "";
+
+      if (match) {
+        setBooking(match);
+        setGuest(match.guest || match.guestName || "");
+        setPhone(match.phone || match.mobile || match.phoneNumber || "");
+        setEmail(match.email || "");
+        setIdProofType(match.idProofType || "Aadhaar Card");
+        setIdProofNumber(match.idProofNumber || "");
+        let currentRoomNum = match.room || match.roomNumber || "";
+        if (currentRoomNum.includes("·")) {
+          currentRoomNum = currentRoomNum.split("·")[0].trim();
+        }
+        if (currentRoomNum.toLowerCase().includes("room")) {
+          currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
+        }
+        assignedNum = currentRoomNum;
+        setRoom(currentRoomNum);
+        if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
+        if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
+        setNights(match.nights || 1);
+        setPax(match.pax || "2 Adults");
+        setSource(match.source || "Direct");
+        setStatus(match.status || "Pending");
+        setAmount(match.totalAmount || match.amount || "");
+        setBalance(match.balance !== undefined ? match.balance : "");
+        setIsGroupBooking(!!match.isGroupBooking);
+      } else {
+        setError("Reservation details not found.");
+      }
+
+      // Dynamic MongoDB & Room Types available rooms computation
+      const [roomsRes, propsRes] = await Promise.all([
+        adminService.getRooms().catch(() => ({})),
+        superAdminService.getProperties().catch(() => ({}))
+      ]);
+
+      let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
+
+      let settingsTypes = [];
+      if (propsRes && propsRes.success && Array.isArray(propsRes.data) && propsRes.data.length > 0) {
+        settingsTypes = propsRes.data[0]?.settings?.roomTypes || [];
+      }
+
+      let savedTypes = [];
       try {
-        const cleanId = decodeURIComponent(String(id)).trim().toLowerCase();
-        const [superRes, mgrRes] = await Promise.all([
-          superAdminService.getReservations().catch(() => ({ success: false })),
-          managerService.getReservations().catch(() => ({ success: false }))
-        ]);
+        const saved = localStorage.getItem("hms_room_types_list_v2");
+        if (saved) savedTypes = JSON.parse(saved);
+      } catch (e) {}
 
-        let allReservations = [];
-        if (superRes.success && Array.isArray(superRes.data)) allReservations.push(...superRes.data);
-        if (mgrRes.success && Array.isArray(mgrRes.data)) allReservations.push(...mgrRes.data);
+      if (settingsTypes.length === 0 && savedTypes.length === 0) {
+        savedTypes = [
+          { category: "Standard Room", rooms: ["101", "102", "103"] },
+          { category: "Deluxe Room", rooms: ["201", "202", "203", "401", "402", "403"] },
+          { category: "Executive Suite", rooms: ["301", "302", "303"] }
+        ];
+      }
 
-        const match = allReservations.find(r => 
+      const allTypes = [...settingsTypes, ...savedTypes];
+      const existingNums = new Set(dbRooms.map(r => String(r.roomNumber || r.num)));
+
+      allTypes.forEach(t => {
+        const assigned = Array.isArray(t.rooms) ? t.rooms : [];
+        assigned.forEach(num => {
+          if (num && !existingNums.has(String(num))) {
+            existingNums.add(String(num));
+            dbRooms.push({
+              _id: `R-${num}`,
+              roomNumber: String(num),
+              category: t.category,
+              status: "Available"
+            });
+          }
+        });
+      });
+
+      // Helper to extract all 3-4 digit room numbers from any reservation object
+      const extractNums = (resObj) => {
+        const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
+        const matches = combined.match(/\b\d{3,4}\b/g);
+        return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
+      };
+
+      // Determine occupied / reserved / confirmed rooms from live reservations (except current editing booking)
+      const occupied = new Set();
+      allReservations.forEach(r => {
+        if (
           String(r._id).toLowerCase() === cleanId || 
           String(r.id).toLowerCase() === cleanId || 
           String(r.bookingId).toLowerCase() === cleanId
-        );
-        let assignedNum = "";
-
-        if (match) {
-          setGuest(match.guest || match.guestName || "");
-          setPhone(match.phone || match.mobile || match.phoneNumber || "");
-          setIdProofType(match.idProofType || "Aadhaar Card");
-          setIdProofNumber(match.idProofNumber || "");
-          let currentRoomNum = match.room || match.roomNumber || "";
-          if (currentRoomNum.includes("·")) {
-            currentRoomNum = currentRoomNum.split("·")[0].trim();
-          }
-          if (currentRoomNum.toLowerCase().includes("room")) {
-            currentRoomNum = currentRoomNum.replace(/room/i, "").trim();
-          }
-          assignedNum = currentRoomNum;
-          setRoom(currentRoomNum);
-          if (match.checkIn) setCheckIn(match.checkIn.substring(0, 10));
-          if (match.checkOut) setCheckOut(match.checkOut.substring(0, 10));
-          setNights(match.nights || 1);
-          setPax(match.pax || "2 Adults");
-          setSource(match.source || "Direct");
-          setStatus(match.status || "Pending");
-          setAmount(match.totalAmount || match.amount || "");
-          setBalance(match.balance !== undefined ? match.balance : "");
-          setIsGroupBooking(!!match.isGroupBooking);
-        } else {
-          setError("Reservation details not found.");
+        ) return;
+        const s = String(r.status || '').toLowerCase().trim();
+        const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
+        if (!isInactive) {
+          const nums = extractNums(r);
+          nums.forEach(n => occupied.add(n));
         }
+      });
 
-        // Dynamic MongoDB & Room Types available rooms computation
-        const [roomsRes, propsRes] = await Promise.all([
-          adminService.getRooms().catch(() => ({})),
-          superAdminService.getProperties().catch(() => ({}))
-        ]);
-
-        let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
-
-        let settingsTypes = [];
-        if (propsRes && propsRes.success && Array.isArray(propsRes.data) && propsRes.data.length > 0) {
-          settingsTypes = propsRes.data[0]?.settings?.roomTypes || [];
-        }
-
-        let savedTypes = [];
-        try {
-          const saved = localStorage.getItem("hms_room_types_list_v2");
-          if (saved) savedTypes = JSON.parse(saved);
-        } catch (e) {}
-
-        if (settingsTypes.length === 0 && savedTypes.length === 0) {
-          savedTypes = [
-            { category: "Standard Room", rooms: ["101", "102", "103"] },
-            { category: "Deluxe Room", rooms: ["201", "202", "203", "401", "402", "403"] },
-            { category: "Executive Suite", rooms: ["301", "302", "303"] }
-          ];
-        }
-
-        const allTypes = [...settingsTypes, ...savedTypes];
-        const existingNums = new Set(dbRooms.map(r => String(r.roomNumber || r.num)));
-
-        allTypes.forEach(t => {
-          const assigned = Array.isArray(t.rooms) ? t.rooms : [];
-          assigned.forEach(num => {
-            if (num && !existingNums.has(String(num))) {
-              existingNums.add(String(num));
-              dbRooms.push({
-                _id: `R-${num}`,
-                roomNumber: String(num),
-                category: t.category,
-                status: "Available"
-              });
-            }
-          });
+      const availableRooms = dbRooms
+        .map(r => ({
+          num: String(r.roomNumber || r.num || ''),
+          type: r.category || 'Standard Room',
+          status: r.status || 'Available'
+        }))
+        .filter(r => {
+          if (!r.num) return false;
+          if (occupied.has(r.num)) return false; // Reserved / Confirmed / Occupied by another reservation
+          const roomStat = String(r.status || 'Available').toLowerCase().trim();
+          return roomStat === 'available' || roomStat === 'vacant';
         });
 
-        // Helper to extract all 3-4 digit room numbers from any reservation object
-        const extractNums = (resObj) => {
-          const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
-          const matches = combined.match(/\b\d{3,4}\b/g);
-          return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
-        };
-
-        // Determine occupied / reserved / confirmed rooms from live reservations (except current editing booking)
-        const occupied = new Set();
-        if (res && res.success && Array.isArray(res.data)) {
-          res.data.forEach(r => {
-            if (r._id === id || r.id === id) return;
-            const s = String(r.status || '').toLowerCase().trim();
-            const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
-            if (!isInactive) {
-              const nums = extractNums(r);
-              nums.forEach(n => occupied.add(n));
-            }
-          });
+      const uniqueAvailable = [];
+      const seen = new Set();
+      availableRooms.forEach(r => {
+        if (!seen.has(r.num)) {
+          seen.add(r.num);
+          uniqueAvailable.push(r);
         }
+      });
 
-        const availableRooms = dbRooms
-          .map(r => ({
-            num: String(r.roomNumber || r.num || ''),
-            type: r.category || 'Standard Room',
-            status: r.status || 'Available'
-          }))
-          .filter(r => {
-            if (!r.num) return false;
-            if (occupied.has(r.num)) return false; // Reserved / Confirmed / Occupied by another reservation
-            const roomStat = String(r.status || 'Available').toLowerCase().trim();
-            return roomStat === 'available' || roomStat === 'vacant';
-          });
-
-        const uniqueAvailable = [];
-        const seen = new Set();
-        availableRooms.forEach(r => {
-          if (!seen.has(r.num)) {
-            seen.add(r.num);
-            uniqueAvailable.push(r);
-          }
+      if (assignedNum && !seen.has(assignedNum)) {
+        seen.add(assignedNum);
+        uniqueAvailable.unshift({
+          num: assignedNum,
+          type: match?.roomType || 'Standard Room',
+          status: 'Assigned'
         });
-
-        if (assignedNum && !seen.has(assignedNum)) {
-          seen.add(assignedNum);
-          uniqueAvailable.unshift({
-            num: assignedNum,
-            type: match?.roomType || 'Standard Room',
-            status: 'Assigned'
-          });
-        }
-
-        uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
-        setAvailableRoomsList(uniqueAvailable);
-      } catch (err) {
-        setError(err.message || "Failed to load booking details.");
-      } finally {
-        setLoading(false);
       }
-    };
-    loadBooking();
+
+      uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
+      setAvailableRoomsList(uniqueAvailable);
+    } catch (err) {
+      setError(err.message || "Failed to load booking details.");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadBooking();
+  }, [loadBooking]);
 
   // Auto-calculate nights and total amount whenever room designation, checkIn, or checkOut changes
   useEffect(() => {
@@ -227,26 +235,33 @@ function EditReservation() {
       const payload = {
         guest,
         phone,
+        email,
         idProofType,
         idProofNumber,
-        room,
+        roomNumber: room,
+        room: room ? `${room}` : "",
         checkIn,
         checkOut,
-        nights: Number(nights),
+        nights: Number(nights) || 1,
         pax,
         source,
         status,
-        amount: Number(amount),
+        amount: Number(amount) || 0,
         balance: Number(balance || 0),
+        paymentStatus: Number(balance || 0) === 0 ? "Paid" : "Pending",
         isGroupBooking
       };
 
-      const res = await superAdminService.updateReservation(id, payload);
-      if (res.success) {
+      let response = await superAdminService.updateReservation(id, payload).catch(() => null);
+      if (!response || !response.success) {
+        response = await managerService.updateReservation(id, payload).catch(() => null);
+      }
+
+      if (response && response.success) {
         toast.success("Reservation details updated.");
         navigate({ to: "/admin/reservations" });
       } else {
-        toast.error(res.message || "Failed to save adjustments.");
+        toast.error(response?.message || "Failed to save adjustments.");
       }
     } catch (err) {
       toast.error(err.message || "Failed to save adjustments.");
@@ -255,25 +270,37 @@ function EditReservation() {
     }
   };
 
+  const handleExtendStay = () => {
+    const targetId = id || booking?._id || booking?.bookingId || booking?.id;
+    if (targetId) {
+      navigate({ to: `/admin/reservations/extend/${encodeURIComponent(targetId)}` });
+    } else {
+      navigate({ to: "/admin/reservations/extend" });
+    }
+  };
+
   return (
     <div className="space-y-6 text-left max-w-4xl pb-16">
-      <Crumbs
-        items={[
-          { label: "Reservations", to: "/admin/reservations" },
-          { label: `Edit Reservation: ${guest || id}` }
-        ]}
-      />
-
-      <PageHeader
-        title={`Edit Reservation: ${guest || id}`}
-        subtitle="Update guest folio stay dates, room parameters, and cost slab metrics."
-      />
-
-
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
       <div className="max-w-xl">
-        <Panel title="Edit Stay Parameters" description="Update operational booking metadata.">
+        <Panel 
+          title="Edit Stay Parameters" 
+          description="Update operational booking metadata."
+          actions={
+            booking && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleExtendStay}
+                className="border-purple/30 text-purple hover:bg-purple/10 hover:border-purple font-semibold text-xs h-8 px-3 rounded-full flex items-center gap-1.5 cursor-pointer"
+              >
+                <CalendarPlus className="size-3.5" />
+                Extend Stay
+              </Button>
+            )
+          }
+        >
           {loading ? (
             <div className="p-6 bg-white rounded-b-xl">
               <LoadingRows rows={4} />
@@ -300,6 +327,16 @@ function EditReservation() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91 XXXXX XXXXX"
+                  />
+                </FormField>
+
+                <FormField label="Email Address" id="email">
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="guest@example.com"
                   />
                 </FormField>
 
@@ -445,18 +482,33 @@ function EditReservation() {
                   />
                 </div>
               </div>
-              <div className="pt-4 border-t border-muted flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate({ to: "/admin/reservations" })}
-                  className="h-10 px-4"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={saving} className="bg-navy hover:bg-navy/90 text-white h-10 px-6 font-bold rounded-full">
-                  {saving ? "Saving..." : "Save Changes"}
-                </Button>
+              <div className="pt-4 border-t border-muted flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  {booking && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleExtendStay}
+                      className="border-purple/30 text-purple hover:bg-purple/10 hover:border-purple font-semibold rounded-full h-10 px-4 flex items-center gap-2 cursor-pointer"
+                    >
+                      <CalendarPlus className="size-4" />
+                      Extend Stay
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => navigate({ to: "/admin/reservations" })}
+                    className="h-10 px-4"
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={saving} className="bg-navy hover:bg-navy/90 text-white h-10 px-6 font-bold rounded-full">
+                    {saving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
               </div>
             </form>
           )}

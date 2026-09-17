@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/staff_model.dart';
 import '../../../providers/manager/staff_provider.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerStaffAttendanceDetailScreen extends StatefulWidget {
   final String staffId;
@@ -64,22 +65,6 @@ class _DailyAttendanceLog {
 
 class _ManagerStaffAttendanceDetailScreenState
     extends State<ManagerStaffAttendanceDetailScreen> {
-  // Theme palette
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color white = Colors.white;
-  static const Color muted = Color(0xFF94A3B8);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFECFDF5);
-  static const Color amber = Color(0xFFD97706);
-  static const Color amberBg = Color(0xFFFFFBEB);
-  static const Color ruby = Color(0xFFEF4444);
-  static const Color rubyBg = Color(0xFFFEF2F2);
-  static const Color purpleBg = Color(0xFFF5F3FF);
 
   String _filterStatus = 'All';
 

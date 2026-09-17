@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -13,14 +14,6 @@ class ManagerBottomNav extends StatelessWidget {
     this.pendingApprovals = 0,
   });
 
-  // Theme Colors
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color pink = Color(0xFFEC4899);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color badgeRed = Color(0xFFE53935);
 
   static const List<ManagerNavItem> items = [
     ManagerNavItem(

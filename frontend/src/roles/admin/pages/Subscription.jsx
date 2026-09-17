@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Crumbs, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
 import { adminService } from "@/services/admin";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
@@ -20,22 +20,22 @@ function AdminSubscriptionPage() {
     setLoading(true);
     setError(null);
     try {
-      const [plansRes, propRes, reqsRes] = await Promise.all([
-        superAdminService.getSubscriptionPlans(),
-        adminService.getProperty(),
-        adminService.getSubscriptionRequests()
+      const [plansRes, currentRes, myRequestsRes] = await Promise.all([
+        superAdminService.getPlans().catch(() => ({ plans: [] })),
+        adminService.getCurrentProperty().catch(() => ({})),
+        adminService.getSubscriptionRequests().catch(() => ({ data: [] }))
       ]);
-      if (plansRes.success) {
-        setPlans(plansRes.data);
-      }
-      if (propRes.success) {
-        setProperty(propRes.data);
-      }
-      if (reqsRes.success) {
-        setRequests(reqsRes.data);
-      }
+
+      const plansList = plansRes.plans || (Array.isArray(plansRes) ? plansRes : []);
+      setPlans(plansList.filter(p => p.isActive !== false));
+
+      const propData = currentRes.property || currentRes.data || currentRes;
+      setProperty(propData);
+
+      const reqList = myRequestsRes.data || (Array.isArray(myRequestsRes) ? myRequestsRes : []);
+      setRequests(reqList);
     } catch (err) {
-      setError(err.message || "Failed to load subscription configurations.");
+      setError(err.message || "Failed to load subscription tiers.");
     } finally {
       setLoading(false);
     }
@@ -46,28 +46,26 @@ function AdminSubscriptionPage() {
   }, []);
 
   const getMappedTierName = (tier) => {
-    if (tier === "Basic") return "Starter Tier";
-    if (tier === "Premium") return "Professional Suite";
-    if (tier === "Enterprise") return "Enterprise Pro";
-    return "None";
+    if (!tier || tier === "None") return "Free Tier";
+    const matched = plans.find(p => p._id === tier || p.name?.toLowerCase() === tier?.toLowerCase());
+    return matched ? matched.name : tier;
   };
 
-  const handleRequestPlan = async (planName, price) => {
-    setRequestingPlan(planName);
+  const handleRequestPlan = async (plan) => {
+    if (!property?._id && !property?.id) {
+      toast.error("Property context missing.");
+      return;
+    }
+    setRequestingPlan(plan._id || plan.name);
     try {
-      const res = await adminService.createSubscriptionRequest(planName, price);
-      if (res.success) {
-        toast.success(`Subscription request for "${planName}" submitted successfully!`);
-        // Reload page data
-        const [propRes, reqsRes] = await Promise.all([
-          adminService.getProperty(),
-          adminService.getSubscriptionRequests()
-        ]);
-        if (propRes.success) setProperty(propRes.data);
-        if (reqsRes.success) setRequests(reqsRes.data);
-      } else {
-        toast.error(res.message || "Failed to submit subscription request.");
-      }
+      await adminService.requestSubscription({
+        propertyId: property._id || property.id,
+        planName: plan.name,
+        requestedTier: plan.name,
+        notes: `Property requested upgrade/switch to ${plan.name} tier.`
+      });
+      toast.success(`Request submitted for ${plan.name}! Super Admin will review.`);
+      loadData();
     } catch (err) {
       toast.error(err.message || "Failed to submit subscription request.");
     } finally {
@@ -78,10 +76,6 @@ function AdminSubscriptionPage() {
   if (loading) {
     return (
       <div className="space-y-6 text-left font-sans animate-fade-in">
-        <Crumbs items={[
-          { label: "Finance", to: "/admin/billing" },
-          { label: "Subscription" }
-        ]} />
         <LoadingRows rows={4} />
       </div>
     );
@@ -93,11 +87,6 @@ function AdminSubscriptionPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in select-none">
-      <Crumbs items={[
-        { label: "Finance", to: "/admin/billing" },
-        { label: "Subscription" }
-      ]} />
-
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
       {/* Expiry Details Notice */}

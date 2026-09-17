@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
+import { Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
 import { apiClient } from "@/services/apiClient";
@@ -288,11 +288,6 @@ function EditStaff() {
 
   return (
     <div className="space-y-6 text-left">
-      <PageHeader
-        title={name ? `Modify Staff: ${name}` : "Modify Staff Details"}
-        subtitle="Update employee designations, permission roles, and account statuses."
-      />
-
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
       <div className="max-w-xl">

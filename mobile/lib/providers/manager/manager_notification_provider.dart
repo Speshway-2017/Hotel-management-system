@@ -162,8 +162,15 @@ class ManagerNotificationProvider with ChangeNotifier {
     }
   }
 
-  Future<void> markAsRead(String id) async {
-    final idx = _notifications.indexWhere((n) => n.id == id);
+  Future<void> markAsRead(String id, {String? title, String? message}) async {
+    int idx = -1;
+    if (id.isNotEmpty) {
+      idx = _notifications.indexWhere((n) => n.id == id);
+    }
+    if (idx == -1 && title != null && message != null) {
+      idx = _notifications.indexWhere((n) => n.title.trim() == title.trim() && n.message.trim() == message.trim());
+    }
+
     if (idx != -1 && !_notifications[idx].isRead) {
       final old = _notifications[idx];
       _notifications[idx] = NotificationModel(
@@ -178,18 +185,35 @@ class ManagerNotificationProvider with ChangeNotifier {
       notifyListeners();
     }
 
+    final targetId = idx != -1 ? _notifications[idx].id : id;
+    final targetTitle = idx != -1 ? _notifications[idx].title : title;
+    final targetMsg = idx != -1 ? _notifications[idx].message : message;
+
+    final body = {
+      if (targetTitle != null && targetTitle.isNotEmpty) 'title': targetTitle,
+      if (targetMsg != null && targetMsg.isNotEmpty) 'message': targetMsg,
+    };
+
     try {
-      final response = await ApiService.post('${ApiEndpoints.managerNotifications}/$id/read');
+      final endpointId = targetId.isNotEmpty ? targetId : 'general';
+      final response = await ApiService.post('${ApiEndpoints.managerNotifications}/$endpointId/read', body);
       if (!response.success) {
-        fetchNotifications(silent: true);
+        await ApiService.patch('${ApiEndpoints.managerNotifications}/$endpointId/read', body);
       }
     } catch (_) {
-      fetchNotifications(silent: true);
+      // Keep optimistic update
     }
   }
 
-  Future<void> markAsUnread(String id) async {
-    final idx = _notifications.indexWhere((n) => n.id == id);
+  Future<void> markAsUnread(String id, {String? title, String? message}) async {
+    int idx = -1;
+    if (id.isNotEmpty) {
+      idx = _notifications.indexWhere((n) => n.id == id);
+    }
+    if (idx == -1 && title != null && message != null) {
+      idx = _notifications.indexWhere((n) => n.title.trim() == title.trim() && n.message.trim() == message.trim());
+    }
+
     if (idx != -1 && _notifications[idx].isRead) {
       final old = _notifications[idx];
       _notifications[idx] = NotificationModel(
@@ -204,23 +228,43 @@ class ManagerNotificationProvider with ChangeNotifier {
       notifyListeners();
     }
 
+    final targetId = idx != -1 ? _notifications[idx].id : id;
+    final targetTitle = idx != -1 ? _notifications[idx].title : title;
+    final targetMsg = idx != -1 ? _notifications[idx].message : message;
+
+    final body = {
+      if (targetTitle != null && targetTitle.isNotEmpty) 'title': targetTitle,
+      if (targetMsg != null && targetMsg.isNotEmpty) 'message': targetMsg,
+    };
+
     try {
-      final response = await ApiService.post('${ApiEndpoints.managerNotifications}/$id/unread');
+      final endpointId = targetId.isNotEmpty ? targetId : 'general';
+      final response = await ApiService.post('${ApiEndpoints.managerNotifications}/$endpointId/unread', body);
       if (!response.success) {
-        fetchNotifications(silent: true);
+        await ApiService.patch('${ApiEndpoints.managerNotifications}/$endpointId/unread', body);
       }
     } catch (_) {
-      fetchNotifications(silent: true);
+      // Keep optimistic update
     }
   }
 
-  Future<void> toggleReadStatus(String id) async {
-    final notif = _notifications.firstWhere((n) => n.id == id, orElse: () => NotificationModel(id: '', title: '', message: ''));
-    if (notif.id.isEmpty) return;
-    if (notif.isRead) {
-      await markAsUnread(id);
+  Future<void> toggleReadStatus(String id, {String? title, String? message}) async {
+    int idx = -1;
+    if (id.isNotEmpty) {
+      idx = _notifications.indexWhere((n) => n.id == id);
+    }
+    if (idx == -1 && title != null && message != null) {
+      idx = _notifications.indexWhere((n) => n.title.trim() == title.trim() && n.message.trim() == message.trim());
+    }
+    if (idx != -1) {
+      final notif = _notifications[idx];
+      if (notif.isRead) {
+        await markAsUnread(notif.id, title: notif.title, message: notif.message);
+      } else {
+        await markAsRead(notif.id, title: notif.title, message: notif.message);
+      }
     } else {
-      await markAsRead(id);
+      await markAsRead(id, title: title, message: message);
     }
   }
 
@@ -240,9 +284,12 @@ class ManagerNotificationProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await ApiService.post('${ApiEndpoints.managerNotifications}/read-all');
+      final res = await ApiService.post('${ApiEndpoints.managerNotifications}/read-all');
+      if (!res.success) {
+        await ApiService.patch('${ApiEndpoints.managerNotifications}/read-all');
+      }
     } catch (_) {
-      fetchNotifications(silent: true);
+      // Retain optimistic state
     }
   }
 }

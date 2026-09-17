@@ -4,6 +4,7 @@ import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/approval_model.dart';
 import 'package:hour_stay_mobile/providers/manager/approval_provider.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
+import 'package:hour_stay_mobile/colours.dart';
 
 class ManagerApprovalsScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -14,20 +15,6 @@ class ManagerApprovalsScreen extends StatefulWidget {
 }
 
 class _ManagerApprovalsScreenState extends State<ManagerApprovalsScreen> {
-  // Hour Stay Design Tokens
-  static const Color navy = Color(0xFF0D1B2A);
-  static const Color purple = Color(0xFF5B21B6);
-  static const Color purpleBg = Color(0xFFEDE9FE);
-  static const Color gold = Color(0xFFF5C06A);
-  static const Color cream = Color(0xFFFFF7E6);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color muted = Color(0xFF8A8F98);
-  static const Color background = Color(0xFFF8FAFC);
-  static const Color cardBorder = Color(0xFFE2E8F0);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color emeraldBg = Color(0xFFDCFCE7);
-  static const Color ruby = Color(0xFFE53935);
-  static const Color rubyBg = Color(0xFFFEE2E2);
 
   String _selectedFilter = 'all';
   String _searchQuery = '';

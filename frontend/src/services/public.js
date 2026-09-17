@@ -48,8 +48,10 @@ export const publicService = {
   getSubscriptionPlans: async () => {
     return await apiClient.get(`${PUBLIC_PREFIX}/plans`);
   },
-  getCoupons: async (propertyId = '') => {
-    const params = propertyId ? { propertyId } : {};
+  getCoupons: async (propertyId = '', extraParams = {}) => {
+    const params = typeof propertyId === 'object' && propertyId !== null
+      ? propertyId
+      : { ...(propertyId ? { propertyId } : {}), ...extraParams };
     return await apiClient.get(`${PUBLIC_PREFIX}/coupons`, { params });
   },
   validateCoupon: async (payload) => {

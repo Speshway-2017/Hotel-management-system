@@ -50,7 +50,7 @@ function StatCard({ label, value, hint, accentColor = "#0d1b2a", icon: Icon }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
-          <h3 className="mt-1.5 font-display text-xl font-black text-navy leading-none">{value}</h3>
+          <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-xl font-bold text-slate-800 leading-none">{value}</h3>
         </div>
         {Icon && (
           <div className="p-2 rounded-lg bg-navy/5 text-navy">
@@ -275,7 +275,7 @@ export function AdminCouponsPage() {
             <div className="size-14 rounded-full bg-purple/10 text-purple flex items-center justify-center mx-auto mb-3">
               <Ticket className="size-7" />
             </div>
-            <h3 className="font-display text-lg font-bold text-navy">No coupons match your filter</h3>
+            <h3 className="font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800">No coupons match your filter</h3>
             <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
               Create a new promotional discount coupon or adjust your search filter to view campaigns.
             </p>
@@ -433,7 +433,7 @@ export function AdminCouponsPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-muted text-left">
-            <h3 className="font-display text-base font-bold text-navy">Delete Coupon</h3>
+            <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">Delete Coupon</h3>
             <p className="text-xs text-muted-foreground mt-2">
               Are you sure you want to delete coupon <strong className="text-navy">{deleteTarget.code}</strong>? This action cannot be undone.
             </p>

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/hs/FormFields";
@@ -87,13 +87,6 @@ export function ViewSubscriptionRequest() {
 
   return (
     <div className="space-y-6 text-left font-ui">
-      <Crumbs
-        items={[
-          { label: "Plans & Billing", to: "/super-admin/subscription" },
-          { label: requestItem ? `Request #${requestItem.id || id}` : "Subscription Request" }
-        ]}
-      />
-
       <PageHeader
         title={requestItem ? `Subscription Request: ${requestItem.propertyName}` : "Subscription Request"}
         subtitle="Review plan tier upgrade/renewal details and grant workspace access."

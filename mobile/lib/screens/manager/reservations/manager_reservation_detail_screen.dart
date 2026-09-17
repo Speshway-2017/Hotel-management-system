@@ -98,69 +98,207 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
     String docType = _reservation.idDocType.isNotEmpty ? _reservation.idDocType : 'Aadhaar Card';
     final docNumberCtrl = TextEditingController(text: _reservation.idDocNumber);
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Verify Guest ID Proof'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: docType,
-                    decoration: const InputDecoration(labelText: 'Document Type', border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'Aadhaar Card', child: Text('Aadhaar Card')),
-                      DropdownMenuItem(value: 'Passport', child: Text('Passport')),
-                      DropdownMenuItem(value: 'Driving License', child: Text('Driving License')),
-                      DropdownMenuItem(value: 'Voter ID', child: Text('Voter ID')),
-                    ],
-                    onChanged: (v) => setDialogState(() => docType = v ?? 'Aadhaar Card'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: docNumberCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'ID Document Number',
-                      hintText: 'e.g. 5432-8765-1234',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                ElevatedButton(
-                  onPressed: () async {
-                    final num = docNumberCtrl.text.trim();
-                    final messenger = ScaffoldMessenger.of(context);
-                    if (num.isEmpty) {
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('Please enter ID document number')),
-                      );
-                      return;
-                    }
-                    Navigator.pop(ctx);
-                    final resProvider = context.read<ReservationProvider>();
-                    final ok = await resProvider.verifyIdProof(_reservation.id, docType, num);
-                    if (ok && mounted) {
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('ID Proof verified successfully!'), backgroundColor: AppColors.success),
-                      );
-                      setState(() {
-                        _reservation = _reservation.copyWith(
-                          idDocType: docType,
-                          idDocNumber: num,
-                          idVerification: 'Verified',
-                        );
-                      });
-                    }
-                  },
-                  child: const Text('Confirm Verification'),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle Bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Header: Icon + Title + Close Button
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(20),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.primary.withAlpha(50)),
+                          ),
+                          child: const Icon(Icons.badge_rounded, color: AppColors.primary, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Verify Guest ID Proof',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_reservation.guestName} • Room ${_reservation.roomNumber.isNotEmpty ? _reservation.roomNumber : "Unassigned"}',
+                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Document Type Dropdown
+                    const Text(
+                      'Document Type',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: docType,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppColors.background,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Aadhaar Card', child: Text('Aadhaar Card')),
+                        DropdownMenuItem(value: 'Passport', child: Text('Passport')),
+                        DropdownMenuItem(value: 'Driving License', child: Text('Driving License')),
+                        DropdownMenuItem(value: 'Voter ID', child: Text('Voter ID')),
+                        DropdownMenuItem(value: 'National ID', child: Text('National ID Card')),
+                      ],
+                      onChanged: (v) => setDialogState(() => docType = v ?? 'Aadhaar Card'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Document Number Input
+                    const Text(
+                      'ID Document Number',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: docNumberCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 5432-8765-1234',
+                        filled: true,
+                        fillColor: AppColors.background,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              side: const BorderSide(color: AppColors.border),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final num = docNumberCtrl.text.trim();
+                              final messenger = ScaffoldMessenger.of(context);
+                              if (num.isEmpty) {
+                                messenger.showSnackBar(
+                                  const SnackBar(content: Text('Please enter ID document number')),
+                                );
+                                return;
+                              }
+                              Navigator.pop(ctx);
+                              final resProvider = context.read<ReservationProvider>();
+                              final ok = await resProvider.verifyIdProof(_reservation.id, docType, num);
+                              if (ok && mounted) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('ID Proof verified successfully!'),
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                );
+                                setState(() {
+                                  _reservation = _reservation.copyWith(
+                                    idDocType: docType,
+                                    idDocNumber: num,
+                                    idVerification: 'Verified',
+                                  );
+                                });
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: const Text('Confirm Verification', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         );
@@ -237,8 +375,10 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
     double dailyRate = _reservation.amount > 0 ? (_reservation.amount / (_reservation.nights > 0 ? _reservation.nights : 1)) : 3000.0;
     double extraAmount = dailyRate * extraNights;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -254,172 +394,300 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
             final newCheckOutDt = DateTime(currentDt.year, currentDt.month, currentDt.day + extraNights, 11, 0);
             final newTotalAmount = _reservation.amount + extraAmount;
 
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Row(
-                children: [
-                  Icon(Icons.more_time_rounded, color: AppColors.primary, size: 22),
-                  SizedBox(width: 8),
-                  Text('Extend Guest Stay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                ],
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Current Check-Out:', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                            Text(
-                              Formatters.checkOutDateTime(_reservation.checkOut),
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                            ),
-                          ],
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle Bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.event_available_rounded, size: 13, color: AppColors.success),
-                                SizedBox(width: 4),
-                                Text('New Check-Out:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                              ],
-                            ),
-                            Text(
-                              Formatters.checkOutDateTime(newCheckOutDt.toIso8601String()),
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary),
-                            ),
-                          ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Header: Icon + Title + Close Button
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5C06A).withAlpha(35),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFF5C06A).withAlpha(90)),
+                          ),
+                          child: const Icon(Icons.more_time_rounded, color: Color(0xFFB47D16), size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Extend Guest Stay',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_reservation.guestName} • ${_reservation.bookingId.isNotEmpty ? _reservation.bookingId : (_reservation.roomNumber.isNotEmpty ? "Room ${_reservation.roomNumber}" : _reservation.id)}',
+                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
+                          onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 18),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Additional Nights:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove, size: 18),
-                              visualDensity: VisualDensity.compact,
-                              onPressed: extraNights > 1 ? () {
-                                setDialogState(() {
-                                  extraNights--;
-                                  extraAmount = dailyRate * extraNights;
-                                });
-                              } : null,
-                            ),
-                            Text(
-                              '$extraNights Night${extraNights > 1 ? "s" : ""}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, size: 18),
-                              visualDensity: VisualDensity.compact,
-                              onPressed: () {
-                                setDialogState(() {
-                                  extraNights++;
-                                  extraAmount = dailyRate * extraNights;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
+                    // Stay Extension Date Card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ],
-                  ),
-                  const Divider(height: 20),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
+                                  SizedBox(width: 6),
+                                  Text('Current Check-Out', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                              Text(
+                                Formatters.checkOutDateTime(_reservation.checkOut),
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider(height: 1, color: AppColors.border),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.event_available_rounded, size: 15, color: AppColors.success),
+                                  SizedBox(width: 6),
+                                  Text('New Check-Out', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                ],
+                              ),
+                              Text(
+                                Formatters.checkOutDateTime(newCheckOutDt.toIso8601String()),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
-                  // Real-time calculated payment summary
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Daily Rate:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      Text('${Formatters.currency(dailyRate)} / night', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Additional Tariff:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
-                      Text(
-                        Formatters.currency(extraAmount),
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 16),
+                    // Additional Nights Stepper Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('New Total Amount:', style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary)),
-                      Text(
-                        Formatters.currency(newTotalAmount),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Additional Nights',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Adjust duration',
+                                style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove, size: 18),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: extraNights > 1
+                                      ? () {
+                                          setDialogState(() {
+                                            extraNights--;
+                                            extraAmount = dailyRate * extraNights;
+                                          });
+                                        }
+                                      : null,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text(
+                                    '$extraNights Night${extraNights > 1 ? "s" : ""}',
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.textPrimary),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.add, size: 18),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      extraNights++;
+                                      extraAmount = dailyRate * extraNights;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Financial Breakdown Card
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Daily Rate:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              Text('${Formatters.currency(dailyRate)} / night', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Additional Tariff:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textPrimary)),
+                              Text(
+                                '+${Formatters.currency(extraAmount)}',
+                                style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider(height: 1, color: AppColors.border),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('New Total Amount:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              Text(
+                                Formatters.currency(newTotalAmount),
+                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              side: const BorderSide(color: AppColors.border),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              final newCheckOut = newCheckOutDt.toIso8601String();
+                              final resProvider = context.read<ReservationProvider>();
+                              final messenger = ScaffoldMessenger.of(context);
+                              final ok = await resProvider.extendReservation(_reservation.id, newCheckOut, extraNights, extraAmount);
+                              if (ok && mounted) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Stay extended to ${Formatters.checkOutDateTime(newCheckOut)}! Added ${Formatters.currency(extraAmount)}.'),
+                                    backgroundColor: AppColors.success,
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
+                                setState(() {
+                                  _reservation = _reservation.copyWith(
+                                    checkOut: newCheckOut,
+                                    nights: _reservation.nights + extraNights,
+                                    amount: newTotalAmount,
+                                  );
+                                });
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              'Confirm (+${Formatters.currency(extraAmount)})',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    final newCheckOut = newCheckOutDt.toIso8601String();
-                    final resProvider = context.read<ReservationProvider>();
-                    final messenger = ScaffoldMessenger.of(context);
-                    final ok = await resProvider.extendReservation(_reservation.id, newCheckOut, extraNights, extraAmount);
-                    if (ok && mounted) {
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Stay extended to ${Formatters.checkOutDateTime(newCheckOut)}! Added ${Formatters.currency(extraAmount)}.'),
-                          backgroundColor: AppColors.success,
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
-                      setState(() {
-                        _reservation = _reservation.copyWith(
-                          checkOut: newCheckOut,
-                          nights: _reservation.nights + extraNights,
-                          amount: newTotalAmount,
-                        );
-                      });
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: Text('Confirm (+${Formatters.currency(extraAmount)})'),
-                ),
-              ],
             );
           },
         );

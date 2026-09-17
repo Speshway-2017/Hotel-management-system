@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
 import { FormField, Textarea } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { superAdminService } from "@/services/superAdmin";
@@ -119,13 +119,6 @@ function AdminViewApproval() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-ui">
-      <Crumbs
-        items={[
-          { label: "Approvals", to: "/admin/approvals" },
-          { label: request ? `Approval: ${request.id}` : "Approval Details" }
-        ]}
-      />
-
       {error && <Notice tone="error" title="Ledger Fetch Error">{error}</Notice>}
 
       {loading ? (
