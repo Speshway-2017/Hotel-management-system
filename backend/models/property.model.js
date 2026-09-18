@@ -18,7 +18,8 @@ const propertySchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'Suspended', 'Pending', 'Onboarding', 'Rejected'], default: 'Onboarding' },
   gm: { type: String, trim: true },
   assignedAdmin: { type: String, ref: 'User', default: null },
-  subscriptionTier: { type: String, enum: ['Basic', 'Premium', 'Enterprise', 'None'], default: 'None' },
+  subscriptionTier: { type: String, default: 'None' },
+  subscriptionPlanName: { type: String, default: '' },
   subscriptionStatus: { type: String, enum: ['Active', 'Unpaid', 'Expired', 'None', 'Pending', 'Rejected'], default: 'None' },
   subscriptionExpiry: { type: Date },
   commissionRate: { type: Number, default: 12 },
@@ -491,6 +492,44 @@ const Property = {
       }
     }
     return await MockProperty.findByIdAndUpdate(id, update, options);
+  },
+  findOneAndUpdate: async (filter, update, options) => {
+    if (mongoose.connection.readyState === 1) {
+      const updated = await MongooseProperty.findOneAndUpdate(filter, update, { new: true, ...options });
+      if (updated) {
+        try {
+          const instance = new PropertyInstance({
+            id: updated._id.toString(),
+            _id: updated._id.toString(),
+            name: updated.name,
+            city: updated.city,
+            rooms: updated.rooms,
+            occupancy: updated.occupancy,
+            adr: updated.adr,
+            revpar: updated.revpar,
+            status: updated.status,
+            gm: updated.gm,
+            assignedAdmin: updated.assignedAdmin,
+            subscriptionTier: updated.subscriptionTier,
+            subscriptionStatus: updated.subscriptionStatus,
+            subscriptionExpiry: updated.subscriptionExpiry,
+            commissionRate: updated.commissionRate,
+            settings: updated.settings,
+            createdAt: updated.createdAt,
+            updatedAt: updated.updatedAt
+          });
+          await instance.save();
+        } catch (err) {
+          console.warn('Mock dual-write update failed:', err.message);
+        }
+        return updated;
+      }
+    }
+    const prop = await MockProperty.findOne(filter);
+    if (prop) {
+      return await MockProperty.findByIdAndUpdate(prop._id || prop.id, update, options);
+    }
+    return null;
   },
   findByIdAndDelete: async (id) => {
     if (mongoose.connection.readyState === 1) {

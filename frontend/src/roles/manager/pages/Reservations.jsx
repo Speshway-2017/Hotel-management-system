@@ -396,19 +396,19 @@ function ManagerReservationsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs table-fixed min-w-[1200px]">
+            <table className="w-full text-left border-collapse text-xs min-w-[1250px]">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
-                  <th className="w-[11%] py-4 pl-6 pr-2 text-left align-middle">Booking ID</th>
-                  <th className="w-[15%] py-4 px-3 text-left align-middle">Guest Details</th>
-                  <th className="w-[12%] py-4 px-3 text-left align-middle">Room Allocation</th>
-                  <th className="w-[9%] py-4 px-3 text-left align-middle">Check-In</th>
-                  <th className="w-[9%] py-4 px-3 text-left align-middle">Check-Out</th>
-                  <th className="w-[7%] py-4 px-2 text-center align-middle">Guests</th>
-                  <th className="w-[9%] py-4 px-3 text-left align-middle">Channel</th>
-                  <th className="w-[9%] py-4 px-3 text-left align-middle">Payment</th>
-                  <th className="w-[8%] py-4 px-2 text-center align-middle">Status</th>
-                  <th className="py-4 pl-3 pr-4 text-right align-middle min-w-[280px] whitespace-nowrap">Actions</th>
+                  <th className="py-4 pl-6 pr-2 text-left align-middle">Booking ID</th>
+                  <th className="py-4 px-3 text-left align-middle">Guest Details</th>
+                  <th className="py-4 px-3 text-left align-middle">Room Allocation</th>
+                  <th className="py-4 px-3 text-left align-middle">Check-In</th>
+                  <th className="py-4 px-3 text-left align-middle">Check-Out</th>
+                  <th className="py-4 px-2 text-center align-middle">Guests</th>
+                  <th className="py-4 px-3 text-left align-middle">Channel</th>
+                  <th className="py-4 px-3 text-left align-middle">Payment</th>
+                  <th className="py-4 px-2 text-center align-middle">Status</th>
+                  <th className="py-4 pl-3 pr-6 text-left align-middle min-w-[220px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-xs text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -418,14 +418,14 @@ function ManagerReservationsPage() {
 
                   return (
                     <tr key={res._id || res.id} className="hover:bg-[#fcfcfc]/60 transition-colors group">
-                      <td className="py-3.5 pl-6 pr-2 text-left align-middle truncate" title={res.bookingId || res._id || res.id}>
-                        <span className="font-mono text-[10px] font-bold bg-muted/40 text-navy-deep px-2 py-0.5 rounded-md border border-muted/60 inline-block max-w-full truncate">
+                      <td className="py-3.5 pl-6 pr-2 text-left align-middle" title={res.bookingId || res._id || res.id}>
+                        <span className="font-mono text-[10px] font-bold bg-muted/40 text-navy-deep px-2 py-0.5 rounded-md border border-muted/60 inline-block">
                           #{res.bookingId || (res._id && String(res._id).length > 10 ? `${String(res._id).substring(0, 8)}...` : (res._id || res.id))}
                         </span>
                       </td>
                       <td className="py-3.5 px-3 text-left align-middle">
-                        <div className="font-bold text-navy-deep flex items-center gap-1.5 truncate">
-                          <span className="truncate">{res.guest}</span>
+                        <div className="font-bold text-navy-deep flex items-center gap-1.5">
+                          <span>{res.guest}</span>
                           {res.isGroupBooking && (
                             <span className="text-[8px] bg-purple/10 text-purple border border-purple/20 px-1 rounded font-bold">Group</span>
                           )}
@@ -433,9 +433,9 @@ function ManagerReservationsPage() {
                             <span className="text-[8px] bg-indigo/10 text-indigo border border-indigo/20 px-1 rounded font-bold">Corp</span>
                           )}
                         </div>
-                        <div className="text-[10px] font-normal text-muted-foreground mt-0.5 truncate">{res.phone}</div>
+                        <div className="text-[10px] font-normal text-muted-foreground mt-0.5">{res.phone}</div>
                       </td>
-                      <td className="py-3.5 px-3 text-left align-middle truncate">
+                      <td className="py-3.5 px-3 text-left align-middle">
                         <div className="font-bold text-brand">{getRoomDisplay(res)}</div>
                         <div className="text-[9px] text-muted-foreground mt-0.5">{getRoomCategoryDisplay(res)}</div>
                       </td>
@@ -465,7 +465,7 @@ function ManagerReservationsPage() {
                           {res.status}
                         </Tag>
                       </td>
-                      <td className="py-3.5 pl-3 pr-4 text-left align-middle min-w-[280px] whitespace-nowrap">
+                      <td className="py-3.5 pl-3 pr-6 text-left align-middle min-w-[220px] whitespace-nowrap">
                         <ActionGroup align="left">
                           {(() => {
                             const statusLower = String(res.status || '').toLowerCase().trim();

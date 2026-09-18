@@ -244,7 +244,7 @@ function SuperAdminReservations() {
                   <th className="p-4 text-left">Amount</th>
                   <th className="p-4 text-left">Payment</th>
                   <th className="p-4 text-left">Status</th>
-                  <th className="p-4 text-right pr-6 min-w-[160px] whitespace-nowrap">Actions</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
@@ -293,8 +293,8 @@ function SuperAdminReservations() {
                       <td className="p-4 text-left">
                         <Tag tone={statusTone(r.status)}>{r.status}</Tag>
                       </td>
-                      <td className="p-4 text-right pr-6 min-w-[160px] whitespace-nowrap">
-                        <ActionGroup>
+                      <td className="p-4 text-right">
+                        <ActionGroup align="right">
                           <ViewActionButton
                             onClick={() => { setSelectedBooking(r); setModalOpen(true); }}
                           />

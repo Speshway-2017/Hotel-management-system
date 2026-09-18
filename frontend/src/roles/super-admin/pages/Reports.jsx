@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs, ActionGroup, ViewActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,7 @@ function FinanceStatCard({ label, value, hint, icon: Icon, accentColor = "#0f172
 }
 
 function SuperAdminReports() {
+  const navigate = useNavigate();
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -90,10 +91,6 @@ function SuperAdminReports() {
   const [propertyFilter, setPropertyFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // View Modal
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState(null);
 
   const loadCommissionData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -358,7 +355,7 @@ function SuperAdminReports() {
                   <th className="p-4 text-left">Settled Amount</th>
                   <th className="p-4 text-left">Status</th>
                   <th className="p-4 text-left">Settlement Date</th>
-                  <th className="p-4 text-right pr-6 w-24 whitespace-nowrap">Actions</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
@@ -381,16 +378,13 @@ function SuperAdminReports() {
                       </Tag>
                     </td>
                     <td className="p-4 text-left text-muted-foreground font-mono">{r.settlementDate}</td>
-                    <td className="p-4 text-right pr-6 w-24 whitespace-nowrap">
-                      <div className="flex justify-end items-center">
-                        <button
-                          onClick={() => { setSelectedRecord(r); setModalOpen(true); }}
-                          className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer flex items-center justify-center h-8 w-8"
-                          title="View commission statement details"
-                        >
-                          <Eye className="size-4" />
-                        </button>
-                      </div>
+                    <td className="p-4 text-right">
+                      <ActionGroup align="right">
+                        <ViewActionButton
+                          onClick={() => navigate({ to: `/super-admin/reports/view/${r.id || r.propertyId}` })}
+                          title="View Statement"
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}
@@ -399,72 +393,6 @@ function SuperAdminReports() {
           </div>
         )}
       </Panel>
-
-      {/* Details Overview Modal */}
-      {modalOpen && selectedRecord && (
-        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-black/5 backdrop-blur-sm flex justify-center items-start py-8 sm:py-16 animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-[0_20px_50px_rgba(13,27,42,0.15)] relative border border-muted my-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-muted">
-              <h3 className="font-display font-bold text-lg text-slate-800 flex items-center gap-2">
-                <Receipt className="size-5 text-purple" />
-                <span>Commission Statement</span>
-              </h3>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-muted-foreground hover:text-navy cursor-pointer size-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="py-4 space-y-4 text-left text-xs leading-relaxed">
-              <div className="bg-muted/20 p-3 rounded-xl border border-muted/30">
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Statement reference ID</span>
-                <p className="text-sm font-bold text-navy mt-0.5">{selectedRecord.id}</p>
-                <p className="text-[10px] text-muted-foreground font-semibold mt-1">Property: {selectedRecord.propertyName} ({selectedRecord.city})</p>
-                <p className="text-[10px] text-muted-foreground font-semibold">Total Transactions: {selectedRecord.bookingCount} Stays</p>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-muted-foreground font-medium">Commission Rate:</span>
-                  <strong className="text-navy font-mono">{selectedRecord.commissionRate}%</strong>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-muted-foreground font-medium">Pending Commission:</span>
-                  <strong className="text-warning font-mono">₹{selectedRecord.pendingAmount.toLocaleString("en-IN")}</strong>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-dashed pb-2">
-                  <span className="text-muted-foreground font-medium">Settled Commission:</span>
-                  <strong className="text-success font-mono">₹{selectedRecord.settledAmount.toLocaleString("en-IN")}</strong>
-                </div>
-
-                <div className="flex justify-between items-center py-1 pt-2 font-bold text-navy">
-                  <span>Gross Commission Amount:</span>
-                  <span className="font-mono text-purple">₹{selectedRecord.commissionAmount.toLocaleString("en-IN")}</span>
-                </div>
-
-                <div className="border-t border-muted my-3" />
-
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-muted-foreground font-medium">Settlement Status:</span>
-                  <Tag tone={selectedRecord.settlementStatus === "Settled" ? "success" : selectedRecord.settlementStatus === "Pending" ? "warning" : "neutral"}>
-                    {selectedRecord.settlementStatus}
-                  </Tag>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-muted-foreground font-medium">Latest Settlement Date:</span>
-                  <strong className="text-navy font-mono">{selectedRecord.settlementDate}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-muted mt-4">
-              <Button onClick={() => setModalOpen(false)} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 text-xs cursor-pointer">Close Panel</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

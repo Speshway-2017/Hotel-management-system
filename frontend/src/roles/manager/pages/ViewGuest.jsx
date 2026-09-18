@@ -1,23 +1,26 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { formatISTDateTime } from "@/utils/dateUtils";
 import { Button } from "@/components/ui/button";
 import {
   User,
   Calendar,
   Home,
   CreditCard,
-  ShieldAlert,
   Award,
   Sparkles,
   MessageSquare,
   AlertOctagon,
-  FileText
+  FileText,
+  Phone,
+  Mail,
+  ArrowRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -154,6 +157,14 @@ function ManagerViewGuest() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Guests", to: "/manager/guests" },
+          { label: guestProfile ? `${guestProfile.name}'s Profile` : "Guest Profile" }
+        ]}
+      />
+
       <PageHeader
         title={guestProfile ? `${guestProfile.name}'s Profile` : "Guest CRM Profile"}
         subtitle="Stay metrics, dynamic room preferences, and feedback tracking ledger."
@@ -164,26 +175,33 @@ function ManagerViewGuest() {
       {loading ? (
         <LoadingRows rows={4} />
       ) : guestProfile ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
-          {/* Guest Profile Details & Restricted KYC Document Box */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
+        <div className="space-y-6 font-sans">
+          {/* Top Overview Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* 1. Guest Identification Card */}
+            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 flex flex-col justify-between">
               <div className="flex items-center gap-2 pb-3 border-b border-muted">
                 <User className="size-4.5 text-brand" />
                 <h4 className="font-semibold text-navy text-sm">Guest Identification</h4>
               </div>
-              <div className="space-y-3.5 text-xs text-navy">
+              <div className="space-y-3 text-xs text-navy flex-1">
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Guest Name</span>
-                  <p className="font-bold text-navy-deep mt-0.5">{guestProfile.name}</p>
+                  <p className="font-bold text-navy-deep text-sm mt-0.5">{guestProfile.name}</p>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Contact Phone</span>
-                  <p className="font-semibold mt-0.5">{guestProfile.phone}</p>
+                  <p className="font-semibold mt-0.5 flex items-center gap-1.5">
+                    <Phone className="size-3 text-muted-foreground" />
+                    <span>{guestProfile.phone}</span>
+                  </p>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Email Address</span>
-                  <p className="font-semibold mt-0.5">{guestProfile.email}</p>
+                  <p className="font-semibold mt-0.5 flex items-center gap-1.5">
+                    <Mail className="size-3 text-muted-foreground" />
+                    <span>{guestProfile.email}</span>
+                  </p>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Stays</span>
@@ -192,164 +210,174 @@ function ManagerViewGuest() {
               </div>
             </div>
 
-            {/* Document Restriction notice */}
-            <div className="bg-destructive/5 border border-destructive/15 rounded-xl p-5 shadow-soft space-y-3">
-              <div className="flex items-center gap-2 text-destructive font-bold text-xs uppercase tracking-wider">
-                <ShieldAlert className="size-4 shrink-0" />
-                <span>KYC Verification Documents</span>
+            {/* 2. Preferences Card */}
+            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 flex flex-col justify-between">
+              <div className="flex items-center gap-2 pb-3 border-b border-muted">
+                <Sparkles className="size-4.5 text-purple" />
+                <h4 className="font-semibold text-navy text-sm">Guest Preferences</h4>
               </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Guest identity documents (Aadhaar cards, passports, Form C cards) are restricted to checkout terminals and front desk receptionists for OCR scan audits. General managers and dashboard reports cannot download or view guest document files directly.
-              </p>
+              <div className="space-y-3.5 text-xs text-navy flex-1">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Room Type Allocation</span>
+                  <p className="font-semibold mt-1 text-navy-deep bg-muted/20 p-2.5 rounded-lg border border-muted/50">
+                    {guestProfile.roomPreference}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Service Preferences</span>
+                  <p className="font-semibold mt-1 text-navy-deep bg-muted/20 p-2.5 rounded-lg border border-muted/50">
+                    {guestProfile.guestPreference}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Feedback and Complaints Card */}
+            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 flex flex-col justify-between">
+              <div className="flex items-center gap-2 pb-3 border-b border-muted">
+                <MessageSquare className="size-4.5 text-warning" />
+                <h4 className="font-semibold text-navy text-sm">Feedback & Complaints</h4>
+              </div>
+              <div className="space-y-3.5 text-xs text-navy flex-1">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Last Stay Feedback</span>
+                  <p className="italic text-muted-foreground mt-1 bg-muted/20 p-2.5 rounded-lg border border-muted/50">
+                    "{guestProfile.feedback}"
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Operational Complaints</span>
+                  <div className="mt-1 flex items-center gap-1.5 font-bold">
+                    {guestProfile.complaint === "None" ? (
+                      <span className="text-success text-[11.5px] bg-success/10 px-2.5 py-1 rounded-md border border-success/20">
+                        No active complaints reported
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-warning text-[11.5px] bg-warning/10 px-2.5 py-1 rounded-md border border-warning/20">
+                        <AlertOctagon className="size-3.5 text-warning" />
+                        <span>{guestProfile.complaint}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Core Details (Preferences, Feedback, Stays) */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Preferences Card */}
-              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-                <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                  <Sparkles className="size-4.5 text-purple" />
-                  <h4 className="font-semibold text-navy text-sm">Guest Preferences</h4>
+          {/* Active / Latest Stay Banner */}
+          {latestStay && (
+            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-muted">
+                <div className="flex items-center gap-2">
+                  <Calendar className="size-4.5 text-brand" />
+                  <h4 className="font-semibold text-navy text-sm">Active / Latest Stay Details</h4>
                 </div>
-                <div className="space-y-3 text-xs text-navy">
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Room Type Allocation</span>
-                    <p className="font-semibold mt-0.5 text-navy-deep">{guestProfile.roomPreference}</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Service Preferences</span>
-                    <p className="font-semibold mt-0.5 text-navy-deep">{guestProfile.guestPreference}</p>
-                  </div>
-                </div>
+                <Tag tone={
+                  latestStay.status === "Confirmed" ? "brand" :
+                  latestStay.status === "Checked-in" ? "success" :
+                  latestStay.status === "Checked-out" ? "neutral" : "error"
+                }>
+                  {latestStay.status}
+                </Tag>
               </div>
-
-              {/* Feedback and complaints card */}
-              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-                <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                  <MessageSquare className="size-4.5 text-warning" />
-                  <h4 className="font-semibold text-navy text-sm">Feedback & Complaints</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-navy">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">Room</span>
+                  <strong className="text-brand text-sm block mt-0.5">
+                    {latestStay.room ? (String(latestStay.room).startsWith('Room') ? latestStay.room : `Room ${latestStay.room}`) : "Not Assigned"}
+                  </strong>
                 </div>
-                <div className="space-y-3 text-xs text-navy">
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Last Stay Feedback</span>
-                    <p className="italic text-muted-foreground mt-0.5">"{guestProfile.feedback}"</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Operational Complaints</span>
-                    <div className="mt-1 flex items-center gap-1.5 font-bold">
-                      {guestProfile.complaint === "None" ? (
-                        <span className="text-success text-[11px]">No active complaints reported</span>
-                      ) : (
-                        <>
-                          <AlertOctagon className="size-3.5 text-warning" />
-                          <span className="text-warning text-[11px]">{guestProfile.complaint}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">Stay Dates (IST)</span>
+                  <span className="font-semibold block mt-0.5">
+                    {formatISTDateTime(latestStay.checkIn)} → {formatISTDateTime(latestStay.checkOut)}
+                  </span>
+                  {latestStay.status === "Checked-in" && (
+                    <button
+                      onClick={() => navigate({ to: `/manager/reservations/extend/${latestStay.bookingId || latestStay._id || latestStay.id}` })}
+                      className="text-[10px] text-brand hover:underline font-bold inline-flex items-center gap-0.5 mt-1 cursor-pointer"
+                    >
+                      Extend Stay →
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">Total Tariff</span>
+                  <strong className="text-navy block mt-0.5 text-sm">₹{latestStay.amount?.toLocaleString('en-IN')}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">Outstanding Folio</span>
+                  <strong className={`block mt-0.5 text-sm ${latestStay.balance === 0 ? "text-success" : "text-destructive"}`}>
+                    ₹{(latestStay.balance || 0).toLocaleString('en-IN')}
+                  </strong>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Current/Latest Stay Details */}
-            {latestStay && (
-              <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-muted">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="size-4.5 text-brand" />
-                    <h4 className="font-semibold text-navy text-sm">Active / Latest Booking Details</h4>
-                  </div>
-                  <Tag tone={
-                    latestStay.status === "Confirmed" ? "brand" :
-                    latestStay.status === "Checked-in" ? "success" :
-                    latestStay.status === "Checked-out" ? "neutral" : "error"
-                  }>
-                    {latestStay.status}
-                  </Tag>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-navy">
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Room</span>
-                    <strong className="text-brand text-sm block mt-0.5">{latestStay.room ? (String(latestStay.room).startsWith('Room') ? latestStay.room : `Room ${latestStay.room}`) : "Not Assigned"}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Stay Dates</span>
-                    <span className="font-semibold block mt-0.5">{latestStay.checkIn} → {latestStay.checkOut}</span>
-                    {latestStay.status === "Checked-in" && (
-                      <button
-                        onClick={() => navigate({ to: `/manager/reservations/extend/${latestStay.bookingId || latestStay._id || latestStay.id}` })}
-                        className="text-[10px] text-brand hover:underline font-bold block mt-1 cursor-pointer"
-                      >
-                        Extend Stay →
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Total Amount</span>
-                    <strong className="text-navy block mt-0.5 text-sm">₹{latestStay.amount?.toLocaleString()}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Outstanding Folio</span>
-                    <strong className={`block mt-0.5 text-sm ${latestStay.balance === 0 ? "text-success" : "text-destructive"}`}>
-                      ₹{(latestStay.balance || 0).toLocaleString()}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Stay History Table */}
-            <div className="bg-white border border-muted rounded-xl shadow-soft overflow-hidden">
-              <div className="p-4 bg-[#fcfcfc] border-b border-muted flex items-center gap-2">
+          {/* Historic Stay Ledger - Full Page Width */}
+          <div className="bg-white border border-muted rounded-xl shadow-soft overflow-hidden w-full">
+            <div className="p-4 bg-[#fcfcfc] border-b border-muted flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <FileText className="size-4.5 text-navy" />
                 <h4 className="font-semibold text-navy text-sm">Historic Stay Ledger</h4>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                      <th className="py-3.5 px-6">Booking ID</th>
-                      <th className="py-3.5 px-4">Room</th>
-                      <th className="py-3.5 px-4">Arrival</th>
-                      <th className="py-3.5 px-4">Departure</th>
-                      <th className="py-3.5 px-4 text-center">Status</th>
-                      <th className="py-3.5 px-4 text-right">Amount</th>
-                      <th className="py-3.5 px-6 text-right">Outstanding</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
-                    {sortedStays.map((s) => (
-                      <tr key={s._id || s.id} className="hover:bg-[#fcfcfc]/60 transition-colors">
-                        <td className="py-3.5 px-6 font-mono text-[11px] text-muted-foreground">
-                          #{s._id || s.id}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-brand">
-                          {s.roomNumber ? `Room ${s.roomNumber}` : (s.room ? (String(s.room).startsWith('Room') ? s.room : `Room ${s.room}`) : "Room 201")}
-                        </td>
-                        <td className="py-3.5 px-4 text-muted-foreground">{s.checkIn}</td>
-                        <td className="py-3.5 px-4 text-muted-foreground">{s.checkOut}</td>
-                        <td className="py-3.5 px-4 text-center">
-                          <Tag tone={
-                            s.status === "Confirmed" ? "brand" :
-                            s.status === "Checked-in" ? "success" :
-                            s.status === "Checked-out" ? "neutral" : "error"
-                          }>
-                            {s.status}
-                          </Tag>
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-semibold text-navy">₹{s.amount?.toLocaleString()}</td>
-                        <td className={`py-3.5 px-6 text-right font-bold ${s.balance === 0 ? "text-success" : "text-destructive"}`}>
-                          ₹{(s.balance || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <span className="text-[11px] text-muted-foreground font-semibold">
+                Total Stays: {sortedStays.length}
+              </span>
             </div>
-
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
+                    <th className="py-3.5 px-6 text-left">Booking Reference</th>
+                    <th className="py-3.5 px-4 text-left">Room Number</th>
+                    <th className="py-3.5 px-4 text-left">Check-In (IST)</th>
+                    <th className="py-3.5 px-4 text-left">Check-Out (IST)</th>
+                    <th className="py-3.5 px-4 text-left">Status</th>
+                    <th className="py-3.5 px-4 text-left">Total Amount</th>
+                    <th className="py-3.5 px-6 text-left min-w-[100px] whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-muted text-xs text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
+                  {sortedStays.map((s) => (
+                    <tr key={s._id || s.id} className="hover:bg-[#fcfcfc]/60 transition-colors">
+                      <td className="py-3.5 px-6 text-left font-mono text-[11px] font-bold text-navy-deep align-middle">
+                        #{s.bookingId || s._id || s.id}
+                      </td>
+                      <td className="py-3.5 px-4 text-left font-bold text-brand align-middle">
+                        {s.roomNumber ? `Room ${s.roomNumber}` : (s.room ? (String(s.room).startsWith('Room') ? s.room : `Room ${s.room}`) : "Room 201")}
+                      </td>
+                      <td className="py-3.5 px-4 text-left text-muted-foreground align-middle">
+                        {formatISTDateTime(s.checkIn)}
+                      </td>
+                      <td className="py-3.5 px-4 text-left text-navy font-semibold align-middle">
+                        {formatISTDateTime(s.checkOut)}
+                      </td>
+                      <td className="py-3.5 px-4 text-left align-middle">
+                        <Tag tone={
+                          s.status === "Confirmed" ? "brand" :
+                          s.status === "Checked-in" ? "success" :
+                          s.status === "Checked-out" ? "neutral" : "error"
+                        }>
+                          {s.status}
+                        </Tag>
+                      </td>
+                      <td className="py-3.5 px-4 text-left font-bold text-navy align-middle">
+                        ₹{s.amount?.toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-3.5 px-6 text-left align-middle min-w-[100px] whitespace-nowrap">
+                        <ActionGroup align="left">
+                          <ViewActionButton
+                            onClick={() => navigate({ to: `/manager/reservations/view/${s._id || s.id || s.bookingId}` })}
+                          />
+                        </ActionGroup>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : null}
@@ -361,3 +389,4 @@ function ManagerViewGuest() {
 export const Route = createFileRoute("/manager/guests/view/$id")({
   component: ManagerViewGuest
 });
+

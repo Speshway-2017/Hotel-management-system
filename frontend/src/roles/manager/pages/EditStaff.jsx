@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import { Panel, Notice, LoadingRows } from "@/components/hs/kit";
+import { Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
@@ -220,6 +220,14 @@ function ManagerEditStaff() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in">
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Staff & Shifts", to: "/manager/shifts" },
+          { label: name ? `Edit ${name}` : "Edit Staff" }
+        ]}
+      />
+
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
       <div className="max-w-xl">

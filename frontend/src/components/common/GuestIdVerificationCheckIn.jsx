@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { toast } from "sonner";
@@ -298,6 +298,33 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
 
   return (
     <div className="space-y-6 text-left font-ui animate-fade-in max-w-6xl mx-auto pb-12">
+      {role === "manager" ? (
+        <Crumbs
+          items={[
+            { label: "Dashboard", to: "/manager" },
+            { label: "Today's Operations", to: "/manager/operations" },
+            { label: "Reservations", to: "/manager/reservations" },
+            { label: "Guest Verification & Check-In" }
+          ]}
+        />
+      ) : role === "admin" ? (
+        <Crumbs
+          items={[
+            { label: "Dashboard", to: "/admin" },
+            { label: "Reservations", to: "/admin/reservations" },
+            { label: "Guest Verification & Check-In" }
+          ]}
+        />
+      ) : (
+        <Crumbs
+          items={[
+            { label: "Front Desk", to: "/reception" },
+            { label: "Arrivals", to: "/reception/check-in" },
+            { label: "Guest Verification & Check-In" }
+          ]}
+        />
+      )}
+
       {/* Header & Title */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-navy/10 pb-4">
         <div className="space-y-2">

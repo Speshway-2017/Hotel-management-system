@@ -111,21 +111,28 @@ function ReceptionNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
       await notificationsService.markAllNotificationsRead();
       loadNotificationsData();
-      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
     } catch (err) {
       console.error(err);
+      loadNotificationsData();
     }
   };
 
-  const handleMarkAsReadSingle = async (id) => {
+  const handleMarkAsReadSingle = async (id, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     try {
-      await notificationsService.markNotificationRead(id);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
       window.dispatchEvent(new Event('refresh-unread-notifications-count'));
+      await notificationsService.markNotificationRead(id);
     } catch (err) {
       console.error(err);
+      loadNotificationsData();
     }
   };
 
@@ -230,13 +237,21 @@ function ReceptionNotificationsPage() {
                   </div>
                 </div>
 
-                {/* Right Side: Property, Time */}
+                {/* Right Side: Property, Time, Action */}
                 <div className="flex flex-row md:flex-col items-center md:items-end gap-3 md:gap-1.5 shrink-0 md:pt-0.5 self-start md:self-auto justify-start md:justify-end w-full md:w-auto text-left md:text-right">
                   <div className="flex items-center gap-1.5 text-navy font-semibold text-[10px] bg-muted/40 px-2.5 py-1 rounded-full shrink-0">
                     <Building className="size-3 text-purple shrink-0" />
                     <span>{n.propertyName}</span>
                   </div>
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">{n.timestamp}</span>
+                  {!n.read && (
+                    <button
+                      onClick={(e) => handleMarkAsReadSingle(n.id, e)}
+                      className="text-[10px] font-bold text-purple hover:text-purple/80 bg-purple/10 hover:bg-purple/20 px-2.5 py-1 rounded-md border-none cursor-pointer transition-colors mt-1"
+                    >
+                      Mark as Read
+                    </button>
+                  )}
                 </div>
               </Link>
             ))}

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Panel } from "@/components/hs/kit";
+import { Panel, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
@@ -48,6 +48,13 @@ function ManagerAddStaff() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in">
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Staff & Shifts", to: "/manager/shifts" },
+          { label: "Add Staff" }
+        ]}
+      />
 
       <div className="max-w-xl">
         <Panel title="Employee Registration Form" description="Assign credentials and contact details.">

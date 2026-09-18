@@ -109,8 +109,16 @@ export const adminService = {
   getProperty: async () => {
     return await apiClient.get('/admin/property');
   },
+  getCurrentProperty: async () => {
+    return await apiClient.get('/admin/property');
+  },
   createSubscriptionRequest: async (planName, price) => {
     return await apiClient.post('/admin/subscription/request', { planName, price });
+  },
+  requestSubscription: async (data) => {
+    const planName = data?.planName || data?.requestedTier || '';
+    const price = data?.price || data?.monthlyPrice || 0;
+    return await apiClient.post('/admin/subscription/request', { planName, price, ...data });
   },
   getSubscriptionRequests: async () => {
     return await apiClient.get('/admin/subscription/requests');
@@ -139,6 +147,21 @@ export const adminService = {
     } catch (err) {
       return await apiClient.get('/manager/feedback', { params });
     }
+  },
+  getFeedbackById: async (id) => {
+    try {
+      const res = await apiClient.get(`/admin/feedback/${id}`);
+      if (res && (res.data || res._id)) return res;
+    } catch {}
+    try {
+      const res = await apiClient.get(`/manager/feedback/${id}`);
+      if (res && (res.data || res._id)) return res;
+    } catch {}
+    const all = await adminService.getFeedback();
+    const list = Array.isArray(all?.data) ? all.data : (Array.isArray(all) ? all : []);
+    const found = list.find(f => (f._id || f.id) === id || String(f._id) === String(id) || String(f.id) === String(id));
+    if (found) return { success: true, data: found };
+    throw new Error('Feedback not found');
   },
   createFeedback: async (data) => {
     try {

@@ -213,7 +213,7 @@ function SuperAdminCoupons() {
                       <th className="p-4">Usage Limits</th>
                       <th className="p-4">Used Count</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">Actions</th>
+                      <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
@@ -241,8 +241,8 @@ function SuperAdminCoupons() {
                         <td className="p-4">
                           <Tag tone={c.status === "Active" ? "success" : "neutral"}>{c.status}</Tag>
                         </td>
-                        <td className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">
-                          <ActionGroup>
+                        <td className="p-4 text-right">
+                          <ActionGroup align="right">
                             <ViewActionButton onClick={() => navigate({ to: `/super-admin/coupons/view/${c._id || c.id}` })} />
                             <EditActionButton onClick={() => navigate({ to: `/super-admin/coupons/edit/${c._id || c.id}` })} />
                             <ActionButton

@@ -168,19 +168,15 @@ export function AdminCouponsPage() {
 
   return (
     <div className="space-y-6 text-left pb-16">
-      {/* 1. Page Header */}
-      <PageHeader
-        title="Promotional Coupons & Direct Booking Offers"
-        subtitle="Create, configure, and manage website discount coupons. Only valid coupons will be visible to guests during online booking checkout."
-        actions={
-          <Button
-            onClick={() => navigate({ to: "/admin/coupons/add" })}
-            className="bg-navy hover:bg-navy/90 text-white rounded-full font-bold shadow-soft hover:shadow-lift transition-all px-5 h-10 gap-2 cursor-pointer"
-          >
-            <Plus className="size-4" /> Create Coupon
-          </Button>
-        }
-      />
+      {/* 1. Page Header Actions */}
+      <div className="flex items-center justify-end">
+        <Button
+          onClick={() => navigate({ to: "/admin/coupons/add" })}
+          className="bg-navy hover:bg-navy/90 text-white rounded-full font-bold shadow-soft hover:shadow-lift transition-all px-5 h-10 gap-2 cursor-pointer"
+        >
+          <Plus className="size-4" /> Create Coupon
+        </Button>
+      </div>
 
       {/* 2. Top Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

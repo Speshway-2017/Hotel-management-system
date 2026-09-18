@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, ActionGroup } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
@@ -52,10 +52,13 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
 }
 
 function ManagerDashboard() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [property, setProperty] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
+  const [property, setProperty] = useState(() => {
+    const u = authService.getCurrentUser();
+    return u?.propertyId ? { name: "Hour Stay Luxury Hotel", id: u.propertyId } : { name: "Hour Stay Luxury Hotel" };
+  });
   
   // Data sets
   const [bookings, setBookings] = useState([]);
@@ -69,8 +72,10 @@ function ManagerDashboard() {
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const loadDashboardData = async (isInitial = false) => {
+    if (isInitial && bookings.length === 0) {
+      setLoading(true);
+    }
     setError(null);
     try {
       let user = authService.getCurrentUser();
@@ -92,7 +97,7 @@ function ManagerDashboard() {
 
       const propertyId = user.propertyId;
       if (!propertyId) {
-        setLoading(false);
+        if (isInitial) setLoading(false);
         return;
       }
 
@@ -129,24 +134,26 @@ function ManagerDashboard() {
         setFeedbackList(feedbackRes.data);
       }
     } catch (err) {
-      setError(err.message || "Failed to load dashboard data.");
+      if (isInitial) setError(err.message || "Failed to load dashboard data.");
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData(true);
 
     const interval = setInterval(() => {
-      loadDashboardData();
-    }, 10000); // 10s poll fallback
+      loadDashboardData(false);
+    }, 30000);
 
-    const handleFocus = () => loadDashboardData();
+    const handleFocus = () => loadDashboardData(false);
     window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
-      loadDashboardData();
+      loadDashboardData(false);
     });
 
     return () => {
@@ -166,11 +173,10 @@ function ManagerDashboard() {
     );
   }
 
-  if (loading) {
+  if (loading && bookings.length === 0) {
     return (
-      <div className="p-6 space-y-6">
-        <PageHeader title="Manager Console" subtitle="Synchronizing stay logs and shift diagnostics..." />
-        <LoadingRows rows={5} />
+      <div className="space-y-6">
+        <LoadingRows rows={6} />
       </div>
     );
   }
@@ -209,8 +215,14 @@ function ManagerDashboard() {
   const totalRooms = roomKPIs.totalRooms;
   const occupancyPercent = roomKPIs.occupancyRate;
   
+  // Calculate Today's Revenue strictly for today's transactions / arrivals / bookings
+  const todayRevenue = activeBookings.filter(r => {
+    const isNotCancelled = String(r.status || '').toLowerCase() !== 'cancelled';
+    return isNotCancelled && (isToday(r.checkIn) || isToday(r.createdAt));
+  }).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
   const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
-  const adrValue = activeBookings.length > 0 ? Math.round(totalRevenue / activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0)) : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0);
+  const adrValue = activeBookings.length > 0 ? Math.round((todayRevenue > 0 ? todayRevenue : totalRevenue) / Math.max(1, activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0))) : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0);
   const revparValue = Math.round(adrValue * (occupancyPercent / 100));
 
   // Dynamic Room Counts from MongoDB
@@ -266,7 +278,7 @@ function ManagerDashboard() {
           <PremiumStatCard label="In-House" value={currentStays.length.toString()} hint="Checked-in guests" icon={Users} accentColor="#2E7D32" />
         </div>
         <div>
-          <PremiumStatCard label="Today's Revenue" value={`₹${totalRevenue.toLocaleString()}`} hint="All-time active stay tariff" icon={DollarSign} accentColor="#F5C06A" />
+          <PremiumStatCard label="Today's Revenue" value={`₹${todayRevenue.toLocaleString("en-IN")}`} hint="Today's confirmed stays revenue" icon={DollarSign} accentColor="#F5C06A" />
         </div>
         <div>
           <PremiumStatCard label="Occupancy Rate" value={`${occupancyPercent}%`} hint={`Stays: ${currentStays.length}/${totalRooms} rms`} icon={Percent} accentColor="#FF6B8B" />
@@ -503,32 +515,6 @@ function ManagerDashboard() {
 
       </div>
 
-      {/* Today's Operations Panel */}
-      <Panel title="Today's Operations" description="Check-in flows and expected stays">
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-5 bg-white rounded-b-xl text-xs font-semibold text-navy">
-          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
-            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Calendar className="size-4 text-indigo shrink-0" /> Total Arrivals</span>
-            <span className="font-bold text-navy text-base mt-1">{arrivalsToday.length} booking(s)</span>
-          </div>
-          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
-            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Calendar className="size-4 text-purple shrink-0" /> Total Departures</span>
-            <span className="font-bold text-navy text-base mt-1">{departuresToday.length} booking(s)</span>
-          </div>
-          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
-            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Users className="size-4 text-success shrink-0" /> Current Stays</span>
-            <span className="font-bold text-navy text-base mt-1">{currentStays.length} guest(s)</span>
-          </div>
-          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
-            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Clock className="size-4 text-warning shrink-0" /> Pending Check-ins</span>
-            <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-warning font-bold text-[10px] mt-1">{pendingCheckins.length} remaining</span>
-          </div>
-          <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border border-muted bg-[#fcfcfc] text-center">
-            <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]"><Clock className="size-4 text-pink shrink-0" /> Pending Check-outs</span>
-            <span className="rounded-full bg-pink/15 px-2.5 py-0.5 text-pink font-bold text-[10px] mt-1">{pendingCheckouts.length} remaining</span>
-          </div>
-        </div>
-      </Panel>
-
       {/* In-House Guests & Stay Extension Desk */}
       <Panel 
         title="In-House Stays & Extension Controls" 
@@ -554,7 +540,7 @@ function ManagerDashboard() {
                   <th className="py-3 px-4">Current Checkout</th>
                   <th className="py-3 px-4">Stay Duration</th>
                   <th className="py-3 px-4">Folio Total</th>
-                  <th className="py-3 px-4 text-right">Extension Action</th>
+                  <th className="py-3 px-4 text-left">Extension Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -572,13 +558,15 @@ function ManagerDashboard() {
                     <td className="py-3.5 px-4 font-bold text-navy">
                       ₹{(booking.amount || booking.totalAmount || 0).toLocaleString()}
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <ExtendStayButton
-                        size="xs"
-                        label="Extend Stay"
-                        booking={booking}
-                        role="manager"
-                      />
+                    <td className="py-3.5 px-4 text-left">
+                      <ActionGroup align="left">
+                        <ExtendStayButton
+                          size="xs"
+                          label="Extend Stay"
+                          booking={booking}
+                          role="manager"
+                        />
+                      </ActionGroup>
                     </td>
                   </tr>
                 ))}

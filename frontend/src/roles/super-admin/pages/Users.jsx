@@ -151,40 +151,6 @@ function SuperAdminGuests() {
 
       {error && <Notice tone="error" title="Synchronization Notice">{error}</Notice>}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Guests</span>
-            <span className="p-2 rounded-lg bg-navy/5 text-navy"><User className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-navy font-sans tracking-tight tabular-nums">{guestDirectory.length}</p>
-          <span className="text-[11px] text-muted-foreground">Registered profile accounts</span>
-        </div>
-
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-purple uppercase tracking-wider">Active Members</span>
-            <span className="p-2 rounded-lg bg-purple/10 text-purple"><ShieldCheck className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-purple font-sans tracking-tight tabular-nums">
-            {guestDirectory.filter((g) => g.status === "Active").length}
-          </p>
-          <span className="text-[11px] text-muted-foreground">In good standing</span>
-        </div>
-
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Total Completed Stays</span>
-            <span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><Sparkles className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-sans tracking-tight tabular-nums">
-            {guestDirectory.reduce((sum, g) => sum + g.totalStays, 0)}
-          </p>
-          <span className="text-[11px] text-muted-foreground">Lifetime bookings aggregated</span>
-        </div>
-      </div>
-
       {/* Filters */}
       <Panel title="Guest Directory Index" description={`Displaying ${filteredGuests.length} registered guest accounts.`}>
         <div className="p-4 border-b border-navy/5 bg-cream/20 flex flex-wrap gap-3 justify-between items-center">
@@ -244,7 +210,7 @@ function SuperAdminGuests() {
                 <th className="p-3.5">Lifetime Stays</th>
                 <th className="p-3.5">Joined Date</th>
                 <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right pr-6 min-w-[100px] whitespace-nowrap">Actions</th>
+                <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y font-sans">
@@ -326,8 +292,8 @@ function SuperAdminGuests() {
                         </Tag>
                       </td>
 
-                      <td className="p-3.5 text-right pr-6 whitespace-nowrap min-w-[100px]">
-                        <ActionGroup>
+                      <td className="p-3.5 text-right">
+                        <ActionGroup align="right">
                           <ViewActionButton onClick={() => navigate({ to: `/super-admin/users/view/${g.id}` })} />
                         </ActionGroup>
                       </td>

@@ -54,6 +54,7 @@ import { Route as AdminEditStaff } from "./roles/admin/pages/EditStaff";
 import { Route as AdminViewStaff } from "./roles/admin/pages/ViewStaff";
 import { Route as AdminTaxes } from "./roles/admin/pages/Taxes";
 import { Route as AdminFeedback } from "./roles/admin/pages/Feedback";
+import { Route as AdminViewFeedback } from "./roles/admin/pages/ViewFeedback";
 import { Route as AdminCrm } from "./roles/admin/pages/Crm";
 import { Route as AdminSubscription } from "./roles/admin/pages/Subscription";
 import { Route as AdminCoupons } from "./roles/admin/pages/Coupons";
@@ -127,6 +128,7 @@ import { Route as ReceptionRoomDetails } from "./roles/receptionist/pages/RoomDe
 import { Route as ReceptionGuestDetails } from "./roles/receptionist/pages/GuestDetails";
 import { Route as ReceptionNotificationDetails } from "./roles/receptionist/pages/NotificationDetails";
 import { Route as ReceptionFeedback } from "./roles/receptionist/pages/Feedback";
+import { Route as ReceptionViewFeedback } from "./roles/receptionist/pages/ViewFeedback";
 
 // Import Guest Workspace Pages
 import { Route as GuestLayout } from "./roles/guest/pages/GuestLayout";
@@ -165,6 +167,7 @@ import { Route as SuperAdminAddProperty } from "./roles/super-admin/pages/AddPro
 import { Route as SuperAdminViewProperty } from "./roles/super-admin/pages/ViewProperty";
 import { Route as SuperAdminEditProperty } from "./roles/super-admin/pages/EditProperty";
 import { Route as SuperAdminReports } from "./roles/super-admin/pages/Reports";
+import { Route as SuperAdminViewReport } from "./roles/super-admin/pages/ViewReport";
 import { Route as SuperAdminReservations } from "./roles/super-admin/pages/Reservations";
 import { Route as SuperAdminViewReservation } from "./roles/super-admin/pages/ViewSuperReservation";
 import { Route as SuperAdminUsers } from "./roles/super-admin/pages/Users";
@@ -307,6 +310,8 @@ export default function App() {
             <Route path="/admin/staff/view/:id" element={<RouteWrapper routeObj={AdminViewStaff} />} />
             <Route path="/admin/taxes" element={<RouteWrapper routeObj={AdminTaxes} />} />
             <Route path="/admin/feedback" element={<RouteWrapper routeObj={AdminFeedback} />} />
+            <Route path="/admin/feedback/view/:id" element={<RouteWrapper routeObj={AdminViewFeedback} />} />
+            <Route path="/admin/feedback/:id" element={<RouteWrapper routeObj={AdminViewFeedback} />} />
             <Route path="/admin/crm" element={<RouteWrapper routeObj={AdminCrm} />} />
             <Route path="/admin/subscription" element={<RouteWrapper routeObj={AdminSubscription} />} />
             <Route path="/admin/coupons" element={<RouteWrapper routeObj={AdminCoupons} />} />
@@ -373,6 +378,8 @@ export default function App() {
             <Route path="/reception/reservations" element={<RouteWrapper routeObj={ReceptionReservations} />} />
             <Route path="/reception/room-assignment" element={<RouteWrapper routeObj={ReceptionRoomAssignment} />} />
             <Route path="/reception/feedback" element={<RouteWrapper routeObj={ReceptionFeedback} />} />
+            <Route path="/reception/feedback/view/:id" element={<RouteWrapper routeObj={ReceptionViewFeedback} />} />
+            <Route path="/reception/feedback/:id" element={<RouteWrapper routeObj={ReceptionViewFeedback} />} />
             <Route path="/reception/profile" element={<RouteWrapper routeObj={ReceptionProfile} />} />
             <Route path="/reception/check-in/:id" element={<RouteWrapper routeObj={ReceptionCheckInDetails} />} />
             <Route path="/reception/check-out/:id" element={<RouteWrapper routeObj={ReceptionCheckOutDetails} />} />
@@ -429,6 +436,7 @@ export default function App() {
             <Route path="/super-admin/contacts" element={<RouteWrapper routeObj={SuperAdminContactRequests} />} />
             <Route path="/super-admin/contacts/view/:id" element={<RouteWrapper routeObj={SuperAdminViewContactRequest} />} />
             <Route path="/super-admin/reports" element={<RouteWrapper routeObj={SuperAdminReports} />} />
+            <Route path="/super-admin/reports/view/:id" element={<RouteWrapper routeObj={SuperAdminViewReport} />} />
             <Route path="/super-admin/reservations" element={<RouteWrapper routeObj={SuperAdminReservations} />} />
             <Route path="/super-admin/reservations/view/:id" element={<RouteWrapper routeObj={SuperAdminViewReservation} />} />
             <Route path="/super-admin/users" element={<RouteWrapper routeObj={SuperAdminUsers} />} />

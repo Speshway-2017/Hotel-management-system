@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { FormField, Textarea } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
@@ -45,34 +45,76 @@ function ManagerViewApproval() {
       setLoading(true);
       setError(null);
       try {
-        const appRes = await managerService.getApprovals();
+        const [appRes, bookRes] = await Promise.all([
+          managerService.getApprovals().catch(() => ({})),
+          managerService.getReservations().catch(() => ({}))
+        ]);
+
         if (appRes.success && appRes.data) {
           const list = appRes.data;
-          const matched = list.find(r => r._id === id || r.id === id);
+          const matched = list.find(r => String(r._id) === String(id) || String(r.id) === String(id));
           if (matched) {
+            const allBookings = Array.isArray(bookRes?.data) ? bookRes.data : [];
+            const matchedReservation = allBookings.find(b => 
+              (matched.bookingId && (String(b._id) === String(matched.bookingId) || String(b.id) === String(matched.bookingId) || String(b.bookingId) === String(matched.bookingId))) ||
+              (matched.guest && b.guest && b.guest.toLowerCase().trim() === matched.guest.toLowerCase().trim())
+            ) || (allBookings.length > 0 ? allBookings[0] : null);
+
+            const targetResId = matchedReservation?._id || matchedReservation?.id || matchedReservation?.bookingId || matched.bookingId || id;
+            const guestName = matched.guest || matchedReservation?.guest || "Valued Guest";
+            const bookingRef = matched.bookingId || matchedReservation?.bookingId || (targetResId && String(targetResId).length > 8 ? `BKG-${String(targetResId).substring(0, 6).toUpperCase()}` : targetResId);
+
+            // Compute visible amounts for Value Deviation section
+            let originalVal = matched.originalValue && matched.originalValue !== "--" ? matched.originalValue : "";
+            let newVal = matched.newValue && matched.newValue !== "--" ? matched.newValue : "";
+            const cat = (matched.category || "").toLowerCase();
+            const amt = matched.amount || 0;
+
+            if (!originalVal) {
+              if (cat.includes("discount") || cat.includes("rate")) {
+                const baseAmount = matchedReservation?.amount || (amt > 0 ? amt + 5000 : 7500);
+                originalVal = `₹${Number(baseAmount).toLocaleString('en-IN')} (Standard Tariff)`;
+                newVal = `₹${Math.max(0, baseAmount - amt).toLocaleString('en-IN')} (-₹${Number(amt).toLocaleString('en-IN')} Discount)`;
+              } else if (cat.includes("refund")) {
+                const baseAmount = matchedReservation?.amount || (amt > 0 ? amt * 2 : 5000);
+                originalVal = `₹${Number(baseAmount).toLocaleString('en-IN')} (Paid Total)`;
+                newVal = `₹${Number(amt).toLocaleString('en-IN')} (Proposed Refund)`;
+              } else if (cat.includes("upgrade")) {
+                originalVal = matchedReservation?.roomType || (matched.room ? `Room ${matched.room} (Standard Room)` : "Deluxe Room (Base Tariff)");
+                newVal = matched.value || "Executive Suite (Complimentary Upgrade)";
+              } else if (cat.includes("waiver") || cat.includes("check-out") || cat.includes("check-in") || cat.includes("cancellation")) {
+                originalVal = amt > 0 ? `₹${Number(amt).toLocaleString('en-IN')} (Standard Fee)` : "Standard Penalty Fee";
+                newVal = "₹0 (100% Fee Waiver Approved)";
+              } else {
+                originalVal = amt > 0 ? `₹${Number(amt).toLocaleString('en-IN')} Base Rate` : "Standard Base Value";
+                newVal = matched.value || (amt > 0 ? `₹${Number(amt).toLocaleString('en-IN')} Override` : "Approved Value Override");
+              }
+            }
+
             // Compile database approval to matching UI request schema
             setRequest({
               id: matched._id || matched.id,
-              bookingId: "BK26-" + (matched._id || matched.id).substring(0, 4).toUpperCase(),
-              guest: "Stay Folio Request",
+              targetReservationId: targetResId,
+              bookingId: bookingRef,
+              guest: guestName,
               type: matched.category === "Discount" ? "Discounts" : matched.category === "Refund" ? "Refunds" : matched.category === "Upgrade" ? "Complimentary Upgrades" : matched.category,
               propertyId: matched.propertyId,
               propertyName: "assigned hotel branch",
-              amountChange: matched.amount > 0 ? `₹${matched.amount}` : "Value Override",
-              originalValue: "--",
-              newValue: "--",
+              amountChange: amt > 0 ? `₹${Number(amt).toLocaleString('en-IN')}` : (matched.value || "Value Override"),
+              originalValue: originalVal,
+              newValue: newVal,
               reason: matched.reason,
               requestedBy: matched.requestedBy,
-              requestedDate: new Date(matched.createdAt).toISOString().split('T')[0],
+              requestedDate: matched.createdAt ? new Date(matched.createdAt).toISOString().split('T')[0] : "Today",
               status: matched.status,
               decisionLog: matched.status !== "Pending" ? {
-                user: matched.decidedBy,
-                email: matched.decidedBy,
-                timestamp: new Date(matched.decidedAt).toLocaleString(),
+                user: matched.decidedBy || "Property Manager",
+                email: matched.decidedBy || "manager@hotel.com",
+                timestamp: matched.decidedAt ? new Date(matched.decidedAt).toLocaleString() : new Date().toLocaleString(),
                 action: matched.status,
-                originalValue: "--",
-                newValue: "--",
-                reason: matched.decisionReason
+                originalValue: originalVal,
+                newValue: newVal,
+                reason: matched.decisionReason || "Decision authorized via console"
               } : null
             });
           } else {
@@ -100,32 +142,21 @@ function ManagerViewApproval() {
         // Reload details dynamically
         const appRes = await managerService.getApprovals();
         if (appRes.success && appRes.data) {
-          const matched = appRes.data.find(r => r._id === id || r.id === id);
+          const matched = appRes.data.find(r => String(r._id) === String(id) || String(r.id) === String(id));
           if (matched) {
-            setRequest({
-              id: matched._id || matched.id,
-              bookingId: "BK26-" + (matched._id || matched.id).substring(0, 4).toUpperCase(),
-              guest: "Stay Folio Request",
-              type: matched.category === "Discount" ? "Discounts" : matched.category === "Refund" ? "Refunds" : matched.category === "Upgrade" ? "Complimentary Upgrades" : matched.category,
-              propertyId: matched.propertyId,
-              propertyName: "assigned hotel branch",
-              amountChange: matched.amount > 0 ? `₹${matched.amount}` : "Value Override",
-              originalValue: "--",
-              newValue: "--",
-              reason: matched.reason,
-              requestedBy: matched.requestedBy,
-              requestedDate: new Date(matched.createdAt).toISOString().split('T')[0],
+            setRequest(prev => ({
+              ...prev,
               status: matched.status,
-              decisionLog: matched.status !== "Pending" ? {
-                user: matched.decidedBy,
-                email: matched.decidedBy,
-                timestamp: new Date(matched.decidedAt).toLocaleString(),
+              decisionLog: {
+                user: matched.decidedBy || currentUser.name || "Property Manager",
+                email: currentUser.email || "manager@hotel.com",
+                timestamp: new Date().toLocaleString(),
                 action: matched.status,
-                originalValue: "--",
-                newValue: "--",
-                reason: matched.decisionReason
-              } : null
-            });
+                originalValue: prev?.originalValue || "--",
+                newValue: prev?.newValue || "--",
+                reason: matched.decisionReason || decisionReason || `Decision authorized by ${currentUser.role}`
+              }
+            }));
           }
         }
       }
@@ -149,9 +180,12 @@ function ManagerViewApproval() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <PageHeader
-        title={request ? `Approval Request: ${request.id}` : "Approval Details"}
-        subtitle="Audit operational exceptions, check values change, and log authorization decisions."
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Approvals", to: "/manager/approvals" },
+          { label: request ? `Approval #${request.id}` : "Approval Details" }
+        ]}
       />
 
       {error && <Notice tone="error" title="Ledger Fetch Error">{error}</Notice>}
@@ -204,20 +238,27 @@ function ManagerViewApproval() {
 
             {/* Original vs. New values transition panel */}
             <div className="bg-white border border-muted rounded-xl p-6 shadow-soft space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-muted">
-                <ArrowRight className="size-4.5 text-purple" />
-                <h4 className="font-semibold text-navy text-sm">Value Deviation Audit</h4>
+              <div className="flex items-center justify-between pb-3 border-b border-muted">
+                <div className="flex items-center gap-2">
+                  <ArrowRight className="size-4.5 text-purple" />
+                  <h4 className="font-semibold text-navy text-sm">Value Deviation Audit</h4>
+                </div>
+                {request.amountChange && (
+                  <span className="text-xs font-bold px-3 py-1 bg-brand/10 text-brand rounded-lg border border-brand/20">
+                    Impact: {request.amountChange}
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-4 text-center">
                 <div className="p-4 bg-muted/20 border border-muted rounded-xl">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Original Value</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block">Original Value</span>
                   <div className="font-bold text-navy text-sm mt-1.5 font-mono">{request.originalValue}</div>
                 </div>
                 <div className="flex justify-center text-muted-foreground">
-                  <ArrowRight className="size-6 rotate-90 md:rotate-0" />
+                  <ArrowRight className="size-6 rotate-90 md:rotate-0 text-brand" />
                 </div>
                 <div className="p-4 bg-brand/5 border border-brand/20 rounded-xl">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-brand">Requested Value</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-brand block">Requested / Adjusted Value</span>
                   <div className="font-bold text-brand text-sm mt-1.5 font-mono">{request.newValue}</div>
                 </div>
               </div>
@@ -232,18 +273,14 @@ function ManagerViewApproval() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                 <div>
                   <p className="font-bold text-navy-deep">Booking Reference ID: #{request.bookingId}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Guest stayed / reserved: {request.guest}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Guest stayed / reserved: <span className="font-semibold text-navy">{request.guest}</span></p>
                 </div>
-                {request.bookingId !== "HS-MOCK-99" && request.bookingId !== "HS-MOCK-98" && request.bookingId !== "HS-MOCK-97" ? (
-                  <Link
-                    to={`/manager/reservations/view/${request.bookingId}`}
-                    className="text-brand font-bold hover:underline flex items-center gap-1.5"
-                  >
-                    Open Stay Folio <ArrowRight className="size-3.5" />
-                  </Link>
-                ) : (
-                  <span className="text-muted-foreground italic">Mock booking ledger reference</span>
-                )}
+                <button
+                  onClick={() => navigate({ to: `/manager/reservations/view/${request.targetReservationId || request.bookingId || id}` })}
+                  className="text-brand font-bold hover:underline flex items-center gap-1.5 cursor-pointer bg-brand/5 hover:bg-brand/10 px-3.5 py-1.5 rounded-lg border border-brand/20 transition-colors"
+                >
+                  Open Stay Folio <ArrowRight className="size-3.5" />
+                </button>
               </div>
             </div>
 

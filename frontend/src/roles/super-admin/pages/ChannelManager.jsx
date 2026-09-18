@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Panel, Tag, statusTone, Notice } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, statusTone, Notice, ActionGroup, ViewActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Activity, Sliders, CheckCircle2, AlertTriangle, AlertCircle, X, ShieldAlert, Key, Eye, EyeOff } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
@@ -186,7 +186,7 @@ function SuperAdminChannelManager() {
                     <th className="p-4">Inventory Status</th>
                     <th className="p-4">Rate Status</th>
                     <th className="p-4">Reservations Synced</th>
-                    <th className="p-4 text-right pr-6 w-28 whitespace-nowrap">Actions</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -209,23 +209,20 @@ function SuperAdminChannelManager() {
                         </Tag>
                       </td>
                       <td className="p-4 font-semibold text-navy font-mono text-xs">{c.reservations}</td>
-                      <td className="p-4 text-right pr-6 w-28 whitespace-nowrap">
-                        <div className="flex gap-1.5 justify-end items-center">
-                          <button
+                      <td className="p-4 text-right">
+                        <ActionGroup align="right">
+                          <ViewActionButton
                             onClick={() => handleOpenModal(c, "view")}
-                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
                             title="View Details"
-                          >
-                            <Eye className="size-4" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenModal(c, "manage")}
-                            className="p-1.5 rounded-full hover:bg-muted text-navy-deep cursor-pointer"
+                          />
+                          <ActionButton
+                            icon={Sliders}
+                            label="Manage"
+                            variant="edit"
                             title="Manage Connection"
-                          >
-                            <Sliders className="size-4" />
-                          </button>
-                        </div>
+                            onClick={() => handleOpenModal(c, "manage")}
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   ))}

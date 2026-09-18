@@ -318,10 +318,10 @@
     "revpar": 0,
     "status": "Active",
     "gm": "Dileep",
-    "assignedAdmin": "usr-adm-dileep",
+    "assignedAdmin": "Dileep",
     "subscriptionTier": "Basic",
     "subscriptionStatus": "Active",
-    "subscriptionExpiry": "2026-09-24T07:31:12.627Z",
+    "subscriptionExpiry": "2027-09-18T06:24:25.308Z",
     "commissionRate": 12,
     "settings": {
       "logo": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788155962/hourstay_hms_assets/k9uc3exlyql4tcrqemnm.jpg",
@@ -490,7 +490,8 @@
       ]
     },
     "createdAt": "2026-08-18T06:50:34.910Z",
-    "updatedAt": "2026-09-16T05:31:19.688Z"
+    "updatedAt": "2026-09-18T06:16:23.977Z",
+    "subscriptionPlanName": "Starter Tier"
   },
   {
     "_id": "HS-0L43K",
@@ -735,5 +736,65 @@
     "updatedAt": "2026-08-21T06:20:02.418Z",
     "__v": 0,
     "id": "HS-6PXNS"
+  },
+  {
+    "id": "HS-7OI67",
+    "_id": "HS-7OI67",
+    "name": "Hour Stay Test Inn",
+    "city": "Hyderabad",
+    "rooms": 45,
+    "occupancy": 0,
+    "adr": 0,
+    "revpar": 0,
+    "status": "Onboarding",
+    "gm": "Test Admin",
+    "assignedAdmin": "ux4m0rsyxo",
+    "commissionRate": 12,
+    "subscriptionTier": "None",
+    "subscriptionStatus": "None",
+    "subscriptionExpiry": null,
+    "settings": {
+      "logo": "",
+      "address": "Hyderabad",
+      "phone": "",
+      "email": "",
+      "gstin": "",
+      "classification": "3-Star",
+      "description": "",
+      "gstEnabled": true,
+      "cgst": 9,
+      "sgst": 9,
+      "igst": 18,
+      "hsnSac": "996311",
+      "taxInclusive": true,
+      "checkInTime": "12:00",
+      "checkOutTime": "11:00",
+      "earlyCheckInCharge": 0,
+      "lateCheckOutCharge": 0,
+      "cancellationPolicy": "Free cancellation up to 24 hours prior to check-in. Cancellation within 24 hours will attract a 1-night tariff penalty.",
+      "noShowPolicy": "No-show will attract 100% room charge penalty.",
+      "refundPolicy": "Refunds are processed within 5-7 business days.",
+      "paymentMethods": [
+        "UPI",
+        "Card",
+        "Cash"
+      ],
+      "advancePaymentPercent": 100,
+      "securityDeposit": 0,
+      "bookingRules": "Guests must produce valid identity documentation on arrival.",
+      "reservationSettings": "Auto-release unconfirmed rooms after 2 hours.",
+      "paymentConfig": "Razorpay Checkout API Integration",
+      "notifyOnBooking": true,
+      "notifyOnPayment": true,
+      "notifyOnCancellation": true,
+      "notifyOnCheckInOut": true,
+      "notifyOnGuestService": true,
+      "channelEmail": true,
+      "channelSms": false,
+      "channelWhatsApp": true,
+      "channelPush": false
+    },
+    "createdAt": "2026-09-18T05:43:09.216Z",
+    "updatedAt": "2026-09-18T05:43:09.216Z"
   }
 ]

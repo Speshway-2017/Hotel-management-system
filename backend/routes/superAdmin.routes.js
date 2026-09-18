@@ -1223,99 +1223,76 @@ router.post('/notifications', authorize('super-admin'), async (req, res) => {
 // ==========================================
 router.get('/plans', authorize('super-admin', 'admin'), async (req, res) => {
   try {
-    const list = await SubscriptionPlan.find({});
-    // If empty, let's seed a few standard plans so the database is populated by default!
-    if (list.length === 0) {
-      const seeded = await SubscriptionPlan.create([
-        { name: "Starter Tier", description: "Perfect for single hotel operators.", monthlyPrice: 2499, yearlyPrice: 24990, propertyLimit: 1, roomLimit: 30, includedFeatures: ["Direct Website Builder", "Manual Bookings Management", "GST Invoice Invoicing"], status: "Active", activeSubscribers: 2 },
-        { name: "Professional Suite", description: "Advanced tools for growing hotel chains.", monthlyPrice: 5999, yearlyPrice: 59990, propertyLimit: 3, roomLimit: 150, includedFeatures: ["Direct Website Builder", "2-Way OTA XML Channel Manager", "Automated CRM & Profiles Module", "Advanced Revenue Analytics"], status: "Active", activeSubscribers: 3 },
-        { name: "Enterprise Pro", description: "Complete platform control for major hospitality brands.", monthlyPrice: 12999, yearlyPrice: 129990, propertyLimit: 10, roomLimit: 800, includedFeatures: ["Unlimited Property Profiles", "All Standard Suite Integrations", "Custom Payment Gateway Routing", "24/7 Dedicated Support Hotline"], status: "Active", activeSubscribers: 1 }
-      ]);
-      return sendSuccess(res, 200, seeded, 'Plans retrieved');
-    }
-    return sendSuccess(res, 200, list, 'Plans retrieved');
-  } catch (error) {
-    return sendError(res, 500, 'Failed to retrieve subscription plans');
-  }
-});
-
-router.post('/plans', authorize('super-admin'), async (req, res) => {
-  try {
-    const newPlan = await SubscriptionPlan.create(req.body);
-    await logAction(req.user, 'Created Subscription Plan', newPlan.name, req);
-    return sendSuccess(res, 201, newPlan, 'Plan created successfully');
-  } catch (error) {
-    return sendError(res, 500, error.message || 'Failed to create plan');
-  }
-});
-
-router.put('/plans/:id', authorize('super-admin'), async (req, res) => {
-  try {
-    const updated = await SubscriptionPlan.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) return sendError(res, 404, 'Plan not found');
-    await logAction(req.user, 'Updated Subscription Plan', updated.name, req);
-    return sendSuccess(res, 200, updated, 'Plan updated successfully');
-  } catch (error) {
-    return sendError(res, 500, error.message || 'Failed to update plan');
-  }
-});
-
-router.delete('/plans/:id', authorize('super-admin'), async (req, res) => {
-  try {
-    const deleted = await SubscriptionPlan.findByIdAndDelete(req.params.id);
-    if (!deleted) return sendError(res, 404, 'Plan not found');
-    await logAction(req.user, 'Deleted Subscription Plan', deleted.name, req);
-    return sendSuccess(res, 200, deleted, 'Plan deleted successfully');
-  } catch (error) {
-    return sendError(res, 500, error.message || 'Failed to delete plan');
-  }
-});
-
-// ==========================================
-// 8.5 SUBSCRIPTION PLANS & REQUESTS
-// ==========================================
-router.get('/plans', authorize('super-admin'), async (req, res) => {
-  try {
     let plans = await SubscriptionPlan.find({}).sort({ monthlyPrice: 1 });
     if (!plans || plans.length === 0) {
       const defaultPlans = [
         {
           name: "Starter Tier",
           description: "Essential suite for boutique properties and standalone guesthouses.",
-          monthlyPrice: 3999,
-          yearlyPrice: 39990,
+          monthlyPrice: 2499,
+          yearlyPrice: 24990,
           propertyLimit: 1,
-          roomLimit: 25,
+          roomLimit: 30,
           includedFeatures: ["Front Desk Console", "Direct Booking Engine", "GST Split Invoicing", "Mobile Housekeeping"],
           status: "Active",
-          activeSubscribers: 12
+          activeSubscribers: 1
         },
         {
           name: "Professional Suite",
           description: "Full-featured management platform for expanding city hotels and resorts.",
-          monthlyPrice: 7999,
-          yearlyPrice: 79990,
+          monthlyPrice: 5999,
+          yearlyPrice: 59990,
           propertyLimit: 3,
-          roomLimit: 75,
+          roomLimit: 150,
           includedFeatures: ["Real-time 2-Way Channel Sync", "Advanced Guest CRM", "Dynamic Rate Calendar", "Shift Roster & Biometrics", "POS Restaurant Billing"],
           status: "Active",
-          activeSubscribers: 28
+          activeSubscribers: 0
         },
         {
           name: "Enterprise Pro",
           description: "Unlimited portfolio management for multi-branch chains and heritage groups.",
-          monthlyPrice: 14999,
-          yearlyPrice: 149990,
+          monthlyPrice: 12999,
+          yearlyPrice: 129990,
           propertyLimit: 10,
-          roomLimit: 300,
+          roomLimit: 800,
           includedFeatures: ["Multi-Property Central Ledger", "Custom API & Webhooks", "Dedicated SLA Account Manager", "Custom WhatsApp Invoicing", "Auditor & CA Export Portal"],
           status: "Active",
-          activeSubscribers: 8
+          activeSubscribers: 0
         }
       ];
       plans = await SubscriptionPlan.insertMany(defaultPlans);
     }
-    return sendSuccess(res, 200, plans, 'Subscription plans retrieved');
+
+    // Dynamically calculate activeSubscribers for each plan based on active properties in database
+    const activeProperties = await Property.find({
+      $or: [
+        { subscriptionStatus: 'Active' },
+        { status: 'Active' }
+      ]
+    });
+
+    const enrichedPlans = plans.map(p => {
+      const pObj = p.toObject ? p.toObject() : { ...p };
+      const matchedProps = (activeProperties || []).filter(prop => {
+        const isStatusActive = prop.subscriptionStatus === 'Active' || (prop.subscriptionTier && prop.subscriptionTier !== 'None');
+        if (!isStatusActive) return false;
+        const tier = (prop.subscriptionTier || '').toLowerCase();
+        const planName = (prop.subscriptionPlanName || '').toLowerCase();
+        const pName = p.name.toLowerCase();
+
+        if (planName && planName === pName) return true;
+        if (tier && tier === pName) return true;
+        if (pName.includes('starter') && (tier === 'basic' || tier.includes('starter') || planName.includes('starter'))) return true;
+        if (pName.includes('professional') && (tier === 'premium' || tier.includes('professional') || planName.includes('professional'))) return true;
+        if (pName.includes('enterprise') && (tier === 'enterprise' || planName.includes('enterprise'))) return true;
+        return false;
+      });
+
+      pObj.activeSubscribers = Math.max(matchedProps.length, pObj.activeSubscribers || 0);
+      return pObj;
+    });
+
+    return sendSuccess(res, 200, enrichedPlans, 'Subscription plans retrieved');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to retrieve subscription plans');
   }
@@ -1447,12 +1424,20 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
       if (requestObj.planName === "Starter Tier") tier = "Basic";
       else if (requestObj.planName === "Professional Suite") tier = "Premium";
       else if (requestObj.planName === "Enterprise Pro") tier = "Enterprise";
+      else tier = requestObj.planName;
 
-      await Property.findByIdAndUpdate(requestObj.propertyId, {
-        subscriptionTier: tier,
-        subscriptionStatus: 'Active',
-        subscriptionExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      });
+      await Property.findOneAndUpdate(
+        { $or: [{ _id: requestObj.propertyId }, { id: requestObj.propertyId }, { name: requestObj.propertyName }] },
+        {
+          subscriptionTier: tier,
+          subscriptionPlanName: requestObj.planName,
+          subscriptionStatus: 'Active',
+          subscriptionExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      );
+      invalidatePropertyCache();
+
+      await SubscriptionPlan.findOneAndUpdate({ name: requestObj.planName }, { $inc: { activeSubscribers: 1 } }).catch(() => null);
 
       await logAction(req.user, 'Approved Subscription Request', `${requestObj.planName} for ${requestObj.propertyName}`, req);
 
@@ -1473,6 +1458,14 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
         category: 'Subscription'
       });
 
+      const io = req.app.get('socketio');
+      if (io) {
+        emitRealtimeSync(io, requestObj.propertyId, 'subscription_request_updated', { request: requestObj, action: 'Approved' });
+        emitRealtimeSync(io, 'global', 'subscription_request_updated', { request: requestObj, action: 'Approved' });
+        emitRealtimeSync(io, requestObj.propertyId, 'dashboard_sync', { action: 'subscription_request_decided' });
+        emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_request_decided' });
+      }
+
       return sendSuccess(res, 200, requestObj, 'Subscription request approved successfully.');
     } else {
       if (!rejectionReason) {
@@ -1484,9 +1477,13 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
       requestObj.decidedAt = new Date();
       await requestObj.save();
 
-      await Property.findByIdAndUpdate(requestObj.propertyId, {
-        subscriptionStatus: 'Rejected'
-      });
+      await Property.findOneAndUpdate(
+        { $or: [{ _id: requestObj.propertyId }, { id: requestObj.propertyId }, { name: requestObj.propertyName }] },
+        {
+          subscriptionStatus: 'Rejected'
+        }
+      );
+      invalidatePropertyCache();
 
       await logAction(req.user, 'Rejected Subscription Request', `${requestObj.planName} for ${requestObj.propertyName}`, req);
 
@@ -1506,6 +1503,14 @@ router.post('/subscription/requests/:id/decide', authorize('super-admin'), async
         message: `Your subscription request for ${requestObj.planName} was rejected: ${rejectionReason}`,
         category: 'Subscription'
       });
+
+      const io = req.app.get('socketio');
+      if (io) {
+        emitRealtimeSync(io, requestObj.propertyId, 'subscription_request_updated', { request: requestObj, action: 'Rejected' });
+        emitRealtimeSync(io, 'global', 'subscription_request_updated', { request: requestObj, action: 'Rejected' });
+        emitRealtimeSync(io, requestObj.propertyId, 'dashboard_sync', { action: 'subscription_request_decided' });
+        emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_request_decided' });
+      }
 
       return sendSuccess(res, 200, requestObj, 'Subscription request rejected.');
     }

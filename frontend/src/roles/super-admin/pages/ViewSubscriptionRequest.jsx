@@ -43,13 +43,12 @@ export function ViewSubscriptionRequest() {
       setError(null);
       try {
         const res = await superAdminService.getSubscriptionRequests();
-        if (res && res.success && Array.isArray(res.data)) {
-          const found = res.data.find((r) => r._id === id || r.id === id);
-          if (found) {
-            setRequestItem(found);
-          } else {
-            setError("Subscription request record not found.");
-          }
+        const list = res?.data || (Array.isArray(res) ? res : []);
+        const found = list.find((r) => r._id === id || r.id === id);
+        if (found) {
+          setRequestItem(found);
+        } else {
+          setError("Subscription request record not found.");
         }
       } catch (err) {
         setError(err.message || "Failed to load subscription request details.");

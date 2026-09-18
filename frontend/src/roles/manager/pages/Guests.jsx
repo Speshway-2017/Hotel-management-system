@@ -7,7 +7,7 @@ import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { extractRoomNumber } from "@/utils/roomUtils";
-import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { isToday, formatDisplayDate, formatISTDateTime } from "@/utils/dateUtils";
 import {
   Users,
   CheckCircle,
@@ -335,19 +335,19 @@ function ManagerGuestsPage() {
             <p className="text-xs text-muted-foreground mt-1">Try resetting filter dropdown configurations.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs table-fixed min-w-[1200px]">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse text-xs min-w-[1240px]">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
-                  <th className="w-[15%] py-3.5 px-4 text-left align-middle">Guest Details</th>
-                  <th className="w-[15%] py-3.5 px-4 text-left align-middle">Contact Details</th>
-                  <th className="w-[12%] py-3.5 px-4 text-left align-middle">Room</th>
-                  <th className="w-[12%] py-3.5 px-4 text-left align-middle">Booking ID</th>
-                  <th className="w-[10%] py-3.5 px-4 text-left align-middle">Check-In</th>
-                  <th className="w-[10%] py-3.5 px-4 text-left align-middle">Check-Out</th>
-                  <th className="w-[9%] py-3.5 px-4 text-center align-middle">Stay Status</th>
-                  <th className="w-[9%] py-3.5 px-4 text-left align-middle">Payment</th>
-                  <th className="py-3.5 px-4 text-left align-middle min-w-[120px] whitespace-nowrap">Actions</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[160px]">Guest Details</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[180px]">Contact Details</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[110px]">Room</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[120px]">Booking ID</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[140px]">Check-In</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[150px]">Check-Out (IST)</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[110px]">Stay Status</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[120px]">Payment</th>
+                  <th className="py-3.5 px-4 text-left align-middle min-w-[100px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-xs text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
@@ -358,44 +358,46 @@ function ManagerGuestsPage() {
 
                   return (
                     <tr key={g.phone || g.name} className="hover:bg-[#fcfcfc]/60 transition-colors group">
-                      <td className="py-3.5 px-4 text-left align-middle font-bold text-navy-deep truncate">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="truncate">{g.name}</span>
+                      <td className="py-3.5 px-4 text-left align-middle font-bold text-navy-deep">
+                        <div className="flex items-center gap-1.5">
+                          <span>{g.name}</span>
                         </div>
                         <div className="text-[9px] font-normal text-muted-foreground/80 mt-0.5">Stays: {g.stays.length}</div>
                       </td>
                       <td className="py-3.5 px-4 text-left align-middle">
                         <div className="flex items-center gap-1 text-[11px] text-navy">
                           <Phone className="size-3 text-muted-foreground shrink-0" />
-                          <span className="truncate">{g.phone}</span>
+                          <span>{g.phone}</span>
                         </div>
                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                           <Mail className="size-3 text-muted-foreground shrink-0" />
-                          <span className="truncate">{g.email}</span>
+                          <span>{g.email}</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-left align-middle truncate">
+                      <td className="py-3.5 px-4 text-left align-middle">
                         <div className="font-bold text-brand">{getRoomDisplay(b)}</div>
                         <div className="text-[9px] text-muted-foreground mt-0.5">{getRoomCategoryDisplay(b)}</div>
                       </td>
-                      <td className="py-3.5 px-4 text-left align-middle truncate" title={b.bookingId || b._id || b.id}>
-                        <span className="font-mono text-[10px] font-bold bg-muted/40 text-navy-deep px-2 py-0.5 rounded-md border border-muted/60 inline-block max-w-full truncate">
+                      <td className="py-3.5 px-4 text-left align-middle" title={b.bookingId || b._id || b.id}>
+                        <span className="font-mono text-[10px] font-bold bg-muted/40 text-navy-deep px-2 py-0.5 rounded-md border border-muted/60 inline-block">
                           #{b.bookingId || (b._id && String(b._id).length > 10 ? `${String(b._id).substring(0, 8)}...` : (b._id || b.id))}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-left align-middle text-muted-foreground">{b.checkIn}</td>
-                      <td className="py-3.5 px-4 text-left align-middle text-muted-foreground">
-                        <div>{b.checkOut}</div>
+                      <td className="py-3.5 px-4 text-left align-middle">
+                        <span className="font-semibold text-muted-foreground text-[11.5px] whitespace-nowrap">{formatISTDateTime(b.checkIn)}</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-left align-middle">
+                        <div className="font-semibold text-navy text-[11.5px] whitespace-nowrap">{formatISTDateTime(b.checkOut)}</div>
                         {b.status === "Checked-in" && (
                           <button
                             onClick={() => navigate({ to: `/manager/reservations/extend/${b.bookingId || b._id || b.id}` })}
-                            className="text-[10px] text-brand hover:underline font-bold block mt-0.5 cursor-pointer"
+                            className="text-[10px] text-brand hover:underline font-bold inline-flex items-center gap-0.5 mt-0.5 cursor-pointer whitespace-nowrap"
                           >
-                            Extend Stay
+                            Extend Stay →
                           </button>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-center align-middle">
+                      <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap">
                         <Tag tone={
                           b.status === "Confirmed" ? "brand" :
                           b.status === "Checked-in" ? "success" :
@@ -412,7 +414,7 @@ function ManagerGuestsPage() {
                           </Tag>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-left align-middle min-w-[120px] whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-left align-middle min-w-[100px] whitespace-nowrap">
                         <ActionGroup align="left">
                           <ViewActionButton
                             onClick={() => navigate({ to: `/manager/guests/view/${btoa(g.phone || g.name)}` })}
