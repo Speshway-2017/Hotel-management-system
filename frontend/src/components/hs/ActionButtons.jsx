@@ -153,15 +153,15 @@ export function ActionGroup({
   ...props
 }) {
   const alignClass = align === "right" 
-    ? "justify-end text-right" 
+    ? "justify-end text-right ml-auto" 
     : align === "center" 
-    ? "justify-center text-center" 
+    ? "justify-center text-center mx-auto" 
     : "justify-start text-left";
 
   return (
     <div
       className={cn(
-        "flex flex-row items-center justify-start gap-1.5 flex-nowrap shrink-0 whitespace-nowrap leading-none",
+        "flex flex-row items-center gap-1.5 flex-nowrap shrink-0 whitespace-nowrap leading-none",
         alignClass,
         className
       )}
@@ -169,7 +169,9 @@ export function ActionGroup({
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start"
+        justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start",
+        marginLeft: align === "right" ? "auto" : undefined,
+        marginRight: align === "center" ? "auto" : undefined
       }}
       {...props}
     >

@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, statusTone } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Tag, statusTone, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton, ActionButton } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { RevenueChart, OccupancyChart } from "@/components/hs/Charts";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColo
 }
 
 function SuperAdminDashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -430,14 +431,18 @@ function SuperAdminDashboard() {
                           <Tag tone={statusTone(p.status)}>{p.status}</Tag>
                         </td>
                         <td className="p-4 w-[10%] text-right">
-                          <div className="flex gap-1.5 justify-end">
-                            <button className="p-1 rounded hover:bg-muted text-navy-deep" title="View Details">
-                              <Eye className="size-3.5" />
-                            </button>
-                            <button className="p-1 rounded hover:bg-muted text-purple" title="Open Property">
-                              <ExternalLink className="size-3.5" />
-                            </button>
-                          </div>
+                          <ActionGroup align="right">
+                            <ViewActionButton
+                              onClick={() => navigate({ to: `/super-admin/properties/view/${p.id || p._id}` })}
+                              title="View Details"
+                            />
+                            <ActionButton
+                              icon={ExternalLink}
+                              variant="view"
+                              title="Open Property"
+                              onClick={() => navigate({ to: `/super-admin/properties/view/${p.id || p._id}` })}
+                            />
+                          </ActionGroup>
                         </td>
                       </tr>
                     );
@@ -624,25 +629,21 @@ function SuperAdminDashboard() {
                       </td>
                       <td className="p-3 text-right">
                         {req.status === 'Pending' ? (
-                          <div className="flex gap-2 justify-end">
-                            <Button
+                          <ActionGroup align="right">
+                            <ApproveActionButton
                               disabled={decidingId !== null}
                               onClick={() => handleDecide(req._id || req.id, 'Approve')}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer flex items-center justify-center gap-1"
-                            >
-                              Approve
-                            </Button>
-                            <Button
+                              title="Approve Request"
+                            />
+                            <RejectActionButton
                               disabled={decidingId !== null}
                               onClick={() => {
                                 setRejectionModalId(req._id || req.id);
                                 setRejectionReason("");
                               }}
-                              className="bg-red-600 hover:bg-red-700 text-white font-bold h-7 px-3 text-[10px] rounded-lg shadow-soft cursor-pointer flex items-center justify-center gap-1"
-                            >
-                              Reject
-                            </Button>
-                          </div>
+                              title="Reject Request"
+                            />
+                          </ActionGroup>
                         ) : (
                           <div className="text-right">
                             <span className="inline-block text-[10px] text-muted-foreground font-bold bg-muted/65 px-2.5 py-1 rounded-md">

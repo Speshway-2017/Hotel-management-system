@@ -95,11 +95,8 @@ function AddCoupon() {
     <div className="space-y-6 text-left max-w-4xl pb-16">
      
 
-      <Panel
-        title="Coupon Details & Discount Rules"
-        description="Set campaign codes, percentage/fixed discounts, validity periods, and constraints."
-      >
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-white rounded-b-xl border-t border-muted">
+      <Panel>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 bg-white rounded-xl">
           {/* Basic Details */}
           <div className="space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">

@@ -1,4 +1,5 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, ExtendActionButton, DetailsActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
@@ -305,7 +306,7 @@ function InHouseGuestsPage() {
                 <th className="py-3.5 px-4">Folio Balance</th>
                 <th className="py-3.5 px-4">Payment</th>
                 <th className="py-3.5 px-4">Stay Status</th>
-                <th className="py-3.5 px-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
+                <th className="py-3.5 px-4 text-left min-w-[200px] whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -359,24 +360,16 @@ function InHouseGuestsPage() {
                         {g.status}
                       </Tag>
                     </td>
-                    <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[240px]">
+                    <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[200px]">
                       <ActionGroup align="left">
-                        {(g.status === "Staying" || g.status === "Extended Stay" || g.status === "Checked-in" || g.status === "Checked In") && (
-                          <ExtendActionButton
-                            onClick={() => navigate({ to: `/reception/reservations/extend/${g.id || g._id}` })}
-                            title="Extend Stay Duration"
-                          />
-                        )}
-
-                        <DetailsActionButton
-                          onClick={() => navigate({ to: `/reception/guest-search/${g.id || g._id}` })}
-                          title="View Guest Details"
+                        <ViewActionButton
+                          onClick={() => navigate(`/reception/reservations/${g.id || g._id || g.bookingId}`)}
+                          title="View Reservation Details"
                         />
 
-                        <ViewActionButton
-                          label="Folio"
-                          onClick={() => navigate({ to: `/reception/folio/FOL-${g.id || g._id}` })}
-                          title="View Guest Folio"
+                        <ExtendActionButton
+                          onClick={() => navigate(`/reception/reservations/extend/${g.id || g._id || g.bookingId}`)}
+                          title="Extend Stay Duration"
                         />
                       </ActionGroup>
                     </td>

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCircle2, ShieldCheck, Calendar, Sparkles, Building2, Layers, Clock, AlertOctagon } from "lucide-react";
 
+import { subscribeRealtimeSync } from "@/services/socket";
+
 function AdminSubscriptionPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -16,18 +18,18 @@ function AdminSubscriptionPage() {
   const [property, setProperty] = useState(null);
   const [requests, setRequests] = useState([]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const [plansRes, currentRes, myRequestsRes] = await Promise.all([
-        superAdminService.getPlans().catch(() => ({ plans: [] })),
-        adminService.getCurrentProperty().catch(() => ({})),
+        superAdminService.getSubscriptionPlans().catch(() => ({ data: [] })),
+        adminService.getProperty().catch(() => ({})),
         adminService.getSubscriptionRequests().catch(() => ({ data: [] }))
       ]);
 
-      const plansList = plansRes.plans || (Array.isArray(plansRes) ? plansRes : []);
-      setPlans(plansList.filter(p => p.isActive !== false));
+      const plansList = plansRes.data || plansRes.plans || (Array.isArray(plansRes) ? plansRes : []);
+      setPlans(plansList.filter(p => p.status === "Active" || p.isActive !== false));
 
       const propData = currentRes.property || currentRes.data || currentRes;
       setProperty(propData);
@@ -35,37 +37,50 @@ function AdminSubscriptionPage() {
       const reqList = myRequestsRes.data || (Array.isArray(myRequestsRes) ? myRequestsRes : []);
       setRequests(reqList);
     } catch (err) {
-      setError(err.message || "Failed to load subscription tiers.");
+      if (!isSilent) setError(err.message || "Failed to load subscription tiers.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(false);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadData(true);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
-  const getMappedTierName = (tier) => {
+  const getMappedTierName = (tier, planName) => {
+    if (planName) return planName;
     if (!tier || tier === "None") return "Free Tier";
+    if (tier === "Basic") return "Starter Tier";
+    if (tier === "Premium") return "Professional Suite";
+    if (tier === "Enterprise") return "Enterprise Pro";
     const matched = plans.find(p => p._id === tier || p.name?.toLowerCase() === tier?.toLowerCase());
     return matched ? matched.name : tier;
   };
 
   const handleRequestPlan = async (plan) => {
+    const planName = typeof plan === 'object' ? plan.name : plan;
+    const planPrice = typeof plan === 'object' ? (plan.monthlyPrice || plan.price || 0) : 0;
+
     if (!property?._id && !property?.id) {
       toast.error("Property context missing.");
       return;
     }
-    setRequestingPlan(plan._id || plan.name);
+    setRequestingPlan(planName);
     try {
-      await adminService.requestSubscription({
-        propertyId: property._id || property.id,
-        planName: plan.name,
-        requestedTier: plan.name,
-        notes: `Property requested upgrade/switch to ${plan.name} tier.`
-      });
-      toast.success(`Request submitted for ${plan.name}! Super Admin will review.`);
-      loadData();
+      await adminService.createSubscriptionRequest(
+        planName,
+        planPrice
+      );
+      toast.success(`Request submitted for ${planName}! Super Admin will review.`);
+      await loadData(true);
     } catch (err) {
       toast.error(err.message || "Failed to submit subscription request.");
     } finally {
@@ -81,7 +96,7 @@ function AdminSubscriptionPage() {
     );
   }
 
-  const currentPlanName = getMappedTierName(property?.subscriptionTier);
+  const currentPlanName = getMappedTierName(property?.subscriptionTier, property?.subscriptionPlanName);
   const pendingRequest = requests.find(r => r.status === "Pending");
   const lastRequest = requests[0]; // sorted descending by createdAt in backend
 
@@ -90,7 +105,7 @@ function AdminSubscriptionPage() {
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
       {/* Expiry Details Notice */}
-      {property && property.subscriptionTier !== "None" && (
+      {property && (property.subscriptionTier !== "None" || property.subscriptionPlanName) && property.subscriptionStatus === 'Active' && (
         <Notice tone="success" title="Subscription Activated">
           Your property has an active **{currentPlanName}** subscription plan.
           {property.subscriptionExpiry && (
@@ -130,7 +145,11 @@ function AdminSubscriptionPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((p) => {
-            const isActivePlan = p.name === currentPlanName && property?.subscriptionStatus === 'Active';
+            const isActivePlan = (
+              p.name === currentPlanName ||
+              p.name?.toLowerCase() === property?.subscriptionTier?.toLowerCase() ||
+              p.name?.toLowerCase() === property?.subscriptionPlanName?.toLowerCase()
+            ) && property?.subscriptionStatus === 'Active';
             const isRequestedPending = pendingRequest && pendingRequest.planName === p.name;
             const isRejectedPlan = lastRequest && lastRequest.status === "Rejected" && lastRequest.planName === p.name && !pendingRequest;
             
@@ -226,7 +245,7 @@ function AdminSubscriptionPage() {
                   ) : (
                     <Button
                       disabled={requestingPlan !== null || pendingRequest !== undefined}
-                      onClick={() => handleRequestPlan(p.name, p.monthlyPrice)}
+                      onClick={() => handleRequestPlan(p)}
                       className={`w-full font-bold h-9 rounded-xl shadow-soft cursor-pointer flex items-center justify-center transition-all ${
                         p.name === "Enterprise Pro"
                           ? "bg-purple text-white hover:bg-purple-deep"

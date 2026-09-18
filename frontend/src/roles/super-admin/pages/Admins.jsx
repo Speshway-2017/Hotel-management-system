@@ -167,7 +167,7 @@ function SuperAdminAdmins() {
                       <th className="p-4">Phone</th>
                       <th className="p-4">Assigned Properties</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right pr-6 min-w-[280px] whitespace-nowrap">Actions</th>
+                      <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
@@ -191,8 +191,8 @@ function SuperAdminAdmins() {
                         <td className="p-4">
                           <Tag tone={statusTone(a.status || "Active")}>{a.status || "Active"}</Tag>
                         </td>
-                        <td className="p-4 text-right pr-6 min-w-[280px] whitespace-nowrap">
-                          <ActionGroup>
+                        <td className="p-4 text-right">
+                          <ActionGroup align="right">
                             <ViewActionButton onClick={() => navigate({ to: `/super-admin/admins/view/${a.id || a._id}` })} />
                             <EditActionButton onClick={() => navigate({ to: `/super-admin/admins/edit/${a.id || a._id}` })} />
                             <ActionButton

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -75,32 +75,49 @@ function ManagerViewReservation() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Today's Operations", to: "/manager/operations" },
+          { label: "Reservations", to: "/manager/reservations" },
+          { label: booking ? `Booking #${booking.bookingId || booking.id || id}` : "Reservation Details" }
+        ]}
+      />
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <PageHeader
           title={booking ? `Reservation Details: ${booking._id || booking.id}` : "Reservation Details"}
           subtitle="Guest stay overview, room parameters, and tariff details."
         />
 
-        {booking && booking.status !== "Checked-out" && booking.status !== "Checked Out" && (
-          <div className="flex items-center gap-2 select-none">
-            {(booking.status === "Checked-in" || booking.status === "Checked In" || booking.status === "Staying" || booking.status === "Staying-In") && (
-              <ExtendStayButton
-                variant="header"
-                label="Extend Stay"
-                booking={booking}
-                onClick={() => navigate({ to: `/manager/reservations/extend/${booking._id || booking.id}` })}
-              />
-            )}
-            <Button
-              onClick={() => navigate({ to: `/manager/reservations/edit/${booking._id || booking.id}` })}
-              variant="outline"
-              size="sm"
-              className="text-navy border-navy/30 hover:bg-navy/5 font-bold text-xs h-9 px-4 rounded-full cursor-pointer"
-            >
-              <Edit2 className="size-3.5 mr-1.5" /> Modify Stay
-            </Button>
-          </div>
-        )}
+        {booking && (() => {
+          const statusLower = (booking.status || "").toLowerCase().trim();
+          const isTerminal = ["checked-out", "checked out", "checked_out", "completed", "cancelled", "canceled", "rejected"].includes(statusLower);
+          if (isTerminal) return null;
+
+          const canExtend = ["checked-in", "checked in", "staying", "staying-in", "confirmed"].includes(statusLower);
+
+          return (
+            <div className="flex items-center gap-2 select-none">
+              {canExtend && (
+                <ExtendStayButton
+                  variant="header"
+                  label="Extend Stay"
+                  booking={booking}
+                  onClick={() => navigate({ to: `/manager/reservations/extend/${booking._id || booking.id}` })}
+                />
+              )}
+              <Button
+                onClick={() => navigate({ to: `/manager/reservations/edit/${booking._id || booking.id}` })}
+                variant="outline"
+                size="sm"
+                className="text-navy border-navy/30 hover:bg-navy/5 font-bold text-xs h-9 px-4 rounded-full cursor-pointer"
+              >
+                <Edit2 className="size-3.5 mr-1.5" /> Modify Stay
+              </Button>
+            </div>
+          );
+        })()}
       </div>
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}

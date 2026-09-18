@@ -95,6 +95,40 @@ export const formatDisplayDate = (dateVal) => {
 };
 
 /**
+ * Formats a date and optional time into Indian Standard Time (IST, UTC+5:30)
+ * Example outputs: "18 Sep 2026, 11:00 AM" or "18 Sep 2026"
+ */
+export const formatISTDateTime = (dateVal, includeTime = true) => {
+  if (!dateVal) return "—";
+  const s = String(dateVal).trim();
+  if (s.toLowerCase() === 'today') return "Today";
+  if (s.toLowerCase() === 'tomorrow') return "Tomorrow";
+
+  const d = parseDateSafe(dateVal);
+  if (!d || isNaN(d.getTime())) return String(dateVal);
+
+  const options = {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  };
+
+  const hasTime = s.includes('T') || s.includes(':') || (dateVal instanceof Date);
+  if (includeTime && hasTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+    options.hour12 = true;
+  }
+
+  return d.toLocaleString('en-IN', options);
+};
+
+export const formatISTDate = (dateVal) => {
+  return formatISTDateTime(dateVal, false);
+};
+
+/**
  * Calculates stay nights strictly as the calendar day difference (checkOut - checkIn).
  * Avoids timezone drift and supports DD-MM-YYYY, YYYY-MM-DD, ISO, same-day, and fallback dates.
  * E.g., check-in 04-09-2026 and check-out 05-09-2026 => 1 night.

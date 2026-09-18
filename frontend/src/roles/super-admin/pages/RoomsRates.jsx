@@ -271,7 +271,7 @@ function SuperAdminRoomsRates() {
                   <th className="p-4 text-left">Current Rate</th>
                   <th className="p-4 text-left">Rate Plan</th>
                   <th className="p-4 text-left">Status</th>
-                  <th className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">Actions</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
@@ -296,8 +296,8 @@ function SuperAdminRoomsRates() {
                     <td className="p-4 text-left">
                       <Tag tone={getStatusTone(r.status)}>{r.status}</Tag>
                     </td>
-                    <td className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">
-                      <ActionGroup>
+                    <td className="p-4 text-right">
+                      <ActionGroup align="right">
                         <ViewActionButton onClick={() => handleOpenModal("view", r)} />
                         <EditActionButton onClick={() => handleOpenModal("edit", r)} />
                         <ActionButton

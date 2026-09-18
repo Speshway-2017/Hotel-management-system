@@ -89,28 +89,27 @@ function GuestNotificationsPage() {
   }, []);
 
   const handleMarkAsRead = async (id) => {
+    setNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, read: true } : n))
+    );
+    window.dispatchEvent(new Event('refresh-unread-notifications-count'));
     try {
       await notificationsService.markNotificationRead(id);
-      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
-
-      // Update local state
-      setNotifications(prev =>
-        prev.map(n => (n.id === id ? { ...n, read: true } : n))
-      );
     } catch (err) {
       console.error("Failed to mark as read:", err);
+      fetchNotifications();
     }
   };
 
   const handleMarkAllAsRead = async () => {
     setMarkingAll(true);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    window.dispatchEvent(new Event('refresh-unread-notifications-count'));
     try {
       await notificationsService.markAllNotificationsRead();
-      window.dispatchEvent(new Event('refresh-unread-notifications-count'));
-
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (err) {
       console.error("Failed to mark all as read:", err);
+      fetchNotifications();
     } finally {
       setMarkingAll(false);
     }

@@ -624,9 +624,9 @@ const syncGuestBookingNotifications = async (user) => {
     const userName = user.name;
 
     const bQuery = [{ guestId: userId }, { guestId: String(userId) }];
-    if (userEmail) bQuery.push({ email: userEmail });
-    if (userPhone) bQuery.push({ phone: userPhone });
-    if (userName) bQuery.push({ guest: userName });
+    if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
+    if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
+    if (userName) bQuery.push({ guest: userName }, { guestName: userName });
 
     const guestBookings = await Booking.find({ $or: bQuery }).sort({ createdAt: -1 });
 
@@ -648,6 +648,7 @@ const syncGuestBookingNotifications = async (user) => {
         let exists = null;
         try {
           exists = await Notification.findOne({
+            userId: String(userId),
             $or: [
               { message: { $regex: bId, $options: 'i' }, title: { $regex: 'check-in', $options: 'i' } },
               { message: { $regex: bId, $options: 'i' }, title: { $regex: 'checked in', $options: 'i' } }
@@ -679,6 +680,7 @@ const syncGuestBookingNotifications = async (user) => {
         let exists = null;
         try {
           exists = await Notification.findOne({
+            userId: String(userId),
             $or: [
               { message: { $regex: bId, $options: 'i' }, title: { $regex: 'check-out', $options: 'i' } },
               { message: { $regex: bId, $options: 'i' }, title: { $regex: 'checked out', $options: 'i' } }
@@ -710,6 +712,7 @@ const syncGuestBookingNotifications = async (user) => {
         let exists = null;
         try {
           exists = await Notification.findOne({
+            userId: String(userId),
             message: { $regex: bId, $options: 'i' },
             title: { $regex: 'confirmed', $options: 'i' }
           });
@@ -739,6 +742,7 @@ const syncGuestBookingNotifications = async (user) => {
         let exists = null;
         try {
           exists = await Notification.findOne({
+            userId: String(userId),
             message: { $regex: bId, $options: 'i' },
             title: { $regex: 'room assigned', $options: 'i' }
           });
@@ -769,6 +773,7 @@ const syncGuestBookingNotifications = async (user) => {
 router.get('/notifications', async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
+    const userIdStr = String(userId || '');
     const userEmail = req.user?.email;
     const userPhone = req.user?.mobile || req.user?.phone;
     const userName = req.user?.name;
@@ -776,30 +781,51 @@ router.get('/notifications', async (req, res) => {
     // Permanently sync any check-in, check-out, or reservation status changes for this guest
     await syncGuestBookingNotifications(req.user);
 
-    const notifQuery = [
-      { role: 'guest' },
-      { role: 'all' },
+    // 1. Collect all bookings for this guest
+    const bQuery = [
+      { guestId: userId },
+      { guestId: userIdStr },
       { userId: userId },
-      { userId: String(userId) }
+      { userId: userIdStr }
+    ];
+    if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
+    if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
+    if (userName) bQuery.push({ guest: userName }, { guestName: userName });
+
+    let guestBookings = [];
+    try {
+      guestBookings = await Booking.find({ $or: bQuery });
+    } catch (_) {}
+
+    const myBookingIds = new Set();
+    for (const b of guestBookings) {
+      if (b.bookingId) myBookingIds.add(String(b.bookingId).trim().toLowerCase());
+      if (b._id) myBookingIds.add(String(b._id).trim().toLowerCase());
+      if (b.id) myBookingIds.add(String(b.id).trim().toLowerCase());
+    }
+
+    // 2. Build targeted notification query
+    const notifQuery = [
+      { userId: userId },
+      { userId: userIdStr }
     ];
     if (userEmail) notifQuery.push({ userId: userEmail });
     if (userPhone) notifQuery.push({ userId: userPhone });
 
-    // Also match notifications for any of this guest's bookings
-    try {
-      const bQuery = [{ guestId: userId }, { guestId: String(userId) }];
-      if (userEmail) bQuery.push({ email: userEmail });
-      if (userPhone) bQuery.push({ phone: userPhone });
-      if (userName) bQuery.push({ guest: userName });
-      const guestBookings = await Booking.find({ $or: bQuery });
-      for (const b of guestBookings) {
-        const bId = b.bookingId || String(b._id) || b.id;
-        if (bId) {
-          notifQuery.push({ message: { $regex: bId, $options: 'i' } });
-          notifQuery.push({ title: { $regex: bId, $options: 'i' } });
-        }
+    for (const b of guestBookings) {
+      const bId = b.bookingId || String(b._id) || b.id;
+      if (bId) {
+        notifQuery.push({ message: { $regex: bId, $options: 'i' } });
+        notifQuery.push({ title: { $regex: bId, $options: 'i' } });
       }
-    } catch (_) {}
+    }
+
+    // General broadcast announcements (broadcast with no specific user ID)
+    notifQuery.push({
+      role: { $in: ['guest', 'all'] },
+      userId: { $in: [null, undefined, '', 'all'] },
+      category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions', 'System'] }
+    });
 
     let list = await Notification.find({ $or: notifQuery });
 
@@ -807,10 +833,51 @@ router.get('/notifications', async (req, res) => {
       list = list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
 
-    // Deduplicate by composite key while preserving read state
+    // 3. Strictly filter out any other guest's notifications
     const seen = new Set();
     const unique = [];
     for (const n of list || []) {
+      const notifUserId = n.userId ? String(n.userId).trim().toLowerCase() : '';
+      const isMyUserId = notifUserId === '' ||
+                         notifUserId === 'null' ||
+                         notifUserId === 'undefined' ||
+                         notifUserId === 'all' ||
+                         notifUserId === userIdStr.toLowerCase() ||
+                         (userEmail && notifUserId === userEmail.toLowerCase()) ||
+                         (userPhone && notifUserId === userPhone.toLowerCase());
+
+      // Extract any booking references from title and message
+      const combined = `${n.title || ''} ${n.message || ''}`;
+      const refMatches = combined.match(/Ref:\s*#?([A-Za-z0-9-]+)/gi) || [];
+      const bkMatches = combined.match(/\b(BK-[A-Za-z0-9-]+)\b/gi) || [];
+      const allRefs = [...refMatches, ...bkMatches].map(r => r.replace(/Ref:\s*#?/i, '').replace(/#/g, '').trim().toLowerCase());
+
+      if (allRefs.length > 0) {
+        // Notification references booking(s) - must belong to this guest's bookings
+        const matchesMyBooking = allRefs.some(ref => {
+          for (const myId of myBookingIds) {
+            if (myId.includes(ref) || ref.includes(myId)) return true;
+          }
+          return false;
+        });
+
+        if (!matchesMyBooking) {
+          // Belongs to another guest's booking! Skip.
+          continue;
+        }
+      } else {
+        // No booking reference: if targeted to another user, skip
+        if (!isMyUserId) {
+          continue;
+        }
+      }
+
+      // Ensure manager/admin internal operational alerts don't leak
+      const nRole = (n.role || '').toLowerCase();
+      if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isMyUserId) {
+        continue;
+      }
+
       const id = n._id ? String(n._id) : (n.id ? String(n.id) : '');
       const key = `${(n.title || '').trim().toLowerCase()}__${(n.message || '').trim().toLowerCase()}`;
       if (!seen.has(id) && !seen.has(key)) {
@@ -830,6 +897,9 @@ const handleMarkGuestNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
     const { title: reqTitle, message: reqMsg } = req.body || {};
+    const userId = req.user?.id || req.user?._id;
+    const userIdStr = String(userId || '');
+
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
@@ -842,7 +912,18 @@ const handleMarkGuestNotificationRead = async (req, res) => {
     const message = notif?.message || reqMsg;
 
     if (title && message) {
-      await Notification.updateMany({ title, message }, { isRead: true }).catch(() => null);
+      const userScoping = [
+        { userId: userId },
+        { userId: userIdStr }
+      ];
+      if (req.user?.email) userScoping.push({ userId: req.user.email });
+      if (req.user?.mobile || req.user?.phone) userScoping.push({ userId: req.user?.mobile || req.user?.phone });
+
+      await Notification.updateMany({
+        title,
+        message,
+        $or: userScoping
+      }, { isRead: true }).catch(() => null);
     }
 
     const io = req.app.get('socketio');
@@ -866,6 +947,9 @@ const handleMarkGuestNotificationUnread = async (req, res) => {
   try {
     const { id } = req.params;
     const { title: reqTitle, message: reqMsg } = req.body || {};
+    const userId = req.user?.id || req.user?._id;
+    const userIdStr = String(userId || '');
+
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
@@ -878,7 +962,18 @@ const handleMarkGuestNotificationUnread = async (req, res) => {
     const message = notif?.message || reqMsg;
 
     if (title && message) {
-      await Notification.updateMany({ title, message }, { isRead: false }).catch(() => null);
+      const userScoping = [
+        { userId: userId },
+        { userId: userIdStr }
+      ];
+      if (req.user?.email) userScoping.push({ userId: req.user.email });
+      if (req.user?.mobile || req.user?.phone) userScoping.push({ userId: req.user?.mobile || req.user?.phone });
+
+      await Notification.updateMany({
+        title,
+        message,
+        $or: userScoping
+      }, { isRead: false }).catch(() => null);
     }
 
     const io = req.app.get('socketio');
@@ -901,24 +996,28 @@ router.put('/notifications/:id/unread', handleMarkGuestNotificationUnread);
 const handleMarkAllGuestNotificationsRead = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
+    const userIdStr = String(userId || '');
     const userEmail = req.user?.email;
     const userPhone = req.user?.mobile || req.user?.phone;
     const userName = req.user?.name;
 
     const notifQuery = [
-      { role: 'guest' },
-      { role: 'all' },
       { userId: userId },
-      { userId: String(userId) }
+      { userId: userIdStr }
     ];
     if (userEmail) notifQuery.push({ userId: userEmail });
     if (userPhone) notifQuery.push({ userId: userPhone });
 
     try {
-      const bQuery = [{ guestId: userId }, { guestId: String(userId) }];
-      if (userEmail) bQuery.push({ email: userEmail });
-      if (userPhone) bQuery.push({ phone: userPhone });
-      if (userName) bQuery.push({ guest: userName });
+      const bQuery = [
+        { guestId: userId },
+        { guestId: userIdStr },
+        { userId: userId },
+        { userId: userIdStr }
+      ];
+      if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
+      if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
+      if (userName) bQuery.push({ guest: userName }, { guestName: userName });
       const guestBookings = await Booking.find({ $or: bQuery });
       for (const b of guestBookings) {
         const bId = b.bookingId || String(b._id) || b.id;

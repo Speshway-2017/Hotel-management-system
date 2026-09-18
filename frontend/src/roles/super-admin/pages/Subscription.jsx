@@ -1,6 +1,6 @@
 import { FormField, Input, Select, Textarea, Checkbox, Switch } from "@/components/hs/FormFields";
 import { Label } from "@/components/ui/label";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 
 function SuperAdminSubscription() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("plans"); // "plans" or "requests"
   const [plans, setPlans] = useState([]);
   const [subscriptionRequests, setSubscriptionRequests] = useState([]);
@@ -77,12 +78,10 @@ function SuperAdminSubscription() {
         superAdminService.getSubscriptionPlans().catch(() => ({})),
         superAdminService.getSubscriptionRequests().catch(() => ({}))
       ]);
-      if (plansRes.success) {
-        setPlans(plansRes.data);
-      }
-      if (reqsRes.success) {
-        setSubscriptionRequests(reqsRes.data);
-      }
+      const plansList = plansRes?.data || (Array.isArray(plansRes) ? plansRes : []);
+      const reqList = reqsRes?.data || (Array.isArray(reqsRes) ? reqsRes : []);
+      setPlans(plansList);
+      setSubscriptionRequests(reqList);
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to load data.");
     } finally {
@@ -93,28 +92,36 @@ function SuperAdminSubscription() {
   useEffect(() => {
     loadData(false);
 
-    const handleFocus = () => loadData(true);
+    const handleFocus = () => loadData(true);
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
     });
 
-    return () => {
+    return () => {
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
   // Filtered plans
   const filteredPlans = plans.filter(p => {
-    return p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return (p.name || "").toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   // Filtered requests
-  const filteredRequests = subscriptionRequests.filter(r => {
+  const filteredRequests = (subscriptionRequests || []).filter(r => {
+    if (!r) return false;
+    const propName = String(r.propertyName || "");
+    const admName = String(r.adminName || "");
+    const pName = String(r.planName || "");
+    const q = (requestSearch || "").toLowerCase();
+
     const matchesSearch =
-      r.propertyName.toLowerCase().includes(requestSearch.toLowerCase()) ||
-      r.adminName.toLowerCase().includes(requestSearch.toLowerCase()) ||
-      r.planName.toLowerCase().includes(requestSearch.toLowerCase());
+      propName.toLowerCase().includes(q) ||
+      admName.toLowerCase().includes(q) ||
+      pName.toLowerCase().includes(q);
     
     const matchesStatus = requestStatusFilter === "all" || r.status === requestStatusFilter;
     return matchesSearch && matchesStatus;
@@ -265,7 +272,7 @@ function SuperAdminSubscription() {
                         <th className="p-4">Property / Room Limits</th>
                         <th className="p-4">Active Subscribers</th>
                         <th className="p-4">Status</th>
-                        <th className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">Actions</th>
+                        <th className="p-4 text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y font-sans">
@@ -280,15 +287,17 @@ function SuperAdminSubscription() {
                           <td className="p-4 font-semibold text-muted-foreground">
                             {p.propertyLimit} {p.propertyLimit === 1 ? "Property" : "Properties"} / {p.roomLimit} Rooms
                           </td>
-                          <td className="p-4 font-bold text-navy flex items-center gap-1.5 mt-2">
-                            <UserCheck className="size-4 text-purple" />
-                            {p.activeSubscribers || 0}
+                          <td className="p-4 font-bold text-navy">
+                            <span className="inline-flex items-center gap-1.5">
+                              <UserCheck className="size-4 text-purple shrink-0" />
+                              <span>{p.activeSubscribers || 0}</span>
+                            </span>
                           </td>
                           <td className="p-4">
                             <Tag tone={p.status === "Active" ? "success" : "neutral"}>{p.status}</Tag>
                           </td>
-                          <td className="p-4 text-right pr-6 min-w-[260px] whitespace-nowrap">
-                            <ActionGroup>
+                          <td className="p-4 text-left">
+                            <ActionGroup align="left">
                               <ViewActionButton onClick={() => navigate({ to: `/super-admin/subscription/view/${p._id || p.id}` })} />
                               <EditActionButton onClick={() => navigate({ to: `/super-admin/subscription/edit/${p._id || p.id}` })} />
                               <ActionButton
@@ -373,33 +382,33 @@ function SuperAdminSubscription() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
                     <thead>
-                      <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-bold select-none">
+                      <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold select-none">
                         <th className="p-4 pl-6">Property Branch</th>
                         <th className="p-4">Requested Plan</th>
                         <th className="p-4">Admin</th>
-                        <th className="p-4 text-right">Price</th>
-                        <th className="p-4 text-center">Status</th>
+                        <th className="p-4">Price</th>
+                        <th className="p-4">Status</th>
                         <th className="p-4">Request Date</th>
-                        <th className="p-4 text-right pr-6 min-w-[220px] whitespace-nowrap">Actions</th>
+                        <th className="p-4 text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y font-sans">
                       {filteredRequests.map((req) => (
                         <tr key={req._id || req.id} className="hover:bg-muted/15 transition-colors">
-                          <td className="p-4 pl-6 font-bold text-navy">{req.propertyName}</td>
+                          <td className="p-4 pl-6 font-semibold text-navy">{req.propertyName}</td>
                           <td className="p-4 font-semibold text-navy-deep">{req.planName}</td>
                           <td className="p-4 text-muted-foreground font-medium">{req.adminName}</td>
-                          <td className="p-4 text-right font-bold text-navy">₹{req.price.toLocaleString("en-IN")}</td>
-                          <td className="p-4 text-center">
+                          <td className="p-4 font-bold text-purple">₹{(req.price || 0).toLocaleString("en-IN")}</td>
+                          <td className="p-4">
                             <Tag tone={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'}>
                               {req.status}
                             </Tag>
                           </td>
-                          <td className="p-4 text-muted-foreground font-semibold">
-                            {new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <td className="p-4 text-muted-foreground font-semibold font-mono">
+                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' }) : "—"}
                           </td>
-                          <td className="p-4 text-right pr-6 min-w-[220px] whitespace-nowrap">
-                            <ActionGroup>
+                          <td className="p-4 text-left">
+                            <ActionGroup align="left">
                               <ViewActionButton onClick={() => navigate({ to: `/super-admin/subscription/requests/view/${req._id || req.id}` })} />
                               {req.status === 'Pending' && (
                                 <>

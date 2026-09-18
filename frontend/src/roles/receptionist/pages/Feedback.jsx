@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ActionGroup, ViewActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { receptionistService } from "@/services/receptionist";
 import { authService } from "@/services/auth";
@@ -122,6 +124,7 @@ function StatusBadge({ status = "Published" }) {
 }
 
 export function ReceptionistFeedbackPage() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -135,9 +138,6 @@ export function ReceptionistFeedbackPage() {
   const itemsPerPage = 8;
 
   // Modals state
-  const [selectedFeedback, setSelectedFeedback] = useState(null);
-  const [responseText, setResponseText] = useState("");
-  const [responseStatus, setResponseStatus] = useState("Resolved");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -225,57 +225,6 @@ export function ReceptionistFeedbackPage() {
       toast.error(err.message || "Failed to record feedback");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Submit response handler
-  const handleSendResponse = async (e) => {
-    e.preventDefault();
-    if (!responseText.trim() || !selectedFeedback) {
-      toast.error("Please enter an acknowledgement response.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const fid = selectedFeedback._id || selectedFeedback.id;
-      await receptionistService.respondFeedback(fid, responseText, responseStatus);
-      toast.success("Front desk response published!");
-      
-      setFeedbackList(prev => prev.map(f => {
-        if ((f._id || f.id) === fid) {
-          return {
-            ...f,
-            response: responseText,
-            respondedBy: currentUser?.name || "Front Desk Staff",
-            respondedAt: new Date().toISOString(),
-            status: responseStatus
-          };
-        }
-        return f;
-      }));
-
-      setSelectedFeedback(null);
-      setResponseText("");
-    } catch (err) {
-      toast.error(err.message || "Failed to submit response");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Quick Status Switcher
-  const handleStatusChange = async (f, newStatus) => {
-    try {
-      const fid = f._id || f.id;
-      await receptionistService.updateFeedbackStatus(fid, newStatus);
-      toast.success(`Feedback status updated to ${newStatus}`);
-      setFeedbackList(prev => prev.map(item => ((item._id || item.id) === fid ? { ...item, status: newStatus } : item)));
-      if (selectedFeedback && (selectedFeedback._id || selectedFeedback.id) === fid) {
-        setSelectedFeedback(prev => ({ ...prev, status: newStatus }));
-      }
-    } catch (err) {
-      toast.error(err.message || "Failed to update status");
     }
   };
 
@@ -439,7 +388,7 @@ export function ReceptionistFeedbackPage() {
                   <th className="py-3.5 px-4 whitespace-nowrap">Sentiment</th>
                   <th className="py-3.5 px-4">Guest Comments</th>
                   <th className="py-3.5 px-4 text-center whitespace-nowrap">Status</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Action</th>
+                  <th className="py-3.5 px-4 text-left whitespace-nowrap min-w-[90px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-navy/5 text-navy font-medium">
@@ -452,11 +401,7 @@ export function ReceptionistFeedbackPage() {
                   return (
                     <tr
                       key={fid}
-                      onClick={() => {
-                        setSelectedFeedback(f);
-                        setResponseText(f.response || "");
-                        setResponseStatus(f.status || "Resolved");
-                      }}
+                      onClick={() => navigate(`/reception/feedback/view/${fid}`)}
                       className="hover:bg-purple/5 transition-colors cursor-pointer group"
                     >
                       {/* Guest Info */}
@@ -524,18 +469,13 @@ export function ReceptionistFeedbackPage() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            setSelectedFeedback(f);
-                            setResponseText(f.response || "");
-                            setResponseStatus(f.status || "Resolved");
-                          }}
-                          className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-white text-navy inline-flex items-center justify-center transition-colors cursor-pointer border-none"
-                          title="View Details"
-                        >
-                          <Eye className="size-4" />
-                        </button>
+                      <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[90px]" onClick={(e) => e.stopPropagation()}>
+                        <ActionGroup align="left">
+                          <ViewActionButton
+                            onClick={() => navigate(`/reception/feedback/view/${fid}`)}
+                            title="View Feedback Details"
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );
@@ -675,105 +615,6 @@ export function ReceptionistFeedbackPage() {
                   <Send className="size-3.5" />
                   {isSubmitting ? "Saving..." : "Save Guest Feedback"}
                 </Button>
-              </div>
-            </form>
-
-          </div>
-        </div>
-      )}
-
-      {/* Review Details & Response Modal */}
-      {selectedFeedback && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-navy/10 shadow-2xl p-6 sm:p-8 space-y-6 text-left animate-in fade-in zoom-in-95">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-navy/5 pb-4">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-purple tracking-widest block">Front Desk Dossier</span>
-                <h3 className="font-sans tracking-tight tabular-nums font-bold text-xl text-slate-800">
-                  Feedback from {selectedFeedback.guestName || selectedFeedback.guest}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedFeedback(null)}
-                className="size-8 rounded-full bg-navy/5 hover:bg-navy/10 text-navy flex items-center justify-center cursor-pointer border-none"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {/* Stay Context */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-cream/20 p-4 rounded-xl border border-navy/5 text-xs">
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Booking ID</span>
-                <strong className="font-mono text-purple font-bold">#{selectedFeedback.bookingId}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Room</span>
-                <strong className="text-navy font-bold">{selectedFeedback.room || "101 Standard"}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Category</span>
-                <strong className="text-navy font-bold">{selectedFeedback.category || "Checkout"}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Rating</span>
-                <div className="flex items-center gap-1 font-bold text-amber-500">
-                  <Star className="size-3.5 fill-amber-400" /> {selectedFeedback.rating || 5}.0 / 5
-                </div>
-              </div>
-            </div>
-
-            {/* Guest Comment */}
-            <div className="space-y-2">
-              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Guest Remarks</h4>
-              <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 text-xs text-navy leading-relaxed italic">
-                "{selectedFeedback.comment || selectedFeedback.comments}"
-              </div>
-            </div>
-
-            {/* Front Desk Response Form */}
-            <form onSubmit={handleSendResponse} className="space-y-3 pt-2 border-t border-navy/5">
-              <label className="text-xs font-bold text-navy flex items-center gap-1.5">
-                <MessageSquareText className="size-3.5 text-purple" /> Front Desk Acknowledgment
-              </label>
-
-              <textarea
-                rows={3}
-                placeholder="Type acknowledgement / response..."
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                className="w-full p-3 text-xs rounded-xl bg-cream/10 border border-navy/10 text-navy focus:outline-none focus:border-purple font-medium"
-              />
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-[11px] text-navy/50">
-                  {selectedFeedback.respondedAt && (
-                    <>Responded on: {new Date(selectedFeedback.respondedAt).toLocaleDateString()}</>
-                  )}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedFeedback(null)}
-                    className="h-9 px-4 text-xs font-bold cursor-pointer"
-                  >
-                    Close
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="hero"
-                    size="sm"
-                    disabled={isSubmitting}
-                    className="h-9 px-5 text-xs font-bold gap-1.5 cursor-pointer shadow-soft"
-                  >
-                    <Send className="size-3.5" />
-                    {isSubmitting ? "Saving..." : "Save Acknowledgment"}
-                  </Button>
-                </div>
               </div>
             </form>
 

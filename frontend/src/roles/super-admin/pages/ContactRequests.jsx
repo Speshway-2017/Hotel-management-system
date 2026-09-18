@@ -259,7 +259,7 @@ export function ContactRequestsPage() {
                 <th className="p-3.5">Inquiry Snippet</th>
                 <th className="p-3.5">Received Date</th>
                 <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right pr-6 min-w-[160px] whitespace-nowrap">Actions</th>
+                <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y font-sans">
@@ -335,8 +335,8 @@ export function ContactRequestsPage() {
                         </select>
                       </td>
 
-                      <td className="p-3.5 text-right pr-6 min-w-[160px] whitespace-nowrap">
-                        <ActionGroup>
+                      <td className="p-3.5 text-right">
+                        <ActionGroup align="right">
                           <ViewActionButton onClick={() => navigate({ to: `/super-admin/contacts/view/${id}` })} />
                           <DeleteActionButton onClick={() => setDeleteModal({ open: true, item: c })} />
                         </ActionGroup>

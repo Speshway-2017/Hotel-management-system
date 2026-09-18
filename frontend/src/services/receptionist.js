@@ -32,6 +32,12 @@ export const receptionistService = {
   getReservations: async () => {
     return await apiClient.get('/receptionist/reservations');
   },
+  getArrivals: async () => {
+    return await apiClient.get('/receptionist/reservations');
+  },
+  getDepartures: async () => {
+    return await apiClient.get('/receptionist/reservations');
+  },
   createReservation: async (data) => {
     return await apiClient.post('/receptionist/reservations', data);
   },

@@ -37,19 +37,12 @@ const subModules = {
     "Operations": [
       { label: "Properties", to: "/super-admin/properties" },
       { label: "Channel Manager", to: "/super-admin/channel-manager" },
-      { label: "Contact Requests", to: "/super-admin/contacts" }
-    ],
-    "Access & Security": [
-      { label: "Guests Portfolio", to: "/super-admin/users" },
-      { label: "Administrators", to: "/super-admin/admins" }
+      { label: "Contact Requests", to: "/super-admin/contacts" },
+      { label: "Guests Portfolio", to: "/super-admin/users" }
     ],
     "System": [
       { label: "Branding", to: "/super-admin/branding" },
       { label: "Global Settings", to: "/super-admin/global-settings" }
-    ],
-    "Subscription": [
-      { label: "Plans & Billing", to: "/super-admin/subscription" },
-      { label: "Coupons", to: "/super-admin/coupons" }
     ]
   },
   "admin": {
@@ -60,15 +53,15 @@ const subModules = {
     ],
     "Finance": [
       { label: "Billing", to: "/admin/billing" },
-      { label: "Payments", to: "/admin/payments" },
-      { label: "Subscription", to: "/admin/subscription" }
+      { label: "Payments", to: "/admin/payments" }
     ],
     "Management": [
       { label: "Staff", to: "/admin/staff" },
       { label: "Approvals", to: "/admin/approvals" },
       { label: "Channel Manager", to: "/admin/channels" },
       { label: "Feedback", to: "/admin/feedback" },
-      { label: "Coupons", to: "/admin/coupons" }
+      { label: "Coupons", to: "/admin/coupons" },
+      { label: "Subscription", to: "/admin/subscription" }
     ],
     "Settings": [
       { label: "Hotel Profile", to: "/admin/settings?tab=hotel-info" },
@@ -559,10 +552,16 @@ export function DashShell({ role, children }) {
                     subtitle: "Manage, onboard, assign, and audit configurations across hotel properties."
                   };
                 }
-                if (path.startsWith("/super-admin/users") || path.startsWith("/super-admin/admins")) {
+                if (path.startsWith("/super-admin/users")) {
                   return {
-                    title: "Access & Security",
-                    subtitle: "Manage platform operators, administrators, and system access."
+                    title: "Guests Portfolio",
+                    subtitle: "Overview of registered guest directory and lifetime stay metrics across properties."
+                  };
+                }
+                if (path.startsWith("/super-admin/admins")) {
+                  return {
+                    title: "Admin Management",
+                    subtitle: "Manage property administrators, owners, and general managers with hotel-level credentials."
                   };
                 }
                 if (path.startsWith("/super-admin/reservations")) {
@@ -1057,7 +1056,7 @@ export function DashShell({ role, children }) {
                   { label: "Billing & Invoices" }
                 ],
                 "/admin/subscription": [
-                  { label: "Finance", to: "/admin/billing" },
+                  { label: "Management", to: "/admin/staff" },
                   { label: "Subscription" }
                 ],
                 "/admin/payments": [{ label: "Payments" }],
@@ -1141,8 +1140,8 @@ export function DashShell({ role, children }) {
                 "/super-admin/properties/add": [{ label: "Properties", to: "/super-admin/properties" }, { label: "Add Property" }],
                 "/super-admin/properties/edit": [{ label: "Properties", to: "/super-admin/properties" }, { label: "Edit Property" }],
                 "/super-admin/properties/view": [{ label: "Properties", to: "/super-admin/properties" }, { label: "View Property Details" }],
-                "/super-admin/users": [{ label: "Users" }],
-                "/super-admin/users/view": [{ label: "Users", to: "/super-admin/users" }, { label: "Guest Details" }],
+                "/super-admin/users": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Guests Portfolio" }],
+                "/super-admin/users/view": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Guests Portfolio", to: "/super-admin/users" }, { label: "Guest Details" }],
                 "/super-admin/admins": [{ label: "Admin Management" }],
                 "/super-admin/admins/add": [{ label: "Admin Management", to: "/super-admin/admins" }, { label: "Add Admin" }],
                 "/super-admin/admins/edit": [{ label: "Admin Management", to: "/super-admin/admins" }, { label: "Edit Admin" }],
@@ -1152,6 +1151,7 @@ export function DashShell({ role, children }) {
                 "/super-admin/reservations/view": [{ label: "Reservations", to: "/super-admin/reservations" }, { label: "Reservation Details" }],
                 "/super-admin/reservations/extend": [{ label: "Reservations", to: "/super-admin/reservations" }, { label: "Extend Stay" }],
                 "/super-admin/reports": [{ label: "Reports" }],
+                "/super-admin/reports/view": [{ label: "Reports", to: "/super-admin/reports" }, { label: "Commission Details" }],
                 "/super-admin/channel-manager": [{ label: "Channel Manager" }],
                 "/super-admin/contacts": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests" }],
                 "/super-admin/contacts/view": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests", to: "/super-admin/contacts" }, { label: "Inquiry Details" }],
@@ -1160,11 +1160,11 @@ export function DashShell({ role, children }) {
                 "/super-admin/coupons/add": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Add Coupon" }],
                 "/super-admin/coupons/edit": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Edit Coupon" }],
                 "/super-admin/coupons/view": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Coupon Details" }],
-                "/super-admin/subscription": [{ label: "Plans & Billing" }],
-                "/super-admin/subscription/requests/view": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Request Details" }],
-                "/super-admin/subscription/add": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Add Plan" }],
-                "/super-admin/subscription/edit": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Edit Plan" }],
-                "/super-admin/subscription/view": [{ label: "Plans & Billing", to: "/super-admin/subscription" }, { label: "Plan Details" }],
+                "/super-admin/subscription": [{ label: "Subscription Plans" }],
+                "/super-admin/subscription/requests/view": [{ label: "Subscription Plans", to: "/super-admin/subscription" }, { label: "Request Details" }],
+                "/super-admin/subscription/add": [{ label: "Subscription Plans", to: "/super-admin/subscription" }, { label: "Add Plan" }],
+                "/super-admin/subscription/edit": [{ label: "Subscription Plans", to: "/super-admin/subscription" }, { label: "Edit Plan" }],
+                "/super-admin/subscription/view": [{ label: "Subscription Plans", to: "/super-admin/subscription" }, { label: "Plan Details" }],
                 "/super-admin/global-settings": [{ label: "Global Settings" }],
                 "/super-admin/notifications": [{ label: "Notifications" }],
                 "/super-admin/profile": [{ label: "Profile" }],

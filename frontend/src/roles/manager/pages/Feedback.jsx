@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { managerService } from "@/services/manager";
@@ -120,6 +120,7 @@ function StatusBadge({ status = "Published" }) {
 }
 
 function ManagerFeedbackPage() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [feedbackList, setFeedbackList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -131,12 +132,6 @@ function ManagerFeedbackPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
-
-  // Selected feedback modal & response state
-  const [selectedFeedback, setSelectedFeedback] = useState(null);
-  const [responseText, setResponseText] = useState("");
-  const [responseStatus, setResponseStatus] = useState("Resolved");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function loadData(isSilent = false) {
     try {
@@ -171,81 +166,23 @@ function ManagerFeedbackPage() {
     };
   }, []);
 
-  // Submit response handler
-  const handleSendResponse = async (e) => {
-    e.preventDefault();
-    if (!responseText.trim() || !selectedFeedback) {
-      toast.error("Please enter a response message.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const fid = selectedFeedback._id || selectedFeedback.id;
-      await managerService.respondFeedback(fid, responseText, responseStatus);
-      toast.success("Management response published successfully!");
-      
-      setFeedbackList(prev => prev.map(f => {
-        if ((f._id || f.id) === fid) {
-          return {
-            ...f,
-            response: responseText,
-            respondedBy: currentUser?.name || "Hotel Manager",
-            respondedAt: new Date().toISOString(),
-            status: responseStatus
-          };
-        }
-        return f;
-      }));
-
-      setSelectedFeedback(null);
-      setResponseText("");
-    } catch (err) {
-      toast.error(err.message || "Failed to post response");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Quick Status Switcher
-  const handleStatusChange = async (f, newStatus) => {
-    try {
-      const fid = f._id || f.id;
-      await managerService.updateFeedbackStatus(fid, newStatus);
-      toast.success(`Feedback status updated to ${newStatus}`);
-      setFeedbackList(prev => prev.map(item => ((item._id || item.id) === fid ? { ...item, status: newStatus } : item)));
-      if (selectedFeedback && (selectedFeedback._id || selectedFeedback.id) === fid) {
-        setSelectedFeedback(prev => ({ ...prev, status: newStatus }));
-      }
-    } catch (err) {
-      toast.error(err.message || "Failed to update status");
-    }
-  };
-
-  // Quick Template Injector
-  const handleApplyTemplate = (type) => {
-    if (type === "thank_you") {
-      setResponseText("Thank you for your generous feedback! We are thrilled to hear that you had an exceptional stay. Our team looks forward to serving you again.");
-      setResponseStatus("Published");
-    } else if (type === "apology") {
-      setResponseText("Thank you for your valuable feedback. We sincerely apologize for not meeting your expectations. We are taking corrective steps with our hotel staff to ensure this is not repeated.");
-      setResponseStatus("Resolved");
-    } else if (type === "resolved") {
-      setResponseText("Thank you for highlighting this to our attention. The matter has been resolved by our on-duty supervisors. We look forward to welcoming you back.");
-      setResponseStatus("Resolved");
-    }
-  };
-
   // Stats computations
   const totalCount = feedbackList.length;
-  const averageRating = totalCount > 0
-    ? (feedbackList.reduce((acc, curr) => acc + (Number(curr.rating) || 5), 0) / totalCount).toFixed(1)
-    : "5.0";
   const fiveStarCount = feedbackList.filter(f => Number(f.rating) === 5).length;
-  const satisfactionRate = totalCount > 0 ? Math.round((fiveStarCount / totalCount) * 100) : 100;
-  const pendingCount = feedbackList.filter(f => (f.status || '').toLowerCase() === "pending" || !f.response).length;
-  const respondedCount = feedbackList.filter(f => f.response && f.response.trim().length > 0).length;
-  const responseRate = totalCount > 0 ? Math.round((respondedCount / totalCount) * 100) : 0;
+  const pendingCount = feedbackList.filter(f => (f.status || '').toLowerCase() === 'pending' || !f.response).length;
+  const respondedCount = feedbackList.filter(f => Boolean(f.response) || (f.status || '').toLowerCase() === 'resolved').length;
+  
+  const averageRating = totalCount > 0
+    ? (feedbackList.reduce((acc, f) => acc + (Number(f.rating) || 5), 0) / totalCount).toFixed(1)
+    : "5.0";
+
+  const satisfactionRate = totalCount > 0
+    ? Math.round((fiveStarCount / totalCount) * 100)
+    : 100;
+
+  const responseRate = totalCount > 0
+    ? Math.round((respondedCount / totalCount) * 100)
+    : 0;
 
   // Filter Computation
   const filteredFeedback = feedbackList.filter(f => {
@@ -281,16 +218,6 @@ function ManagerFeedbackPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-ui">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-navy/5 pb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-navy">Property Guest Feedback & Reviews</h1>
-          <p className="text-xs text-navy/60 mt-0.5">
-            Monitor real-time guest reviews, reply to ratings, and maintain hotel reputation in MongoDB.
-          </p>
-        </div>
-      </div>
-
       {/* Summary Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <PremiumStatCard label="Total Reviews" value={totalCount.toString()} hint="Property guest submissions" accentColor="#0d1b2a" icon={MessageSquare} />
@@ -402,11 +329,7 @@ function ManagerFeedbackPage() {
                   return (
                     <tr
                       key={fid}
-                      onClick={() => {
-                        setSelectedFeedback(f);
-                        setResponseText(f.response || "");
-                        setResponseStatus(f.status || "Resolved");
-                      }}
+                      onClick={() => navigate({ to: `/manager/feedback/view/${fid}` })}
                       className="hover:bg-purple/5 transition-colors cursor-pointer group"
                     >
                       {/* Guest Info */}
@@ -477,11 +400,7 @@ function ManagerFeedbackPage() {
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => {
-                              setSelectedFeedback(f);
-                              setResponseText(f.response || "");
-                              setResponseStatus(f.status || "Resolved");
-                            }}
+                            onClick={() => navigate({ to: `/manager/feedback/view/${fid}` })}
                             className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-white text-navy flex items-center justify-center transition-colors cursor-pointer border-none"
                             title="View Details & Reply"
                           >
@@ -515,175 +434,6 @@ function ManagerFeedbackPage() {
                 <ChevronRight className="size-4" />
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Review Details & Response Modal */}
-      {selectedFeedback && (
-        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-navy/10 shadow-2xl p-6 sm:p-8 space-y-6 text-left animate-in fade-in zoom-in-95">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-navy/5 pb-4">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-purple tracking-widest block">Review Dossier</span>
-                <h3 className="font-sans tracking-tight tabular-nums font-bold text-xl text-slate-800">
-                  Feedback from {selectedFeedback.guestName || selectedFeedback.guest}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedFeedback(null)}
-                className="size-8 rounded-full bg-navy/5 hover:bg-navy/10 text-navy flex items-center justify-center cursor-pointer border-none"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {/* Guest & Stay Context Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-cream/20 p-4 rounded-xl border border-navy/5 text-xs">
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Booking ID</span>
-                <strong className="font-mono text-purple font-bold">#{selectedFeedback.bookingId}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Room</span>
-                <strong className="text-navy font-bold">{selectedFeedback.room || "101 Standard"}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Stay Dates</span>
-                <strong className="text-navy font-bold">{selectedFeedback.stayDates || "Recent Stay"}</strong>
-              </div>
-              <div>
-                <span className="text-[10px] text-navy/50 font-bold uppercase block">Overall Rating</span>
-                <div className="flex items-center gap-1 font-bold text-amber-500">
-                  <Star className="size-3.5 fill-amber-400" /> {selectedFeedback.rating || 5}.0 / 5
-                </div>
-              </div>
-            </div>
-
-            {/* Sub-Ratings Matrix */}
-            <div className="space-y-2">
-              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Rating Breakdown</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Cleanliness", val: selectedFeedback.ratings?.cleanliness || selectedFeedback.rating || 5 },
-                  { label: "Staff Service", val: selectedFeedback.ratings?.service || selectedFeedback.rating || 5 },
-                  { label: "Room Comfort", val: selectedFeedback.ratings?.room || selectedFeedback.rating || 5 },
-                  { label: "Food & Dining", val: selectedFeedback.ratings?.food || selectedFeedback.rating || 5 }
-                ].map((item, idx) => (
-                  <div key={idx} className="p-3 bg-white border border-navy/10 rounded-xl space-y-1">
-                    <span className="text-[10px] text-navy/60 font-semibold block">{item.label}</span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-navy">{item.val}/5</span>
-                      <StarRating rating={item.val} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Guest Comment */}
-            <div className="space-y-2">
-              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Guest Remarks</h4>
-              <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 text-xs text-navy leading-relaxed italic">
-                "{selectedFeedback.comment || selectedFeedback.comments}"
-              </div>
-            </div>
-
-            {/* Status Selector */}
-            <div className="space-y-2">
-              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Publication Status</h4>
-              <div className="flex flex-wrap gap-2">
-                {["Published", "Pending", "Resolved", "Archived"].map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => handleStatusChange(selectedFeedback, st)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                      selectedFeedback.status === st
-                        ? "bg-purple text-white border-purple shadow-sm"
-                        : "bg-white text-navy/70 border-navy/10 hover:bg-cream/40"
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Official Management Response Form */}
-            <form onSubmit={handleSendResponse} className="space-y-3 pt-2 border-t border-navy/5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-navy flex items-center gap-1.5">
-                  <MessageSquareText className="size-3.5 text-purple" /> Management Response
-                </label>
-                <div className="flex items-center gap-1 text-[11px]">
-                  <span className="text-navy/50">Templates:</span>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTemplate("thank_you")}
-                    className="text-purple hover:underline font-bold bg-transparent border-none cursor-pointer"
-                  >
-                    Thank You
-                  </button>
-                  <span className="text-navy/30">·</span>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTemplate("apology")}
-                    className="text-purple hover:underline font-bold bg-transparent border-none cursor-pointer"
-                  >
-                    Apology
-                  </button>
-                  <span className="text-navy/30">·</span>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTemplate("resolved")}
-                    className="text-purple hover:underline font-bold bg-transparent border-none cursor-pointer"
-                  >
-                    Resolved
-                  </button>
-                </div>
-              </div>
-
-              <textarea
-                rows={3}
-                placeholder="Type your official response to the guest..."
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                className="w-full p-3 text-xs rounded-xl bg-cream/10 border border-navy/10 text-navy focus:outline-none focus:border-purple font-medium"
-              />
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-[11px] text-navy/50">
-                  {selectedFeedback.respondedAt && (
-                    <>Last response on: {new Date(selectedFeedback.respondedAt).toLocaleDateString()}</>
-                  )}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedFeedback(null)}
-                    className="h-9 px-4 text-xs font-bold cursor-pointer"
-                  >
-                    Close
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="hero"
-                    size="sm"
-                    disabled={isSubmitting}
-                    className="h-9 px-5 text-xs font-bold gap-1.5 cursor-pointer shadow-soft"
-                  >
-                    <Send className="size-3.5" />
-                    {isSubmitting ? "Saving..." : "Save & Publish Response"}
-                  </Button>
-                </div>
-              </div>
-            </form>
-
           </div>
         </div>
       )}

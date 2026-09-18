@@ -52,6 +52,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 }
 
 function ArrivalsPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterSource, setFilterSource] = useState("All");
@@ -79,10 +80,10 @@ function ArrivalsPage() {
               guest: b.guest || b.name || 'Guest',
               phone: b.phone || '--',
               email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-              room: rmNum,
-              roomNumber: rmNum,
-              type: rmType,
-              roomType: rmType,
+              room: cleanRoom,
+              roomNumber: cleanRoom,
+              type: cleanRoomType,
+              roomType: cleanRoomType,
               roomReady: true,
               isEarly: false,
               idVerification: 'Verified',
@@ -380,8 +381,8 @@ function ArrivalsPage() {
                         
                         {/* View Details */}
                         <ViewActionButton
-                          onClick={() => navigate(`/reception/reservations/${guest.id || guest._id}`)}
-                          title="View Details"
+                          onClick={() => navigate(`/reception/reservations/${guest.id || guest._id || guest.bookingId}`)}
+                          title="View Reservation Details"
                         />
 
                         {/* No-Show Action */}

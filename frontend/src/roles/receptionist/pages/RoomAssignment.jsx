@@ -31,11 +31,6 @@ function RoomStatusPage() {
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState([]);
 
-  // Edit status modal state
-  const [editingRoom, setEditingRoom] = useState(null);
-  const [newStatus, setNewStatus] = useState("Available");
-  const [savingStatus, setSavingStatus] = useState(false);
-
   const loadRooms = (isSilent = false) => {
     if (!isSilent) setLoading(true);
     receptionistService.getRooms()
@@ -99,30 +94,6 @@ function RoomStatusPage() {
 
     return matchesSearch && matchesFloor && matchesType && matchesStatus;
   });
-
-  // Handle Save Status Change
-  const handleSaveStatusChange = async (e) => {
-    e.preventDefault();
-    if (!editingRoom) return;
-    const roomNum = editingRoom.room || editingRoom.roomNumber;
-    setSavingStatus(true);
-    try {
-      const res = await receptionistService.updateRoomStatus(roomNum, newStatus, undefined);
-      if (res.success) {
-        toast.success(`Room #${roomNum} status updated to ${newStatus}`);
-        emitRealtimeEvent('room_updated', { roomNumber: roomNum, status: newStatus });
-        setEditingRoom(null);
-        loadRooms(true);
-      } else {
-        toast.error(res.message || "Failed to update room status.");
-      }
-    } catch (err) {
-      console.error("Failed to update status:", err);
-      toast.error(err.message || "Failed to update room status.");
-    } finally {
-      setSavingStatus(false);
-    }
-  };
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
@@ -258,14 +229,11 @@ function RoomStatusPage() {
                 <div className="pt-2.5 border-t border-muted/30 flex items-center justify-between mt-auto">
                   <ActionGroup align="left">
                     <ViewActionButton
-                      onClick={() => navigate(`/reception/room-assignment/${rm.room}`)}
+                      onClick={() => navigate(`/reception/room-assignment/${rm.room || rm.roomNumber}`)}
                       title="View Room Details"
                     />
                     <EditActionButton
-                      onClick={() => {
-                        setEditingRoom(rm);
-                        setNewStatus(rm.status || "Available");
-                      }}
+                      onClick={() => navigate(`/reception/room-assignment/${rm.room || rm.roomNumber}`)}
                       title="Edit Room Status"
                     />
                   </ActionGroup>
@@ -280,65 +248,6 @@ function RoomStatusPage() {
           })
         )}
       </div>
-
-      {/* Edit Room Status Modal Dialog */}
-      {editingRoom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl border border-muted shadow-2xl w-full max-w-sm overflow-hidden text-left animate-scale-in">
-            <div className="p-4 bg-muted/15 border-b border-muted flex items-center justify-between">
-              <div>
-                <h3 className="font-display font-black text-navy text-sm">Edit Room Status</h3>
-                <p className="text-[10px] text-muted-foreground font-semibold">Room #{editingRoom.room} · {editingRoom.roomType}</p>
-              </div>
-              <button
-                onClick={() => setEditingRoom(null)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-navy hover:bg-muted/40 cursor-pointer"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveStatusChange} className="p-4 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider select-none">
-                  Select Status
-                </label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer"
-                >
-                  <option value="Available">Available</option>
-                  <option value="Occupied">Occupied</option>
-                  <option value="Reserved">Reserved</option>
-                  <option value="Out of Order">Out of Order</option>
-                  <option value="Out of Service">Out of Service</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-muted/30">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditingRoom(null)}
-                  className="h-8 text-xs font-bold px-3 rounded-lg"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={savingStatus}
-                  size="sm"
-                  className="bg-navy hover:bg-navy-deep text-white font-bold h-8 px-4 text-xs rounded-lg cursor-pointer"
-                >
-                  {savingStatus ? "Saving..." : "Save Status"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );

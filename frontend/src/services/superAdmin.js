@@ -103,6 +103,9 @@ export const superAdminService = {
   getSubscriptionPlans: async () => {
     return await apiClient.get('/super-admin/plans');
   },
+  getPlans: async () => {
+    return await apiClient.get('/super-admin/plans');
+  },
   createSubscriptionPlan: async (data) => {
     return await apiClient.post('/super-admin/plans', data);
   },

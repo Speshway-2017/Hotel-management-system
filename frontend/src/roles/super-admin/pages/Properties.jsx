@@ -205,7 +205,7 @@ function SuperAdminPlatform() {
                     <th className="p-4">Revenue</th>
                     <th className="p-4">Assigned Admin</th>
                     <th className="p-4">Status</th>
-                    <th className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">Actions</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y font-sans">
@@ -225,8 +225,8 @@ function SuperAdminPlatform() {
                         <td className="p-4">
                           <Tag tone={statusTone(p.status)}>{p.status}</Tag>
                         </td>
-                        <td className="p-4 text-right pr-6 min-w-[200px] whitespace-nowrap">
-                          <ActionGroup>
+                        <td className="p-4 text-right">
+                          <ActionGroup align="right">
                             <ViewActionButton onClick={() => navigate({ to: `/super-admin/properties/view/${p._id || p.id}` })} />
                             <EditActionButton onClick={() => navigate({ to: `/super-admin/properties/edit/${p._id || p.id}` })} />
                             {p.status === "Active" ? (

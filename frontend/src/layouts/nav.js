@@ -45,9 +45,9 @@ export const roleMeta = {
   },
   admin: {
     name: "Admin / Owner",
-    person: "Vikram Rathore",
-    caption: "Rambagh Residency, Jaipur",
-    initials: "VR"
+    person: "Dileep",
+    caption: "Speshway Luxury Hotel, Hyderabad",
+    initials: "DL"
   },
   manager: {
     name: "Manager",
@@ -77,9 +77,8 @@ export const navByRole = {
         { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
         { label: "Operations", to: "/super-admin/properties", icon: CalendarCheck },
         { label: "Analytics & Reports", to: "/super-admin/reports", icon: TrendingUp },
-        { label: "Access & Security", to: "/super-admin/users", icon: ShieldCheck },
-        { label: "System", to: "/super-admin/branding", icon: Settings },
-        { label: "Subscription", to: "/super-admin/subscription", icon: BadgeIndianRupee }
+        { label: "Subscription Plans", to: "/super-admin/subscription", icon: BadgeIndianRupee },
+        { label: "System", to: "/super-admin/branding", icon: Settings }
       ]
     }
   ],

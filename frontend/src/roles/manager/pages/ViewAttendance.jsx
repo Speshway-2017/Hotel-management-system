@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import {
@@ -129,9 +129,12 @@ function ManagerViewAttendance() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      <PageHeader
-        title={record ? `${record.name}'s Attendance Audit` : "Attendance Audit"}
-        subtitle="Punch check-ins timeline, shift tolerances deviations, and device logs ledger."
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Attendance", to: "/manager/attendance" },
+          { label: record ? `${record.name}'s Attendance Audit` : "Attendance Audit" }
+        ]}
       />
 
       {error && <Notice tone="error" title="Roster Sync Error">{error}</Notice>}

@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -302,26 +301,20 @@ function FrontDeskDashboard() {
                           <Tag tone={arr.status === "Pre-checked" ? "success" : "warning"}>{arr.status}</Tag>
                         </td>
                         <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[140px]">
-                          <div className="flex items-center justify-start gap-1.5">
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              onClick={() => handleCheckIn(arr.id || arr._id, arr.room, arr)}
-                              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                            >
-                              Check-In
-                            </Button>
-                            <Button
-                              asChild
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-navy hover:text-navy-deep hover:bg-navy/5 cursor-pointer rounded-lg"
-                            >
-                              <Link to={arr.id ? `/reception/reservations/${arr.id}` : "/reception/reservations"} title="View Booking Details">
-                                <Eye className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          </div>
+                          <ActionGroup align="left">
+                            {(arr.status === "Pending" || arr.status === "Confirmed" || arr.status === "Pre-checked") && (
+                              <CheckInActionButton
+                                onClick={() => handleCheckIn(arr.id || arr._id, arr.room, arr)}
+                              />
+                            )}
+                            <ViewActionButton
+                              onClick={() => {
+                                const targetId = arr.id || arr._id || arr.bookingId;
+                                navigate(targetId ? `/reception/reservations/${targetId}` : "/reception/reservations");
+                              }}
+                              title="View Reservation Details"
+                            />
+                          </ActionGroup>
                         </td>
                       </tr>
                     ))
@@ -365,7 +358,7 @@ function FrontDeskDashboard() {
                           </Tag>
                         </td>
                         <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[160px]">
-                          <div className="flex items-center justify-start gap-1.5">
+                          <ActionGroup align="left">
                             {dep.status !== "Checked-out" && dep.status !== "Checked Out" && (
                               <>
                                 <ExtendStayButton
@@ -374,27 +367,19 @@ function FrontDeskDashboard() {
                                   booking={dep}
                                   onClick={() => navigate(`/reception/reservations/extend/${dep.id || dep._id || dep.bookingId}`)}
                                 />
-                                <Button
-                                  size="xs"
-                                  variant="outline"
+                                <CheckOutActionButton
                                   onClick={() => handleCheckOut(dep.id || dep._id)}
-                                  className="text-navy border-navy/30 hover:bg-navy/5 h-7 px-2.5 text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-2xs"
-                                >
-                                  Check-Out
-                                </Button>
+                                />
                               </>
                             )}
-                            <Button
-                              asChild
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-navy hover:text-navy-deep hover:bg-navy/5 cursor-pointer rounded-lg"
-                            >
-                              <Link to={dep.id ? `/reception/reservations/${dep.id}` : "/reception/reservations"} title="View Booking Details">
-                                <Eye className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          </div>
+                            <ViewActionButton
+                              onClick={() => {
+                                const targetId = dep.id || dep._id || dep.bookingId;
+                                navigate(targetId ? `/reception/reservations/${targetId}` : "/reception/reservations");
+                              }}
+                              title="View Reservation Details"
+                            />
+                          </ActionGroup>
                         </td>
                       </tr>
                     ))

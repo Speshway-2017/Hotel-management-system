@@ -13,6 +13,7 @@ import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
+import { extractRoomNumber } from '../utils/roomHelper.js';
 
 const router = express.Router();
 
@@ -226,30 +227,33 @@ router.get('/property', async (req, res) => {
   }
 });
 
+import SubscriptionPlan from '../models/subscriptionPlan.model.js';
+
 router.post('/subscription/request', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId;
-    if (!propertyId) {
-      return sendError(res, 400, 'User has no assigned property');
+    let property = await findPropertySafely(req.user?.propertyId, req.user);
+    if (!property) {
+      return sendError(res, 404, 'Property not found for admin context');
+    }
+    const propertyId = property._id || property.id || req.user?.propertyId;
+
+    let { planName, price } = req.body;
+    if (!planName) {
+      return sendError(res, 400, 'Plan name is required');
     }
 
-    const { planName, price } = req.body;
-    if (!planName || !price) {
-      return sendError(res, 400, 'Plan name and price are required');
+    if (!price || Number(price) <= 0) {
+      const foundPlan = await SubscriptionPlan.findOne({ name: planName });
+      price = foundPlan ? foundPlan.monthlyPrice : 0;
     }
 
     // Check for existing pending request
     const existingPending = await SubscriptionRequest.findOne({
-      propertyId,
+      $or: [{ propertyId }, { propertyName: property.name }],
       status: 'Pending'
     });
     if (existingPending) {
       return sendError(res, 400, 'A subscription request is already pending for this property.');
-    }
-
-    const property = await Property.findById(propertyId);
-    if (!property) {
-      return sendError(res, 404, 'Property not found');
     }
 
     // Create the request
@@ -264,9 +268,31 @@ router.post('/subscription/request', async (req, res) => {
     });
 
     // Set property status to Pending
-    await Property.findByIdAndUpdate(propertyId, {
-      subscriptionStatus: 'Pending'
+    await Property.findOneAndUpdate(
+      { $or: [{ _id: propertyId }, { id: propertyId }, { name: property.name }] },
+      {
+        subscriptionStatus: 'Pending'
+      }
+    );
+    invalidatePropertyCache();
+
+    // Trigger Notification for Super Admin
+    await triggerNotification({
+      req,
+      role: 'super-admin',
+      propertyId,
+      title: 'New Subscription Upgrade Request',
+      message: `${property.name} (Admin: ${req.user.name}) requested an upgrade to ${planName} (₹${Number(price).toLocaleString('en-IN')}/mo).`,
+      category: 'Subscription'
     });
+
+    // Emit Realtime socket sync
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'subscription_request_created', { request: newRequest });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'subscription_request_created' });
+      emitRealtimeSync(io, propertyId, 'dashboard_sync', { action: 'subscription_request_created' });
+    }
 
     return sendSuccess(res, 201, newRequest, 'Subscription request submitted successfully.');
   } catch (error) {

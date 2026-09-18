@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { superAdminService } from "@/services/superAdmin";
 import { authService } from "@/services/auth";
@@ -192,6 +192,15 @@ function ManagerEditReservation() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Today's Operations", to: "/manager/operations" },
+          { label: "Reservations", to: "/manager/reservations" },
+          { label: `Modify Stay — ${guest || id}` }
+        ]}
+      />
+
       <PageHeader
         title={`Modify Reservation: ${guest || id}`}
         subtitle="Adjust room allocation, stay dates, guest folio, tariffs, and distribution parameters."

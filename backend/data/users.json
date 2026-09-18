@@ -180,8 +180,10 @@
     "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-09-07T04:34:56.840Z",
-    "updatedAt": "2026-09-07T04:34:56.873Z"
+    "updatedAt": "2026-09-18T05:48:35.096Z"
   },
   {
     "_id": "6a83fb716926726de0827cd8",
@@ -236,30 +238,32 @@
     "updatedAt": "2026-09-01T04:34:45.864Z"
   },
   {
-    "_id": "4044drz30u18tdq683z0rl",
-    "email": "superadmin@hourstay.com",
-    "address": "",
-    "avatar": null,
-    "city": "",
-    "country": "India",
-    "createdAt": "2026-09-01T04:34:45.868Z",
-    "dept": "Front Desk",
     "id": "4044drz30u18tdq683z0rl",
-    "idDocNumber": "",
-    "idDocType": "Aadhaar Card",
-    "loyaltyPoints": 0,
-    "mobile": "9876543210",
+    "_id": "4044drz30u18tdq683z0rl",
     "name": "Ravi",
-    "notes": "",
-    "password": "$2a$10$3NzL55uwycBojoPfzzDAmemUU/nY.OQJ/f1QQam3T8Byjg4jt6EpK",
-    "preferences": "",
-    "propertyId": null,
+    "email": "superadmin@hourstay.com",
+    "password": "$2a$10$qDGHtVQImFFXUJ.pWsSxeODXdxfoAxmY0l14/VzkQITmBM.ULMfqi",
     "role": "super-admin",
-    "shift": "Morning (06:00 - 14:00)",
-    "state": "",
+    "mobile": "9876543210",
+    "propertyId": null,
     "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1787659317/hourstay_hms_assets/hd2w8kste7va2xvesusw.png",
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
     "type": "Regular",
-    "updatedAt": "2026-09-01T04:34:45.871Z"
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-08-21T05:30:53.485Z",
+    "updatedAt": "2026-09-18T06:09:28.553Z"
   },
   {
     "_id": "usr-sa-kiran",
@@ -625,7 +629,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:40:50.570Z",
-    "updatedAt": "2026-09-17T10:19:32.516Z"
+    "updatedAt": "2026-09-18T06:16:24.083Z"
   },
   {
     "id": "lfir6yhyu3b",
@@ -650,10 +654,12 @@
     "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": null,
-    "fcmTokens": [],
+    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
+    "fcmTokens": [
+      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
+    ],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-17T10:08:47.401Z"
+    "updatedAt": "2026-09-18T11:11:13.139Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -785,7 +791,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-24T11:47:56.630Z",
-    "updatedAt": "2026-09-16T05:12:55.166Z"
+    "updatedAt": "2026-09-18T12:05:30.682Z"
   },
   {
     "id": "nhb9td45vas",
@@ -810,12 +816,10 @@
     "idDocNumber": "5333 4664 8567",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
-    "fcmTokens": [
-      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
-    ],
+    "fcmToken": null,
+    "fcmTokens": [],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-17T10:29:42.444Z"
+    "updatedAt": "2026-09-18T05:05:28.053Z"
   },
   {
     "id": "omk6dktv7lj",
@@ -1064,5 +1068,33 @@
     "fcmTokens": [],
     "createdAt": "2026-09-03T09:46:59.613Z",
     "updatedAt": "2026-09-17T08:47:07.717Z"
+  },
+  {
+    "id": "ux4m0rsyxo",
+    "_id": "ux4m0rsyxo",
+    "name": "Test Admin",
+    "email": "testadmin_47a1a@hourstay.com",
+    "password": "$2a$10$7JuVYzxAvLIBslmZm6XdcOCiF6IGXVJZXZDsmp8mo0nUp5or6ZChS",
+    "role": "admin",
+    "mobile": "9999999999",
+    "propertyId": "HS-7OI67",
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-09-18T05:43:09.213Z",
+    "updatedAt": "2026-09-18T05:43:09.219Z"
   }
 ]

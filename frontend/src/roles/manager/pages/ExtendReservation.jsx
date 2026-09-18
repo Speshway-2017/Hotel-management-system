@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useParams, Link } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
+import { PageHeader, Panel, Tag, Notice, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -301,6 +301,14 @@ function ManagerExtendReservation() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto text-left font-ui space-y-6">
+      <Crumbs
+        items={[
+          { label: "Dashboard", to: "/manager" },
+          { label: "Today's Operations", to: "/manager/operations" },
+          { label: "Reservations", to: "/manager/reservations" },
+          { label: booking ? `Extend Stay — #${booking.bookingId || booking._id || targetId}` : "Extend Stay" }
+        ]}
+      />
       
       {/* 1. Header with Status */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
