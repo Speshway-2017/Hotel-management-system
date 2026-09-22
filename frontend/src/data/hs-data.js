@@ -167,6 +167,34 @@ export const roomTypes = [
 
 export const reservations = [
 {
+  id: "BK-20101",
+  guest: "Sunny",
+  phone: "+91 98765 20101",
+  room: "101 · Standard Room",
+  checkIn: "22 Sep 2026",
+  checkOut: "24 Sep 2026",
+  nights: 2,
+  pax: "1 Adult",
+  source: "Hour Stay App",
+  status: "Checked-in",
+  amount: 9500,
+  balance: 0
+},
+{
+  id: "BK-10101",
+  guest: "Mounika",
+  phone: "+91 99443 88120",
+  room: "102 · Standard Room",
+  checkIn: "22 Sep 2026",
+  checkOut: "24 Sep 2026",
+  nights: 2,
+  pax: "2 Adults",
+  source: "MakeMyTrip",
+  status: "Checked-in",
+  amount: 11400,
+  balance: 0
+},
+{
   id: "BK-10301",
   guest: "Surya",
   phone: "+91 47362 54654",
@@ -181,20 +209,6 @@ export const reservations = [
   balance: 0
 },
 {
-  id: "BK-10101",
-  guest: "Mounika",
-  phone: "+91 99443 88120",
-  room: "101 · Standard Room",
-  checkIn: "02 Sep 2026",
-  checkOut: "04 Sep 2026",
-  nights: 2,
-  pax: "2 Adults",
-  source: "MakeMyTrip",
-  status: "Checked-in",
-  amount: 11400,
-  balance: 0
-},
-{
   id: "BK-20202",
   guest: "Aswini",
   phone: "+91 98840 20203",
@@ -204,7 +218,7 @@ export const reservations = [
   nights: 3,
   pax: "2 Adults",
   source: "Direct Web",
-  status: "Checked-in",
+  status: "Checked-out",
   amount: 14500,
   balance: 0
 },
@@ -455,11 +469,12 @@ export const searchResults = [
 
 
 export const myBookings = [
+{ id: "BK-20101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "101 · Standard Room", dates: "22–24 Sep 2026", status: "Active", amount: 9500 },
+{ id: "BK-10101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "102 · Standard Room", dates: "22–24 Sep 2026", status: "Active", amount: 11400 },
 { id: "BK-10301", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "103 · Standard Room", dates: "01–02 Sep 2026", status: "Completed", amount: 8500 },
-{ id: "BK-10101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "101 · Standard Room", dates: "02–04 Sep 2026", status: "Active", amount: 11400 },
-{ id: "BK-20202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "202 · Deluxe Room", dates: "02–05 Sep 2026", status: "Active", amount: 14500 },
-{ id: "BK-10202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "102 · Standard Room", dates: "03–05 Sep 2026", status: "Upcoming", amount: 7000 },
-{ id: "BK-30101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "301 · Executive Suite", dates: "03–06 Sep 2026", status: "Upcoming", amount: 21000 }];
+{ id: "BK-20202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "202 · Deluxe Room", dates: "02–05 Sep 2026", status: "Completed", amount: 14500 },
+{ id: "BK-10202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "102 · Standard Room", dates: "25–27 Sep 2026", status: "Upcoming", amount: 7000 },
+{ id: "BK-30101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "301 · Executive Suite", dates: "26–28 Sep 2026", status: "Upcoming", amount: 21000 }];
 
 
 export const serviceRequests = [

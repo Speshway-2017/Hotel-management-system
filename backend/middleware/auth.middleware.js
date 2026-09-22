@@ -1,6 +1,14 @@
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/user.model.js';
 import Property from '../models/property.model.js';
+
+const userCache = new Map();
+
+export const clearUserCache = (userId) => {
+  if (userId) userCache.delete(String(userId));
+  else userCache.clear();
+};
 
 export const protect = async (req, res, next) => {
   let token;
@@ -14,15 +22,26 @@ export const protect = async (req, res, next) => {
 
       // Decode token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const cacheKey = String(decoded.id || decoded.email || '');
 
-      // Get user from token
-      req.user = await User.findById(decoded.id).select('-password');
-      if (!req.user && decoded.id) {
-        req.user = await User.findOne({ $or: [{ _id: decoded.id }, { id: decoded.id }] }).select('-password');
+      const cached = userCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < 60000)) {
+        req.user = cached.user;
+        return next();
       }
-      if (!req.user && decoded.email) {
-        req.user = await User.findOne({ email: decoded.email }).select('-password');
+
+      // Get user from token safely
+      let user = null;
+      if (decoded.id) {
+        try { user = await User.findById(decoded.id).select('-password'); } catch (_) {}
       }
+      if (!user && decoded.id) {
+        try { user = await User.findOne({ $or: [{ _id: String(decoded.id) }, { id: String(decoded.id) }] }).select('-password'); } catch (_) {}
+      }
+      if (!user && decoded.email) {
+        try { user = await User.findOne({ email: decoded.email }).select('-password'); } catch (_) {}
+      }
+      req.user = user;
       if (!req.user) {
         console.warn('❌ User not found for token payload:', decoded, 'on url:', req.originalUrl);
         return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
@@ -31,6 +50,8 @@ export const protect = async (req, res, next) => {
       if (req.user.status !== 'Active') {
         return res.status(403).json({ success: false, message: 'Your account is suspended. Access denied.' });
       }
+
+      userCache.set(cacheKey, { user: req.user, timestamp: Date.now() });
 
       next();
     } catch (error) {

@@ -202,47 +202,56 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: gold.withAlpha(40),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: gold, width: 1),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: gold,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Payment Summary',
-                        style: TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w800,
-                          color: cream,
-                          letterSpacing: -0.2,
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: gold.withAlpha(40),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: gold, width: 1),
                       ),
-                      Text(
-                        'Live verified MongoDB billing ledger',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xB3FFF7E6),
-                          fontWeight: FontWeight.w500,
-                        ),
+                      child: const Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: gold,
+                        size: 20,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Payment Summary',
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w800,
+                              color: cream,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Live verified billing ledger',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xB3FFF7E6),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
@@ -575,50 +584,61 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Payment ID & Copy
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.receipt_rounded, size: 12, color: navy),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      payment.paymentId.isNotEmpty ? payment.paymentId : 'PAY-${payment.bookingId}',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: navy,
+                                        letterSpacing: 0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.receipt_rounded, size: 12, color: navy),
-                              const SizedBox(width: 4),
-                              Text(
-                                payment.paymentId.isNotEmpty ? payment.paymentId : 'PAY-${payment.bookingId}',
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: navy,
-                                  letterSpacing: 0.2,
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.copy_rounded, size: 14, color: muted),
+                            tooltip: 'Copy Payment ID',
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: payment.paymentId));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Payment ID "${payment.paymentId}" copied to clipboard!'),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
                                 ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          icon: const Icon(Icons.copy_rounded, size: 14, color: muted),
-                          tooltip: 'Copy Payment ID',
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4),
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: payment.paymentId));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Payment ID "${payment.paymentId}" copied to clipboard!'),
-                                duration: const Duration(seconds: 2),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
 
                     // Status Badge
                     Container(

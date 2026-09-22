@@ -27,6 +27,8 @@ const FrontDeskDashboardRoute = {
   component: FrontDeskDashboard
 };
 
+import { receptionCache } from "@/services/receptionCache";
+
 export { FrontDeskDashboardRoute as Route };
 
 function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -55,11 +57,12 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function FrontDeskDashboard() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [arrivals, setArrivals] = useState([]);
-  const [departures, setDepartures] = useState([]);
-  const [stats, setStats] = useState({
+  const cachedDash = receptionCache.get('dashboard');
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
+  const [loading, setLoading] = useState(() => !cachedDash);
+  const [arrivals, setArrivals] = useState(() => cachedDash?.arrivals || []);
+  const [departures, setDepartures] = useState(() => cachedDash?.departures || []);
+  const [stats, setStats] = useState(() => cachedDash?.stats || {
     available: 0,
     occupied: 0,
     dirty: 0,
@@ -68,11 +71,11 @@ function FrontDeskDashboard() {
     blocked: 0
   });
 
-  const [propName, setPropName] = useState("Assigned Hotel");
+  const [propName, setPropName] = useState(() => cachedDash?.propName || "Assigned Hotel");
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
 
-  const [feedbackStats, setFeedbackStats] = useState({ average: "5.0", count: 0 });
+  const [feedbackStats, setFeedbackStats] = useState(() => cachedDash?.feedbackStats || { average: "5.0", count: 0 });
 
   const fetchDashboardData = () => {
     Promise.all([
@@ -90,36 +93,60 @@ function FrontDeskDashboard() {
         setFeedbackStats({ average: avg, count: feedbacks.length });
       }
 
-      // 1. Dynamic Arrivals (Check-in is TODAY and status is Confirmed / Paid / Pending / Pre-checked)
-      const finalArrivals = allBookings
-        .filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked'))
-        .map(b => ({
-          id: b.bookingId || b.id || b._id,
-          _id: b._id || b.id || b.bookingId,
-          name: b.guest || b.name || 'Guest',
-          room: extractRoomNumber(b) || b.roomNumber || '—',
-          type: b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room')),
-          time: formatDisplayDate(b.checkIn) || 'Today',
-          checkIn: b.checkIn || 'Today',
-          checkOut: b.checkOut || 'Tomorrow',
-          source: b.source || 'Direct Web',
-          status: b.status === 'Confirmed' ? 'Pre-checked' : b.status
-        }));
+      // 1. Dynamic Arrivals (Check-in is TODAY and not Cancelled / Checked-out)
+      const rawArrivals = allBookings
+        .filter(b => (isToday(b.checkIn) || String(b.checkIn).toLowerCase() === 'today' || isToday(b.checkInDate)) && b.status !== 'Cancelled' && b.status !== 'Checked-out' && b.status !== 'Checked Out');
 
-      // 2. Dynamic Departures (Check-out is TODAY and status is Checked-in / Checked In / Staying / Checked-out / Checked Out)
-      const finalDepartures = allBookings
-        .filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'))
-        .map(b => ({
-          id: b.bookingId || b.id || b._id,
-          _id: b._id || b.id || b.bookingId,
-          name: b.guest || b.name || 'Guest',
-          room: extractRoomNumber(b) || b.roomNumber || '—',
-          time: formatDisplayDate(b.checkOut) || 'Today',
-          checkIn: b.checkIn || 'Today',
-          checkOut: b.checkOut || 'Today',
-          balance: Number(b.balance || 0),
-          status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
-        }));
+      const seenArr = new Set();
+      const finalArrivals = [];
+      for (const b of rawArrivals) {
+        const rm = extractRoomNumber(b) || b.roomNumber || '—';
+        const gName = b.guest || b.name || 'Guest';
+        const key = `${gName.trim().toLowerCase()}_${rm}`;
+        if (!seenArr.has(key)) {
+          seenArr.add(key);
+          finalArrivals.push({
+            id: b.bookingId || b.id || b._id,
+            _id: b._id || b.id || b.bookingId,
+            bookingId: b.bookingId || b.id || b._id,
+            name: gName,
+            room: rm,
+            type: b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room')),
+            time: formatDisplayDate(b.checkIn) || 'Today',
+            checkIn: b.checkIn || 'Today',
+            checkOut: b.checkOut || 'Tomorrow',
+            source: b.source || 'Direct Web',
+            status: b.status === 'Confirmed' ? 'Pre-checked' : (b.status === 'Checked-in' || b.status === 'Checked In' ? 'Checked-In' : b.status)
+          });
+        }
+      }
+
+      // 2. Dynamic Departures (Check-out is TODAY and not Cancelled)
+      const rawDepartures = allBookings
+        .filter(b => (isToday(b.checkOut) || String(b.checkOut).toLowerCase() === 'today' || isToday(b.checkOutDate)) && b.status !== 'Cancelled');
+
+      const seenDep = new Set();
+      const finalDepartures = [];
+      for (const b of rawDepartures) {
+        const rm = extractRoomNumber(b) || b.roomNumber || '—';
+        const gName = b.guest || b.name || 'Guest';
+        const key = `${gName.trim().toLowerCase()}_${rm}`;
+        if (!seenDep.has(key)) {
+          seenDep.add(key);
+          finalDepartures.push({
+            id: b.bookingId || b.id || b._id,
+            _id: b._id || b.id || b.bookingId,
+            bookingId: b.bookingId || b.id || b._id,
+            name: gName,
+            room: rm,
+            time: formatDisplayDate(b.checkOut) || 'Today',
+            checkIn: b.checkIn || 'Today',
+            checkOut: b.checkOut || 'Today',
+            balance: Number(b.balance || 0),
+            status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+          });
+        }
+      }
 
       // Dynamic Room metrics using shared helper
       const roomKPIs = calculateRoomKPIs(allRooms, allBookings);
@@ -132,7 +159,7 @@ function FrontDeskDashboard() {
       setArrivals(finalArrivals);
       setDepartures(finalDepartures);
 
-      setStats({
+      const calculatedStats = {
         available: roomKPIs.availableRooms,
         occupied: roomKPIs.occupiedRooms,
         inStay: roomKPIs.occupiedRooms,
@@ -143,6 +170,15 @@ function FrontDeskDashboard() {
         ooo: roomKPIs.outOfOrderRooms,
         blocked: allRooms.filter(r => r.status === 'Blocked').length,
         totalRevenue: revenue
+      };
+      setStats(calculatedStats);
+
+      receptionCache.set('dashboard', {
+        arrivals: finalArrivals,
+        departures: finalDepartures,
+        stats: calculatedStats,
+        propName,
+        feedbackStats: feedbacks.length > 0 ? { average: (feedbacks.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbacks.length).toFixed(1), count: feedbacks.length } : feedbackStats
       });
     })
     .catch(err => console.error("Failed to load dashboard data:", err))
@@ -239,20 +275,12 @@ function FrontDeskDashboard() {
 
   const totalOutstandingBalance = departures.reduce((sum, d) => sum + d.balance, 0);
 
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
-        Loading operational dashboard...
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
 
       {/* Premium KPI Stat Cards Grid */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-6">
-        <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked').length} Pre-checked, ${arrivals.filter(a => a.status === 'Pending').length} Pending`} icon={LogIn} accentColor="#6366f1" />
+        <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked' || a.status === 'Confirmed').length} Expected, ${arrivals.filter(a => a.status === 'Checked-In' || a.status === 'Checked-in').length} Checked In`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
         <PremiumStatCard label="In-Stay" value={stats.inStay || 0} hint={`${stats.occupied || 0} Room occupied`} icon={Users} accentColor="#10b981" />
         <PremiumStatCard label="Available Rooms" value={stats.available || 0} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
@@ -276,7 +304,7 @@ function FrontDeskDashboard() {
                     <th className="py-3 px-4">ETA</th>
                     <th className="py-3 px-4">Source</th>
                     <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-left min-w-[140px] whitespace-nowrap">Actions</th>
+                    <th className="py-3 px-4 text-left min-w-[180px] whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30 whitespace-nowrap">
@@ -298,14 +326,29 @@ function FrontDeskDashboard() {
                           <Tag tone="brand">{arr.source}</Tag>
                         </td>
                         <td className="py-3.5 px-4">
-                          <Tag tone={arr.status === "Pre-checked" ? "success" : "warning"}>{arr.status}</Tag>
+                          <Tag tone={arr.status === "Pre-checked" || arr.status === "Checked-In" || arr.status === "Checked-in" ? "success" : "warning"}>{arr.status}</Tag>
                         </td>
-                        <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[140px]">
+                        <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[180px]">
                           <ActionGroup align="left">
                             {(arr.status === "Pending" || arr.status === "Confirmed" || arr.status === "Pre-checked") && (
                               <CheckInActionButton
                                 onClick={() => handleCheckIn(arr.id || arr._id, arr.room, arr)}
                               />
+                            )}
+                            {arr.status !== "Checked-out" && arr.status !== "Checked Out" && (
+                              <>
+                                <ExtendStayButton
+                                  size="xs"
+                                  label="Extend"
+                                  booking={arr}
+                                  onClick={() => navigate(`/reception/reservations/extend/${arr.id || arr._id || arr.bookingId}`)}
+                                />
+                                {(arr.status === "Checked-in" || arr.status === "Checked-In" || arr.status === "Staying") && (
+                                  <CheckOutActionButton
+                                    onClick={() => handleCheckOut(arr.id || arr._id)}
+                                  />
+                                )}
+                              </>
                             )}
                             <ViewActionButton
                               onClick={() => {

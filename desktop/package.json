@@ -1,0 +1,31 @@
+{
+  "name": "hourstay-hms-receptionist-desktop",
+  "version": "1.0.0",
+  "description": "HourStay Hotel Management System - Receptionist Desktop Application",
+  "main": "main.js",
+  "icon": "icon.ico",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "build": {
+    "appId": "com.hourstay.hms.receptionist",
+    "productName": "HourStay HMS - Receptionist Desk",
+    "win": {
+      "icon": "icon.ico"
+    }
+  },
+  "keywords": [
+    "electron",
+    "hotel-management-system",
+    "receptionist",
+    "desktop-app"
+  ],
+  "author": "HourStay HMS Team",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "png-to-ico": "^3.0.2",
+    "to-ico": "^1.1.5"
+  }
+}

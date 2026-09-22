@@ -18,87 +18,71 @@ import { authService } from "@/services/auth";
 import { notificationsService } from "@/services/notifications";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { receptionCache } from "@/services/receptionCache";
 
 export const Route = createFileRoute("/reception/notifications")({
   head: () => ({
     meta: [
-      { title: "Notifications & Alerts — Hour Stay" },
-      { name: "description", content: "Desk live alerts, booking updates, and shift notifications." }
+      { title: "Notifications & Alerts — Reception Desk" },
+      { name: "description", content: "Front desk system alerts, check-in requests, and property notifications." }
     ]
   }),
   component: ReceptionNotificationsPage
 });
 
-function getToneForType(type) {
-  const t = (type || "").toLowerCase();
-  if (t.includes("reserv") || t.includes("book") || t.includes("pay")) return "success";
+function getToneForType(type = "") {
+  const t = type.toLowerCase();
+  if (t.includes("checkin") || t.includes("arrival") || t.includes("checkout")) return "success";
   if (t.includes("approval") || t.includes("maint") || t.includes("service") || t.includes("check")) return "warning";
   if (t.includes("complaint") || t.includes("alert") || t.includes("overbook")) return "error";
   return "brand";
 }
+const getNotificationTone = getToneForType;
 
 function ReceptionNotificationsPage() {
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
+  const cachedNotifs = receptionCache.get('notifications');
+  const [loading, setLoading] = useState(() => !cachedNotifs);
+  const [notifications, setNotifications] = useState(() => cachedNotifs || []);
   const [filterType, setFilterType] = useState("All"); // 'All' | 'Unread' | 'Operations' | 'Alerts'
   const [userProperty, setUserProperty] = useState(null);
 
-  const loadNotificationsData = (isSilent = false) => {
-    if (!isSilent) setLoading(true);
-    receptionistService.getProperty()
-      .then(propRes => {
-        const propName = propRes.success && propRes.data ? propRes.data.name : "Assigned Hotel";
-        notificationsService.getNotifications()
-          .then(res => {
-            if (res.success && res.data) {
-              const compiled = res.data.map(n => ({
-                id: n._id || n.id,
-                title: n.title,
-                message: n.message,
-                type: n.category || "General",
-                propertyId: n.propertyId,
-                propertyName: propName,
-                timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
-                read: n.isRead,
-                body: n.message
-              }));
-              setNotifications(compiled);
-            }
-          })
-          .catch(err => console.error("Failed to load notifications:", err))
-          .finally(() => {
-            if (!isSilent) setLoading(false);
-          });
-      })
-      .catch(() => {
-        notificationsService.getNotifications()
-          .then(res => {
-            if (res.success && res.data) {
-              const compiled = res.data.map(n => ({
-                id: n._id || n.id,
-                title: n.title,
-                message: n.message,
-                type: n.category || "General",
-                propertyId: n.propertyId,
-                propertyName: "Assigned Hotel",
-                timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
-                read: n.isRead,
-                body: n.message
-              }));
-              setNotifications(compiled);
-            }
-          })
-          .catch(err => console.error(err))
-          .finally(() => {
-            if (!isSilent) setLoading(false);
-          });
-      });
+  const loadNotificationsData = async (isSilent = false) => {
+    if (!isSilent && notifications.length === 0) setLoading(true);
+    try {
+      const [propRes, res] = await Promise.all([
+        receptionistService.getProperty().catch(() => ({})),
+        notificationsService.getNotifications().catch(() => ({}))
+      ]);
+
+      const propName = propRes?.success && propRes?.data ? propRes.data.name : "Assigned Hotel";
+      if (propRes?.data) setUserProperty(propRes.data);
+
+      if (res?.success && Array.isArray(res.data)) {
+        const compiled = res.data.map(n => ({
+          id: n._id || n.id,
+          title: n.title,
+          message: n.message,
+          type: n.category || "General",
+          propertyId: n.propertyId,
+          propertyName: propName,
+          timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
+          read: n.isRead,
+          body: n.message
+        }));
+        setNotifications(compiled);
+        receptionCache.set('notifications', compiled);
+      }
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadNotificationsData(false);
+    loadNotificationsData(!loading);
 
-    const handleFocus = () => loadNotificationsData(true);
+    const handleFocus = () => loadNotificationsData(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadNotificationsData(true);
@@ -151,14 +135,6 @@ function ReceptionNotificationsPage() {
   });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
-        Loading system alerts...
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 text-left animate-fade-in text-navy font-sans">

@@ -997,11 +997,16 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Room ${currentBooking.roomNumber.isNotEmpty ? currentBooking.roomNumber : "Assigned on Arrival"}',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      Expanded(
+                        child: Text(
+                          'Room ${currentBooking.roomNumber.isNotEmpty ? currentBooking.roomNumber : "Assigned on Arrival"}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      StatusBadge(status: currentBooking.status, fontSize: 13),
+                      const SizedBox(width: 8),
+                      StatusBadge(status: currentBooking.status, fontSize: 12),
                     ],
                   ),
                   const SizedBox(height: 6),

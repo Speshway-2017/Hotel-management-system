@@ -139,7 +139,13 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
             children: [
               const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 8),
-              Text(_isEditing ? 'Your review was updated successfully!' : 'Thank you! Your stay review was submitted.'),
+              Expanded(
+                child: Text(
+                  _isEditing ? 'Your review was updated successfully!' : 'Thank you! Your stay review was submitted.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           backgroundColor: emerald,
@@ -235,27 +241,30 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
                     const SizedBox(height: 14),
 
                     // Interactive 5 Gold Stars
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(5, (index) {
-                        final starValue = (index + 1).toDouble();
-                        final isFilled = starValue <= _overallRating;
-                        return GestureDetector(
-                          onTap: () => setState(() => _overallRating = starValue),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            child: AnimatedScale(
-                              scale: isFilled ? 1.15 : 1.0,
-                              duration: const Duration(milliseconds: 150),
-                              child: Icon(
-                                isFilled ? Icons.star_rounded : Icons.star_outline_rounded,
-                                color: isFilled ? gold : Colors.white38,
-                                size: 40,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final starValue = (index + 1).toDouble();
+                          final isFilled = starValue <= _overallRating;
+                          return GestureDetector(
+                            onTap: () => setState(() => _overallRating = starValue),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 5),
+                              child: AnimatedScale(
+                                scale: isFilled ? 1.15 : 1.0,
+                                duration: const Duration(milliseconds: 150),
+                                child: Icon(
+                                  isFilled ? Icons.star_rounded : Icons.star_outline_rounded,
+                                  color: isFilled ? gold : Colors.white38,
+                                  size: 38,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }),
+                          );
+                        }),
+                      ),
                     ),
                   ],
                 ),
@@ -504,14 +513,20 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
                   Text(
                     b.propertyName,
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: navy),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Booking #${b.id} · Room ${b.room}',
+                    'Booking #${b.bookingId.isNotEmpty ? b.bookingId : (b.id.length > 8 ? b.id.substring(0, 8) : b.id)} · Room ${b.room}',
                     style: const TextStyle(fontSize: 12, color: muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     '${b.checkIn} → ${b.checkOut}',
                     style: const TextStyle(fontSize: 11, color: purple, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -544,6 +559,7 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
             )
           else
             DropdownButtonFormField<ReservationModel>(
+              isExpanded: true,
               initialValue: _selectedBooking ?? completedBookings.first,
               decoration: InputDecoration(
                 filled: true,
@@ -555,11 +571,15 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
               items: completedBookings.map((b) {
+                final displayId = b.bookingId.isNotEmpty ? b.bookingId : (b.id.length > 8 ? b.id.substring(0, 8) : b.id);
+                final hotelName = b.propertyName;
                 return DropdownMenuItem<ReservationModel>(
                   value: b,
                   child: Text(
-                    '#${b.id} - ${b.propertyName} (${b.room})',
+                    '#$displayId · $hotelName (${b.room})',
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 );
               }).toList(),
@@ -581,27 +601,35 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: purple),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: navy),
-              ),
-            ],
+          Expanded(
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: purple),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: navy),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: List.generate(5, (index) {
               final star = index + 1;
               final isFilled = star <= value;
               return GestureDetector(
                 onTap: () => onChanged(star),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 1.5),
                   child: Icon(
                     isFilled ? Icons.star_rounded : Icons.star_outline_rounded,
-                    size: 24,
+                    size: 21,
                     color: isFilled ? gold : const Color(0xFFCBD5E1),
                   ),
                 ),

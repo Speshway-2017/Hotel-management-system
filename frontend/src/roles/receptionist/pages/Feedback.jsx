@@ -33,6 +33,8 @@ import {
   RefreshCw
 } from "lucide-react";
 
+import { receptionCache } from "@/services/receptionCache";
+
 export const Route = createFileRoute("/reception/feedback")({
   head: () => ({
     meta: [
@@ -78,41 +80,46 @@ function StarRating({ rating = 5 }) {
 }
 
 function SentimentBadge({ sentiment, rating = 5 }) {
-  const norm = sentiment || (rating >= 4 ? "Positive" : rating === 3 ? "Neutral" : "Negative");
-  if (norm === "Positive") {
+  if (rating >= 4) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
         <Smile className="size-3 text-emerald-600" /> Positive
       </span>
     );
   }
-  if (norm === "Negative") {
+  if (rating === 3) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-        <Frown className="size-3 text-rose-600" /> Negative
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+        <Meh className="size-3 text-amber-600" /> Neutral
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-      <Meh className="size-3 text-amber-600" /> Neutral
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+      <Frown className="size-3 text-red-600" /> Critical
     </span>
   );
 }
 
-function StatusBadge({ status = "Published" }) {
-  const s = status.toLowerCase();
-  if (s === "published" || s === "responded" || s === "resolved") {
+function StatusBadge({ status = "Received" }) {
+  if (status === "Resolved") {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-        <CheckCircle2 className="size-3 text-emerald-600" /> {status}
+        <CheckCircle2 className="size-3 text-emerald-600" /> Resolved
       </span>
     );
   }
-  if (s === "pending" || s === "pending response") {
+  if (status === "Under Review") {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-        <Clock className="size-3 text-amber-600" /> Pending
+        <Clock className="size-3 text-amber-600" /> In Review
+      </span>
+    );
+  }
+  if (status === "Responded") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple/10 text-purple border border-purple/20">
+        <MessageSquareText className="size-3 text-purple" /> Responded
       </span>
     );
   }
@@ -125,9 +132,10 @@ function StatusBadge({ status = "Published" }) {
 
 export function ReceptionistFeedbackPage() {
   const navigate = useNavigate();
+  const cachedFeedback = receptionCache.get('feedback');
   const [currentUser, setCurrentUser] = useState(null);
-  const [feedbackList, setFeedbackList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [feedbackList, setFeedbackList] = useState(() => cachedFeedback || []);
+  const [loading, setLoading] = useState(() => !cachedFeedback);
   const [error, setError] = useState(null);
 
   // Search & Filters
@@ -166,6 +174,7 @@ export function ReceptionistFeedbackPage() {
 
       if (res && res.success && Array.isArray(res.data)) {
         setFeedbackList(res.data);
+        receptionCache.set('feedback', res.data);
       } else {
         setFeedbackList([]);
       }
@@ -177,7 +186,7 @@ export function ReceptionistFeedbackPage() {
   }
 
   useEffect(() => {
-    loadData();
+    loadData(!loading);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadData(true);
@@ -280,16 +289,6 @@ export function ReceptionistFeedbackPage() {
             Collect checkout guest ratings, acknowledge comments, and track front desk guest satisfaction.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setShowAddModal(true)}
-            variant="hero"
-            size="sm"
-            className="px-4 text-xs font-bold gap-1.5 shadow-soft cursor-pointer"
-          >
-            <Plus className="size-4" /> Record Guest Feedback
-          </Button>
-        </div>
       </div>
 
       {/* Summary Statistics */}
@@ -372,7 +371,7 @@ export function ReceptionistFeedbackPage() {
           <div>
             <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">No Feedback Records Found</h3>
             <p className="text-xs text-navy/60 max-w-sm mx-auto mt-1">
-              Click "Record Guest Feedback" to enter checkout reviews directly at front desk.
+              Guest reviews and checkout feedback will appear here as they are submitted.
             </p>
           </div>
         </div>

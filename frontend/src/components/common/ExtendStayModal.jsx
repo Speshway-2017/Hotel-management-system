@@ -34,6 +34,8 @@ const inr = (val) => "₹" + Math.round(Number(val || 0)).toLocaleString("en-IN"
  * Reusable, Redesigned Extend Stay Button
  * Used across Admin, Manager, and Receptionist views
  */
+import { useNavigate } from "react-router-dom";
+
 export function ExtendStayButton({
   booking,
   bookingId,
@@ -46,8 +48,17 @@ export function ExtendStayButton({
   disabled = false,
   title = "Extend guest stay dates"
 }) {
+  const navigate = useNavigate();
+
   const handleClick = (e) => {
     if (disabled) return;
+
+    if (onClick) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      onClick(e);
+      return;
+    }
 
     const targetId = bookingId || booking?._id || booking?.id || booking?.bookingId || booking?.reservationId;
     
@@ -61,23 +72,14 @@ export function ExtendStayButton({
       else targetRole = 'manager';
     }
 
-    if (onClick && !targetId) {
-      onClick(e);
-      return;
-    }
-
     if (targetId) {
       e?.preventDefault?.();
       e?.stopPropagation?.();
       const targetUrl = targetRole === 'reception'
         ? `/reception/reservations/extend/${targetId}`
         : `/${targetRole}/reservations/extend/${targetId}`;
-      window.location.href = targetUrl;
+      navigate(targetUrl);
       return;
-    }
-
-    if (onClick) {
-      onClick(e);
     }
   };
 
@@ -368,6 +370,8 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
                 <span className="absolute left-3 top-2.5 font-bold text-slate-500 text-xs">₹</span>
                 <input
                   type="number"
+                  min="0"
+                  step="any"
                   value={dailyRate}
                   onChange={(e) => setDailyRate(Math.max(0, Number(e.target.value)))}
                   className="w-full pl-6 pr-3 py-2 border border-slate-300 bg-white rounded-xl text-xs text-[#0f172a] font-bold focus:outline-none focus:ring-1 focus:ring-[#4f46e5] h-10"

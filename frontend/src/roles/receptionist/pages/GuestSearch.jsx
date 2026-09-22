@@ -14,6 +14,7 @@ import {
 import { subscribeRealtimeSync } from "@/services/socket";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { receptionCache } from "@/services/receptionCache";
 
 export const Route = createFileRoute("/reception/guest-search")({
   head: () => ({
@@ -33,7 +34,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground tracking-wider leading-tight">{label}</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           <h3 className="mt-2.5 font-sans tracking-tight tabular-nums text-base font-bold text-slate-800 leading-none">{value}</h3>
         </div>
         {Icon && (
@@ -51,53 +52,53 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function InHouseGuestsPage() {
   const navigate = useNavigate();
+  const cachedGuests = receptionCache.get('guests');
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterRoomType, setFilterRoomType] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [guests, setGuests] = useState([]);
+  const [loading, setLoading] = useState(() => !cachedGuests);
+  const [guests, setGuests] = useState(() => cachedGuests || []);
   const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadGuests = (isSilent = false) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && guests.length === 0) setLoading(true);
     receptionistService.getGuests()
       .then(res => {
-        let allGuests = res.success && Array.isArray(res.data) ? res.data : [];
-        if (allGuests.length === 0) {
-          return receptionistService.getReservations().then(resRes => {
-            const allBookings = resRes.success && Array.isArray(resRes.data) ? resRes.data : [];
-            const mapped = allBookings
-              .filter(b => b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying')
-              .map(b => {
-                const rmNum = extractRoomNumber(b) || b.roomNumber || (b.room ? b.room.split(' ')[0] : '—');
-                const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
-                const bal = Number(b.balance || 0);
-                return {
-                  id: b.bookingId || b.id || b._id,
-                  _id: b._id || b.id || b.bookingId,
-                  bookingId: b.bookingId || b.id || b._id,
-                  name: b.guest || b.name || 'Guest',
-                  phone: b.phone || '--',
-                  email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-                  room: rmNum,
-                  roomType: rmType,
-                  checkIn: b.checkIn || 'Today',
-                  checkOut: b.checkOut || 'Tomorrow',
-                  duration: `${b.nights || 1} Nights`,
-                  pax: b.pax || '2 Adults',
-                  balance: bal,
-                  paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
-                  status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : b.status,
-                  specialRequests: b.notes || b.specialRequests || 'None',
-                  timeline: [
-                    { time: b.checkIn || 'Today', action: 'Guest in-house active stay.' }
-                  ]
-                };
-              });
-            setGuests(mapped);
-          });
-        }
-        setGuests(allGuests);
+        const raw = res && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+        const mapped = raw.map(b => {
+          const rmNum = extractRoomNumber(b) || b.roomNumber || (b.room ? b.room.split(' ')[0] : '—');
+          const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
+          const bal = Number(b.balance !== undefined ? b.balance : 0);
+          const guestName = b.guest || b.name || 'Guest';
+          return {
+            id: b.bookingId || b.id || b._id,
+            _id: b._id || b.id || b.bookingId,
+            bookingId: b.bookingId || b.id || b._id,
+            name: guestName,
+            guest: guestName,
+            phone: b.phone || '--',
+            email: b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+            room: rmNum,
+            roomNumber: rmNum,
+            roomType: rmType,
+            checkIn: b.checkIn || 'Today',
+            checkOut: b.checkOut || 'Tomorrow',
+            duration: b.duration || `${b.nights || 1} Nights`,
+            nights: b.nights || 1,
+            pax: b.pax || '2 Adults',
+            amount: Number(b.amount || b.totalAmount || 0),
+            balance: bal,
+            paymentStatus: b.paymentStatus || (bal === 0 ? 'Paid' : 'Pending'),
+            status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : (b.status || 'Staying'),
+            vipTier: b.vipTier || 'Gold Elite',
+            specialRequests: b.specialRequests || b.notes || 'None',
+            timeline: b.timeline || [
+              { time: b.checkIn || 'Today', action: 'Guest in-house active stay.' }
+            ]
+          };
+        });
+        setGuests(mapped);
+        receptionCache.set('guests', mapped);
       })
       .catch(err => console.error("Failed to load in-house guests:", err))
       .finally(() => {
@@ -310,7 +311,13 @@ function InHouseGuestsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-              {filteredGuests.length === 0 ? (
+              {loading && guests.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="py-10 text-center font-semibold text-xs text-muted-foreground animate-pulse select-none">
+                    Loading in-house guests directory...
+                  </td>
+                </tr>
+              ) : filteredGuests.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="py-10 text-center font-bold text-muted-foreground select-none">
                     No matching in-house guests found.

@@ -56,43 +56,75 @@ router.get('/property', async (req, res) => {
   }
 });
 
+let lastReceptionistSyncTime = 0;
+let receptionistSeeded = false;
+
 // Helper to seed default receptionist notifications if empty
 const seedDefaultReceptionistNotifications = async (propertyId) => {
-  const count = await ReceptionistNotification.countDocuments({});
-  if (count === 0) {
-    const defaults = [
-      {
-        title: "New Reservation Received",
-        message: "Booking BK-10101 confirmed via MakeMyTrip for Standard Room.",
-        category: "New reservations",
-        isRead: false,
-        propertyId: propertyId || 'HS-JAI'
-      },
-      {
-        title: "Room Overdue Check-out",
-        message: "Room 101 occupied by Mounika is scheduled for departure check-out.",
-        category: "Upcoming check-ins/check-outs",
-        isRead: false,
-        propertyId: propertyId || 'HS-JAI'
-      },
-      {
-        title: "Incidentals Surcharge Added",
-        message: "Recorded ₹450 laundry service POS charge to Room 101.",
-        category: "Payment updates",
-        isRead: false,
-        propertyId: propertyId || 'HS-JAI'
-      }
-    ];
-    await ReceptionistNotification.insertMany(defaults);
+  if (receptionistSeeded) return;
+  receptionistSeeded = true;
+  try {
+    const count = await ReceptionistNotification.countDocuments({});
+    if (count === 0) {
+      const defaults = [
+        {
+          title: "New Reservation Received",
+          message: "Booking BK-10101 confirmed via MakeMyTrip for Standard Room.",
+          category: "New reservations",
+          isRead: false,
+          propertyId: propertyId || 'HS-JAI'
+        },
+        {
+          title: "Room Overdue Check-out",
+          message: "Room 101 occupied by Mounika is scheduled for departure check-out.",
+          category: "Upcoming check-ins/check-outs",
+          isRead: false,
+          propertyId: propertyId || 'HS-JAI'
+        },
+        {
+          title: "Incidentals Surcharge Added",
+          message: "Recorded ₹450 laundry service POS charge to Room 101.",
+          category: "Payment updates",
+          isRead: false,
+          propertyId: propertyId || 'HS-JAI'
+        }
+      ];
+      await ReceptionistNotification.insertMany(defaults);
+    }
+  } catch (e) {
+    console.error('Error seeding receptionist notifications:', e.message);
   }
 };
 
-// Permanent synchronizer: ensures all bookings in database have matching receptionist notifications
+// Batch synchronizer: ensures all bookings in database have matching receptionist notifications
 const syncReceptionistBookingNotifications = async (propertyId) => {
+  const now = Date.now();
+  if (now - lastReceptionistSyncTime < 300000) return;
+  lastReceptionistSyncTime = now;
+
   try {
-    const allBookings = await Booking.find({}).sort({ createdAt: -1 });
-    for (const b of allBookings) {
-      const bId = b.bookingId || String(b._id) || b.id;
+    const [allBookings, existingRecNotifs] = await Promise.all([
+      Booking.find({}).lean(),
+      ReceptionistNotification.find({}, { message: 1, title: 1 }).lean()
+    ]);
+
+    const existingRefs = new Set();
+    for (const n of existingRecNotifs || []) {
+      const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      const matches = text.match(/([a-z0-9_-]{4,})/g);
+      if (matches) {
+        for (const m of matches) existingRefs.add(m);
+      }
+    }
+
+    const toInsert = [];
+    for (const b of allBookings || []) {
+      const bId = String(b.bookingId || b._id || b.id || '').trim();
+      if (!bId) continue;
+      const bIdLower = bId.toLowerCase();
+      if (existingRefs.has(bIdLower)) continue;
+      existingRefs.add(bIdLower);
+
       const guestName = b.guest || b.guestName || b.customerName || 'Guest';
       const roomInfo = b.room || b.roomType || 'Standard Room';
       const checkIn = b.checkIn || b.checkInDate || 'Today';
@@ -100,56 +132,18 @@ const syncReceptionistBookingNotifications = async (propertyId) => {
       const amount = b.totalAmount || b.amount || 0;
       const targetProp = b.propertyId || propertyId || 'HS-9HQ8P';
 
-      const title = 'New Online Reservation';
-      const message = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`;
+      toInsert.push({
+        title: 'New Online Reservation',
+        message: `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`,
+        category: 'New reservations',
+        isRead: false,
+        propertyId: targetProp,
+        createdAt: b.createdAt || new Date()
+      });
+    }
 
-      let existsInReceptionist = null;
-      try {
-        existsInReceptionist = await ReceptionistNotification.findOne({
-          $or: [
-            { message: { $regex: bId, $options: 'i' } },
-            { title: { $regex: bId, $options: 'i' } }
-          ]
-        });
-      } catch (_) {}
-
-      if (!existsInReceptionist) {
-        try {
-          await ReceptionistNotification.create({
-            title,
-            message,
-            category: 'New reservations',
-            isRead: false,
-            propertyId: targetProp,
-            createdAt: b.createdAt || new Date()
-          });
-        } catch (_) {}
-      }
-
-      let existsInNotif = null;
-      try {
-        existsInNotif = await Notification.findOne({
-          role: 'receptionist',
-          $or: [
-            { message: { $regex: bId, $options: 'i' } },
-            { title: { $regex: bId, $options: 'i' } }
-          ]
-        });
-      } catch (_) {}
-
-      if (!existsInNotif) {
-        try {
-          await Notification.create({
-            role: 'receptionist',
-            propertyId: targetProp,
-            title,
-            message,
-            category: 'Reservations',
-            isRead: false,
-            createdAt: b.createdAt || new Date()
-          });
-        } catch (_) {}
-      }
+    if (toInsert.length > 0) {
+      await ReceptionistNotification.insertMany(toInsert);
     }
   } catch (err) {
     console.error('Error syncing receptionist booking notifications:', err.message);
@@ -161,8 +155,8 @@ const syncReceptionistBookingNotifications = async (propertyId) => {
 // ==========================================
 router.get('/dashboard', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
-    const propFilter = { $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] };
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propFilter = { $or: [{ propertyId }, { hotelId: propertyId }] };
 
     // 1. Fetch rooms and compile room counts
     const rooms = await Room.find(propFilter);
@@ -174,8 +168,8 @@ router.get('/dashboard', async (req, res) => {
       .filter(b => b.status !== 'Cancelled')
       .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
 
-    // Arrivals: Incoming stays for today / pending check-in (check-in date is today)
-    const arrivals = bookings.filter(b => isToday(b.checkIn) && (b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending' || b.status === 'Pre-checked'));
+    // Arrivals: Incoming stays for today / arriving today (excluding Cancelled and previous Checked-out)
+    const arrivals = bookings.filter(b => isToday(b.checkIn) && b.status !== 'Cancelled' && b.status !== 'Checked-out' && b.status !== 'Checked Out');
     const arrivalsList = arrivals.map(b => {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
       const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : 'Unassigned'));
@@ -203,7 +197,7 @@ router.get('/dashboard', async (req, res) => {
     });
 
     // Departures: Stays scheduled for departure today (check-out date is today)
-    const departures = bookings.filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'));
+    const departures = bookings.filter(b => isToday(b.checkOut) && b.status !== 'Cancelled');
     const departuresList = departures.map(b => {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
       const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : 'Unassigned'));
@@ -262,49 +256,174 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // ==========================================
+// 1.1 TODAY'S ARRIVALS
+// ==========================================
+router.get('/arrivals', async (req, res) => {
+  try {
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propFilter = { $or: [{ propertyId }, { hotelId: propertyId }] };
+
+    const bookings = await Booking.find(propFilter).sort({ createdAt: -1 });
+
+    const arrivals = bookings.filter(b => isToday(b.checkIn) && b.status !== 'Cancelled' && b.status !== 'Checked-out' && b.status !== 'Checked Out');
+
+    const seenArrivals = new Set();
+    const arrivalsList = [];
+    for (const b of arrivals) {
+      const match = String(b.room || "").match(/\b\d{3,4}\b/);
+      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : '101'));
+      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (rmNum.startsWith('2') ? 'Deluxe Room' : rmNum.startsWith('3') ? 'Executive Suite' : 'Standard Room'));
+      const gName = b.guest || b.name || 'Guest';
+      const dedupKey = `${gName.trim().toLowerCase()}_${rmNum}_${b.checkIn}`;
+
+      if (!seenArrivals.has(dedupKey)) {
+        seenArrivals.add(dedupKey);
+        arrivalsList.push({
+          id: b.bookingId || b.id || b._id,
+          _id: b._id || b.id || b.bookingId,
+          bookingId: b.bookingId || b.id || b._id,
+          name: gName,
+          guest: gName,
+          phone: b.phone || '--',
+          email: b.email || `${gName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+          room: rmNum,
+          roomNumber: rmNum,
+          type: rmType,
+          roomType: rmType,
+          roomReady: true,
+          isEarly: false,
+          idVerification: b.idVerification || 'Verified',
+          paymentStatus: Number(b.balance || 0) === 0 || b.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
+          source: b.source || 'Direct Web',
+          status: b.status === 'Confirmed' ? 'Pre-checked' : (b.status === 'Checked-in' || b.status === 'Checked In' ? 'Checked-In' : b.status),
+          time: b.checkIn || 'Today',
+          checkIn: b.checkIn || 'Today',
+          checkOut: b.checkOut || 'Tomorrow',
+          nights: b.nights || 1,
+          amount: Number(b.amount || b.totalAmount || 0),
+          balance: Number(b.balance || 0)
+        });
+      }
+    }
+
+    return sendSuccess(res, 200, arrivalsList, "Today arrivals retrieved successfully.");
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// ==========================================
+// 1.2 TODAY'S DEPARTURES
+// ==========================================
+router.get('/departures', async (req, res) => {
+  try {
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propFilter = { $or: [{ propertyId }, { hotelId: propertyId }] };
+
+    const bookings = await Booking.find(propFilter).sort({ createdAt: -1 });
+
+    const departures = bookings.filter(b => isToday(b.checkOut) && b.status !== 'Cancelled');
+
+    const seenDepartures = new Set();
+    const departuresList = [];
+    for (const b of departures) {
+      const match = String(b.room || "").match(/\b\d{3,4}\b/);
+      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : '101'));
+      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
+      const gName = b.guest || b.name || 'Guest';
+      const dedupKey = `${gName.trim().toLowerCase()}_${rmNum}_${b.checkOut}`;
+
+      if (!seenDepartures.has(dedupKey)) {
+        seenDepartures.add(dedupKey);
+        departuresList.push({
+          id: b.bookingId || b.id || b._id,
+          _id: b._id || b.id || b.bookingId,
+          bookingId: b.bookingId || b.id || b._id,
+          name: gName,
+          guest: gName,
+          phone: b.phone || '--',
+          email: b.email || `${gName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+          room: rmNum,
+          roomNumber: rmNum,
+          type: rmType,
+          roomType: rmType,
+          nights: Number(b.nights || 1),
+          duration: `${b.nights || 1} Nights`,
+          time: b.checkOut || 'Today',
+          checkOut: b.checkOut || 'Today',
+          checkIn: b.checkIn || 'Today',
+          isLate: false,
+          isCorporate: false,
+          corporateAccount: '',
+          balance: b.balance !== undefined ? Number(b.balance) : 0,
+          amount: Number(b.amount || b.totalAmount || 0),
+          paymentStatus: Number(b.balance || 0) === 0 ? 'Paid' : 'Pending',
+          status: (b.status === 'Checked-out' || b.status === 'Checked Out') ? 'Checked Out' : (Number(b.balance || 0) > 0 ? 'Pending Balance' : 'Ready')
+        });
+      }
+    }
+
+    return sendSuccess(res, 200, departuresList, "Today departures retrieved successfully.");
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// ==========================================
 // 2. IN-HOUSE GUESTS CRM
 // ==========================================
+router.get('/in-house', async (req, res, next) => {
+  req.url = '/guests';
+  router.handle(req, res, next);
+});
+
 router.get('/guests', async (req, res) => {
   try {
-    const propId = req.user?.propertyId;
+    const propId = req.user?.propertyId || req.headers['x-property-id'] || 'HS-JAI';
     let query = {
-      $or: [{ propertyId: propId || 'HS-JAI' }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }],
+      $or: [{ propertyId: propId }, { hotelId: propId }],
       status: { $in: ['Checked-in', 'Checked In', 'Staying'] }
     };
     const bookings = await Booking.find(query).sort({ createdAt: -1 });
     
-    const guestList = bookings.map(b => {
+    const seenGuests = new Set();
+    const guestList = [];
+    for (const b of bookings) {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
-      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : 'Unassigned'));
+      const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : '101'));
       const rmCategory = b.roomType || b.category || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
       const guestName = b.guest || b.guestName || 'Guest';
+      const dedupKey = `${guestName.trim().toLowerCase()}_${rmNum}`;
 
-      return {
-        id: b.bookingId || b.id || b._id,
-        _id: b._id || b.id || b.bookingId,
-        bookingId: b.bookingId || b.id || b._id,
-        name: guestName,
-        guest: guestName,
-        phone: b.phone || '--',
-        email: b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-        room: rmNum,
-        roomNumber: rmNum,
-        roomType: rmCategory,
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
-        duration: `${b.nights || 1} Nights`,
-        pax: b.pax || `${b.adults || 2} Adults`,
-        balance: b.balance !== undefined ? Number(b.balance) : 0,
-        amount: Number(b.amount || b.totalAmount || 0),
-        paymentStatus: Number(b.balance || 0) === 0 || b.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
-        status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : (b.status || 'Staying'),
-        vipTier: 'Gold Elite',
-        specialRequests: b.specialRequests || b.notes || 'None',
-        timeline: [
-          { time: b.checkIn || 'Recent', action: `Guest booking status: ${b.status}` }
-        ]
-      };
-    });
+      if (!seenGuests.has(dedupKey)) {
+        seenGuests.add(dedupKey);
+        guestList.push({
+          id: b.bookingId || b.id || b._id,
+          _id: b._id || b.id || b.bookingId,
+          bookingId: b.bookingId || b.id || b._id,
+          name: guestName,
+          guest: guestName,
+          phone: b.phone || '--',
+          email: b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+          room: rmNum,
+          roomNumber: rmNum,
+          roomType: rmCategory,
+          checkIn: b.checkIn,
+          checkOut: b.checkOut,
+          duration: `${b.nights || 1} Nights`,
+          pax: b.pax || `${b.adults || 2} Adults`,
+          balance: b.balance !== undefined ? Number(b.balance) : 0,
+          amount: Number(b.amount || b.totalAmount || 0),
+          paymentStatus: Number(b.balance || 0) === 0 || b.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
+          status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : (b.status || 'Staying'),
+          vipTier: 'Gold Elite',
+          specialRequests: b.specialRequests || b.notes || 'None',
+          timeline: [
+            { time: b.checkIn || 'Recent', action: `Guest in-house active stay in Room ${rmNum}.` }
+          ]
+        });
+      }
+    }
 
     return sendSuccess(res, 200, guestList, 'In-house guests list compiled.');
   } catch (err) {
@@ -410,16 +529,16 @@ router.post('/reservations/:id/extend', handleReceptionistExtendStay);
 // ==========================================
 router.get('/rooms', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
     const { checkIn, checkOut } = req.query;
-    let rooms = await Room.find({ $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] }).sort({ roomNumber: 1 });
+    let rooms = await Room.find({ $or: [{ propertyId }, { hotelId: propertyId }] }).sort({ roomNumber: 1 });
     if (!rooms || rooms.length === 0) {
       rooms = await Room.find().sort({ roomNumber: 1 });
     }
     
-    // Fetch all active bookings across propertyId or global
+    // Fetch all active bookings for property
     const bookings = await Booking.find({
-      $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }],
+      $or: [{ propertyId }, { hotelId: propertyId }],
       status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
     });
     
@@ -560,9 +679,9 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
 // ==========================================
 router.get('/reservations', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
     const bookings = await Booking.find({
-      $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }]
+      $or: [{ propertyId }, { hotelId: propertyId }]
     }).sort({ createdAt: -1 });
 
     const list = bookings.map(b => ({
@@ -679,6 +798,9 @@ router.post('/reservations', async (req, res) => {
       await syncRoomStatus(roomNum, rmStatus, propertyId);
     }
 
+    // Notify Realtime (Socket.io)
+    const io = req.app.get('socketio');
+
     // Trigger Unified Notifications across Web & Mobile consoles
     await notifyBookingEvent({
       req,
@@ -687,8 +809,6 @@ router.post('/reservations', async (req, res) => {
       booking: newBooking
     });
 
-    // Notify Realtime (Socket.io)
-    const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, propertyId, 'booking_created', { booking: newBooking, propertyId });
       emitRealtimeSync(io, propertyId, 'booking_updated', { type: 'CREATED', booking: newBooking, propertyId });
@@ -1007,11 +1127,28 @@ const ensureRealPayments = async (propId) => {
   try {
     const bookings = await Booking.find({});
     for (const b of bookings) {
-      const bId = b.bookingId || (b._id ? String(b._id) : null);
-      if (!bId) continue;
+      const rawId = b._id ? String(b._id) : null;
+      let cleanBookingId = b.bookingId;
+      if (!cleanBookingId || cleanBookingId.length === 24) {
+        cleanBookingId = b._id ? `BK-${String(b._id).slice(-5).toUpperCase()}` : `BK-1001`;
+      }
+      const bId = cleanBookingId;
       const guestName = b.guest || b.customerName || b.guestName || 'Guest';
 
-      let roomNumber = extractRoomNumber(b) || '101';
+      let roomNumber = b.roomNumber;
+      if (!roomNumber || isNaN(roomNumber) || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
+        const match = String(b.room || '').match(/\b\d{3,4}\b/)?.[0];
+        if (match) {
+          roomNumber = match;
+        } else {
+          const rType = String(b.room || b.roomType || '').toLowerCase();
+          if (rType.includes('executive') || rType.includes('suite')) roomNumber = '301';
+          else if (rType.includes('deluxe')) roomNumber = '201';
+          else if (rType.includes('penthouse')) roomNumber = '501';
+          else roomNumber = '101';
+        }
+      }
+
       const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
       const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
@@ -1021,25 +1158,27 @@ const ensureRealPayments = async (propId) => {
         ? 'Settled'
         : 'Pending');
 
+      const paymentDate = b.createdAt || (b.checkIn ? new Date(b.checkIn) : new Date());
+
       const query = {
         $or: [
-          { bookingId: bId },
-          ...(b.bookingId ? [{ bookingId: b.bookingId }] : []),
-          { guestName: guestName, roomNumber: roomNumber }
+          { bookingId: cleanBookingId },
+          ...(rawId ? [{ bookingId: rawId }] : []),
+          ...(b.bookingId ? [{ bookingId: b.bookingId }] : [])
         ]
       };
       const existingList = await Payment.find(query);
 
       if (!existingList || existingList.length === 0) {
         await Payment.create({
-          bookingId: bId,
+          bookingId: cleanBookingId,
           guestName,
           roomNumber,
           amount: amount > 0 ? amount : 3500,
           paymentMethod,
           status,
           propertyId: b.propertyId || propId || 'HS-9HQ8P',
-          createdAt: b.createdAt || new Date()
+          createdAt: paymentDate
         });
       } else {
         const existing = existingList[0];
@@ -1050,12 +1189,13 @@ const ensureRealPayments = async (propId) => {
           }
         }
         let needsUpdate = false;
+        if (existing.bookingId !== cleanBookingId) { existing.bookingId = cleanBookingId; needsUpdate = true; }
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
-        if (b.createdAt && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(b.createdAt).getTime()) > 1000) {
-          existing.createdAt = b.createdAt;
+        if (paymentDate && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(paymentDate).getTime()) > 1000) {
+          existing.createdAt = paymentDate;
           needsUpdate = true;
         }
         if (needsUpdate) await existing.save();
@@ -1180,26 +1320,24 @@ router.delete('/payments/:id', async (req, res) => {
 router.get('/notifications', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
-    await seedDefaultReceptionistNotifications(propertyId);
-    await syncReceptionistBookingNotifications(propertyId);
+    setImmediate(() => {
+      seedDefaultReceptionistNotifications(propertyId).catch(() => {});
+      syncReceptionistBookingNotifications(propertyId).catch(() => {});
+    });
 
     const propQuery = [
       { role: 'receptionist' },
       { role: 'all' },
       { role: null },
-      { role: { $exists: false } },
       { userId: req.user.id || req.user._id },
       { propertyId },
       { propertyId: 'HS-JAI' },
-      { propertyId: 'HS-9HQ8P' },
-      { propertyId: { $exists: false } },
-      { propertyId: null },
-      { propertyId: '' }
+      { propertyId: 'HS-9HQ8P' }
     ];
 
     const [standardList, receptionistList] = await Promise.all([
-      Notification.find({ $or: propQuery }),
-      ReceptionistNotification.find()
+      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(100),
+      ReceptionistNotification.find().sort({ createdAt: -1 }).lean().limit(100)
     ]);
 
     const itemsMap = new Map();

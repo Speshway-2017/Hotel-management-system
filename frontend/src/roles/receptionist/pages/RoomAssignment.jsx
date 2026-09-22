@@ -10,6 +10,7 @@ import {
   Search, X, Wrench, Shield, Check, Bed
 } from "lucide-react";
 import { formatDisplayDate } from "@/utils/dateUtils";
+import { receptionCache } from "@/services/receptionCache";
 
 export const Route = createFileRoute("/reception/room-assignment")({
   head: () => ({
@@ -23,20 +24,22 @@ export const Route = createFileRoute("/reception/room-assignment")({
 
 function RoomStatusPage() {
   const navigate = useNavigate();
+  const cachedRooms = receptionCache.get('rooms');
   const [searchQuery, setSearchQuery] = useState("");
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const [loading, setLoading] = useState(true);
-  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(() => !cachedRooms);
+  const [rooms, setRooms] = useState(() => cachedRooms || []);
 
   const loadRooms = (isSilent = false) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && rooms.length === 0) setLoading(true);
     receptionistService.getRooms()
       .then(res => {
         if (res.success && res.data) {
           setRooms(res.data);
+          receptionCache.set('rooms', res.data);
         }
       })
       .catch(err => console.error("Failed to load property rooms status:", err))
@@ -46,7 +49,7 @@ function RoomStatusPage() {
   };
 
   useEffect(() => {
-    loadRooms(false);
+    loadRooms(!loading);
 
     const interval = setInterval(() => {
       loadRooms(true);
@@ -71,14 +74,6 @@ function RoomStatusPage() {
     "Out of Order": { tone: "error", label: "Out of Order", color: "text-red-700 bg-red-50 border-red-200" },
     "Out of Service": { tone: "neutral", label: "Out of Service", color: "text-slate-700 bg-slate-50 border-slate-200" }
   };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
-        Loading property room status grid...
-      </div>
-    );
-  }
 
   // Filter computations
   const filteredRooms = rooms.filter(rm => {
@@ -169,7 +164,11 @@ function RoomStatusPage() {
 
       {/* Racks Grid of Room Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {filteredRooms.length === 0 ? (
+        {loading && rooms.length === 0 ? (
+          <div className="col-span-full bg-white border border-muted rounded-2xl p-16 text-center text-muted-foreground font-semibold text-xs animate-pulse select-none">
+            Loading property room status grid...
+          </div>
+        ) : filteredRooms.length === 0 ? (
           <div className="col-span-full bg-white border border-muted rounded-2xl p-16 text-center text-muted-foreground font-bold select-none">
             No rooms match current rack filter parameters.
           </div>

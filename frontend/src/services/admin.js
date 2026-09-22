@@ -130,6 +130,13 @@ export const adminService = {
       return await apiClient.post(`/super-admin/reservations/${id}/extend`, data);
     }
   },
+  extendStay: async (id, data) => {
+    try {
+      return await apiClient.post(`/manager/reservations/${id}/extend`, data);
+    } catch (err) {
+      return await apiClient.post(`/super-admin/reservations/${id}/extend`, data);
+    }
+  },
   verifyIdProof: async (id, data) => {
     try {
       return await apiClient.post(`/super-admin/reservations/${id}/verify-id`, data);

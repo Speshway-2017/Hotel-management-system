@@ -409,7 +409,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
 
                     // Stay Details Pill Container
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: white.withAlpha(15),
                         borderRadius: BorderRadius.circular(10),
@@ -419,14 +419,15 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.login_rounded, color: cream, size: 13),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                               Text(
                                 Formatters.date(spotlightStay.checkIn),
                                 style: const TextStyle(
                                   color: white,
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -434,9 +435,10 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                           ),
                           Container(width: 1, height: 14, color: white.withAlpha(35)),
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.payments_outlined, color: gold, size: 13),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                               Text(
                                 Formatters.currency(spotlightStay.totalAmount),
                                 style: const TextStyle(
@@ -447,8 +449,6 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                               ),
                             ],
                           ),
-                          Container(width: 1, height: 14, color: white.withAlpha(35)),
-                          StatusBadge(status: spotlightStay.status),
                         ],
                       ),
                     ),

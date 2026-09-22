@@ -16,12 +16,13 @@ import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { receptionCache } from "@/services/receptionCache";
 
 export const Route = createFileRoute("/reception/check-out")({
   head: () => ({
     meta: [
-      { title: "Today's Departures Desk — Hour Stay" },
-      { name: "description", content: "Front desk checkout ledger and guest folio settlement." }
+      { title: "Departures Desk — Hour Stay" },
+      { name: "description", content: "Front desk guest departures, settle balances, and room turnover." }
     ]
   }),
   component: DeparturesPage
@@ -57,25 +58,28 @@ function DeparturesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
 
-  const [loading, setLoading] = useState(true);
-  const [departures, setDepartures] = useState([]);
+  const cachedDepartures = receptionCache.get('departures');
+  const [loading, setLoading] = useState(() => !cachedDepartures);
+  const [departures, setDepartures] = useState(() => cachedDepartures || []);
   const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadDepartures = () => {
-    receptionistService.getReservations()
+    receptionistService.getDepartures()
       .then(res => {
-        const allBookings = res.success && Array.isArray(res.data) ? res.data : [];
+        const allBookings = res && Array.isArray(res.data) ? res.data : [];
         const list = allBookings
-          .filter(b => isToday(b.checkOut) && (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying' || b.status === 'Checked-out' || b.status === 'Checked Out'))
+          .filter(b => (isToday(b.checkOut) || String(b.checkOut).toLowerCase() === 'today') && b.status !== 'Cancelled')
           .map(b => {
             const rmNum = extractRoomNumber(b) || b.roomNumber || (b.room ? b.room.split(' ')[0] : '—');
             const rmType = b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Standard Room' : 'Standard Room');
             return {
               id: b.bookingId || b.id || b._id,
               _id: b._id || b.id || b.bookingId,
+              bookingId: b.bookingId || b.id || b._id,
               name: b.guest || b.name || 'Guest',
               guest: b.guest || b.name || 'Guest',
               phone: b.phone || '--',
+              email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '')}@gmail.com`,
               room: rmNum,
               roomNumber: rmNum,
               type: rmType,
@@ -84,6 +88,7 @@ function DeparturesPage() {
               duration: `${b.nights || 1} Nights`,
               time: formatDisplayDate(b.checkOut) || 'Today',
               checkOut: b.checkOut || 'Today',
+              checkIn: b.checkIn || 'Today',
               isLate: false,
               isCorporate: false,
               corporateAccount: '',
@@ -93,16 +98,17 @@ function DeparturesPage() {
             };
           });
         setDepartures(list);
+        receptionCache.set('departures', list);
       })
       .catch(err => console.error("Failed to load departures list:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    loadDepartures(true);
+    loadDepartures();
 
     const unsubscribe = subscribeRealtimeSync(() => {
-      loadDepartures(false);
+      loadDepartures();
     });
 
     return () => {
@@ -127,14 +133,6 @@ function DeparturesPage() {
       toast.error(err.message || "Failed to check out guest.");
     }
   };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
-        Loading departures ledger...
-      </div>
-    );
-  }
 
   // Stats
   const totalCount = departures.length;
@@ -229,7 +227,13 @@ function DeparturesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-              {filteredDepartures.length === 0 ? (
+              {loading && departures.length === 0 ? (
+                <tr>
+                  <td colSpan="10" className="py-10 text-center font-semibold text-xs text-muted-foreground animate-pulse select-none">
+                    Loading today's departures...
+                  </td>
+                </tr>
+              ) : filteredDepartures.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="py-10 text-center font-bold text-muted-foreground select-none">
                     No matching check-outs registered today.

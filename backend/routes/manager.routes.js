@@ -240,36 +240,68 @@ const seedDefaultApprovals = async (propertyId) => {
   }
 };
 
-// Helper to seed default notifications if empty
+let lastManagerSyncTime = 0;
+let managerSeeded = false;
+
+// Helper to seed default notifications
 const seedDefaultNotifications = async (propertyId) => {
-  const count = await ManagerNotification.countDocuments({});
-  if (count === 0) {
-    const defaults = [
-      {
-        title: "Refund Request Pending",
-        message: "Front Desk submitted a refund request of ₹4,900 for Approval.",
-        category: "Approvals",
-        isRead: false,
-        propertyId: propertyId || 'HS-JAI'
-      },
-      {
-        title: "Guest Feedback Submitted",
-        message: "Surya submitted a 5-star review for cleanliness and services.",
-        category: "Guest Experience",
-        isRead: false,
-        propertyId: propertyId || 'HS-JAI'
-      }
-    ];
-    await ManagerNotification.insertMany(defaults);
+  if (managerSeeded) return;
+  managerSeeded = true;
+  try {
+    const count = await ManagerNotification.countDocuments({});
+    if (count === 0) {
+      const defaults = [
+        {
+          title: "New Reservation Received",
+          message: "Booking BK-10101 confirmed via MakeMyTrip for Standard Room.",
+          category: "Reservations",
+          isRead: false,
+          propertyId: propertyId || 'HS-JAI'
+        },
+        {
+          title: "Housekeeping Alert",
+          message: "Room 102 reported priority cleaning completed.",
+          category: "Operations",
+          isRead: false,
+          propertyId: propertyId || 'HS-JAI'
+        }
+      ];
+      await ManagerNotification.insertMany(defaults);
+    }
+  } catch (e) {
+    console.error('Error seeding manager notifications:', e.message);
   }
 };
 
-// Permanent synchronizer: ensures all bookings in database have matching manager notifications
+// Batch synchronizer: ensures all bookings in database have matching manager notifications
 const syncManagerBookingNotifications = async (propertyId) => {
+  const now = Date.now();
+  if (now - lastManagerSyncTime < 300000) return;
+  lastManagerSyncTime = now;
+
   try {
-    const allBookings = await Booking.find({}).sort({ createdAt: -1 });
-    for (const b of allBookings) {
-      const bId = b.bookingId || String(b._id) || b.id;
+    const [allBookings, existingMgrNotifs] = await Promise.all([
+      Booking.find({}).lean(),
+      ManagerNotification.find({}, { message: 1, title: 1 }).lean()
+    ]);
+
+    const existingRefs = new Set();
+    for (const n of existingMgrNotifs || []) {
+      const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      const matches = text.match(/([a-z0-9_-]{4,})/g);
+      if (matches) {
+        for (const m of matches) existingRefs.add(m);
+      }
+    }
+
+    const toInsert = [];
+    for (const b of allBookings || []) {
+      const bId = String(b.bookingId || b._id || b.id || '').trim();
+      if (!bId) continue;
+      const bIdLower = bId.toLowerCase();
+      if (existingRefs.has(bIdLower)) continue;
+      existingRefs.add(bIdLower);
+
       const guestName = b.guest || b.guestName || b.customerName || 'Guest';
       const roomInfo = b.room || b.roomType || 'Standard Room';
       const checkIn = b.checkIn || b.checkInDate || 'Today';
@@ -277,53 +309,18 @@ const syncManagerBookingNotifications = async (propertyId) => {
       const amount = b.totalAmount || b.amount || 0;
       const targetProp = b.propertyId || propertyId || 'HS-9HQ8P';
 
-      const title = 'New Online Reservation';
-      const message = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`;
+      toInsert.push({
+        title: 'New Online Reservation',
+        message: `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`,
+        category: 'Reservations',
+        isRead: false,
+        propertyId: targetProp,
+        createdAt: b.createdAt || new Date()
+      });
+    }
 
-      let existsInManager = null;
-      try {
-        existsInManager = await ManagerNotification.findOne({
-          $or: [
-            { message: { $regex: bId, $options: 'i' } },
-            { title: { $regex: bId, $options: 'i' } }
-          ]
-        });
-      } catch (_) {}
-
-      let existsInNotif = null;
-      try {
-        existsInNotif = await Notification.findOne({
-          role: 'manager',
-          $or: [
-            { message: { $regex: bId, $options: 'i' } },
-            { title: { $regex: bId, $options: 'i' } }
-          ]
-        });
-      } catch (_) {}
-
-      if (!existsInManager && !existsInNotif) {
-        try {
-          await Promise.all([
-            ManagerNotification.create({
-              title,
-              message,
-              category: 'Reservations',
-              isRead: false,
-              propertyId: targetProp,
-              createdAt: b.createdAt || new Date()
-            }).catch(() => null),
-            Notification.create({
-              role: 'manager',
-              propertyId: targetProp,
-              title,
-              message,
-              category: 'Reservations',
-              isRead: false,
-              createdAt: b.createdAt || new Date()
-            }).catch(() => null)
-          ]);
-        } catch (_) {}
-      }
+    if (toInsert.length > 0) {
+      await ManagerNotification.insertMany(toInsert);
     }
   } catch (err) {
     console.error('Error syncing manager booking notifications:', err.message);
@@ -1695,11 +1692,28 @@ const ensureRealPayments = async (propId) => {
   try {
     const bookings = await Booking.find({});
     for (const b of bookings) {
-      const bId = b.bookingId || (b._id ? String(b._id) : null);
-      if (!bId) continue;
+      const rawId = b._id ? String(b._id) : null;
+      let cleanBookingId = b.bookingId;
+      if (!cleanBookingId || cleanBookingId.length === 24) {
+        cleanBookingId = b._id ? `BK-${String(b._id).slice(-5).toUpperCase()}` : `BK-1001`;
+      }
+      const bId = cleanBookingId;
       const guestName = b.guest || b.customerName || b.guestName || 'Guest';
 
-      let roomNumber = extractRoomNumber(b) || '101';
+      let roomNumber = b.roomNumber;
+      if (!roomNumber || isNaN(roomNumber) || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
+        const match = String(b.room || '').match(/\b\d{3,4}\b/)?.[0];
+        if (match) {
+          roomNumber = match;
+        } else {
+          const rType = String(b.room || b.roomType || '').toLowerCase();
+          if (rType.includes('executive') || rType.includes('suite')) roomNumber = '301';
+          else if (rType.includes('deluxe')) roomNumber = '201';
+          else if (rType.includes('penthouse')) roomNumber = '501';
+          else roomNumber = '101';
+        }
+      }
+
       const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
       const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
@@ -1709,25 +1723,27 @@ const ensureRealPayments = async (propId) => {
         ? 'Settled'
         : 'Pending');
 
+      const paymentDate = b.createdAt || (b.checkIn ? new Date(b.checkIn) : new Date());
+
       const query = {
         $or: [
-          { bookingId: bId },
-          ...(b.bookingId ? [{ bookingId: b.bookingId }] : []),
-          { guestName: guestName, roomNumber: roomNumber }
+          { bookingId: cleanBookingId },
+          ...(rawId ? [{ bookingId: rawId }] : []),
+          ...(b.bookingId ? [{ bookingId: b.bookingId }] : [])
         ]
       };
       const existingList = await Payment.find(query);
 
       if (!existingList || existingList.length === 0) {
         await Payment.create({
-          bookingId: bId,
+          bookingId: cleanBookingId,
           guestName,
           roomNumber,
           amount: amount > 0 ? amount : 3500,
           paymentMethod,
           status,
           propertyId: b.propertyId || propId || 'HS-9HQ8P',
-          createdAt: b.createdAt || new Date()
+          createdAt: paymentDate
         });
       } else {
         const existing = existingList[0];
@@ -1738,12 +1754,13 @@ const ensureRealPayments = async (propId) => {
           }
         }
         let needsUpdate = false;
+        if (existing.bookingId !== cleanBookingId) { existing.bookingId = cleanBookingId; needsUpdate = true; }
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
-        if (b.createdAt && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(b.createdAt).getTime()) > 1000) {
-          existing.createdAt = b.createdAt;
+        if (paymentDate && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(paymentDate).getTime()) > 1000) {
+          existing.createdAt = paymentDate;
           needsUpdate = true;
         }
         if (needsUpdate) await existing.save();
@@ -1868,27 +1885,25 @@ router.delete('/payments/:id', async (req, res) => {
 router.get('/notifications', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || 'HS-JAI';
-    await seedDefaultNotifications(propertyId);
-    await syncManagerBookingNotifications(propertyId);
+    setImmediate(() => {
+      seedDefaultNotifications(propertyId).catch(() => {});
+      syncManagerBookingNotifications(propertyId).catch(() => {});
+    });
 
     // Fetch from both Notification and ManagerNotification with fallback property coverage
     const propQuery = [
       { role: 'manager' },
       { role: 'all' },
       { role: null },
-      { role: { $exists: false } },
       { userId: req.user.id || req.user._id },
       { propertyId },
       { propertyId: 'HS-JAI' },
-      { propertyId: 'HS-9HQ8P' },
-      { propertyId: { $exists: false } },
-      { propertyId: null },
-      { propertyId: '' }
+      { propertyId: 'HS-9HQ8P' }
     ];
 
     const [standardList, managerList] = await Promise.all([
-      Notification.find({ $or: propQuery }),
-      ManagerNotification.find()
+      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(100),
+      ManagerNotification.find().sort({ createdAt: -1 }).lean().limit(100)
     ]);
 
     // Map and merge with robust deduplication
