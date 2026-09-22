@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { receptionCache } from "@/services/receptionCache";
 
 export const Route = createFileRoute("/reception/check-in")({
   head: () => ({
@@ -53,11 +54,12 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function ArrivalsPage() {
   const navigate = useNavigate();
+  const cachedArrivals = receptionCache.get('arrivals');
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterSource, setFilterSource] = useState("All");
-  const [loading, setLoading] = useState(true);
-  const [arrivals, setArrivals] = useState([]);
+  const [loading, setLoading] = useState(() => !cachedArrivals);
+  const [arrivals, setArrivals] = useState(() => cachedArrivals || []);
   const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadArrivals = (isSilent = false) => {
@@ -67,7 +69,7 @@ function ArrivalsPage() {
         if (!res || !res.data) return;
         const raw = Array.isArray(res.data) ? res.data : [];
         const list = raw
-          .filter(b => b.status !== 'Checked-out' && b.status !== 'Checked Out' && b.status !== 'Cancelled')
+          .filter(b => (isToday(b.checkIn) || String(b.checkIn).toLowerCase() === 'today') && b.status !== 'Checked-out' && b.status !== 'Checked Out' && b.status !== 'Cancelled')
           .map(b => {
             const cleanRoom = extractRoomNumber(b) || '101';
             const cleanRoomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (cleanRoom.startsWith('2') ? 'Deluxe Room' : cleanRoom.startsWith('3') ? 'Executive Suite' : cleanRoom.startsWith('4') ? 'Presidential Suite' : 'Standard Room'));
@@ -100,6 +102,7 @@ function ArrivalsPage() {
           });
 
         setArrivals(list);
+        receptionCache.set('arrivals', list);
       })
       .catch(err => console.error("Failed to load arrivals list:", err))
       .finally(() => {
@@ -108,27 +111,19 @@ function ArrivalsPage() {
   };
 
   useEffect(() => {
-    loadArrivals(false);
+    loadArrivals(!loading);
     const interval = setInterval(() => loadArrivals(true), 10000);
-    const handleFocus = () => loadArrivals(true);
+    const handleFocus = () => loadArrivals(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadArrivals(true);
     });
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval);
       if (unsubscribe) unsubscribe();
     };
   }, []);
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
-        Loading arrivals desk...
-      </div>
-    );
-  }
 
   // Stats
   const totalCount = arrivals.length;
@@ -306,7 +301,13 @@ function ArrivalsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-              {filteredArrivals.length === 0 ? (
+              {loading && arrivals.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="py-10 text-center font-semibold text-xs text-muted-foreground animate-pulse select-none">
+                    Loading today's arrivals...
+                  </td>
+                </tr>
+              ) : filteredArrivals.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="py-10 text-center font-bold text-muted-foreground select-none">
                     No matching arrivals found today.

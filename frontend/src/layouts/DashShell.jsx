@@ -111,6 +111,34 @@ export function DashShell({ role, children }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    window.__appNavigate = (to) => {
+      navigate({ to });
+    };
+
+    const handleAppNav = (e) => {
+      if (e.detail) {
+        navigate({ to: e.detail });
+      }
+    };
+    window.addEventListener('app:navigate', handleAppNav);
+
+    let unsubscribeElectron = null;
+    if (window.electronAPI?.onMenuNavigate) {
+      unsubscribeElectron = window.electronAPI.onMenuNavigate((route) => {
+        navigate({ to: route });
+      });
+    }
+
+    return () => {
+      window.removeEventListener('app:navigate', handleAppNav);
+      if (unsubscribeElectron) unsubscribeElectron();
+      delete window.__appNavigate;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
     let isMounted = true;
     const fetchUnreadCount = async () => {
       try {
@@ -1182,8 +1210,10 @@ export function DashShell({ role, children }) {
                 "/manager/feedback": [{ label: "Feedback" }],
                 "/manager/payments": [{ label: "Payments" }],
                 "/manager/payments/:id": [{ label: "Payments", to: "/manager/payments" }, { label: "Payment Details" }],
-                "/manager/billing": [{ label: "Payments", to: "/manager/payments" }, { label: "Ledger" }],
+                "/admin/check-in/:id": [{ label: "Reservations", to: "/admin/reservations" }, { label: "Guest Verification & Check-In" }],
+                "/manager/check-in/:id": [{ label: "Today's Operations", to: "/manager/operations" }, { label: "Reservations", to: "/manager/reservations" }, { label: "Guest Verification & Check-In" }],
                 "/reception/check-in": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals" }],
+                "/reception/id-capture": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals", to: "/reception/check-in" }, { label: "Guest ID Capture" }],
                 "/reception/check-out": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures" }],
                 "/reception/guest-search": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "In-House Guests" }],
                 "/reception/room-assignment": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Room Status" }],
@@ -1194,7 +1224,7 @@ export function DashShell({ role, children }) {
                 "/reception/folio": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio" }],
                 "/reception/notifications": [{ label: "Notifications" }],
                 "/reception/profile": [{ label: "Profile" }],
-                "/reception/check-in/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals", to: "/reception/check-in" }, { label: "Check-in Details" }],
+                "/reception/check-in/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals", to: "/reception/check-in" }, { label: "Guest Verification & Check-In" }],
                 "/reception/check-out/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures", to: "/reception/check-out" }, { label: "Checkout Details" }],
                 "/reception/folio/:id": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio Details" }],
                 "/reception/reservations/:id": [{ label: "Reservations", to: "/reception/reservations" }, { label: "Reservations Ledger", to: "/reception/reservations" }, { label: "Booking Details" }],
@@ -1224,6 +1254,8 @@ export function DashShell({ role, children }) {
                                             .replace(/\/edit-type\/[^\/]+$/, "/edit-type")
                                             .replace(/\/extend\/[^\/]+$/, "/extend")
                                             .replace(/\/payments\/[^\/]+$/, "/payments/:id")
+                                            .replace(/\/admin\/check-in\/[^\/]+$/, "/admin/check-in/:id")
+                                            .replace(/\/manager\/check-in\/[^\/]+$/, "/manager/check-in/:id")
                                             .replace(/\/reception\/check-in\/[^\/]+$/, "/reception/check-in/:id")
                                             .replace(/\/reception\/check-out\/[^\/]+$/, "/reception/check-out/:id")
                                             .replace(/\/reception\/folio\/[^\/]+$/, "/reception/folio/:id")

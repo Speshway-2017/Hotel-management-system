@@ -244,10 +244,13 @@ class QueryWrapper {
     this.executor = executor;
     this.selectFields = [];
     this.sortFields = null;
+    this.limitCount = null;
+    this.isLean = false;
   }
   select(fields) { this.selectFields.push(fields); return this; }
   sort(fields) { this.sortFields = fields; return this; }
-  lean() { return this; }
+  limit(n) { this.limitCount = n; return this; }
+  lean() { this.isLean = true; return this; }
   populate() { return this; }
   async then(onFulfilled, onRejected) {
     try {
@@ -260,15 +263,39 @@ class QueryWrapper {
         if (this.sortFields) {
           query = query.sort(this.sortFields);
         }
+        if (this.limitCount) {
+          query = query.limit(this.limitCount);
+        }
+        if (this.isLean) {
+          query = query.lean();
+        }
         result = await query;
       } else {
         result = await this.executor(false);
+        if (this.limitCount && Array.isArray(result)) {
+          result = result.slice(0, this.limitCount);
+        }
       }
       return onFulfilled ? onFulfilled(result) : result;
     } catch (err) {
       if (onRejected) return onRejected(err);
       throw err;
     }
+  }
+  async catch(onRejected) {
+    return this.then(undefined, onRejected);
+  }
+  async finally(onFinally) {
+    return this.then(
+      async (val) => {
+        if (onFinally) await onFinally();
+        return val;
+      },
+      async (err) => {
+        if (onFinally) await onFinally();
+        throw err;
+      }
+    );
   }
 }
 

@@ -265,7 +265,7 @@ function ReceptionExtendReservation() {
           additionalAmount: calculation.totalAdditionalAmount
         });
 
-        navigate({ to: `/reception/reservations/details/${bookingTargetId}` });
+        navigate(`/reception/reservations/${bookingTargetId}`);
       } else {
         toast.error(res?.message || "Failed to extend stay. Please try again.");
       }
@@ -493,8 +493,8 @@ function ReceptionExtendReservation() {
                   <Input
                     id="daily-rate"
                     type="number"
-                    min="100"
-                    step="50"
+                    min="0"
+                    step="any"
                     value={dailyRate}
                     onChange={(e) => setDailyRate(Math.max(0, Number(e.target.value)))}
                     className="pl-7 h-10 text-xs font-bold"

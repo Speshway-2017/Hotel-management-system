@@ -16,6 +16,7 @@ import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { receptionCache } from "@/services/receptionCache";
 
 export const Route = createFileRoute("/reception/reservations")({
   head: () => ({
@@ -29,12 +30,13 @@ export const Route = createFileRoute("/reception/reservations")({
 
 function ReservationsPage() {
   const navigate = useNavigate();
+  const cachedReservations = receptionCache.get('reservations');
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRoomType, setFilterRoomType] = useState("all");
   const [filterSource, setFilterSource] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [reservations, setReservations] = useState([]);
+  const [loading, setLoading] = useState(() => !cachedReservations);
+  const [reservations, setReservations] = useState(() => cachedReservations || []);
   const [extendingBooking, setExtendingBooking] = useState(null);
 
   const loadReservations = (isSilent = false) => {
@@ -54,6 +56,7 @@ function ReservationsPage() {
             };
           });
           setReservations(list);
+          receptionCache.set('reservations', list);
         }
       })
       .catch(err => console.error("Failed to load reservations ledger:", err))
@@ -63,7 +66,7 @@ function ReservationsPage() {
   };
 
   useEffect(() => {
-    loadReservations(false);
+    loadReservations(!loading);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadReservations(true);
@@ -76,14 +79,6 @@ function ReservationsPage() {
 
   // Selected Reservation details Drawer State
   const [selectedRes, setSelectedRes] = useState(null);
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
-        Loading reservations ledger...
-      </div>
-    );
-  }
 
   // Status config
   const statusMeta = {
@@ -302,7 +297,13 @@ function ReservationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-              {filteredReservations.length === 0 ? (
+              {loading && reservations.length === 0 ? (
+                <tr>
+                  <td colSpan="10" className="py-10 text-center font-semibold text-xs text-muted-foreground animate-pulse select-none">
+                    Loading reservations ledger...
+                  </td>
+                </tr>
+              ) : filteredReservations.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="py-10 text-center font-bold text-muted-foreground select-none">
                     No matching reservations found in ledger database.

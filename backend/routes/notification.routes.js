@@ -9,16 +9,24 @@ import { emitRealtimeSync } from '../utils/socketEmitter.js';
 
 const router = express.Router();
 
+let lastSyncAllRoleTime = 0;
+let isSeededMap = new Map();
+
 // Helper to seed initial notifications if database is empty for role
 const seedNotificationsIfNeeded = async (user) => {
+  if (!user) return;
+  const cacheKey = `${user.role}_${user.id || user._id}`;
+  if (isSeededMap.has(cacheKey)) return;
+  isSeededMap.set(cacheKey, true);
+
   try {
-    const list = await Notification.find({
+    const count = await Notification.countDocuments({
       $or: [
         { userId: user.id || user._id },
         { role: user.role }
       ]
     });
-    if (list.length === 0) {
+    if (count === 0) {
       const propertyId = user.propertyId || 'HS-JAI';
       if (user.role === 'super-admin') {
         await Notification.create({
@@ -74,14 +82,41 @@ const seedNotificationsIfNeeded = async (user) => {
   }
 };
 
-// Permanent synchronizer: ensures all bookings in DB have matching notifications across Admin, Super Admin, Manager, and Receptionist
+// Batch synchronizer: ensures all bookings in DB have matching notifications across Admin, Super Admin, Manager, and Receptionist
 const syncAllRoleBookingNotifications = async () => {
-  try {
-    const allBookings = await Booking.find({}).sort({ createdAt: -1 });
-    const rolesToNotify = ['super-admin', 'admin', 'manager', 'receptionist'];
+  const now = Date.now();
+  if (now - lastSyncAllRoleTime < 300000) return; // run at most once per 5 minutes
+  lastSyncAllRoleTime = now;
 
-    for (const b of allBookings) {
-      const bId = b.bookingId || String(b._id) || b.id;
+  try {
+    const [allBookings, existingNotifs] = await Promise.all([
+      Booking.find({}).lean(),
+      Notification.find({}, { role: 1, message: 1, title: 1 }).lean()
+    ]);
+
+    const rolesToNotify = ['super-admin', 'admin', 'manager', 'receptionist'];
+    const existingRefMap = new Map();
+    for (const r of rolesToNotify) {
+      existingRefMap.set(r, new Set());
+    }
+
+    for (const n of existingNotifs || []) {
+      const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      const r = n.role;
+      if (existingRefMap.has(r)) {
+        const set = existingRefMap.get(r);
+        const matches = text.match(/([a-z0-9_-]{4,})/g);
+        if (matches) {
+          for (const m of matches) set.add(m);
+        }
+      }
+    }
+
+    const notifsToInsert = [];
+    for (const b of allBookings || []) {
+      const bId = String(b.bookingId || b._id || b.id || '').trim();
+      if (!bId) continue;
+      const bIdLower = bId.toLowerCase();
       const guestName = b.guest || b.guestName || b.customerName || 'Guest';
       const roomInfo = b.room || b.roomType || 'Standard Room';
       const checkIn = b.checkIn || b.checkInDate || 'Today';
@@ -93,31 +128,24 @@ const syncAllRoleBookingNotifications = async () => {
       const message = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bId}]`;
 
       for (const role of rolesToNotify) {
-        let exists = null;
-        try {
-          exists = await Notification.findOne({
+        const roleSet = existingRefMap.get(role);
+        if (!roleSet.has(bIdLower)) {
+          roleSet.add(bIdLower);
+          notifsToInsert.push({
             role,
-            $or: [
-              { message: { $regex: bId, $options: 'i' } },
-              { title: { $regex: bId, $options: 'i' } }
-            ]
+            propertyId: targetProp,
+            title,
+            message,
+            category: 'Reservations',
+            isRead: false,
+            createdAt: b.createdAt || new Date()
           });
-        } catch (_) {}
-
-        if (!exists) {
-          try {
-            await Notification.create({
-              role,
-              propertyId: targetProp,
-              title,
-              message,
-              category: 'Reservations',
-              isRead: false,
-              createdAt: b.createdAt || new Date()
-            });
-          } catch (_) {}
         }
       }
+    }
+
+    if (notifsToInsert.length > 0) {
+      await Notification.insertMany(notifsToInsert);
     }
   } catch (err) {
     console.error("Failed to sync booking notifications across roles:", err.message);
@@ -127,9 +155,6 @@ const syncAllRoleBookingNotifications = async () => {
 // 1. Get user notifications
 router.get('/', protect, async (req, res) => {
   try {
-    await seedNotificationsIfNeeded(req.user);
-    await syncAllRoleBookingNotifications();
-    
     const userRole = req.user.role;
     const userId = req.user.id || req.user._id;
     const propId = req.user.propertyId;
@@ -139,31 +164,24 @@ router.get('/', protect, async (req, res) => {
       query = {
         $or: [
           { userId },
-          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null] } },
-          { role: { $exists: false } }
+          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null, 'all'] } }
         ]
       };
     } else if (userRole === 'manager') {
       query = {
         $or: [
           { userId },
-          { role: 'manager' },
-          { role: null },
-          { role: { $exists: false } },
+          { role: { $in: ['manager', 'all', null] } },
           { propertyId: propId },
           { propertyId: 'HS-JAI' },
-          { propertyId: 'HS-9HQ8P' },
-          { propertyId: null },
-          { propertyId: { $exists: false } }
+          { propertyId: 'HS-9HQ8P' }
         ]
       };
     } else if (userRole === 'receptionist') {
       query = {
         $or: [
           { userId },
-          { role: 'receptionist' },
-          { role: null },
-          { role: { $exists: false } },
+          { role: { $in: ['receptionist', 'all', null] } },
           { propertyId: propId },
           { propertyId: 'HS-JAI' },
           { propertyId: 'HS-9HQ8P' }
@@ -187,7 +205,7 @@ router.get('/', protect, async (req, res) => {
 
       let guestBookings = [];
       try {
-        guestBookings = await Booking.find({ $or: bQuery });
+        guestBookings = await Booking.find({ $or: bQuery }).lean();
       } catch (_) {}
 
       var myBookingIds = new Set();
@@ -229,7 +247,7 @@ router.get('/', protect, async (req, res) => {
       };
     }
 
-    const list = await Notification.find(query).sort({ createdAt: -1 });
+    const list = await Notification.find(query).sort({ createdAt: -1 }).lean().limit(100);
 
     // Deduplicate items by title and message with strict guest isolation
     const dedupMap = new Map();
@@ -284,7 +302,6 @@ router.get('/', protect, async (req, res) => {
 // 2. Get unread count
 router.get('/unread-count', protect, async (req, res) => {
   try {
-    await syncAllRoleBookingNotifications();
     const userRole = req.user.role;
     const userId = req.user.id || req.user._id;
     const propId = req.user.propertyId;
@@ -295,31 +312,24 @@ router.get('/unread-count', protect, async (req, res) => {
       query = {
         $or: [
           { userId },
-          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null] } },
-          { role: { $exists: false } }
+          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null, 'all'] } }
         ]
       };
     } else if (userRole === 'manager') {
       query = {
         $or: [
           { userId },
-          { role: 'manager' },
-          { role: null },
-          { role: { $exists: false } },
+          { role: { $in: ['manager', 'all', null] } },
           { propertyId: propId },
           { propertyId: 'HS-JAI' },
-          { propertyId: 'HS-9HQ8P' },
-          { propertyId: null },
-          { propertyId: { $exists: false } }
+          { propertyId: 'HS-9HQ8P' }
         ]
       };
     } else if (userRole === 'receptionist') {
       query = {
         $or: [
           { userId },
-          { role: 'receptionist' },
-          { role: null },
-          { role: { $exists: false } },
+          { role: { $in: ['receptionist', 'all', null] } },
           { propertyId: propId },
           { propertyId: 'HS-JAI' },
           { propertyId: 'HS-9HQ8P' }
@@ -385,7 +395,7 @@ router.get('/unread-count', protect, async (req, res) => {
       };
     }
 
-    const list = await Notification.find(query).sort({ createdAt: -1 });
+    const list = await Notification.find(query).sort({ createdAt: -1 }).lean().limit(100);
     const dedupMap = new Map();
     for (const item of list) {
       if (userRole === 'guest') {

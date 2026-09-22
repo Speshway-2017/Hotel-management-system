@@ -76,6 +76,8 @@ const variantStyles = {
  * Displays a clean action tooltip on hover.
  * Icon is size-3.5 (14px x 14px), perfectly centered.
  */
+import { useNavigate } from "react-router-dom";
+
 export function ActionIcon({
   icon: Icon,
   label,
@@ -92,6 +94,8 @@ export function ActionIcon({
   children,
   ...props
 }) {
+  const navigate = useNavigate();
+
   const handleClick = (e) => {
     if (disabled) {
       e.preventDefault();
@@ -101,7 +105,11 @@ export function ActionIcon({
       onClick(e);
     } else if (to || href) {
       const destination = to || href;
-      window.location.href = destination;
+      if (destination.startsWith('http://') || destination.startsWith('https://') || destination.startsWith('//')) {
+        window.location.href = destination;
+      } else {
+        navigate(destination);
+      }
     }
   };
 

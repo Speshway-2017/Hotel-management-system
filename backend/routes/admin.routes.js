@@ -320,11 +320,28 @@ const ensureRealPayments = async (propId) => {
   try {
     const bookings = await Booking.find({});
     for (const b of bookings) {
-      const bId = b.bookingId || (b._id ? String(b._id) : null);
-      if (!bId) continue;
+      const rawId = b._id ? String(b._id) : null;
+      let cleanBookingId = b.bookingId;
+      if (!cleanBookingId || cleanBookingId.length === 24) {
+        cleanBookingId = b._id ? `BK-${String(b._id).slice(-5).toUpperCase()}` : `BK-1001`;
+      }
+      const bId = cleanBookingId;
       const guestName = b.guest || b.customerName || b.guestName || 'Guest';
 
-      let roomNumber = extractRoomNumber(b) || '101';
+      let roomNumber = b.roomNumber;
+      if (!roomNumber || isNaN(roomNumber) || roomNumber === 'Deluxe' || roomNumber === 'Standard') {
+        const match = String(b.room || '').match(/\b\d{3,4}\b/)?.[0];
+        if (match) {
+          roomNumber = match;
+        } else {
+          const rType = String(b.room || b.roomType || '').toLowerCase();
+          if (rType.includes('executive') || rType.includes('suite')) roomNumber = '301';
+          else if (rType.includes('deluxe')) roomNumber = '201';
+          else if (rType.includes('penthouse')) roomNumber = '501';
+          else roomNumber = '101';
+        }
+      }
+
       const amount = Number(b.totalAmount || b.amount || 0);
       const paymentMethod = b.paymentMethod || 'UPI';
       const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
@@ -334,25 +351,27 @@ const ensureRealPayments = async (propId) => {
         ? 'Settled'
         : 'Pending');
 
+      const paymentDate = b.createdAt || (b.checkIn ? new Date(b.checkIn) : new Date());
+
       const query = {
         $or: [
-          { bookingId: bId },
-          ...(b.bookingId ? [{ bookingId: b.bookingId }] : []),
-          { guestName: guestName, roomNumber: roomNumber }
+          { bookingId: cleanBookingId },
+          ...(rawId ? [{ bookingId: rawId }] : []),
+          ...(b.bookingId ? [{ bookingId: b.bookingId }] : [])
         ]
       };
       const existingList = await Payment.find(query);
 
       if (!existingList || existingList.length === 0) {
         await Payment.create({
-          bookingId: bId,
+          bookingId: cleanBookingId,
           guestName,
           roomNumber,
           amount: amount > 0 ? amount : 3500,
           paymentMethod,
           status,
           propertyId: b.propertyId || propId || 'HS-9HQ8P',
-          createdAt: b.createdAt || new Date()
+          createdAt: paymentDate
         });
       } else {
         const existing = existingList[0];
@@ -363,12 +382,13 @@ const ensureRealPayments = async (propId) => {
           }
         }
         let needsUpdate = false;
+        if (existing.bookingId !== cleanBookingId) { existing.bookingId = cleanBookingId; needsUpdate = true; }
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
-        if (b.createdAt && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(b.createdAt).getTime()) > 1000) {
-          existing.createdAt = b.createdAt;
+        if (paymentDate && existing.createdAt && Math.abs(new Date(existing.createdAt).getTime() - new Date(paymentDate).getTime()) > 1000) {
+          existing.createdAt = paymentDate;
           needsUpdate = true;
         }
         if (needsUpdate) await existing.save();

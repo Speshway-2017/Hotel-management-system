@@ -512,6 +512,21 @@ class QueryWrapper {
       throw err;
     }
   }
+  async catch(onRejected) {
+    return this.then(undefined, onRejected);
+  }
+  async finally(onFinally) {
+    return this.then(
+      async (val) => {
+        if (onFinally) await onFinally();
+        return val;
+      },
+      async (err) => {
+        if (onFinally) await onFinally();
+        throw err;
+      }
+    );
+  }
 }
 
 const Booking = {

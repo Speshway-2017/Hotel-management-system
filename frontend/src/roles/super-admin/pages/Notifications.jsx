@@ -24,53 +24,36 @@ function SuperAdminNotifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchAlerts = (isSilent = false) => {
+  const fetchAlerts = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
-    superAdminService.getProperties()
-      .then(propRes => {
-        const propertiesList = propRes.success && propRes.data ? propRes.data : [];
-        notificationsService.getNotifications()
-          .then(res => {
-            if (res.success && res.data) {
-              const compiled = res.data.map(n => {
-                const matched = propertiesList.find(p => p._id === n.propertyId || p.id === n.propertyId);
-                return {
-                  id: n._id || n.id,
-                  title: n.title,
-                  message: n.message,
-                  type: n.category || 'General',
-                  propertyName: matched ? matched.name : (n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel'),
-                  timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
-                  read: n.isRead,
-                  body: n.message
-                };
-              });
-              setNotifications(compiled);
-            }
-          })
-          .catch(err => console.error("Failed to load super admin alerts:", err))
-          .finally(() => { if (!isSilent) setLoading(false); });
-      })
-      .catch(() => {
-        notificationsService.getNotifications()
-          .then(res => {
-            if (res.success && res.data) {
-              const compiled = res.data.map(n => ({
-                id: n._id || n.id,
-                title: n.title,
-                message: n.message,
-                type: n.category || 'General',
-                propertyName: n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel',
-                timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
-                read: n.isRead,
-                body: n.message
-              }));
-              setNotifications(compiled);
-            }
-          })
-          .catch(err => console.error(err))
-          .finally(() => { if (!isSilent) setLoading(false); });
-      });
+    try {
+      const [propRes, res] = await Promise.all([
+        superAdminService.getProperties().catch(() => ({})),
+        notificationsService.getNotifications().catch(() => ({}))
+      ]);
+
+      const propertiesList = propRes?.success && propRes?.data ? propRes.data : [];
+      if (res?.success && Array.isArray(res.data)) {
+        const compiled = res.data.map(n => {
+          const matched = propertiesList.find(p => p._id === n.propertyId || p.id === n.propertyId);
+          return {
+            id: n._id || n.id,
+            title: n.title,
+            message: n.message,
+            type: n.category || 'General',
+            propertyName: matched ? matched.name : (n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel'),
+            timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
+            read: n.isRead,
+            body: n.message
+          };
+        });
+        setNotifications(compiled);
+      }
+    } catch (err) {
+      console.error("Failed to load super admin alerts:", err);
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
   };
 
   useEffect(() => {

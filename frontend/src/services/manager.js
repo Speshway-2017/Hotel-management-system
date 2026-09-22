@@ -123,6 +123,9 @@ export const managerService = {
   },
   extendReservation: async (id, data) => {
     return await apiClient.put(`/manager/reservations/${id}/extend`, data);
+  },
+  extendStay: async (id, data) => {
+    return await apiClient.put(`/manager/reservations/${id}/extend`, data);
   }
 };
 

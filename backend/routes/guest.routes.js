@@ -22,9 +22,19 @@ const guestAuth = async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       const token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
-      req.user = await User.findById(decoded.id).select('-password');
+      if (decoded.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
+        req.user = await User.findById(decoded.id).select('-password');
+      }
+      if (!req.user && decoded.id) {
+        req.user = await User.findOne({ $or: [{ _id: decoded.id }, { id: decoded.id }] }).select('-password');
+      }
+      if (!req.user && decoded.email) {
+        req.user = await User.findOne({ email: decoded.email }).select('-password');
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('GuestAuth error:', e.message);
+  }
   
   if (!req.user) {
     return sendError(res, 401, 'Authentication required to access guest portal');
@@ -88,8 +98,13 @@ router.get('/bookings', async (req, res) => {
     if (req.user?.mobile) query.push({ phone: req.user.mobile });
     if (req.user?.name) query.push({ guest: req.user.name });
 
-    // Show bookings linked to the logged-in guest
-    const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
+    // Show bookings linked to the logged-in guest for their related property only
+    const targetPropId = req.query.propertyId || req.headers['x-property-id'] || req.user?.propertyId || 'HS-JAI';
+    const bookingQuery = targetPropId
+      ? { $and: [{ $or: query }, { $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }] }] }
+      : { $or: query };
+
+    const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
     // Fetch existing feedbacks to mark which bookings already have feedback
     const feedbackQuery = [];
@@ -191,8 +206,13 @@ router.get('/dashboard', async (req, res) => {
     if (req.user?.mobile) query.push({ phone: req.user.mobile });
     if (req.user?.name) query.push({ guest: req.user.name });
 
-    // Show bookings linked to the logged-in guest
-    const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
+    // Show bookings linked to the logged-in guest for their related property only
+    const targetPropId = req.query.propertyId || req.headers['x-property-id'] || req.user?.propertyId || 'HS-JAI';
+    const bookingQuery = targetPropId
+      ? { $and: [{ $or: query }, { $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }] }] }
+      : { $or: query };
+
+    const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
@@ -257,8 +277,13 @@ router.get('/folio', async (req, res) => {
     if (req.user?.mobile) query.push({ phone: req.user.mobile });
     if (req.user?.name) query.push({ guest: req.user.name });
 
-    // Show folios linked to the logged-in guest
-    const bookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
+    // Show folios linked to the logged-in guest for their related property only
+    const targetPropId = req.query.propertyId || req.headers['x-property-id'] || req.user?.propertyId || 'HS-JAI';
+    const bookingQuery = targetPropId
+      ? { $and: [{ $or: query }, { $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }] }] }
+      : { $or: query };
+
+    const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
     const folios = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
@@ -614,11 +639,18 @@ router.put('/notifications-settings', async (req, res) => {
   }
 });
 
+let lastGuestSyncMap = new Map();
+
 // Helper to ensure all booking lifecycle events (Check-in, Check-out, Room Assigned, Confirmed) have matching guest notifications
 const syncGuestBookingNotifications = async (user) => {
   if (!user) return;
+  const userId = user._id || user.id;
+  const userKey = String(userId);
+  const now = Date.now();
+  if (lastGuestSyncMap.has(userKey) && (now - lastGuestSyncMap.get(userKey) < 300000)) return;
+  lastGuestSyncMap.set(userKey, now);
+
   try {
-    const userId = user._id || user.id;
     const userEmail = user.email;
     const userPhone = user.mobile || user.phone;
     const userName = user.name;
@@ -628,10 +660,25 @@ const syncGuestBookingNotifications = async (user) => {
     if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
     if (userName) bQuery.push({ guest: userName }, { guestName: userName });
 
-    const guestBookings = await Booking.find({ $or: bQuery }).sort({ createdAt: -1 });
+    const [guestBookings, existingNotifs] = await Promise.all([
+      Booking.find({ $or: bQuery }).lean(),
+      Notification.find({ userId: String(userId) }, { message: 1, title: 1 }).lean()
+    ]);
 
-    for (const b of guestBookings) {
-      const bId = b.bookingId || String(b._id) || b.id;
+    const existingRefs = new Set();
+    for (const n of existingNotifs || []) {
+      const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      const matches = text.match(/([a-z0-9_-]{4,})/g);
+      if (matches) {
+        for (const m of matches) existingRefs.add(m);
+      }
+    }
+
+    const toInsert = [];
+    for (const b of guestBookings || []) {
+      const bId = String(b.bookingId || b._id || b.id || '').trim();
+      if (!bId) continue;
+      const bIdLower = bId.toLowerCase();
       const hotelName = b.hotel || b.hotelName || b.propertyName || 'Hour Stay Hotel & Suites';
       const roomNum = b.roomNumber || '';
       const roomInfo = roomNum ? `Room ${roomNum} (${b.room || b.roomType || 'Standard Room'})` : (b.room || b.roomType || 'Standard Room');
@@ -640,129 +687,37 @@ const syncGuestBookingNotifications = async (user) => {
       const status = (b.status || '').toLowerCase();
       const propId = b.propertyId || 'HS-JAI';
 
-      // 1. If Booking is Checked-in / Staying / Active
-      if (status === 'checked-in' || status === 'checked_in' || status === 'checked in' || status === 'staying' || status === 'active') {
-        const title = 'Check-in Confirmed!';
-        const message = `Welcome! Your check-in to ${roomInfo} at ${hotelName} is complete. Enjoy your stay! [Ref: #${bId}]`;
-        
-        let exists = null;
-        try {
-          exists = await Notification.findOne({
-            userId: String(userId),
-            $or: [
-              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'check-in', $options: 'i' } },
-              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'checked in', $options: 'i' } }
-            ]
-          });
-        } catch (_) {}
+      if (!existingRefs.has(bIdLower)) {
+        existingRefs.add(bIdLower);
+        let title = 'Booking Confirmed!';
+        let message = `Your stay at ${hotelName} (${roomInfo}) is confirmed for ${checkIn} → ${checkOut}. [Ref: #${bId}]`;
+        let category = 'Bookings';
 
-        if (!exists) {
-          try {
-            await Notification.create({
-              userId: String(userId),
-              role: 'guest',
-              propertyId: propId,
-              title,
-              message,
-              category: 'Check-in',
-              isRead: false,
-              createdAt: b.updatedAt || b.createdAt || new Date()
-            });
-          } catch (_) {}
+        if (status === 'checked-in' || status === 'checked_in' || status === 'checked in' || status === 'staying' || status === 'active') {
+          title = 'Check-in Confirmed!';
+          message = `Welcome! Your check-in to ${roomInfo} at ${hotelName} is complete. Enjoy your stay! [Ref: #${bId}]`;
+          category = 'Check-in';
+        } else if (status === 'checked-out' || status === 'checked_out' || status === 'checked out' || status === 'completed') {
+          title = 'Check-out Completed';
+          message = `Thank you for staying with us at ${hotelName} (${roomInfo}). We hope you had a pleasant experience! [Ref: #${bId}]`;
+          category = 'Stay';
         }
+
+        toInsert.push({
+          userId: String(userId),
+          role: 'guest',
+          propertyId: propId,
+          title,
+          message,
+          category,
+          isRead: false,
+          createdAt: b.updatedAt || b.createdAt || new Date()
+        });
       }
+    }
 
-      // 2. If Booking is Checked-out / Completed
-      if (status === 'checked-out' || status === 'checked_out' || status === 'checked out' || status === 'completed') {
-        const title = 'Check-out Completed';
-        const message = `Thank you for staying with us at ${hotelName} (${roomInfo}). We hope you had a pleasant experience! [Ref: #${bId}]`;
-
-        let exists = null;
-        try {
-          exists = await Notification.findOne({
-            userId: String(userId),
-            $or: [
-              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'check-out', $options: 'i' } },
-              { message: { $regex: bId, $options: 'i' }, title: { $regex: 'checked out', $options: 'i' } }
-            ]
-          });
-        } catch (_) {}
-
-        if (!exists) {
-          try {
-            await Notification.create({
-              userId: String(userId),
-              role: 'guest',
-              propertyId: propId,
-              title,
-              message,
-              category: 'Stay',
-              isRead: false,
-              createdAt: b.updatedAt || b.createdAt || new Date()
-            });
-          } catch (_) {}
-        }
-      }
-
-      // 3. If Booking is Confirmed / Paid / Pending
-      if (status === 'confirmed' || status === 'paid' || status === 'pending') {
-        const title = 'Booking Confirmed!';
-        const message = `Your stay at ${hotelName} (${roomInfo}) is confirmed for ${checkIn} → ${checkOut}. [Ref: #${bId}]`;
-
-        let exists = null;
-        try {
-          exists = await Notification.findOne({
-            userId: String(userId),
-            message: { $regex: bId, $options: 'i' },
-            title: { $regex: 'confirmed', $options: 'i' }
-          });
-        } catch (_) {}
-
-        if (!exists) {
-          try {
-            await Notification.create({
-              userId: String(userId),
-              role: 'guest',
-              propertyId: propId,
-              title,
-              message,
-              category: 'Bookings',
-              isRead: false,
-              createdAt: b.createdAt || new Date()
-            });
-          } catch (_) {}
-        }
-      }
-
-      // 4. If Room is assigned
-      if (roomNum && roomNum !== 'TBD' && roomNum !== '') {
-        const title = 'Room Assigned';
-        const message = `Room ${roomNum} has been allocated for your reservation #${bId} at ${hotelName}.`;
-
-        let exists = null;
-        try {
-          exists = await Notification.findOne({
-            userId: String(userId),
-            message: { $regex: bId, $options: 'i' },
-            title: { $regex: 'room assigned', $options: 'i' }
-          });
-        } catch (_) {}
-
-        if (!exists) {
-          try {
-            await Notification.create({
-              userId: String(userId),
-              role: 'guest',
-              propertyId: propId,
-              title,
-              message,
-              category: 'Room Assigned',
-              isRead: false,
-              createdAt: b.updatedAt || b.createdAt || new Date()
-            });
-          } catch (_) {}
-        }
-      }
+    if (toInsert.length > 0) {
+      await Notification.insertMany(toInsert);
     }
   } catch (err) {
     console.error('syncGuestBookingNotifications error:', err.message);
@@ -772,14 +727,15 @@ const syncGuestBookingNotifications = async (user) => {
 // GET /api/v1/guest/notifications
 router.get('/notifications', async (req, res) => {
   try {
-    const userId = req.user?.id || req.user?._id;
+    const userId = req.user?._id || req.user?.id;
     const userIdStr = String(userId || '');
     const userEmail = req.user?.email;
     const userPhone = req.user?.mobile || req.user?.phone;
     const userName = req.user?.name;
 
-    // Permanently sync any check-in, check-out, or reservation status changes for this guest
-    await syncGuestBookingNotifications(req.user);
+    setImmediate(() => {
+      syncGuestBookingNotifications(req.user).catch(() => {});
+    });
 
     // 1. Collect all bookings for this guest
     const bQuery = [
@@ -1048,6 +1004,37 @@ const handleMarkAllGuestNotificationsRead = async (req, res) => {
 router.patch('/notifications/read-all', handleMarkAllGuestNotificationsRead);
 router.post('/notifications/read-all', handleMarkAllGuestNotificationsRead);
 router.put('/notifications/read-all', handleMarkAllGuestNotificationsRead);
+
+router.get('/notifications/unread-count', async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const uIdStr = String(userId || '');
+    const userEmail = req.user?.email;
+
+    const count = await Notification.countDocuments({
+      isRead: false,
+      $or: [
+        { userId: uIdStr },
+        { userId: userEmail },
+        { role: 'guest', userId: { $in: [null, undefined, '', 'all'] } }
+      ]
+    });
+    return sendSuccess(res, 200, { unreadCount: count }, 'Unread count retrieved');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.delete('/notifications/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const idQuery = mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }, { id }] : [{ _id: id }, { id }];
+    await Notification.deleteMany({ $or: idQuery });
+    return sendSuccess(res, 200, { id }, 'Notification removed successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
 
 // Extend guest stay with dynamic payment calculation
 const handleGuestExtendStay = async (req, res) => {
@@ -2278,4 +2265,5 @@ router.post('/delete-account-request', async (req, res) => {
 });
 
 export default router;
+
 

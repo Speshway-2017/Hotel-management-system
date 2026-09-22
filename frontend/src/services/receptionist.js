@@ -23,6 +23,13 @@ export const receptionistService = {
       return await apiClient.post(`/manager/reservations/${id}/extend`, data);
     }
   },
+  extendStay: async (id, data) => {
+    try {
+      return await apiClient.post(`/receptionist/reservations/${id}/extend`, data);
+    } catch (err) {
+      return await apiClient.post(`/manager/reservations/${id}/extend`, data);
+    }
+  },
   getRooms: async () => {
     return await apiClient.get('/receptionist/rooms');
   },
@@ -33,10 +40,10 @@ export const receptionistService = {
     return await apiClient.get('/receptionist/reservations');
   },
   getArrivals: async () => {
-    return await apiClient.get('/receptionist/reservations');
+    return await apiClient.get('/receptionist/arrivals');
   },
   getDepartures: async () => {
-    return await apiClient.get('/receptionist/reservations');
+    return await apiClient.get('/receptionist/departures');
   },
   createReservation: async (data) => {
     return await apiClient.post('/receptionist/reservations', data);

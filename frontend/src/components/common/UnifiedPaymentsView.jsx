@@ -38,10 +38,13 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
   );
 }
 
+import { receptionCache } from "@/services/receptionCache";
+
 export function UnifiedPaymentsView({ role = "admin" }) {
   const navigate = useNavigate();
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cachedPayments = role === 'reception' ? receptionCache.get('payments') : null;
+  const [payments, setPayments] = useState(() => cachedPayments || []);
+  const [loading, setLoading] = useState(() => !cachedPayments);
   const [refreshing, setRefreshing] = useState(false);
 
   // Filters state
@@ -88,19 +91,34 @@ export function UnifiedPaymentsView({ role = "admin" }) {
         ? res.data
         : (Array.isArray(res) ? res : []);
 
-      const formatted = rawList.map(p => ({
-        _id: String(p._id || p.id || ""),
-        bookingId: p.bookingId || "—",
-        guestName: p.guestName || p.guest || p.customerName || "Guest",
-        roomNumber: p.roomNumber || p.room || "101",
-        amount: Number(p.amount || 0),
-        paymentMethod: p.paymentMethod || p.method || "UPI",
-        status: p.status || "Settled",
-        propertyId: p.propertyId || "",
-        createdAt: p.createdAt || p.date || new Date().toISOString()
-      }));
+      const formatted = rawList.map(p => {
+        let cleanBookingId = p.bookingId || "—";
+        if (cleanBookingId.length === 24) {
+          cleanBookingId = `BK-${cleanBookingId.slice(-5).toUpperCase()}`;
+        }
+        let cleanRoom = p.roomNumber || p.room;
+        if (!cleanRoom || isNaN(cleanRoom)) {
+          const match = String(p.room || p.roomNumber || '').match(/\b\d{3,4}\b/)?.[0];
+          cleanRoom = match || cleanRoom || "101";
+        }
+
+        return {
+          _id: String(p._id || p.id || ""),
+          bookingId: cleanBookingId,
+          guestName: p.guestName || p.guest || p.customerName || "Guest",
+          roomNumber: cleanRoom,
+          amount: Number(p.amount || 0),
+          paymentMethod: p.paymentMethod || p.method || "UPI",
+          status: p.status || "Settled",
+          propertyId: p.propertyId || "",
+          createdAt: p.createdAt || p.date || new Date().toISOString()
+        };
+      });
 
       setPayments(formatted);
+      if (role === "reception") {
+        receptionCache.set("payments", formatted);
+      }
     } catch (err) {
       console.error("Failed to load payments ledger:", err);
       if (!isSilent) {
@@ -110,10 +128,10 @@ export function UnifiedPaymentsView({ role = "admin" }) {
       if (!isSilent) setLoading(false);
       setRefreshing(false);
     }
-  }, [getService]);
+  }, [getService, role]);
 
   useEffect(() => {
-    loadPayments(false);
+    loadPayments(!loading);
 
     const handleFocus = () => loadPayments(true);
     const handleVisibilityChange = () => {
@@ -752,19 +770,27 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                 paginatedPayments.map((p) => {
                   const MethodIcon = getMethodIcon(p.paymentMethod);
                   const tone = getStatusTone(p.status);
-                  const formattedDate = p.createdAt ? new Date(p.createdAt).toLocaleString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true
-                  }) : "Recent";
+                  const formattedDate = (() => {
+                    if (!p.createdAt) return "—";
+                    const d = new Date(p.createdAt);
+                    if (isNaN(d.getTime())) return "—";
+                    const datePart = d.toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric"
+                    });
+                    const timePart = d.toLocaleTimeString("en-IN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true
+                    });
+                    return `${datePart}, ${timePart}`;
+                  })();
 
                   return (
                     <tr key={p._id} className="hover:bg-muted/5 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-navy-deep text-left">
-                        {p._id ? p._id.substring(p._id.length - 8).toUpperCase() : "—"}
+                        {p._id ? `TXN-${p._id.substring(p._id.length - 6).toUpperCase()}` : "—"}
                       </td>
                       <td className="py-3.5 px-4 text-left">
                         <div className="flex flex-col">

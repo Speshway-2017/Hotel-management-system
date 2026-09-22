@@ -262,59 +262,69 @@ class _GuestFeedbackScreenState extends State<GuestFeedbackScreen> {
           ),
 
           // Right: Summary Badges
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: white.withAlpha(20),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: gold.withAlpha(100)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.reviews_rounded, color: gold, size: 14),
-                    const SizedBox(width: 5),
-                    Text(
-                      '$totalReviews Submitted',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: cream,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (pendingReviewsCount > 0) ...[
-                const SizedBox(height: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: amber.withAlpha(40),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: amber),
+                    color: white.withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: gold.withAlpha(100)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.pending_actions_rounded, color: gold, size: 12),
+                      const Icon(Icons.reviews_rounded, color: gold, size: 13),
                       const SizedBox(width: 4),
-                      Text(
-                        '$pendingReviewsCount Eligible Stay${pendingReviewsCount == 1 ? "" : "s"}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: gold,
+                      Flexible(
+                        child: Text(
+                          '$totalReviews Submitted',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: cream,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                 ),
+                if (pendingReviewsCount > 0) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: amber.withAlpha(40),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: amber),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.pending_actions_rounded, color: gold, size: 12),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '$pendingReviewsCount Eligible Stay${pendingReviewsCount == 1 ? "" : "s"}',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: gold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ],
       ),
