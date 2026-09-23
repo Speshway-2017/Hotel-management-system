@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 
 // Premium stat card component
 function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
@@ -76,6 +77,7 @@ export const Route = createFileRoute("/manager/operations")({
 
 function ManagerOperationsPage() {
   const navigate = useNavigate();
+  useServerTime(2000);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
@@ -153,6 +155,15 @@ function ManagerOperationsPage() {
 
   const handleStatusUpdate = async (resId, newStatus, booking = null) => {
     const targetBooking = booking || reservations.find(r => r._id === resId || r.id === resId || r.bookingId === resId);
+
+    if (newStatus === "Checked-in" && targetBooking) {
+      const checkInStatus = getCheckInStatusInfo(targetBooking);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
+
     const source = targetBooking?.source || "";
     const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
     
@@ -475,6 +486,7 @@ function ManagerOperationsPage() {
                           </>
                         ) : (r.status !== "Checked-out" && r.status !== "Checked Out" && r.status !== "Cancelled") ? (
                           <CheckInActionButton
+                            booking={r}
                             onClick={() => handleStatusUpdate(r._id || r.id, "Checked-in", r)}
                             title="Process Check-in"
                           />

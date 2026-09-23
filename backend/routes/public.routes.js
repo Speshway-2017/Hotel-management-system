@@ -12,8 +12,12 @@ import Coupon from '../models/coupon.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { triggerNotification, notifyFeedbackEvent, notifyBookingEvent } from '../utils/notification.helper.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
-import { calculateStayNights, parseDateSafe } from '../utils/dateUtils.js';
+import { calculateStayNights, parseDateSafe, formatISTDateTime } from '../utils/dateUtils.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
+import {
+  validateBookingAadhaarConsistency,
+  syncVerifiedAadhaarToGuestProfile
+} from '../utils/aadhaarValidator.js';
 
 const router = express.Router();
 
@@ -85,6 +89,19 @@ const checkHasPreviousBookings = async ({ userId, email, phone }) => {
 
   return count > 0;
 };
+
+// GET /api/public/server-time (Used by all clients to synchronize with server clock)
+router.get('/server-time', (req, res) => {
+  const now = new Date();
+  return sendSuccess(res, 200, {
+    serverTime: now.toISOString(),
+    serverTimestamp: now.getTime(),
+    timezone: 'Asia/Kolkata',
+    formattedIST: formatISTDateTime(now),
+    standardCheckInTime: '12:00 PM',
+    standardCheckOutTime: '11:00 AM'
+  }, 'Current server time synchronized');
+});
 
 // GET /api/v1/public/branding
 router.get('/branding', async (req, res) => {
@@ -332,7 +349,9 @@ router.post('/bookings', async (req, res) => {
     const cIn = checkInDate || checkIn;
     const cOut = checkOutDate || checkOut;
     const rType = roomType || room || 'Standard Room';
-    let amt = Number(totalAmount || amount || 0);
+    const rawGross = Number(req.body.originalAmount || (req.body.roomBaseTotal ? (Number(req.body.roomBaseTotal) + Number(req.body.gstAmount || 0)) : (totalAmount || amount || 7080)));
+    const rawPassedFinal = Number(totalAmount || amount || 0);
+    let amt = rawGross > 0 ? rawGross : (rawPassedFinal > 0 ? rawPassedFinal : 7080);
     if (!amt || isNaN(amt) || amt <= 0) {
       amt = 7080;
     }
@@ -534,8 +553,9 @@ router.post('/bookings', async (req, res) => {
 
     // 2. Validate and Apply Promo / Coupon if provided
     let appliedCoupon = null;
-    let discountAmount = 0;
-    let finalAmount = amt;
+    let discountAmount = Number(req.body.discountAmount || 0);
+    const grossAmount = rawGross > 0 ? rawGross : 7080;
+    let finalAmount = rawPassedFinal > 0 ? rawPassedFinal : grossAmount;
     const requestedCouponCode = req.body.couponCode || req.body.coupon;
 
     if (requestedCouponCode) {
@@ -558,18 +578,18 @@ router.post('/bookings', async (req, res) => {
         const todayStr = new Date().toISOString().split('T')[0];
         const isDateValid = (!coupon.validFrom || todayStr >= coupon.validFrom) && (!coupon.validUntil || todayStr <= coupon.validUntil);
         const isUsageValid = !coupon.usageLimit || coupon.usageLimit === 0 || (coupon.usedCount || 0) < coupon.usageLimit;
-        const isMinAmountValid = !coupon.minBookingAmount || amt >= coupon.minBookingAmount;
+        const isMinAmountValid = !coupon.minBookingAmount || grossAmount >= coupon.minBookingAmount;
 
         if (isEligible && isDateValid && isUsageValid && isMinAmountValid) {
           if (coupon.discountType === 'percentage') {
-            discountAmount = Math.round((amt * coupon.discountValue) / 100);
+            discountAmount = Math.round((grossAmount * coupon.discountValue) / 100);
             if (coupon.maxDiscount && coupon.maxDiscount > 0 && discountAmount > coupon.maxDiscount) {
               discountAmount = coupon.maxDiscount;
             }
           } else {
-            discountAmount = Math.min(coupon.discountValue, amt);
+            discountAmount = Math.min(coupon.discountValue, grossAmount);
           }
-          finalAmount = Math.max(0, amt - discountAmount);
+          finalAmount = Math.max(0, grossAmount - discountAmount);
           appliedCoupon = coupon;
 
           // Increment usage count
@@ -585,8 +605,46 @@ router.post('/bookings', async (req, res) => {
       }
     }
 
+    // Single source of truth: if client calculated final payable amount matches gross - discount, preserve exact value
+    if (rawPassedFinal > 0 && discountAmount > 0 && Math.abs(rawPassedFinal - (grossAmount - discountAmount)) <= 5) {
+      finalAmount = rawPassedFinal;
+    }
+
     const bookingId = `BK${Date.now().toString().slice(-6)}`;
     const formattedRoom = assignedRoomNumber ? `${assignedRoomNumber} · ${rType || 'Standard Room'}` : (rType || 'Standard Room');
+
+    // Aadhaar consistency validation on website booking if provided
+    const inputDocType = req.body.idProofType || req.body.idDocType || 'Aadhaar Card';
+    const inputDocNumber = req.body.idProofNumber || req.body.idDocNumber || req.body.aadhaar || '';
+
+    let hasVerifiedId = false;
+    let finalDocNumber = '';
+    let finalDocType = inputDocType;
+
+    if (inputDocNumber) {
+      const aadhaarValidation = await validateBookingAadhaarConsistency({
+        guestId,
+        email: cleanEmail,
+        phone: cleanPhone,
+        name: gName,
+        idDocType: inputDocType,
+        idDocNumber: inputDocNumber
+      });
+
+      if (!aadhaarValidation.isValid) {
+        return sendError(res, 400, aadhaarValidation.error);
+      }
+
+      if (aadhaarValidation.isAadhaar) {
+        finalDocNumber = aadhaarValidation.formattedAadhaar;
+        finalDocType = 'Aadhaar Card';
+        hasVerifiedId = true;
+      } else {
+        finalDocNumber = String(inputDocNumber).trim();
+      }
+    }
+
+    const effectiveCoupon = appliedCoupon ? appliedCoupon.code : (requestedCouponCode ? String(requestedCouponCode).trim().toUpperCase() : null);
 
     const newBooking = await Booking.create({
       bookingId,
@@ -594,6 +652,11 @@ router.post('/bookings', async (req, res) => {
       propertyId: targetPropId,
       roomId: assignedRoomId,
       roomNumber: assignedRoomNumber ? String(assignedRoomNumber) : null,
+      idDocType: finalDocType,
+      idDocNumber: finalDocNumber,
+      idVerification: hasVerifiedId ? 'Verified' : 'Pending',
+      idVerifiedAt: hasVerifiedId ? new Date() : null,
+      idVerifiedBy: hasVerifiedId ? 'Online Direct Verification' : '',
       city: bookingCity || 'Hyderabad',
       guest: gName,
       email: cleanEmail,
@@ -607,30 +670,41 @@ router.post('/bookings', async (req, res) => {
       rooms: Number(roomsCount) || 1,
       adults: Number(adults) || 2,
       children: Number(children) || 0,
-      originalAmount: Number(req.body.originalAmount || amt),
-      couponCode: appliedCoupon ? appliedCoupon.code : (req.body.couponCode || null),
-      discountAmount: discountAmount || Number(req.body.discountAmount || 0),
+      originalAmount: grossAmount,
+      couponCode: effectiveCoupon,
+      discountAmount: discountAmount,
       amount: finalAmount,
       totalAmount: finalAmount,
       netAmount: finalAmount,
       paidAmount: finalAmount,
+      balance: 0,
+      paymentStatus: 'Paid',
       specialRequests: specialRequests || '',
       source: 'Website Direct',
       status: 'Confirmed'
     });
 
+    if (hasVerifiedId) {
+      await syncVerifiedAadhaarToGuestProfile({
+        booking: newBooking,
+        idDocType: finalDocType,
+        idDocNumber: finalDocNumber,
+        verifiedBy: 'Online Direct Verification'
+      });
+    }
+
     // Automatically log verified payment in ledger for real-time manager/receptionist consoles
     let newPayment = null;
     try {
-      const paymentAmount = finalAmount;
       newPayment = await Payment.create({
         bookingId: newBooking.bookingId,
         guestName: gName,
         roomNumber: assignedRoomNumber ? String(assignedRoomNumber) : '101',
-        amount: paymentAmount,
-        originalAmount: Number(req.body.originalAmount || amt),
-        discountAmount: discountAmount || Number(req.body.discountAmount || 0),
-        couponCode: appliedCoupon ? appliedCoupon.code : (req.body.couponCode || null),
+        amount: finalAmount,
+        originalAmount: grossAmount,
+        discountAmount: discountAmount,
+        couponCode: effectiveCoupon,
+        paidAmount: finalAmount,
         paymentMethod: req.body.paymentMethod || 'UPI',
         status: 'Settled',
         propertyId: targetPropId,
@@ -968,7 +1042,7 @@ router.get('/feedback', async (req, res) => {
         { propertyId: propertyId },
         { propertyId: { $exists: false } },
         { propertyId: '' },
-        { propertyId: 'HS-JAI' }
+        { propertyId: 'HS-9HQ8P' }
       ];
     }
     const list = await getUnifiedFeedbacksAndReviews(query);
@@ -989,7 +1063,7 @@ router.post('/feedback', async (req, res) => {
       ratings,
       comment = '',
       comments = '',
-      propertyId = 'HS-JAI'
+      propertyId = 'HS-9HQ8P'
     } = req.body;
 
     const feedbackText = comment || comments;

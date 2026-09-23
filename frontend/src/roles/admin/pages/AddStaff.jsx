@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import { validateWithZod, staffSchema } from "@/schemas";
 
 function AddStaff() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form States
   const [name, setName] = useState("");
@@ -24,6 +26,31 @@ function AddStaff() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const val = validateWithZod(staffSchema, {
+      name,
+      email,
+      phone,
+      password,
+      role,
+      dept,
+      shift,
+      status
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setFieldErrors(prev => ({ ...prev, password: "Password must be at least 6 characters" }));
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setFieldErrors({});
+
     setLoading(true);
     try {
       const payload = {
@@ -59,36 +86,45 @@ function AddStaff() {
       <div className="max-w-xl">
         <Panel title="Employee Registration Form" description="Assign credentials and contact details.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
-            <FormField label="Full Name" required id="name">
+            <FormField label="Full Name" required id="name" status={fieldErrors.name ? "error" : undefined} errorMsg={fieldErrors.name}>
               <Input
                 id="name"
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (fieldErrors.name) setFieldErrors(p => ({ ...p, name: null }));
+                }}
                 placeholder="Enter full name"
               />
             </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Email Address" required id="email">
+              <FormField label="Email Address" required id="email" status={fieldErrors.email ? "error" : undefined} errorMsg={fieldErrors.email}>
                 <Input
                   id="email"
                   type="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: null }));
+                  }}
                   placeholder="name@hourstay.com"
                 />
               </FormField>
-              <FormField label="Password" required id="password">
+              <FormField label="Password" required id="password" status={fieldErrors.password ? "error" : undefined} errorMsg={fieldErrors.password}>
                 <div className="relative w-full">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) setFieldErrors(p => ({ ...p, password: null }));
+                    }}
                     placeholder="••••••••"
                     className="pr-10"
                   />
@@ -104,13 +140,16 @@ function AddStaff() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Phone Number" required id="phone">
+              <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
                   type="text"
                   required
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null }));
+                  }}
                   placeholder="+91 XXXXX XXXXX"
                 />
               </FormField>

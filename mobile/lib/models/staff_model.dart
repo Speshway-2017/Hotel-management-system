@@ -18,7 +18,7 @@ class StaffModel {
     this.dept = 'Front Desk',
     this.shift = 'Morning Shift',
     this.status = 'Active',
-    this.propertyId = 'HS-JAI',
+    this.propertyId = 'HS-9HQ8P',
   });
 
   String get department => dept;
@@ -34,7 +34,7 @@ class StaffModel {
       dept: json['dept'] ?? json['department'] ?? 'Front Desk',
       shift: json['shift'] ?? 'Morning Shift',
       status: json['status'] ?? 'Active',
-      propertyId: json['propertyId']?.toString() ?? 'HS-JAI',
+      propertyId: json['propertyId']?.toString() ?? 'HS-9HQ8P',
     );
   }
 
@@ -73,7 +73,7 @@ class ShiftModel {
       userId: json['userId'] ?? '',
       username: json['username'] ?? '',
       shiftType: json['shiftType'] ?? 'Morning',
-      propertyId: json['propertyId']?.toString() ?? 'HS-JAI',
+      propertyId: json['propertyId']?.toString() ?? 'HS-9HQ8P',
     );
   }
 }
@@ -98,7 +98,7 @@ class AttendanceModel {
     this.checkOut = '--',
     this.workingHours = 8,
     this.status = 'Present',
-    this.propertyId = 'HS-JAI',
+    this.propertyId = 'HS-9HQ8P',
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) {
@@ -111,7 +111,7 @@ class AttendanceModel {
       checkOut: json['checkOut'] ?? '--',
       workingHours: int.tryParse(json['workingHours']?.toString() ?? '8') ?? 8,
       status: json['status'] ?? 'Present',
-      propertyId: json['propertyId']?.toString() ?? 'HS-JAI',
+      propertyId: json['propertyId']?.toString() ?? 'HS-9HQ8P',
     );
   }
 }

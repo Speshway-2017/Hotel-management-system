@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema({
   preferences: { type: String, trim: true },
   idDocType: { type: String, default: "Aadhaar Card" },
   idDocNumber: { type: String, trim: true },
+  idProofType: { type: String, default: "Aadhaar Card" },
+  idProofNumber: { type: String, trim: true },
+  verifiedAadhaar: { type: String, trim: true },
+  verifiedAadhaarLast4: { type: String, trim: true },
+  isAadhaarVerified: { type: Boolean, default: false },
+  aadhaarVerifiedAt: { type: Date },
   loyaltyPoints: { type: Number, default: 0 },
   notificationSettings: {
     emailConfirmations: { type: Boolean, default: true },
@@ -518,6 +524,12 @@ const User = {
       return await MongooseUser.deleteOne(query);
     }
     return await MockUser.findOneAndDelete(query);
+  },
+  deleteMany: async (query) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseUser.deleteMany(query);
+    }
+    return { acknowledged: true, deletedCount: 0 };
   }
 };
 

@@ -6,6 +6,7 @@ import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
+import { validateWithZod, guestProfileSchema } from "@/schemas";
 
 export const Route = createFileRoute("/admin/guests/add")({
   head: () => ({
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/admin/guests/add")({
 function AddGuestPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -39,14 +41,33 @@ function AddGuestPage() {
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
+    if (fieldErrors[id]) {
+      setFieldErrors((prev) => ({ ...prev, [id]: null }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) {
-      toast.error("Please fill in required fields (Name and Phone).");
+
+    const val = validateWithZod(guestProfileSchema, {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      city: formData.city,
+      state: formData.state,
+      country: formData.country,
+      address: formData.address,
+      idDocType: formData.idType,
+      idDocNumber: formData.idNumber,
+      notes: formData.notes
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
+    setFieldErrors({});
 
     setLoading(true);
     try {
@@ -91,7 +112,7 @@ function AddGuestPage() {
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Full Name" required id="name">
+              <FormField label="Full Name" required id="name" status={fieldErrors.name ? "error" : undefined} errorMsg={fieldErrors.name}>
                 <Input
                   id="name"
                   type="text"
@@ -116,7 +137,7 @@ function AddGuestPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Email Address" required id="email">
+              <FormField label="Email Address" required id="email" status={fieldErrors.email ? "error" : undefined} errorMsg={fieldErrors.email}>
                 <Input
                   id="email"
                   type="email"
@@ -126,7 +147,7 @@ function AddGuestPage() {
                   onChange={handleChange}
                 />
               </FormField>
-              <FormField label="Phone Number" required id="phone">
+              <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
                   type="text"
@@ -192,7 +213,7 @@ function AddGuestPage() {
                   <option value="Driver License">Driver License</option>
                 </Select>
               </FormField>
-              <FormField label="Secure Document ID Number" id="idDocNumber">
+              <FormField label="Secure Document ID Number" id="idDocNumber" status={fieldErrors.idDocNumber || fieldErrors.aadhaar ? "error" : undefined} errorMsg={fieldErrors.idDocNumber || fieldErrors.aadhaar}>
                 <Input
                   id="idDocNumber"
                   type="text"

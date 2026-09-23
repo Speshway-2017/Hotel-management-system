@@ -18,12 +18,14 @@ export const Route = createFileRoute("/admin/guests/edit/$id")({
 
 import { superAdminService } from "@/services/superAdmin";
 import { managerService } from "@/services/manager";
+import { validateWithZod, guestProfileSchema } from "@/schemas";
 
 function EditGuestPage() {
   const params = useParams() || {};
   const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -100,18 +102,38 @@ function EditGuestPage() {
   }, [id]);
 
   const handleChange = (e) => {
+    const { id: fieldId, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.id]: e.target.value
+      [fieldId]: value
     });
+    if (fieldErrors[fieldId]) {
+      setFieldErrors(prev => ({ ...prev, [fieldId]: null }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error("Please fill in guest name, email, and phone contact.");
+
+    const val = validateWithZod(guestProfileSchema, {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      city: formData.city,
+      state: formData.state,
+      country: formData.country,
+      address: formData.address,
+      idDocType: formData.idDocType,
+      idDocNumber: formData.idDocNumber,
+      notes: formData.notes
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
+    setFieldErrors({});
 
     setLoading(true);
     try {
@@ -152,7 +174,7 @@ function EditGuestPage() {
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Full Name" required id="name">
+              <FormField label="Full Name" required id="name" status={fieldErrors.name ? "error" : undefined} errorMsg={fieldErrors.name}>
                 <Input
                   id="name"
                   type="text"
@@ -176,7 +198,7 @@ function EditGuestPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Email Address" required id="email">
+              <FormField label="Email Address" required id="email" status={fieldErrors.email ? "error" : undefined} errorMsg={fieldErrors.email}>
                 <Input
                   id="email"
                   type="email"
@@ -185,7 +207,7 @@ function EditGuestPage() {
                   onChange={handleChange}
                 />
               </FormField>
-              <FormField label="Phone Number" required id="phone">
+              <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
                   type="text"
@@ -246,7 +268,7 @@ function EditGuestPage() {
                   <option value="Driver License">Driver License</option>
                 </Select>
               </FormField>
-              <FormField label="Secure Document ID Number" id="idDocNumber">
+              <FormField label="Secure Document ID Number" id="idDocNumber" status={fieldErrors.idDocNumber || fieldErrors.aadhaar ? "error" : undefined} errorMsg={fieldErrors.idDocNumber || fieldErrors.aadhaar}>
                 <Input
                   id="idDocNumber"
                   type="text"

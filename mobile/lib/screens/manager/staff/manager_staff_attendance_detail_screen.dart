@@ -534,7 +534,7 @@ class _ManagerStaffAttendanceDetailScreenState
                     border: Border.all(color: gold.withAlpha(120)),
                   ),
                   child: Text(
-                    widget.propertyId.isNotEmpty ? widget.propertyId : 'HS-JAI',
+                    widget.propertyId.isNotEmpty ? widget.propertyId : 'HS-9HQ8P',
                     style: const TextStyle(
                       fontSize: 8.5,
                       fontWeight: FontWeight.w800,

@@ -155,6 +155,7 @@ import { Route as SuperAdminDashboard } from "./roles/super-admin/pages/Dashboar
 import { Route as SuperAdminChannelManager } from "./roles/super-admin/pages/ChannelManager";
 import { Route as SuperAdminContactRequests } from "./roles/super-admin/pages/ContactRequests";
 import { Route as SuperAdminViewContactRequest } from "./roles/super-admin/pages/ViewContactRequest";
+import { Route as SuperAdminReplyContactRequest } from "./roles/super-admin/pages/ReplyContactRequest";
 import { Route as SuperAdminNotifications } from "./roles/super-admin/pages/Notifications";
 import { Route as SuperAdminNotificationDetails } from "./roles/super-admin/pages/NotificationDetails";
 import { Route as SuperAdminOccupancy } from "./roles/super-admin/pages/Occupancy";
@@ -285,6 +286,7 @@ export default function App() {
             <Route path="/admin/guests/add" element={<RouteWrapper routeObj={AdminAddGuest} />} />
             <Route path="/admin/guests/edit/:id" element={<RouteWrapper routeObj={AdminEditGuest} />} />
             <Route path="/admin/guests/view/:id" element={<RouteWrapper routeObj={AdminViewGuest} />} />
+            <Route path="/admin/guests/view" element={<RouteWrapper routeObj={AdminViewGuest} />} />
             <Route path="/admin/notifications" element={<RouteWrapper routeObj={AdminNotifications} />} />
             <Route path="/admin/notifications/:id" element={<RouteWrapper routeObj={AdminNotificationDetails} />} />
             <Route path="/admin/payments" element={<RouteWrapper routeObj={AdminPayments} />} />
@@ -434,7 +436,10 @@ export default function App() {
             <Route path="/super-admin/properties/view/:id" element={<RouteWrapper routeObj={SuperAdminViewProperty} />} />
             <Route path="/super-admin/properties/edit/:id" element={<RouteWrapper routeObj={SuperAdminEditProperty} />} />
             <Route path="/super-admin/contacts" element={<RouteWrapper routeObj={SuperAdminContactRequests} />} />
+            <Route path="/super-admin/contacts/view" element={<RouteWrapper routeObj={SuperAdminViewContactRequest} />} />
             <Route path="/super-admin/contacts/view/:id" element={<RouteWrapper routeObj={SuperAdminViewContactRequest} />} />
+            <Route path="/super-admin/contacts/reply" element={<RouteWrapper routeObj={SuperAdminReplyContactRequest} />} />
+            <Route path="/super-admin/contacts/reply/:id" element={<RouteWrapper routeObj={SuperAdminReplyContactRequest} />} />
             <Route path="/super-admin/reports" element={<RouteWrapper routeObj={SuperAdminReports} />} />
             <Route path="/super-admin/reports/view/:id" element={<RouteWrapper routeObj={SuperAdminViewReport} />} />
             <Route path="/super-admin/reservations" element={<RouteWrapper routeObj={SuperAdminReservations} />} />

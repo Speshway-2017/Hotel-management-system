@@ -48,11 +48,20 @@ export const receptionistService = {
   createReservation: async (data) => {
     return await apiClient.post('/receptionist/reservations', data);
   },
+  getReservationById: async (id) => {
+    return await apiClient.get(`/receptionist/reservations/${id}`);
+  },
   updateReservationStatus: async (id, status, room, extraData = {}) => {
     return await apiClient.put(`/receptionist/reservations/${id}/status`, { status, room, ...extraData });
   },
   verifyIdProof: async (id, idData) => {
     return await apiClient.post(`/receptionist/reservations/${id}/verify-id`, idData);
+  },
+  getGuestAadhaarStatus: async (id) => {
+    return await apiClient.get(`/receptionist/reservations/${id}/guest-aadhaar-status`);
+  },
+  lookupGuestAadhaar: async (params) => {
+    return await apiClient.get('/receptionist/guests/lookup-aadhaar', { params });
   },
   getFolios: async () => {
     return await apiClient.get('/receptionist/folios');

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import { validateWithZod, staffSchema } from "@/schemas";
 
 function ManagerAddStaff() {
   const navigate = useNavigate();
@@ -19,9 +20,26 @@ function ManagerAddStaff() {
   const [dept, setDept] = useState("Front Office");
   const [shift, setShift] = useState("Morning Shift");
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const val = validateWithZod(staffSchema, {
+      name,
+      email,
+      phone,
+      password,
+      dept,
+      shift
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
+      return;
+    }
+    setFieldErrors({});
     setLoading(true);
     try {
       const payload = {
@@ -59,38 +77,47 @@ function ManagerAddStaff() {
       <div className="max-w-xl">
         <Panel title="Employee Registration Form" description="Assign credentials and contact details.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
-            <FormField label="Full Name" required id="name">
+            <FormField label="Full Name" required id="name" status={fieldErrors.name ? "error" : undefined} errorMsg={fieldErrors.name}>
               <Input
                 id="name"
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (fieldErrors.name) setFieldErrors(p => ({ ...p, name: null }));
+                }}
                 placeholder="Enter full name"
                 className="text-xs font-semibold text-navy bg-cream/5 border-muted h-9"
               />
             </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Email Address" required id="email">
+              <FormField label="Email Address" required id="email" status={fieldErrors.email ? "error" : undefined} errorMsg={fieldErrors.email}>
                 <Input
                   id="email"
                   type="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: null }));
+                  }}
                   placeholder="name@hourstay.com"
                   className="text-xs font-semibold text-navy bg-cream/5 border-muted h-9"
                 />
               </FormField>
-              <FormField label="Password" required id="password">
+              <FormField label="Password" required id="password" status={fieldErrors.password ? "error" : undefined} errorMsg={fieldErrors.password}>
                 <div className="relative w-full">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) setFieldErrors(p => ({ ...p, password: null }));
+                    }}
                     placeholder="••••••••"
                     className="pr-10 text-xs font-semibold text-navy bg-cream/5 border-muted h-9"
                   />

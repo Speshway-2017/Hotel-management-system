@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Layers, ArrowLeft, Save, Sparkles } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
+import { validateWithZod, roomTypeSchema } from "@/schemas";
 
 export const Route = createFileRoute("/admin/rooms/add-type")({
   head: () => ({
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/admin/rooms/add-type")({
 function AddRoomTypePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form States
   const [category, setCategory] = useState("");
@@ -32,16 +34,21 @@ function AddRoomTypePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!category.trim()) {
-      toast.error("Please enter a Room Type category name.");
+
+    const val = validateWithZod(roomTypeSchema, {
+      category,
+      baseRate,
+      occupancy
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
+    setFieldErrors({});
 
     const rateNum = Number(baseRate);
-    if (!baseRate || isNaN(rateNum) || rateNum <= 0) {
-      toast.error("Please enter a valid Base Tariff greater than ₹0.");
-      return;
-    }
 
     setLoading(true);
     try {
@@ -155,24 +162,32 @@ function AddRoomTypePage() {
         <Panel title="Room Type Specifications Form" description="Assign operational category parameters and room allocations.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Category Name" required className="col-span-2" id="category">
+              <FormField label="Category Name" required className="col-span-2" id="category" status={fieldErrors.category ? "error" : undefined} errorMsg={fieldErrors.category}>
                 <Input
                   id="category"
                   type="text"
                   required
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    if (fieldErrors.category) setFieldErrors(p => ({ ...p, category: null }));
+                  }}
                   placeholder="e.g. Penthouse Suite, Royal Ocean Villa, Superior Deluxe"
                 />
               </FormField>
 
-              <FormField label="Base Tariff (₹)" required id="baseRate">
+              <FormField label="Base Tariff (₹)" required id="baseRate" status={fieldErrors.baseRate || fieldErrors.basePrice ? "error" : undefined} errorMsg={fieldErrors.baseRate || fieldErrors.basePrice}>
                 <Input
                   id="baseRate"
                   type="number"
                   required
                   value={baseRate}
-                  onChange={(e) => setBaseRate(e.target.value)}
+                  onChange={(e) => {
+                    setBaseRate(e.target.value);
+                    if (fieldErrors.baseRate || fieldErrors.basePrice) {
+                      setFieldErrors(p => ({ ...p, baseRate: null, basePrice: null }));
+                    }
+                  }}
                   placeholder="3000"
                   suffix="₹"
                 />

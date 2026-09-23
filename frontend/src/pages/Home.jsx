@@ -125,7 +125,7 @@ function Home() {
       .catch(err => {});
 
     const fetchActiveProperty = () => {
-      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
       publicService.getProperty(activeId)
         .then(res => {
           if (res.success && res.data) {
@@ -742,7 +742,7 @@ function Home() {
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {searchResults.map((h) => {
-              const hotelImg = h.id === "HS-JAI" ? jaipurImg : (h.id === "HS-UDA" ? palaceImg : (h.id === "HS-GOA" ? otaState === "synced" || activeOtaChannel === "Booking.com" ? goaImg : goaImg : keralaImg));
+              const hotelImg = h.id === "HS-9HQ8P" ? jaipurImg : (h.id === "HS-UDA" ? palaceImg : (h.id === "HS-GOA" ? otaState === "synced" || activeOtaChannel === "Booking.com" ? goaImg : goaImg : keralaImg));
               return (
                 <article
                   key={h.id}
@@ -758,7 +758,7 @@ function Home() {
                     <div className="absolute inset-0 bg-gradient-to-t from-navy/85 via-navy/35 to-black/10" />
                     <div className="absolute inset-x-0 bottom-0 p-4 flex flex-col gap-2 z-10">
                       <span className="self-start rounded bg-gold text-navy text-[9px] font-bold uppercase px-2 py-0.5 tracking-wider font-ui">
-                        {h.id === "HS-JAI" ? "Jaipur Collection" : (h.id === "HS-UDA" ? "Udaipur Collection" : (h.id === "HS-GOA" ? "Goa Collection" : "Kerala Collection"))}
+                        {h.id === "HS-9HQ8P" ? "Jaipur Collection" : (h.id === "HS-UDA" ? "Udaipur Collection" : (h.id === "HS-GOA" ? "Goa Collection" : "Kerala Collection"))}
                       </span>
                       <div className="flex flex-wrap gap-1">
                         {h.tags.slice(0, 2).map((t, idx) => (

@@ -9,6 +9,7 @@ import { apiClient, invalidateApiCache } from "@/services/apiClient";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
+import { validateWithZod, feedbackSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/feedback")({
   head: () => ({
@@ -59,6 +60,7 @@ function GuestReviewsPage() {
   });
   const [comments, setComments] = useState("");
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -131,10 +133,20 @@ function GuestReviewsPage() {
 
   const handleSubmitFeedback = async (e) => {
     e.preventDefault();
-    if (!comments.trim()) {
-      setFormError("Please write a few words about your stay experience.");
+    const validation = validateWithZod(feedbackSchema, {
+      rating: overallRating,
+      comments,
+      bookingId: selectedBooking,
+      categories
+    });
+
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      setFormError(firstError || "Please write a few words about your stay experience.");
       return;
     }
+    setFieldErrors({});
     setFormError("");
     setSubmitting(true);
     setSuccessMsg("");
@@ -150,7 +162,7 @@ function GuestReviewsPage() {
         guestName: user?.name || matchedBooking?.guest || "Valued Guest",
         guestEmail: user?.email || matchedBooking?.email || "",
         guestPhone: user?.mobile || matchedBooking?.phone || "",
-        propertyId: matchedBooking?.propertyId || user?.propertyId || "HS-JAI",
+        propertyId: matchedBooking?.propertyId || user?.propertyId || "HS-9HQ8P",
         room: matchedBooking?.room || "101 · Standard Room",
         roomType: matchedBooking?.roomType || "Standard Room",
         rating: overallRating,
@@ -350,9 +362,15 @@ function GuestReviewsPage() {
                   rows={4}
                   placeholder="Share details of your stay, amenities you enjoyed, and room experience..."
                   value={comments}
-                  onChange={(e) => setComments(e.target.value)}
-                  className="w-full p-3.5 text-xs rounded-xl bg-cream/10 border border-navy/10 text-navy focus:outline-none focus:border-purple font-medium"
+                  onChange={(e) => {
+                    setComments(e.target.value);
+                    if (fieldErrors.comments) setFieldErrors({ ...fieldErrors, comments: undefined });
+                  }}
+                  className={`w-full p-3.5 text-xs rounded-xl bg-cream/10 border ${fieldErrors.comments ? "border-rose-500" : "border-navy/10"} text-navy focus:outline-none focus:border-purple font-medium`}
                 />
+                {fieldErrors.comments && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.comments}</p>
+                )}
               </div>
 
               {/* Form Action Buttons */}

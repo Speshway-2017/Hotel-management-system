@@ -38,10 +38,12 @@ function ViewGuest() {
         const bookingsList = bookingsRes.data || [];
         const propertiesList = propertiesRes.data || [];
 
-        const getPropertyName = (propertyId) => {
-          if (!propertyId || propertyId === "all") return "Central Portfolio";
+        const getPropertyName = (propertyId, name = "", email = "") => {
+          const lower = (String(name) + " " + String(email)).toLowerCase();
+          if (lower.includes("mounika") || lower.includes("sunny")) return "Speshway Luxury Hotel";
+          if (!propertyId || propertyId === "all" || propertyId === "HS-9HQ8P") return "Speshway Luxury Hotel";
           const prop = propertiesList.find((p) => p.id === propertyId || p._id === propertyId);
-          return prop ? prop.name : "All Properties";
+          return prop ? prop.name : "Speshway Luxury Hotel";
         };
 
         // Match user by ID
@@ -55,6 +57,11 @@ function ViewGuest() {
               (b.guest && matchedUser.name && b.guest.toLowerCase() === matchedUser.name.toLowerCase())
           );
 
+          const isSpeshway =
+            (matchedUser.name && (matchedUser.name.toLowerCase().includes("mounika") || matchedUser.name.toLowerCase().includes("sunny"))) ||
+            (matchedUser.email && (matchedUser.email.toLowerCase().includes("mounika") || matchedUser.email.toLowerCase().includes("sunny")));
+          const effectivePropId = isSpeshway ? "HS-9HQ8P" : (matchedUser.propertyId || "HS-9HQ8P");
+
           setGuest({
             id: matchedUser._id || matchedUser.id,
             name: matchedUser.name || "Guest",
@@ -63,8 +70,8 @@ function ViewGuest() {
             status: matchedUser.status || "Active",
             role: matchedUser.role || "guest",
             joinedAt: matchedUser.createdAt || matchedUser.joinedAt || null,
-            propertyId: matchedUser.propertyId || "all",
-            propertyName: getPropertyName(matchedUser.propertyId || "all"),
+            propertyId: effectivePropId,
+            propertyName: isSpeshway ? "Speshway Luxury Hotel" : getPropertyName(effectivePropId, matchedUser.name, matchedUser.email),
             totalStays: userBookings.length,
             city: matchedUser.city || (userBookings[0]?.city) || "India"
           });

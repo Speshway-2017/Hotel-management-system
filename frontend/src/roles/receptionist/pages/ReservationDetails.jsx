@@ -24,16 +24,47 @@ import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 
 function ReceptionReservationDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  useServerTime(2000);
 
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(null);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
 
   const loadReservationDetails = () => {
+    const processFound = (found) => {
+      if (found) {
+        found.guests = found.pax || '2 Adults';
+        const finalAmt = Number(found.totalAmount ?? found.amount ?? 0);
+        const bal = Number(found.balance ?? 0);
+        found.amountPaid = found.paidAmount !== undefined ? Number(found.paidAmount) : (finalAmt - bal);
+        found.notes = found.specialRequests || 'No special requests listed.';
+        setBooking(found);
+        return true;
+      }
+      return false;
+    };
+
+    if (receptionistService.getReservationById) {
+      receptionistService.getReservationById(id)
+        .then(res => {
+          if (res.success && res.data && processFound(res.data)) {
+            setLoading(false);
+          } else {
+            fallbackGetReservations();
+          }
+        })
+        .catch(() => fallbackGetReservations());
+    } else {
+      fallbackGetReservations();
+    }
+  };
+
+  const fallbackGetReservations = () => {
     receptionistService.getReservations()
       .then(res => {
         if (res.success && res.data) {
@@ -44,7 +75,9 @@ function ReceptionReservationDetailsPage() {
           );
           if (found) {
             found.guests = found.pax || '2 Adults';
-            found.amountPaid = Number(found.amount || 0) - Number(found.balance || 0);
+            const finalAmt = Number(found.totalAmount ?? found.amount ?? 0);
+            const bal = Number(found.balance ?? 0);
+            found.amountPaid = found.paidAmount !== undefined ? Number(found.paidAmount) : (finalAmt - bal);
             found.notes = found.specialRequests || 'No special requests listed.';
             setBooking(found);
           } else {
@@ -159,12 +192,27 @@ function ReceptionReservationDetailsPage() {
                   >
                     Cancel Booking
                   </Button>
-                  <Button 
-                    asChild
-                    className="bg-emerald-600 hover:bg-emerald-700 !text-white h-9 px-6 text-xs rounded-full font-bold cursor-pointer"
-                  >
-                    <Link to={`/reception/check-in/${booking._id || booking.id || booking.bookingId}`}>Check In Guest</Link>
-                  </Button>
+                  {getCheckInStatusInfo(booking).allowed ? (
+                    <Button 
+                      asChild
+                      className="bg-emerald-600 hover:bg-emerald-700 !text-white h-9 px-6 text-xs rounded-full font-bold cursor-pointer"
+                    >
+                      <Link to={`/reception/check-in/${booking._id || booking.id || booking.bookingId}`}>Check In Guest</Link>
+                    </Button>
+                  ) : (
+                    <div className="relative group inline-block" title={getCheckInStatusInfo(booking).reason}>
+                      <Button 
+                        disabled
+                        className="bg-emerald-600/40 text-white/80 h-9 px-6 text-xs rounded-full font-bold cursor-not-allowed select-none"
+                      >
+                        <Clock className="w-3.5 h-3.5 mr-1.5 inline" />
+                        Check-in at {getCheckInStatusInfo(booking).checkInTime}
+                      </Button>
+                      <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block z-50 w-64 p-2 bg-slate-900 text-white text-[11px] rounded shadow-lg">
+                        {getCheckInStatusInfo(booking).reason}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -218,6 +266,18 @@ function ReceptionReservationDetailsPage() {
               </div>
               
               <div className="space-y-2">
+                {Number(booking.discountAmount || 0) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Original Tariff:</span>
+                      <span className="line-through text-muted-foreground">₹{Number(booking.originalAmount || (Number(booking.totalAmount || booking.amount) + Number(booking.discountAmount))).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600">
+                      <span>Promo Discount ({booking.couponCode || 'Coupon'}):</span>
+                      <span>-₹{Number(booking.discountAmount).toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Paid Amount:</span>
                   <span className="text-emerald-600">₹{booking.amountPaid.toLocaleString()}</span>
@@ -225,12 +285,12 @@ function ReceptionReservationDetailsPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Outstanding Dues:</span>
                   <span className={booking.balance > 0 ? "text-rose-600 animate-pulse font-bold" : ""}>
-                    ₹{booking.balance.toLocaleString()}
+                    ₹{Number(booking.balance || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-muted/50 pt-2 text-sm font-black text-navy-deep">
                   <span>Grand Total:</span>
-                  <span>₹{(booking.amountPaid + booking.balance).toLocaleString()}</span>
+                  <span>₹{Number(booking.totalAmount || booking.amount || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>

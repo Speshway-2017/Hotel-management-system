@@ -13,6 +13,7 @@ import {
   Undo2, RefreshCw, Plus, Wallet, Landmark,
   IndianRupee, Download, Check, ArrowLeft, User
 } from "lucide-react";
+import { validateWithZod, paymentSchema } from "@/schemas";
 
 function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
   return (
@@ -72,6 +73,10 @@ export function UnifiedPaymentsView({ role = "admin" }) {
     paymentMethod: "UPI",
     status: "Settled"
   });
+
+  // Validation Errors
+  const [recordErrors, setRecordErrors] = useState({});
+  const [editErrors, setEditErrors] = useState({});
 
   const getService = useCallback(() => {
     if (role === "admin") return adminService;
@@ -175,10 +180,13 @@ export function UnifiedPaymentsView({ role = "admin" }) {
   // Record Payment Submit Handler
   const handleRecordPaymentSubmit = async (e) => {
     e.preventDefault();
-    if (!newPayment.guestName || !newPayment.amount) {
-      toast.error("Please fill in required fields (Guest Name & Amount).");
+    const validation = validateWithZod(paymentSchema, newPayment);
+    if (!validation.isValid) {
+      setRecordErrors(validation.errors);
+      toast.error(Object.values(validation.errors)[0]);
       return;
     }
+    setRecordErrors({});
 
     setIsSubmitting(true);
     const service = getService();
@@ -232,6 +240,14 @@ export function UnifiedPaymentsView({ role = "admin" }) {
   const handleSaveEditSubmit = async (e) => {
     e.preventDefault();
     if (!editingPayment) return;
+
+    const validation = validateWithZod(paymentSchema, editingPayment);
+    if (!validation.isValid) {
+      setEditErrors(validation.errors);
+      toast.error(Object.values(validation.errors)[0]);
+      return;
+    }
+    setEditErrors({});
 
     setIsEditing(true);
     const service = getService();
@@ -403,9 +419,14 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   placeholder="0.00"
                   value={newPayment.amount}
                   onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
-                  className="w-full pl-9 pr-4 py-3 bg-[#fcfcfc] border border-muted rounded-xl text-xl font-black text-navy focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                  className={`w-full pl-9 pr-4 py-3 bg-[#fcfcfc] border rounded-xl text-xl font-black text-navy focus:outline-none focus:ring-2 focus:ring-navy/20 ${
+                    recordErrors.amount ? "border-rose-500 ring-1 ring-rose-500" : "border-muted focus:border-navy"
+                  }`}
                 />
               </div>
+              {recordErrors.amount && (
+                <p className="text-[11px] font-bold text-rose-600">{recordErrors.amount}</p>
+              )}
               <div className="flex items-center gap-2 flex-wrap pt-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1">Quick Presets:</span>
                 {[1000, 2500, 5000, 10000, 25000].map((amt) => (
@@ -437,8 +458,13 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                     placeholder="e.g. Rahul Sharma"
                     value={newPayment.guestName}
                     onChange={(e) => setNewPayment({ ...newPayment, guestName: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                    className={`w-full px-3.5 py-2.5 border bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy ${
+                      recordErrors.guestName ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"
+                    }`}
                   />
+                  {recordErrors.guestName && (
+                    <p className="text-[11px] font-bold text-rose-600 mt-1">{recordErrors.guestName}</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
@@ -946,8 +972,13 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   required
                   value={editingPayment.guestName}
                   onChange={(e) => setEditingPayment({ ...editingPayment, guestName: e.target.value })}
-                  className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                  className={`w-full px-3 py-2 border bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy ${
+                    editErrors.guestName ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"
+                  }`}
                 />
+                {editErrors.guestName && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{editErrors.guestName}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -985,8 +1016,13 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                   min="1"
                   value={editingPayment.amount}
                   onChange={(e) => setEditingPayment({ ...editingPayment, amount: e.target.value })}
-                  className="w-full px-3 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-black text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                  className={`w-full px-3 py-2 border bg-[#fcfcfc] rounded-xl text-xs font-black text-navy focus:outline-none focus:ring-1 focus:ring-navy ${
+                    editErrors.amount ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"
+                  }`}
                 />
+                {editErrors.amount && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{editErrors.amount}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

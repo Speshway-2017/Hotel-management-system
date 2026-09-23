@@ -10,6 +10,7 @@ import { calculateStayNights } from "@/utils/dateUtils";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
+import { validateWithZod, publicBookingSchema } from "@/schemas";
 
 export const Route = {
   head: () => ({
@@ -39,6 +40,7 @@ function Booking() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponFeedback, setCouponFeedback] = useState(null); // { type: 'success' | 'error', text: '' }
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     // Check if user is authenticated before proceeding with booking
@@ -320,6 +322,24 @@ function Booking() {
       return;
     }
 
+    const val = validateWithZod(publicBookingSchema, {
+      guestName,
+      email,
+      phone,
+      city: city || property?.settings?.city || property?.city || "Hyderabad",
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+      pax: pax || "2 Adults",
+      roomType: roomCategory
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      setBookingError(val.firstError);
+      return;
+    }
+    setFieldErrors({});
+
     if (!payableTotal || isNaN(payableTotal) || payableTotal <= 0) {
       setBookingError("Booking amount validation failed: amount must be a positive number.");
       return;
@@ -431,19 +451,23 @@ function Booking() {
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <Label htmlFor="guestName" className="text-xs font-bold text-navy">Full Name</Label>
-                    <Input id="guestName" className="mt-1.5 h-11 text-xs font-medium" value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="e.g. Surya Sharma" required />
+                    <Input id="guestName" className="mt-1.5 h-11 text-xs font-medium" value={guestName} onChange={e => { setGuestName(e.target.value); if (fieldErrors.guestName) setFieldErrors(p => ({ ...p, guestName: null })); }} placeholder="e.g. Surya Sharma" required />
+                    {fieldErrors.guestName && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.guestName}</p>}
                   </div>
                   <div>
                     <Label htmlFor="em" className="text-xs font-bold text-navy">Email Address</Label>
-                    <Input id="em" type="email" className="mt-1.5 h-11 text-xs font-medium" value={email} onChange={e => setEmail(e.target.value)} required />
+                    <Input id="em" type="email" className="mt-1.5 h-11 text-xs font-medium" value={email} onChange={e => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: null })); }} required />
+                    {fieldErrors.email && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.email}</p>}
                   </div>
                   <div>
                     <Label htmlFor="mb" className="text-xs font-bold text-navy">Mobile Number</Label>
-                    <Input id="mb" type="tel" className="mt-1.5 h-11 text-xs font-medium" value={phone} onChange={e => setPhone(e.target.value)} required />
+                    <Input id="mb" type="tel" className="mt-1.5 h-11 text-xs font-medium" value={phone} onChange={e => { setPhone(e.target.value); if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null })); }} required />
+                    {fieldErrors.phone && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.phone}</p>}
                   </div>
                   <div>
                     <Label htmlFor="ct" className="text-xs font-bold text-navy">City</Label>
-                    <Input id="ct" className="mt-1.5 h-11 text-xs font-medium" value={city || (property?.settings?.city || property?.city || "Hyderabad")} onChange={e => setCity(e.target.value)} placeholder="e.g. Hyderabad" />
+                    <Input id="ct" className="mt-1.5 h-11 text-xs font-medium" value={city || (property?.settings?.city || property?.city || "Hyderabad")} onChange={e => { setCity(e.target.value); if (fieldErrors.city) setFieldErrors(p => ({ ...p, city: null })); }} placeholder="e.g. Hyderabad" />
+                    {fieldErrors.city && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.city}</p>}
                   </div>
                   <div>
                     <Label htmlFor="gst" className="text-xs font-bold text-navy">GSTIN (Optional)</Label>

@@ -20,6 +20,7 @@ import {
   Clock,
   Loader2
 } from "lucide-react";
+import { validateWithZod, couponSchema } from "@/schemas";
 
 function EditCoupon() {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ function EditCoupon() {
   const id = params.id || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -92,25 +94,35 @@ function EditCoupon() {
       ...prev,
       [field]: field === "code" ? String(value).toUpperCase().replace(/[^A-Z0-9_-]/g, "") : value
     }));
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: null }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.code || !formData.code.trim()) {
-      toast.error("Please enter a valid coupon code.");
-      return;
-    }
+    const val = validateWithZod(couponSchema, {
+      code: formData.code,
+      title: formData.title,
+      description: formData.description,
+      discountType: formData.discountType,
+      discountValue: formData.discountValue,
+      maxDiscount: formData.maxDiscount,
+      minBookingAmount: formData.minBookingAmount,
+      validFrom: formData.validFrom,
+      validUntil: formData.validUntil,
+      usageLimit: formData.usageLimit,
+      status: formData.status,
+      propertyId: formData.propertyId
+    });
 
-    if (Number(formData.discountValue) <= 0) {
-      toast.error("Discount value must be greater than 0.");
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
-
-    if (new Date(formData.validUntil) < new Date(formData.validFrom)) {
-      toast.error("Expiry date cannot be earlier than start date.");
-      return;
-    }
+    setFieldErrors({});
 
     setSaving(true);
     try {
@@ -167,7 +179,7 @@ function EditCoupon() {
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Coupon Code" required id="code" helper="Unique promotional code">
+              <FormField label="Coupon Code" required id="code" helper="Unique promotional code" status={fieldErrors.code ? "error" : undefined} errorMsg={fieldErrors.code}>
                 <div className="relative">
                   <Input
                     id="code"
@@ -182,7 +194,7 @@ function EditCoupon() {
                 </div>
               </FormField>
 
-              <FormField label="Campaign Title" required id="title" helper="Display title visible to guests">
+              <FormField label="Campaign Title" required id="title" helper="Display title visible to guests" status={fieldErrors.title ? "error" : undefined} errorMsg={fieldErrors.title}>
                 <Input
                   id="title"
                   type="text"
@@ -226,6 +238,8 @@ function EditCoupon() {
                 label={formData.discountType === "percentage" ? "Discount Percentage (%)" : "Discount Amount (₹)"}
                 required
                 id="discountValue"
+                status={fieldErrors.discountValue ? "error" : undefined}
+                errorMsg={fieldErrors.discountValue}
               >
                 <div className="relative">
                   <Input
@@ -317,7 +331,7 @@ function EditCoupon() {
                 />
               </FormField>
 
-              <FormField label="Valid Until (Expiry)" required id="validUntil">
+              <FormField label="Valid Until (Expiry)" required id="validUntil" status={fieldErrors.validUntil ? "error" : undefined} errorMsg={fieldErrors.validUntil}>
                 <Input
                   id="validUntil"
                   type="date"

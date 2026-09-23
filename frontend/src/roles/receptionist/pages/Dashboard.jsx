@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
+import { useServerTime, isCheckInPermitted, getCheckInStatusInfo } from "@/utils/serverTime";
 
 const FrontDeskDashboardRoute = {
   head: () => ({
@@ -57,6 +58,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function FrontDeskDashboard() {
   const navigate = useNavigate();
+  useServerTime(2000);
   const cachedDash = receptionCache.get('dashboard');
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
   const [loading, setLoading] = useState(() => !cachedDash);
@@ -223,6 +225,14 @@ function FrontDeskDashboard() {
 
   // Action handlers
   const handleCheckIn = async (id, roomNum, booking = null) => {
+    if (booking) {
+      const checkInStatus = getCheckInStatusInfo(booking);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
+
     // If it's a website / OTA booking, route to dedicated ID Verification & Check-in page
     const source = booking?.source || "";
     const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
@@ -332,6 +342,7 @@ function FrontDeskDashboard() {
                           <ActionGroup align="left">
                             {(arr.status === "Pending" || arr.status === "Confirmed" || arr.status === "Pre-checked") && (
                               <CheckInActionButton
+                                booking={arr}
                                 onClick={() => handleCheckIn(arr.id || arr._id, arr.room, arr)}
                               />
                             )}

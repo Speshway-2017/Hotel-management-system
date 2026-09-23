@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { inr } from "@/data/hs-data";
 import { calculateStayNights } from "@/utils/dateUtils";
 import { emitRealtimeEvent, subscribeRealtimeSync } from "@/services/socket";
+import { validateWithZod, refundRequestSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/refund")({
   head: () => ({
@@ -34,6 +35,7 @@ export function GuestRefundPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Payout Form States
   const [refundMethod, setRefundMethod] = useState("UPI");
@@ -151,15 +153,24 @@ export function GuestRefundPage() {
       return;
     }
 
-    if (refundMethod === "UPI" && !upiId.trim()) {
-      toast.error("Please provide a valid UPI ID (e.g. yourname@upi) for payout.");
-      return;
-    }
+    const validation = validateWithZod(refundRequestSchema, {
+      bookingId: currentBooking.bookingId || currentBooking.id || currentBooking._id || selectedBookingId,
+      refundMethod,
+      upiId: refundMethod === "UPI" ? upiId.trim() : undefined,
+      accountHolder: refundMethod === "Bank Transfer" ? accountHolder.trim() : undefined,
+      accountNumber: refundMethod === "Bank Transfer" ? accountNumber.trim() : undefined,
+      ifscCode: refundMethod === "Bank Transfer" ? ifscCode.trim().toUpperCase() : undefined,
+      bankName: refundMethod === "Bank Transfer" ? bankName.trim() : undefined,
+      reason: currentBooking.cancellationReason || "Upcoming stay cancelled prior to check-in"
+    });
 
-    if (refundMethod === "Bank Transfer" && (!accountNumber.trim() || !ifscCode.trim())) {
-      toast.error("Please enter your Bank Account Number and IFSC Code.");
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please check required payout fields.");
       return;
     }
+    setFieldErrors({});
 
     setSubmitting(true);
     try {
@@ -602,10 +613,16 @@ export function GuestRefundPage() {
                   type="text"
                   placeholder="e.g. yourname@oksbi or 9876543210@paytm"
                   value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
+                  onChange={(e) => {
+                    setUpiId(e.target.value);
+                    if (fieldErrors.upiId) setFieldErrors({ ...fieldErrors, upiId: undefined });
+                  }}
                   disabled={submitting || (hasRefundRequest && refundStatus !== 'Rejected')}
-                  className="w-full px-3.5 py-2.5 border border-navy/20 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple disabled:bg-cream/40"
+                  className={`w-full px-3.5 py-2.5 border ${fieldErrors.upiId ? "border-rose-500" : "border-navy/20"} rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple disabled:bg-cream/40`}
                 />
+                {fieldErrors.upiId && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.upiId}</p>
+                )}
                 <span className="text-[10px] text-navy/50 font-medium block">
                   Refund will be disbursed directly via UPI dynamic payout upon staff approval.
                 </span>
@@ -635,10 +652,16 @@ export function GuestRefundPage() {
                       type="text"
                       placeholder="Account Number"
                       value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
+                      onChange={(e) => {
+                        setAccountNumber(e.target.value);
+                        if (fieldErrors.accountNumber) setFieldErrors({ ...fieldErrors, accountNumber: undefined });
+                      }}
                       disabled={submitting || (hasRefundRequest && refundStatus !== 'Rejected')}
-                      className="w-full px-3 py-2 border border-navy/20 rounded-xl font-mono font-bold disabled:bg-cream/40"
+                      className={`w-full px-3 py-2 border ${fieldErrors.accountNumber ? "border-rose-500" : "border-navy/20"} rounded-xl font-mono font-bold disabled:bg-cream/40`}
                     />
+                    {fieldErrors.accountNumber && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.accountNumber}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="block text-[10px] font-bold text-navy">
@@ -648,10 +671,16 @@ export function GuestRefundPage() {
                       type="text"
                       placeholder="e.g. HDFC0001234"
                       value={ifscCode}
-                      onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setIfscCode(e.target.value.toUpperCase());
+                        if (fieldErrors.ifscCode) setFieldErrors({ ...fieldErrors, ifscCode: undefined });
+                      }}
                       disabled={submitting || (hasRefundRequest && refundStatus !== 'Rejected')}
-                      className="w-full px-3 py-2 border border-navy/20 rounded-xl font-mono font-bold uppercase disabled:bg-cream/40"
+                      className={`w-full px-3 py-2 border ${fieldErrors.ifscCode ? "border-rose-500" : "border-navy/20"} rounded-xl font-mono font-bold uppercase disabled:bg-cream/40`}
                     />
+                    {fieldErrors.ifscCode && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.ifscCode}</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1">

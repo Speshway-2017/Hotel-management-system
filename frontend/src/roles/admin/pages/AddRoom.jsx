@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Bed, ArrowLeft, Upload, Trash2 } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
+import { validateWithZod, roomSchema } from "@/schemas";
 
 export const Route = createFileRoute("/admin/rooms/add")({
   head: () => ({
@@ -21,6 +22,7 @@ function AddRoomPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Load existing room types from database
   const [roomTypes, setRoomTypes] = useState([
@@ -112,17 +114,23 @@ function AddRoomPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!roomNumber) {
-      toast.error("Please enter a room number.");
+
+    const val = validateWithZod(roomSchema, {
+      roomNumber,
+      type: selectedType === "new" ? newTypeName : selectedType,
+      floor,
+      baseRate,
+      capacity
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
+    setFieldErrors({});
 
     const finalRate = Number(baseRate);
-    if (!baseRate || isNaN(finalRate) || finalRate <= 0) {
-      toast.error("Please enter a valid Base Rate (₹) greater than 0.");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -201,7 +209,7 @@ function AddRoomPage() {
           <form onSubmit={handleSubmit} className="p-6 space-y-5 text-left">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Room Number" required id="roomNumber">
+              <FormField label="Room Number" required id="roomNumber" status={fieldErrors.roomNumber ? "error" : undefined} errorMsg={fieldErrors.roomNumber}>
                 <Input
                   id="roomNumber"
                   required
@@ -210,6 +218,7 @@ function AddRoomPage() {
                   onChange={(e) => {
                     const val = e.target.value;
                     setRoomNumber(val);
+                    if (fieldErrors.roomNumber) setFieldErrors(p => ({ ...p, roomNumber: null }));
                     if (val && val.trim().length > 0) {
                       const firstDigit = val.trim().charAt(0);
                       if (!isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {

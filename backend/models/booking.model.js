@@ -28,6 +28,14 @@ const bookingSchema = new mongoose.Schema({
   paymentStatus: { type: String, default: 'Paid' },
   amount: { type: Number, default: 0 },
   totalAmount: { type: Number, default: 0 },
+  originalAmount: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
+  couponCode: { type: String, default: null },
+  paidAmount: { type: Number, default: 0 },
+  netAmount: { type: Number, default: 0 },
+  tax: { type: Number, default: 0 },
+  gstAmount: { type: Number, default: 0 },
+  roomBaseTotal: { type: Number, default: 0 },
   city: { type: String, default: 'Hyderabad' },
   balance: { type: Number, default: 0 },
   propertyId: { type: String, required: true },
@@ -49,11 +57,52 @@ bookingSchema.index({ email: 1 });
 bookingSchema.index({ checkIn: 1, checkOut: 1 });
 
 bookingSchema.pre('validate', function(next) {
-  if (!this.amount || isNaN(this.amount) || Number(this.amount) <= 0) {
-    this.amount = Number(this.totalAmount) || 7080;
+  // Ensure amount and totalAmount always synchronize to one backend-calculated payable amount
+  const resolvedAmount = Number(this.totalAmount || this.amount || 0);
+  if (resolvedAmount > 0) {
+    this.amount = resolvedAmount;
+    this.totalAmount = resolvedAmount;
+    this.netAmount = resolvedAmount;
+  } else {
+    this.amount = 7080;
+    this.totalAmount = 7080;
+    this.netAmount = 7080;
   }
-  if (!this.totalAmount || isNaN(this.totalAmount) || Number(this.totalAmount) <= 0) {
-    this.totalAmount = Number(this.amount) || 7080;
+
+  const disc = Number(this.discountAmount || 0);
+  if (!this.originalAmount || Number(this.originalAmount) <= 0) {
+    this.originalAmount = this.totalAmount + disc;
+  }
+
+  if (!this.createdAt) {
+    this.createdAt = this.checkIn ? new Date(this.checkIn) : new Date();
+  }
+  if (!this.guestName && this.guest) {
+    this.guestName = this.guest;
+  }
+  if (!this.name && (this.guest || this.guestName)) {
+    this.name = this.guest || this.guestName;
+  }
+  if (!this.guest && (this.guestName || this.name)) {
+    this.guest = this.guestName || this.name;
+  }
+  if (!this.roomNumber && this.room) {
+    this.roomNumber = extractRoomNumber(this.room) || '';
+  }
+  if (!this.propertyId) {
+    this.propertyId = 'HS-9HQ8P';
+  }
+  if (!this.hotelId) {
+    this.hotelId = this.propertyId || 'HS-9HQ8P';
+  }
+  if (!this.dates && this.checkIn && this.checkOut) {
+    this.dates = `${this.checkIn} → ${this.checkOut}`;
+  }
+  if (this.balance === 0 || this.status === 'Checked-in' || this.status === 'Checked-out') {
+    if (!this.paymentStatus) this.paymentStatus = 'Paid';
+    if (!this.paidAmount || Number(this.paidAmount) <= 0) {
+      this.paidAmount = this.totalAmount;
+    }
   }
   next();
 });
@@ -567,9 +616,18 @@ const Booking = {
   },
   create: async (data) => {
     const cleanData = { ...data };
-    const numAmount = Number(cleanData.amount || cleanData.totalAmount || 7080);
+    const numAmount = Number(cleanData.totalAmount || cleanData.amount || 7080);
     cleanData.amount = (isNaN(numAmount) || numAmount <= 0) ? 7080 : numAmount;
     cleanData.totalAmount = cleanData.amount;
+    cleanData.netAmount = cleanData.amount;
+    cleanData.discountAmount = Number(cleanData.discountAmount || 0);
+    cleanData.originalAmount = Number(cleanData.originalAmount || (cleanData.amount + cleanData.discountAmount));
+    if (cleanData.paidAmount === undefined || cleanData.paidAmount === null) {
+      const bal = Number(cleanData.balance || 0);
+      cleanData.paidAmount = bal === 0 ? cleanData.amount : Math.max(0, cleanData.amount - bal);
+    } else {
+      cleanData.paidAmount = Number(cleanData.paidAmount);
+    }
     cleanData.guest = cleanData.guest || cleanData.guestName || 'Guest';
     cleanData.checkIn = cleanData.checkIn || cleanData.checkInDate || '2026-09-01';
     cleanData.checkOut = cleanData.checkOut || cleanData.checkOutDate || '2026-09-02';

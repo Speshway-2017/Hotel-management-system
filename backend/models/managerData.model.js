@@ -137,10 +137,14 @@ const paymentSchema = new mongoose.Schema({
   guestName: { type: String, required: true },
   roomNumber: { type: String, default: '101' },
   amount: { type: Number, required: true },
+  originalAmount: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
+  couponCode: { type: String, default: null },
+  paidAmount: { type: Number, default: 0 },
   paymentMethod: { type: String, default: 'UPI' },
   status: { type: String, default: 'Settled' }, // Settled, Refunded, Pending
   propertyId: { type: String, required: true }
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 paymentSchema.index({ propertyId: 1, createdAt: -1 });
 export const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
@@ -155,7 +159,9 @@ const contactMessageSchema = new mongoose.Schema({
   subject: { type: String, default: '' },
   message: { type: String, required: true },
   propertyId: { type: String, default: 'HS-9HQ8P' },
-  status: { type: String, enum: ['New', 'In Progress', 'Resolved', 'Read', 'Replied'], default: 'New' }
+  status: { type: String, enum: ['New', 'In Progress', 'Resolved', 'Read', 'Replied'], default: 'New' },
+  replyMessage: { type: String, default: '' },
+  repliedAt: { type: Date }
 }, { timestamps: true });
 
 export const ContactMessage = mongoose.models.ContactMessage || mongoose.model('ContactMessage', contactMessageSchema);

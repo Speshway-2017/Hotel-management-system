@@ -14,10 +14,18 @@ import {
 } from '../models/managerData.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { findPropertySafely } from '../utils/propertyCache.js';
-import { isToday, calculateStayNights } from '../utils/dateUtils.js';
+import { isToday, calculateStayNights, isCheckInAllowed, formatISTDateTime } from '../utils/dateUtils.js';
+import { runAutoCheckoutSweep, processAutoCheckouts } from '../services/autoCheckout.service.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
+import {
+  validateAadhaarConsistency,
+  validateBookingAadhaarConsistency,
+  syncVerifiedAadhaarToGuestProfile,
+  findExistingVerifiedAadhaar,
+  formatAadhaar
+} from '../utils/aadhaarValidator.js';
 
 import mongoose from 'mongoose';
 
@@ -72,21 +80,21 @@ const seedDefaultReceptionistNotifications = async (propertyId) => {
           message: "Booking BK-10101 confirmed via MakeMyTrip for Standard Room.",
           category: "New reservations",
           isRead: false,
-          propertyId: propertyId || 'HS-JAI'
+          propertyId: propertyId || 'HS-9HQ8P'
         },
         {
           title: "Room Overdue Check-out",
           message: "Room 101 occupied by Mounika is scheduled for departure check-out.",
           category: "Upcoming check-ins/check-outs",
           isRead: false,
-          propertyId: propertyId || 'HS-JAI'
+          propertyId: propertyId || 'HS-9HQ8P'
         },
         {
           title: "Incidentals Surcharge Added",
           message: "Recorded ₹450 laundry service POS charge to Room 101.",
           category: "Payment updates",
           isRead: false,
-          propertyId: propertyId || 'HS-JAI'
+          propertyId: propertyId || 'HS-9HQ8P'
         }
       ];
       await ReceptionistNotification.insertMany(defaults);
@@ -155,7 +163,7 @@ const syncReceptionistBookingNotifications = async (propertyId) => {
 // ==========================================
 router.get('/dashboard', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     const propFilter = { $or: [{ propertyId }, { hotelId: propertyId }] };
 
     // 1. Fetch rooms and compile room counts
@@ -260,7 +268,7 @@ router.get('/dashboard', async (req, res) => {
 // ==========================================
 router.get('/arrivals', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     const propFilter = { $or: [{ propertyId }, { hotelId: propertyId }] };
 
     const bookings = await Booking.find(propFilter).sort({ createdAt: -1 });
@@ -317,7 +325,7 @@ router.get('/arrivals', async (req, res) => {
 // ==========================================
 router.get('/departures', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     const propFilter = { $or: [{ propertyId }, { hotelId: propertyId }] };
 
     const bookings = await Booking.find(propFilter).sort({ createdAt: -1 });
@@ -379,7 +387,7 @@ router.get('/in-house', async (req, res, next) => {
 
 router.get('/guests', async (req, res) => {
   try {
-    const propId = req.user?.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propId = req.user?.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     let query = {
       $or: [{ propertyId: propId }, { hotelId: propId }],
       status: { $in: ['Checked-in', 'Checked In', 'Staying'] }
@@ -439,7 +447,7 @@ router.post('/guests/:id/charge', async (req, res) => {
       return sendError(res, 400, 'Valid numeric charge amount required.');
     }
     
-    const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-JAI');
+    const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-9HQ8P');
     if (!booking) {
       return sendError(res, 404, 'Guest stay record not found.');
     }
@@ -452,7 +460,7 @@ router.post('/guests/:id/charge', async (req, res) => {
     // Trigger notification
     await triggerNotification({
       role: 'manager',
-      propertyId: req.user.propertyId || 'HS-JAI',
+      propertyId: req.user.propertyId || 'HS-9HQ8P',
       title: 'Incidental Charge Posted',
       message: `Charge of ₹${amount} (${description || 'laundry/restaurant service'}) posted to guest ${booking.guest}'s folio.`,
       category: 'General'
@@ -469,10 +477,16 @@ const handleReceptionistExtendStay = async (req, res) => {
   try {
     const { days, newCheckOut, additionalNights, additionalAmount } = req.body;
     
-    const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-JAI');
+    const booking = await findBookingById(req.params.id, req.user.propertyId || 'HS-9HQ8P');
     if (!booking) {
       return sendError(res, 404, 'Guest stay record not found.');
     }
+
+    const bStatus = String(booking.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled'].includes(bStatus)) {
+      return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
+    }
+
 
     let calculatedNights = additionalNights !== undefined ? Number(additionalNights) : Number(days);
     if (!calculatedNights || isNaN(calculatedNights) || calculatedNights <= 0) {
@@ -488,17 +502,20 @@ const handleReceptionistExtendStay = async (req, res) => {
 
     const addAmount = additionalAmount !== undefined ? Number(additionalAmount) : 0;
 
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + addAmount;
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, {
       nights: Number(booking.nights || 1) + calculatedNights,
       checkOut: calculatedCheckOut,
-      amount: Number(booking.amount || 0) + addAmount,
+      amount: newAmount,
+      totalAmount: newAmount,
+      netAmount: newAmount,
       balance: Number(booking.balance || 0) + addAmount
     }, { new: true });
 
     // Trigger notification
     await triggerNotification({
       role: 'manager',
-      propertyId: booking.propertyId || req.user.propertyId || 'HS-JAI',
+      propertyId: booking.propertyId || req.user.propertyId || 'HS-9HQ8P',
       title: 'Stay Extended',
       message: `Stay extended by ${calculatedNights} night(s) for guest ${booking.guest}. New checkout: ${updated.checkOut}.`,
       category: 'Operations'
@@ -506,7 +523,7 @@ const handleReceptionistExtendStay = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-JAI', 'booking_updated', {
+      emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-9HQ8P', 'booking_updated', {
         action: 'extend',
         booking: updated,
         bookingId: updated._id,
@@ -529,7 +546,7 @@ router.post('/reservations/:id/extend', handleReceptionistExtendStay);
 // ==========================================
 router.get('/rooms', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     const { checkIn, checkOut } = req.query;
     let rooms = await Room.find({ $or: [{ propertyId }, { hotelId: propertyId }] }).sort({ roomNumber: 1 });
     if (!rooms || rooms.length === 0) {
@@ -625,7 +642,7 @@ router.get('/rooms', async (req, res) => {
 router.put('/rooms/:roomNumber/status', async (req, res) => {
   try {
     const { status, housekeeping } = req.body;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
 
     const updateData = {};
     if (status) updateData.status = status;
@@ -679,37 +696,108 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
 // ==========================================
 router.get('/reservations', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-JAI';
+    await processAutoCheckouts(req.app.get('socketio'));
+    const propertyId = req.user?.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     const bookings = await Booking.find({
-      $or: [{ propertyId }, { hotelId: propertyId }]
-    }).sort({ createdAt: -1 });
-
-    const list = bookings.map(b => ({
-      id: b.bookingId || b.id || b._id,
-      _id: b._id || b.id || b.bookingId,
-      bookingId: b.bookingId || b.id || b._id,
-      name: b.guest,
-      guest: b.guest,
-      phone: b.phone || '--',
-      email: b.email || `${b.guest.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-      room: b.room ? b.room.split(' ')[0] : 'TBD',
-      roomType: b.roomType || (b.room ? b.room.split('·')[1]?.trim() || 'Deluxe Room' : 'Deluxe Room'),
-      checkIn: b.checkIn,
-      checkOut: b.checkOut,
-      nights: b.nights || 1,
-      pax: b.pax || '2 Adults',
-      source: b.source || 'Direct Web',
-      status: b.status,
-      amount: b.amount,
-      balance: b.balance,
-      paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
-      specialRequests: b.specialRequests || 'High floor preference.',
-      timeline: [
-        { time: b.createdAt, action: 'Reservation created successfully.' }
+      $or: [
+        { propertyId },
+        { hotelId: propertyId },
+        { propertyId: 'HS-9HQ8P' },
+        { hotelId: 'HS-9HQ8P' },
+        { propertyId: { $exists: false } },
+        { propertyId: null },
+        { propertyId: '' }
       ]
-    }));
+    }).sort({ createdAt: -1, checkIn: -1, updatedAt: -1, _id: -1 });
+
+    const list = bookings.map(b => {
+      const cleanRm = extractRoomNumber(b) || (b.roomNumber ? String(b.roomNumber) : '');
+      const rmNum = cleanRm || '';
+      const rmType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
+      const finalAmount = Number(b.totalAmount || b.amount || 0);
+      const discountAmount = Number(b.discountAmount || 0);
+      const originalAmount = Number(b.originalAmount || (finalAmount + discountAmount));
+      const couponCode = b.couponCode || null;
+      const balance = Number(b.balance !== undefined ? b.balance : 0);
+      const paidAmount = Number(b.paidAmount || (b.paymentStatus === 'Paid' ? finalAmount : Math.max(0, finalAmount - balance)));
+
+      return {
+        id: b.bookingId || b.id || b._id,
+        _id: b._id || b.id || b.bookingId,
+        bookingId: b.bookingId || b.id || b._id,
+        name: b.guest || b.guestName || 'Guest',
+        guest: b.guest || b.guestName || 'Guest',
+        guestName: b.guest || b.guestName || 'Guest',
+        phone: b.phone || '--',
+        email: b.email || `${(b.guest || 'guest').toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        room: rmNum ? `Room ${rmNum}` : (b.room || 'TBD'),
+        roomNumber: rmNum,
+        roomType: rmType,
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        dates: b.dates || (b.checkIn && b.checkOut ? `${b.checkIn} → ${b.checkOut}` : ''),
+        nights: b.nights || 1,
+        pax: b.pax || '2 Adults',
+        source: b.source || 'Direct Web',
+        status: b.status,
+        amount: finalAmount,
+        totalAmount: finalAmount,
+        netAmount: finalAmount,
+        originalAmount,
+        discountAmount,
+        couponCode,
+        paidAmount,
+        amountPaid: paidAmount,
+        balance,
+        paymentStatus: (balance === 0 || b.paymentStatus === 'Paid' || b.status === 'Checked-in') ? 'Paid' : 'Pending',
+        specialRequests: b.specialRequests || '',
+        createdAt: b.createdAt || b.updatedAt,
+        timeline: [
+          { time: b.createdAt || b.updatedAt, action: 'Reservation created successfully.' }
+        ]
+      };
+    });
 
     return sendSuccess(res, 200, list, 'Reservations retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.get('/reservations/:id', async (req, res) => {
+  try {
+    const propertyId = req.user?.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
+    const booking = await findBookingById(req.params.id, propertyId);
+    if (!booking) return sendError(res, 404, 'Reservation not found');
+    const cleanRm = extractRoomNumber(booking) || (booking.roomNumber ? String(booking.roomNumber) : '');
+    const rmNum = cleanRm || '';
+    const rmType = booking.roomType || (booking.room && booking.room.includes('·') ? booking.room.split('·')[1]?.trim() : 'Standard Room');
+    const finalAmount = Number(booking.totalAmount || booking.amount || 0);
+    const balance = Number(booking.balance !== undefined ? booking.balance : 0);
+    const discountAmount = Number(booking.discountAmount || 0);
+    const originalAmount = Number(booking.originalAmount || (finalAmount + discountAmount));
+    const paidAmount = Number(booking.paidAmount || (booking.paymentStatus === 'Paid' ? finalAmount : Math.max(0, finalAmount - balance)));
+
+    return sendSuccess(res, 200, {
+      ...(booking.toObject ? booking.toObject() : booking),
+      id: booking.bookingId || booking.id || booking._id,
+      _id: booking._id || booking.id || booking.bookingId,
+      bookingId: booking.bookingId || booking.id || booking._id,
+      guest: booking.guest || booking.guestName || 'Guest',
+      room: rmNum ? `Room ${rmNum}` : (booking.room || 'TBD'),
+      roomNumber: rmNum,
+      roomType: rmType,
+      amount: finalAmount,
+      totalAmount: finalAmount,
+      netAmount: finalAmount,
+      originalAmount,
+      discountAmount,
+      couponCode: booking.couponCode || null,
+      paidAmount,
+      amountPaid: paidAmount,
+      balance,
+      paymentStatus: (balance === 0 || booking.paymentStatus === 'Paid' || booking.status === 'Checked-in') ? 'Paid' : 'Pending'
+    }, 'Reservation details retrieved');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -719,11 +807,49 @@ router.get('/reservations', async (req, res) => {
 router.post('/reservations', async (req, res) => {
   try {
     const { guest, phone, email, room, roomId, checkIn, checkOut, nights, pax, source, amount, balance } = req.body;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
 
     if (!guest || !checkIn || !checkOut || !amount) {
       return sendError(res, 400, 'Guest, checkIn, checkOut, and amount are required.');
     }
+
+    // Check if an existing Guest Account already exists for this guest
+    let guestId = null;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPhone = String(phone || '').trim();
+
+    if (cleanEmail || cleanPhone) {
+      const query = [];
+      if (cleanEmail) query.push({ email: cleanEmail });
+      if (cleanPhone) query.push({ mobile: cleanPhone });
+      const existingGuest = await User.findOne({ $or: query, role: 'guest' });
+      if (existingGuest) {
+        guestId = existingGuest._id || existingGuest.id;
+      }
+    }
+
+    // Aadhaar consistency validation on reservation creation / confirmation
+    const inputDocType = req.body.idProofType || req.body.idDocType || 'Aadhaar Card';
+    const inputDocNumber = req.body.idProofNumber || req.body.idDocNumber || '';
+
+    const aadhaarValidation = await validateBookingAadhaarConsistency({
+      guestId,
+      email: cleanEmail,
+      phone: cleanPhone,
+      name: guest,
+      idDocType: inputDocType,
+      idDocNumber: inputDocNumber
+    });
+
+    if (!aadhaarValidation.isValid) {
+      return sendError(res, 400, aadhaarValidation.error);
+    }
+
+    const isAadhaar = aadhaarValidation.isAadhaar;
+    const finalDocNumber = isAadhaar ? aadhaarValidation.formattedAadhaar : (inputDocNumber ? String(inputDocNumber).trim() : '');
+    const finalDocType = isAadhaar ? 'Aadhaar Card' : inputDocType;
+    const bookingStatus = req.body.status || (source === 'Walk-in' && isToday(checkIn) ? 'Checked-in' : 'Confirmed');
+    const hasVerifiedId = Boolean(finalDocNumber && (isAadhaar || bookingStatus === 'Checked-in'));
 
     // Overlapping Date Availability Check
     const newCheckIn = new Date(checkIn).getTime();
@@ -733,7 +859,6 @@ router.post('/reservations', async (req, res) => {
     const roomNum = req.body.roomNumber || (room ? String(room).match(/\b\d{3,4}\b/)?.[0] : null);
     const roomType = req.body.roomType || (room && room.includes('·') ? room.split('·')[1]?.trim() : (room || 'Standard Room'));
     const roomString = roomNum ? `${roomNum} · ${roomType}` : (room || `${roomType}`);
-    const bookingStatus = req.body.status || (source === 'Walk-in' && isToday(checkIn) ? 'Checked-in' : 'Confirmed');
 
     if (roomNum || assignedRoomId) {
       const existingBookings = await Booking.find({
@@ -757,26 +882,16 @@ router.post('/reservations', async (req, res) => {
       }
     }
 
-    // Check if an existing Guest Account already exists for this guest
-    let guestId = null;
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    const cleanPhone = String(phone || '').trim();
-
-    if (cleanEmail || cleanPhone) {
-      const query = [];
-      if (cleanEmail) query.push({ email: cleanEmail });
-      if (cleanPhone) query.push({ mobile: cleanPhone });
-      const existingGuest = await User.findOne({ $or: query, role: 'guest' });
-      if (existingGuest) {
-        guestId = existingGuest._id || existingGuest.id;
-      }
-    }
-
     const newBooking = await Booking.create({
       guest,
       guestId,
       phone: cleanPhone,
       email: cleanEmail,
+      idDocType: finalDocType,
+      idDocNumber: finalDocNumber,
+      idVerification: hasVerifiedId ? 'Verified' : 'Pending',
+      idVerifiedAt: hasVerifiedId ? new Date() : null,
+      idVerifiedBy: hasVerifiedId ? (req.user?.name || 'Receptionist') : '',
       room: roomString,
       roomNumber: roomNum,
       roomType: roomType,
@@ -791,6 +906,15 @@ router.post('/reservations', async (req, res) => {
       balance: Number(balance !== undefined ? balance : amount),
       propertyId
     });
+
+    if (hasVerifiedId && isAadhaar) {
+      await syncVerifiedAadhaarToGuestProfile({
+        booking: newBooking,
+        idDocType: finalDocType,
+        idDocNumber: finalDocNumber,
+        verifiedBy: req.user?.name || 'Receptionist'
+      });
+    }
 
     // Update assigned room status in MongoDB
     if (roomNum) {
@@ -825,11 +949,59 @@ router.post('/reservations', async (req, res) => {
   }
 });
 
+// Check existing Aadhaar verification status for a guest
+router.get('/reservations/:id/guest-aadhaar-status', async (req, res) => {
+  try {
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
+    const booking = await findBookingById(req.params.id, propertyId);
+    if (!booking) {
+      return sendError(res, 404, 'Booking not found.');
+    }
+
+    const existingRecord = await findExistingVerifiedAadhaar({
+      guestId: booking.guestId,
+      email: booking.email,
+      phone: booking.phone,
+      name: booking.guest
+    });
+
+    return sendSuccess(res, 200, {
+      hasExistingAadhaar: Boolean(existingRecord.existingAadhaar),
+      maskedAadhaar: existingRecord.maskedAadhaar || null,
+      source: existingRecord.source,
+      guestName: booking.guest,
+      currentStatus: booking.idVerification || 'Pending'
+    }, 'Guest Aadhaar status retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// Lookup Aadhaar status for an existing or prospective guest before booking creation
+router.get('/guests/lookup-aadhaar', async (req, res) => {
+  try {
+    const { phone, email, guestId, name } = req.query;
+    if (!phone && !email && !guestId) {
+      return sendSuccess(res, 200, { hasExistingAadhaar: false, maskedAadhaar: null });
+    }
+    const existingRecord = await findExistingVerifiedAadhaar({ phone, email, guestId, name });
+    return sendSuccess(res, 200, {
+      hasExistingAadhaar: Boolean(existingRecord.existingAadhaar),
+      maskedAadhaar: existingRecord.maskedAadhaar || null,
+      last4: existingRecord.existingAadhaar ? existingRecord.existingAadhaar.slice(-4) : null,
+      source: existingRecord.source,
+      guestName: existingRecord.guestUser?.name || name
+    }, 'Guest Aadhaar status retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 // Verify ID proof details for a reservation
 router.post('/reservations/:id/verify-id', async (req, res) => {
   try {
     const { idDocType, idDocNumber, idDocImage, idVerification, notes } = req.body;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
 
     if (!idDocNumber || !idDocNumber.trim()) {
       return sendError(res, 400, 'ID Document Number is required for verification.');
@@ -840,33 +1012,33 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
       return sendError(res, 404, 'Booking not found.');
     }
 
-    const verificationData = {
-      idDocType: idDocType || booking.idDocType || 'Aadhaar Card',
-      idDocNumber: idDocNumber.trim(),
-      idDocImage: idDocImage || booking.idDocImage || '',
-      idVerification: idVerification || 'Verified',
-      idVerifiedAt: new Date(),
-      idVerifiedBy: req.user?.name || req.user?.username || 'Staff'
-    };
+    const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
 
-    const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, verificationData, { new: true });
+    // Authoritative Aadhaar consistency validation
+    const validation = await validateAadhaarConsistency({
+      booking,
+      idDocType: effectiveDocType,
+      idDocNumber
+    });
 
-    // Sync guest profile in User collection if guestId or email matches
-    try {
-      if (booking.guestId) {
-        await User.findByIdAndUpdate(booking.guestId, {
-          idDocType: verificationData.idDocType,
-          idDocNumber: verificationData.idDocNumber
-        });
-      } else if (booking.email) {
-        await User.findOneAndUpdate({ email: booking.email.toLowerCase() }, {
-          idDocType: verificationData.idDocType,
-          idDocNumber: verificationData.idDocNumber
+    if (!validation.isValid) {
+      if (validation.mismatch) {
+        await Booking.findByIdAndUpdate(booking.id || booking._id, {
+          idVerification: 'Mismatch',
+          idDocNumber: idDocNumber.trim(),
+          idDocType: effectiveDocType
         });
       }
-    } catch (e) {
-      console.warn('Could not sync guest user document:', e.message);
+      return sendError(res, 400, validation.error);
     }
+
+    const updated = await syncVerifiedAadhaarToGuestProfile({
+      booking,
+      idDocType: effectiveDocType,
+      idDocNumber: validation.formattedAadhaar || idDocNumber.trim(),
+      idDocImage: idDocImage || booking.idDocImage || '',
+      verifiedBy: req.user?.name || req.user?.username || 'Staff'
+    });
 
     return sendSuccess(res, 200, updated, 'ID proof successfully verified.');
   } catch (err) {
@@ -878,7 +1050,7 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
 router.put('/reservations/:id/status', async (req, res) => {
   try {
     const { status, room, idDocType, idDocNumber, idDocImage, idVerification } = req.body;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
 
     const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) {
@@ -886,6 +1058,41 @@ router.put('/reservations/:id/status', async (req, res) => {
     }
 
     const isWebsiteBooking = booking.source && booking.source !== 'Walk-in' && !booking.source.toLowerCase().includes('walk-in');
+
+    // Strict server-time check-in enforcement
+    if (status === 'Checked-in') {
+      const serverNow = new Date();
+      if (!isCheckInAllowed(booking, serverNow)) {
+        const checkInTime = booking.checkInTime || '12:00 PM';
+        return sendError(res, 400, `Check-in is only permitted starting at ${checkInTime} on ${booking.checkIn} (Current server time: ${formatISTDateTime(serverNow)}). Early check-in is locked.`);
+      }
+    }
+
+    // Block check-in if reservation is in Aadhaar mismatch state and no valid override provided
+    if (status === 'Checked-in' && booking.idVerification === 'Mismatch' && !idDocNumber) {
+      return sendError(res, 400, 'Cannot check in guest: ID verification has an Aadhaar mismatch on file. Please complete ID proof verification first.');
+    }
+
+    // If ID document is submitted or updated during check-in, run Aadhaar consistency validation
+    if (idDocNumber) {
+      const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
+      const validation = await validateAadhaarConsistency({
+        booking,
+        idDocType: effectiveDocType,
+        idDocNumber
+      });
+
+      if (!validation.isValid) {
+        if (validation.mismatch) {
+          await Booking.findByIdAndUpdate(booking.id || booking._id, {
+            idVerification: 'Mismatch',
+            idDocNumber: idDocNumber.trim(),
+            idDocType: effectiveDocType
+          });
+        }
+        return sendError(res, 400, validation.error);
+      }
+    }
 
     // Enforce ID proof for website bookings on check-in
     if (status === 'Checked-in' && isWebsiteBooking) {
@@ -898,12 +1105,23 @@ router.put('/reservations/:id/status', async (req, res) => {
 
     const updateData = { status };
     if (idDocNumber) {
-      updateData.idDocNumber = idDocNumber.trim();
-      updateData.idDocType = idDocType || booking.idDocType || 'Aadhaar Card';
+      const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
+      const isAadhaar = effectiveDocType.toLowerCase().includes('aadhaar');
+      updateData.idDocNumber = isAadhaar ? formatAadhaar(idDocNumber) : idDocNumber.trim();
+      updateData.idDocType = effectiveDocType;
       updateData.idDocImage = idDocImage || booking.idDocImage || '';
       updateData.idVerification = 'Verified';
       updateData.idVerifiedAt = new Date();
       updateData.idVerifiedBy = req.user?.name || req.user?.username || 'Staff';
+
+      // Sync guest profile in User collection
+      await syncVerifiedAadhaarToGuestProfile({
+        booking,
+        idDocType: updateData.idDocType,
+        idDocNumber: updateData.idDocNumber,
+        idDocImage: updateData.idDocImage,
+        verifiedBy: updateData.idVerifiedBy
+      });
     } else if (idVerification) {
       updateData.idVerification = idVerification;
     }
@@ -961,21 +1179,25 @@ router.put('/reservations/:id/status', async (req, res) => {
 // ==========================================
 router.get('/folios', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
     const bookings = await Booking.find({ propertyId });
     
-    const folios = bookings.map(b => ({
-      id: `FOL-${b.id || b._id}`,
-      guestName: b.guest,
-      roomNo: b.room ? b.room.split(' ')[0] : 'TBD',
-      bookingId: b.id || b._id,
-      stayDates: `${b.checkIn} - ${b.checkOut}`,
-      totalCharges: b.amount,
-      amountPaid: b.amount - b.balance,
-      balanceDue: b.balance,
-      paymentStatus: b.balance === 0 ? 'Paid' : 'Pending',
-      status: b.status === 'Checked-out' ? 'Closed' : 'Active'
-    }));
+    const folios = bookings.map(b => {
+      const finalAmt = Number(b.totalAmount || b.amount || 0);
+      const bal = Number(b.balance !== undefined ? b.balance : 0);
+      return {
+        id: `FOL-${b.id || b._id}`,
+        guestName: b.guest,
+        roomNo: b.room ? b.room.split(' ')[0] : 'TBD',
+        bookingId: b.id || b._id,
+        stayDates: `${b.checkIn} - ${b.checkOut}`,
+        totalCharges: finalAmt,
+        amountPaid: Number(b.paidAmount || (b.paymentStatus === 'Paid' ? finalAmt : Math.max(0, finalAmt - bal))),
+        balanceDue: bal,
+        paymentStatus: bal === 0 ? 'Paid' : 'Pending',
+        status: b.status === 'Checked-out' ? 'Closed' : 'Active'
+      };
+    });
 
     return sendSuccess(res, 200, folios, 'Guest billing folios index loaded.');
   } catch (err) {
@@ -985,15 +1207,48 @@ router.get('/folios', async (req, res) => {
 
 router.get('/folios/:id', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
     const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) {
       return sendError(res, 404, 'Folio record not found.');
     }
 
-    const totalPaid = booking.amount - booking.balance;
-    const baseTariff = Math.round(booking.amount / 1.18);
-    const taxAmount = booking.amount - baseTariff;
+    const finalAmt = Number(booking.totalAmount || booking.amount || 0);
+    const bal = Number(booking.balance !== undefined ? booking.balance : 0);
+    const totalPaid = Number(booking.paidAmount || (booking.paymentStatus === 'Paid' ? finalAmt : Math.max(0, finalAmt - bal)));
+    const discountAmount = Number(booking.discountAmount || 0);
+    const originalAmount = Number(booking.originalAmount || (finalAmt + discountAmount));
+
+    const items = [];
+    if (discountAmount > 0) {
+      items.push({
+        category: "Room Tariff",
+        desc: `${booking.nights || 1} Night stay tariff (Gross)`,
+        qty: 1,
+        price: originalAmount,
+        tax: 0,
+        total: originalAmount
+      });
+      items.push({
+        category: "Discount",
+        desc: `Coupon Promo Discount (${booking.couponCode || 'PROMO'})`,
+        qty: 1,
+        price: -discountAmount,
+        tax: 0,
+        total: -discountAmount
+      });
+    } else {
+      const baseTariff = Math.round(finalAmt / 1.18);
+      const taxAmount = finalAmt - baseTariff;
+      items.push({
+        category: "Room Tariff",
+        desc: `${booking.nights || 1} Night stay tariff`,
+        qty: 1,
+        price: baseTariff,
+        tax: taxAmount,
+        total: finalAmt
+      });
+    }
 
     const folioDetail = {
       id: `FOL-${booking.id || booking._id}`,
@@ -1002,14 +1257,12 @@ router.get('/folios/:id', async (req, res) => {
       roomType: booking.room ? booking.room.split('·')[1]?.trim() || 'Standard' : 'Standard',
       bookingId: booking.id || booking._id,
       stayDates: `${booking.checkIn} - ${booking.checkOut}`,
-      totalCharges: booking.amount,
+      totalCharges: finalAmt,
       amountPaid: totalPaid,
-      balanceDue: booking.balance,
-      paymentStatus: booking.balance === 0 ? 'Paid' : 'Pending',
+      balanceDue: bal,
+      paymentStatus: bal === 0 ? 'Paid' : 'Pending',
       status: booking.status === 'Checked-out' ? 'Closed' : 'Active',
-      items: [
-        { category: "Room Tariff", desc: `${booking.nights} Night stay tariff`, qty: 1, price: baseTariff, tax: taxAmount, total: booking.amount }
-      ]
+      items
     };
 
     return sendSuccess(res, 200, folioDetail, 'Folio billing items loaded.');
@@ -1022,10 +1275,16 @@ router.get('/folios/:id', async (req, res) => {
 router.post('/folios/:id/charges', async (req, res) => {
   try {
     const { amount, description, category } = req.body;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
 
     const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) return sendError(res, 404, 'Folio not found.');
+
+    const bStatus = String(booking.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled'].includes(bStatus)) {
+      return sendError(res, 400, 'Cannot post charges to a closed or checked-out folio.');
+    }
+
 
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, {
       amount: Number(booking.amount) + Number(amount),
@@ -1057,7 +1316,7 @@ router.post('/folios/:id/charges', async (req, res) => {
 router.post('/folios/:id/payments', async (req, res) => {
   try {
     const { amount, method } = req.body;
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
 
     const booking = await findBookingById(req.params.id, propertyId);
     if (!booking) return sendError(res, 404, 'Folio not found.');
@@ -1150,6 +1409,10 @@ const ensureRealPayments = async (propId) => {
       }
 
       const amount = Number(b.totalAmount || b.amount || 0);
+      const discountAmount = Number(b.discountAmount || 0);
+      const originalAmount = Number(b.originalAmount || (amount + discountAmount));
+      const couponCode = b.couponCode || null;
+      const paidAmount = Number(b.paidAmount || (b.paymentStatus === 'Paid' ? amount : Math.max(0, amount - Number(b.balance || 0))));
       const paymentMethod = b.paymentMethod || 'UPI';
       const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
       const status = isRefunded
@@ -1175,6 +1438,10 @@ const ensureRealPayments = async (propId) => {
           guestName,
           roomNumber,
           amount: amount > 0 ? amount : 3500,
+          originalAmount,
+          discountAmount,
+          couponCode,
+          paidAmount,
           paymentMethod,
           status,
           propertyId: b.propertyId || propId || 'HS-9HQ8P',
@@ -1191,6 +1458,10 @@ const ensureRealPayments = async (propId) => {
         let needsUpdate = false;
         if (existing.bookingId !== cleanBookingId) { existing.bookingId = cleanBookingId; needsUpdate = true; }
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
+        if (originalAmount > 0 && existing.originalAmount !== originalAmount) { existing.originalAmount = originalAmount; needsUpdate = true; }
+        if (discountAmount !== undefined && existing.discountAmount !== discountAmount) { existing.discountAmount = discountAmount; needsUpdate = true; }
+        if (couponCode !== undefined && existing.couponCode !== couponCode) { existing.couponCode = couponCode; needsUpdate = true; }
+        if (paidAmount !== undefined && existing.paidAmount !== paidAmount) { existing.paidAmount = paidAmount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
@@ -1211,7 +1482,7 @@ router.get('/payments', async (req, res) => {
     const propertyId = req.user.propertyId || 'HS-9HQ8P';
     await ensureRealPayments(propertyId);
     let payments = await Payment.find({
-      $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }]
+      $or: [{ propertyId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }]
     }).sort({ createdAt: -1 });
     if (!payments || payments.length === 0) {
       payments = await Payment.find({}).sort({ createdAt: -1 });
@@ -1319,7 +1590,7 @@ router.delete('/payments/:id', async (req, res) => {
 // ==========================================
 router.get('/notifications', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
     setImmediate(() => {
       seedDefaultReceptionistNotifications(propertyId).catch(() => {});
       syncReceptionistBookingNotifications(propertyId).catch(() => {});
@@ -1331,7 +1602,7 @@ router.get('/notifications', async (req, res) => {
       { role: null },
       { userId: req.user.id || req.user._id },
       { propertyId },
-      { propertyId: 'HS-JAI' },
+      { propertyId: 'HS-9HQ8P' },
       { propertyId: 'HS-9HQ8P' }
     ];
 
@@ -1410,7 +1681,7 @@ const handleMarkReceptionistNotifRead = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const propertyId = req.user.propertyId || 'HS-JAI';
+      const propertyId = req.user.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, propertyId, 'unread_notifications_count_updated', { propertyId });
       emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'receptionist_notification_read', id });
     }
@@ -1448,7 +1719,7 @@ const handleMarkReceptionistNotifUnread = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const propertyId = req.user.propertyId || 'HS-JAI';
+      const propertyId = req.user.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, propertyId, 'unread_notifications_count_updated', { propertyId });
       emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'receptionist_notification_unread', id });
     }
@@ -1465,7 +1736,7 @@ router.put('/notifications/:id/unread', handleMarkReceptionistNotifUnread);
 
 const handleMarkAllReceptionistNotifsRead = async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
     await Promise.all([
       ReceptionistNotification.updateMany(
         { isRead: false },
@@ -1538,7 +1809,7 @@ router.get('/feedback', async (req, res) => {
   try {
     const propId = req.query.propertyId || req.user?.propertyId;
     const query = (propId && propId !== 'all')
-      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
+      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-9HQ8P' }] }
       : {};
     const list = await getUnifiedFeedbacksAndReviews(query);
     return sendSuccess(res, 200, list, 'Guest feedback retrieved successfully from MongoDB.');
@@ -1549,7 +1820,7 @@ router.get('/feedback', async (req, res) => {
 
 router.post('/feedback', async (req, res) => {
   try {
-    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const {
       bookingId = `BK-${Date.now().toString().slice(-5)}`,
       guestName,

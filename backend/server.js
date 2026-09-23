@@ -21,6 +21,9 @@ const PORT = process.env.PORT || 5000;
 import { seedUsers } from './scripts/seed.js';
 
 import { Server } from 'socket.io';
+import { startAutoCheckoutScheduler } from './services/autoCheckout.service.js';
+
+// Auto checkout scheduler active with interval 30s
 
 const startServer = async () => {
   // Connect to Database
@@ -39,6 +42,9 @@ const startServer = async () => {
   });
 
   app.set('socketio', io);
+
+  // Initialize background automatic checkout persistent engine (every 30s)
+  startAutoCheckoutScheduler(io, 30000);
 
   io.on('connection', (socket) => {
     console.log('⚡ Socket.io client connected:', socket.id);

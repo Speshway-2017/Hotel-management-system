@@ -74,7 +74,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
           existingMn = await ManagerNotification.findOne({
             title: cleanTitle,
             message: cleanMsg,
-            propertyId: targetPropId || 'HS-JAI',
+            propertyId: targetPropId || 'HS-9HQ8P',
             createdAt: { $gte: sixtySecondsAgo }
           });
         } catch (_) {}
@@ -85,7 +85,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
             message: cleanMsg,
             category: category || 'General',
             isRead: false,
-            propertyId: targetPropId || 'HS-JAI'
+            propertyId: targetPropId || 'HS-9HQ8P'
           });
         }
       } catch (_) {}
@@ -167,7 +167,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
 export const notifyBookingEvent = async ({ req, io, action = 'created', booking, guestUser = null, property = null }) => {
   try {
     const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
-    const propId = booking.propertyId || 'HS-JAI';
+    const propId = booking.propertyId || 'HS-9HQ8P';
     const guestName = booking.guest || booking.guestName || 'A Guest';
     const roomInfo = booking.room || booking.roomType || 'Standard Room';
     const bookingId = booking.bookingId || booking._id || booking.id || '';
@@ -320,7 +320,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
 export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = 'Guest' }) => {
   try {
     const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
-    const propId = feedback.propertyId || 'HS-JAI';
+    const propId = feedback.propertyId || 'HS-9HQ8P';
     const ratingStars = `${feedback.rating || 5}★`;
     const snippet = (feedback.comment || feedback.comments || '').slice(0, 50);
 

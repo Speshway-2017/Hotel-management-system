@@ -148,6 +148,28 @@ export const adminService = {
       }
     }
   },
+  getGuestAadhaarStatus: async (id) => {
+    try {
+      return await apiClient.get(`/super-admin/reservations/${id}/guest-aadhaar-status`);
+    } catch (err) {
+      try {
+        return await apiClient.get(`/manager/reservations/${id}/guest-aadhaar-status`);
+      } catch {
+        return await apiClient.get(`/receptionist/reservations/${id}/guest-aadhaar-status`);
+      }
+    }
+  },
+  lookupGuestAadhaar: async (params) => {
+    try {
+      return await apiClient.get('/super-admin/guests/lookup-aadhaar', { params });
+    } catch {
+      try {
+        return await apiClient.get('/manager/guests/lookup-aadhaar', { params });
+      } catch {
+        return await apiClient.get('/receptionist/guests/lookup-aadhaar', { params });
+      }
+    }
+  },
   getFeedback: async (params = {}) => {
     try {
       return await apiClient.get('/admin/feedback', { params });

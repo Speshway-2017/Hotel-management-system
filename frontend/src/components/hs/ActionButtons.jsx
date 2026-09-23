@@ -121,13 +121,13 @@ export function ActionIcon({
     <button
       type={type}
       onClick={handleClick}
-      disabled={disabled}
+      aria-disabled={disabled}
       title={tooltipText}
       aria-label={tooltipText}
       className={cn(
         "relative inline-flex items-center justify-center rounded-lg border text-xs font-bold leading-none font-ui select-none shrink-0 shadow-2xs transition-all duration-150 cursor-pointer",
         isIconOnly ? "size-7 w-7 h-7 min-w-7 min-h-7 max-w-7 max-h-7 p-0" : "h-7 min-h-7 px-2.5 gap-1.5 whitespace-nowrap",
-        disabled ? "opacity-50 pointer-events-none cursor-not-allowed" : styleClass,
+        disabled ? "opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground border-muted shadow-none select-none hover:bg-muted/40 hover:text-muted-foreground" : styleClass,
         className
       )}
       style={{
@@ -206,8 +206,16 @@ export function DeleteActionIcon({ label = "Delete", title = "Delete Record", ..
 }
 export const DeleteActionButton = DeleteActionIcon;
 
-export function CheckInActionIcon({ label = "Check-In", title = "Process Check-In", ...props }) {
-  return <ActionIcon icon={LogIn} label={label} title={title} variant="checkin" {...props} />;
+import { getCheckInStatusInfo } from "@/utils/serverTime";
+
+export function CheckInActionIcon({ booking, label = "Check-In", title, disabled, ...props }) {
+  const statusInfo = booking ? getCheckInStatusInfo(booking) : null;
+  const isDisabled = disabled !== undefined ? disabled : (statusInfo ? !statusInfo.isAllowed : false);
+  const tooltip = statusInfo && !statusInfo.isAllowed
+    ? statusInfo.tooltip
+    : (title || (statusInfo ? statusInfo.tooltip : "Process Check-In"));
+
+  return <ActionIcon icon={LogIn} label={label} title={tooltip} variant="checkin" disabled={isDisabled} {...props} />;
 }
 export const CheckInActionButton = CheckInActionIcon;
 

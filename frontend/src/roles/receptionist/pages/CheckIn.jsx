@@ -17,6 +17,7 @@ import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendSta
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
 import { receptionCache } from "@/services/receptionCache";
+import { useServerTime, isCheckInPermitted, getCheckInStatusInfo } from "@/utils/serverTime";
 
 export const Route = createFileRoute("/reception/check-in")({
   head: () => ({
@@ -54,6 +55,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
 
 function ArrivalsPage() {
   const navigate = useNavigate();
+  useServerTime(2000);
   const cachedArrivals = receptionCache.get('arrivals');
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -151,6 +153,13 @@ function ArrivalsPage() {
   // Action methods
   const handleCheckIn = async (id, roomNum) => {
     const target = arrivals.find(a => a.id === id || a._id === id || a.bookingId === id);
+    if (target) {
+      const checkInStatus = getCheckInStatusInfo(target);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
     const isWebsiteBooking = !target || (target.source !== "Walk-in" && !String(target.source || "").toLowerCase().includes("walk-in"));
 
     if (isWebsiteBooking) {
@@ -362,6 +371,7 @@ function ArrivalsPage() {
                       <ActionGroup align="left">
                         {guest.status !== "Checked-In" && guest.status !== "Checked-in" && guest.status !== "No-Show" && guest.status !== "No-show" && (
                           <CheckInActionButton
+                            booking={guest}
                             onClick={() => handleCheckIn(guest.id || guest._id, guest.roomNumber || guest.room)}
                           />
                         )}

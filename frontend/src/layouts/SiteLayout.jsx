@@ -20,7 +20,7 @@ export function SiteHeader() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const [properties, setProperties] = useState([]);
-  const [selectedPropertyId, setSelectedPropertyId] = useState(localStorage.getItem('selected_property_id') || 'HS-JAI');
+  const [selectedPropertyId, setSelectedPropertyId] = useState(localStorage.getItem('selected_property_id') || 'HS-9HQ8P');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -187,7 +187,7 @@ export function SiteFooter() {
       .catch(err => {});
 
     const fetchActiveProperty = () => {
-      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
       publicService.getProperty(activeId)
         .then(res => {
           if (res.success && res.data) {

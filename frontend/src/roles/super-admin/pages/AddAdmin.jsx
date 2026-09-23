@@ -7,6 +7,7 @@ import { FormField, Input } from "@/components/hs/FormFields";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import { validateWithZod, adminUserSchema } from "@/schemas";
 
 function AddAdmin() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ function AddAdmin() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -50,10 +52,14 @@ function AddAdmin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.password) {
-      toast.error("Please fill in all required fields.");
+    const validation = validateWithZod(adminUserSchema, formData);
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please correct the highlighted errors.");
       return;
     }
+    setFieldErrors({});
 
     setSubmitting(true);
     setError(null);
@@ -85,25 +91,43 @@ function AddAdmin() {
 
       <Panel title="Administrator Credentials & Scope" description="Specify account logins and assigned properties.">
         <form onSubmit={handleSubmit} className="p-5 space-y-4 bg-white rounded-b-xl max-w-xl">
-          <FormField label="Full Name" required id="admin-name">
+          <FormField
+            label="Full Name"
+            required
+            id="admin-name"
+            status={fieldErrors.name ? "error" : undefined}
+            errorMsg={fieldErrors.name}
+          >
             <Input
               id="admin-name"
               required
               placeholder="e.g. Vikram Rathore"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: undefined });
+              }}
               className="h-10 text-xs"
             />
           </FormField>
 
-          <FormField label="Email Address" required id="admin-email">
+          <FormField
+            label="Email Address"
+            required
+            id="admin-email"
+            status={fieldErrors.email ? "error" : undefined}
+            errorMsg={fieldErrors.email}
+          >
             <Input
               id="admin-email"
               type="email"
               required
               placeholder="e.g. vikram.rathore@hourstay.com"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
+              }}
               className="h-10 text-xs"
             />
           </FormField>
@@ -116,9 +140,12 @@ function AddAdmin() {
                 type={showPassword ? "text" : "password"}
                 required
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
+                }}
                 placeholder="Min 6 characters"
-                className="h-10 pr-10 text-xs"
+                className={`h-10 pr-10 text-xs ${fieldErrors.password ? "border-rose-500" : ""}`}
               />
               <button
                 type="button"
@@ -129,14 +156,25 @@ function AddAdmin() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.password}</p>
+            )}
           </div>
 
-          <FormField label="Mobile Number" id="admin-mobile">
+          <FormField
+            label="Mobile Number"
+            id="admin-mobile"
+            status={fieldErrors.mobile ? "error" : undefined}
+            errorMsg={fieldErrors.mobile}
+          >
             <Input
               id="admin-mobile"
               placeholder="e.g. 98290 11223"
               value={formData.mobile}
-              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, mobile: e.target.value });
+                if (fieldErrors.mobile) setFieldErrors({ ...fieldErrors, mobile: undefined });
+              }}
               className="h-10 text-xs"
             />
           </FormField>

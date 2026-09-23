@@ -16,7 +16,7 @@ export async function getUnifiedFeedbacksAndReviews(query = {}) {
           { propertyId: { $exists: false } },
           { propertyId: '' },
           { propertyId: 'all' },
-          { propertyId: 'HS-JAI' }
+          { propertyId: 'HS-9HQ8P' }
         ]
       };
     } else {

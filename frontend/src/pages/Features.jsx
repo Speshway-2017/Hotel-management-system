@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { 
   CalendarDays, Check, LayoutGrid, Receipt, RefreshCw, 
   Sparkles, HardHat, Smartphone, BarChart3, CheckCircle2,
-  Building2, ShieldCheck, ArrowRight, Layers, AlertCircle
+  Building2, ShieldCheck, ArrowRight, Layers, AlertCircle,
+  CreditCard, UtensilsCrossed, Users, Wrench, Clock,
+  Bell, Star, Briefcase, Languages
 } from "lucide-react";
 
 export const Route = createFileRoute("/features")({
@@ -24,6 +26,67 @@ export const Route = createFileRoute("/features")({
   }),
   component: Features
 });
+
+const PASTEL_PALETTES = [
+  { tab: "#93C5FD", iconBg: "#EFF6FF", iconText: "#0284C7", bullet: "#60A5FA" }, // Sky Blue
+  { tab: "#86EFAC", iconBg: "#F0FDF4", iconText: "#16A34A", bullet: "#4ADE80" }, // Mint Green
+  { tab: "#C4B5FD", iconBg: "#F5F3FF", iconText: "#7C3AED", bullet: "#A78BFA" }, // Lavender
+  { tab: "#FDBA74", iconBg: "#FFF7ED", iconText: "#EA580C", bullet: "#FB923C" }, // Peach / Apricot
+  { tab: "#F9A8D4", iconBg: "#FDF2F8", iconText: "#DB2777", bullet: "#F472B6" }, // Soft Rose
+  { tab: "#FDE047", iconBg: "#FEFCE8", iconText: "#CA8A04", bullet: "#FACC15" }, // Butter Honey
+  { tab: "#5EEAD4", iconBg: "#F0FDFA", iconText: "#0D9488", bullet: "#2DD4BF" }, // Aqua Teal
+  { tab: "#A5B4FC", iconBg: "#EEF2FF", iconText: "#4F46E5", bullet: "#818CF8" }, // Periwinkle / Indigo
+  { tab: "#FCA5A5", iconBg: "#FEF2F2", iconText: "#DC2626", bullet: "#F87171" }, // Coral Blush
+  { tab: "#BEF264", iconBg: "#F7FEE7", iconText: "#65A30D", bullet: "#A3E635" }, // Sage Lime
+  { tab: "#67E8F9", iconBg: "#ECFEFF", iconText: "#0891B2", bullet: "#22D3EE" }, // Ice Cyan
+  { tab: "#F0ABFC", iconBg: "#FDF4FF", iconText: "#C026D3", bullet: "#E879F9" }, // Pastel Orchid
+];
+
+const FEATURE_ICONS = [
+  CalendarDays,
+  LayoutGrid,
+  Sparkles,
+  Layers,
+  Receipt,
+  CreditCard,
+  UtensilsCrossed,
+  Users,
+  Wrench,
+  Clock,
+  BarChart3,
+  RefreshCw,
+  Building2,
+  Bell,
+  Smartphone,
+  Star,
+  Briefcase,
+  ShieldCheck,
+  Languages,
+];
+
+function getFeatureIcon(idx, title = "") {
+  const t = title.toLowerCase();
+  if (t.includes("reserv") || t.includes("book")) return CalendarDays;
+  if (t.includes("front desk") || t.includes("console")) return LayoutGrid;
+  if (t.includes("housekeep")) return Sparkles;
+  if (t.includes("rate") || t.includes("room")) return Layers;
+  if (t.includes("invoic") || t.includes("bill")) return Receipt;
+  if (t.includes("pay") || t.includes("upi")) return CreditCard;
+  if (t.includes("pos") || t.includes("din") || t.includes("food")) return UtensilsCrossed;
+  if (t.includes("crm") || (t.includes("guest") && t.includes("profile"))) return Users;
+  if (t.includes("maint") || t.includes("ticket")) return Wrench;
+  if (t.includes("staff") || t.includes("roster") || t.includes("shift")) return Clock;
+  if (t.includes("report") || t.includes("analytic")) return BarChart3;
+  if (t.includes("channel") || t.includes("sync")) return RefreshCw;
+  if (t.includes("multi-property") || t.includes("hub") || t.includes("hotel")) return Building2;
+  if (t.includes("notif") || t.includes("alert")) return Bell;
+  if (t.includes("self-service") || t.includes("mobile")) return Smartphone;
+  if (t.includes("feedback") || t.includes("review")) return Star;
+  if (t.includes("agent") || t.includes("travel")) return Briefcase;
+  if (t.includes("security") || t.includes("audit")) return ShieldCheck;
+  if (t.includes("local") || t.includes("language")) return Languages;
+  return FEATURE_ICONS[idx % FEATURE_ICONS.length] || Layers;
+}
 
 function Features() {
   const [dbFeatures, setDbFeatures] = useState([]);
@@ -355,7 +418,7 @@ function Features() {
       </section>
 
       {/* Complete Product Feature Directory Section */}
-      <section className="bg-cream py-20 border-t border-navy/5 animate-fade-up">
+      <section className="bg-[#EEF3F8] py-20 border-t border-slate-200/70 animate-fade-up">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>
@@ -367,23 +430,55 @@ function Features() {
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 text-left font-ui">
-            {featuresToRender.map((mod, idx) => (
-              <div key={idx} className="card-guest border border-navy/5 bg-white p-6 rounded-xl shadow-soft flex flex-col justify-between hover:-translate-y-1 transition-all duration-300">
-                <div>
-                  <h3 className="font-display text-base font-bold text-navy border-b border-navy/5 pb-2 mb-3">{mod.title}</h3>
-                  <p className="text-xs text-[#4A4F58] leading-relaxed mb-4 font-ui">{mod.desc}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6 text-left font-ui">
+            {featuresToRender.map((mod, idx) => {
+              const pastel = PASTEL_PALETTES[idx % PASTEL_PALETTES.length];
+              const IconComponent = getFeatureIcon(idx, mod.title);
+
+              return (
+                <div 
+                  key={idx} 
+                  className="group relative bg-white rounded-2xl p-5 pt-6 border border-white/90 ring-1 ring-slate-900/[0.04] shadow-[0_10px_25px_-5px_rgba(20,30,60,0.06),0_4px_10px_-2px_rgba(20,30,60,0.02),inset_0_1px_1px_rgba(255,255,255,1)] hover:-translate-y-1 hover:shadow-[0_18px_35px_-6px_rgba(20,30,60,0.09),0_6px_12px_-2px_rgba(20,30,60,0.03)] transition-all duration-300 flex flex-col justify-between"
+                >
+                  {/* Small colored horizontal tab attached to the top center */}
+                  <div 
+                    className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-14 h-2 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.7)] border border-white/60 transition-all duration-300 group-hover:w-16"
+                    style={{ backgroundColor: pastel.tab }}
+                    aria-hidden="true"
+                  />
+
+                  <div>
+                    {/* Small Line Icon in pastel soft-depth container */}
+                    <div 
+                      className="size-9 rounded-xl flex items-center justify-center mb-3.5 shadow-[inset_0_1px_2px_rgba(255,255,255,0.9),0_2px_4px_rgba(20,30,60,0.04)] border border-white/90"
+                      style={{ backgroundColor: pastel.iconBg, color: pastel.iconText }}
+                    >
+                      <IconComponent className="size-4.5" strokeWidth={1.9} />
+                    </div>
+
+                    <h3 className="font-display text-[15px] sm:text-base font-bold text-navy leading-snug mb-2">
+                      {mod.title}
+                    </h3>
+                    <p className="text-xs text-[#525F70] leading-relaxed mb-4 font-ui">
+                      {mod.desc}
+                    </p>
+                  </div>
+
+                  {/* Feature bullet points */}
+                  <ul className="space-y-1.5 pt-3 border-t border-slate-100 font-ui">
+                    {mod.points.map((pt, pIdx) => (
+                      <li key={pIdx} className="flex items-center gap-2 text-[11px] font-medium text-slate-700">
+                        <span 
+                          className="size-1.5 rounded-full shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.1)]" 
+                          style={{ backgroundColor: pastel.bullet }}
+                        />
+                        <span className="truncate">{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="space-y-1.5 pt-2 border-t border-navy/5">
-                  {mod.points.map((pt, pIdx) => (
-                    <li key={pIdx} className="flex items-center gap-1.5 text-[11px] font-semibold text-navy">
-                      <span className="size-1 rounded-full bg-purple" />
-                      <span>{pt}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

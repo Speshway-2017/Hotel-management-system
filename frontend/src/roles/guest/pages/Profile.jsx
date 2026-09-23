@@ -27,6 +27,7 @@ import {
   X
 } from "lucide-react";
 import { authService } from "@/services/auth";
+import { validateWithZod, guestProfileSchema, changePasswordSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/profile")({
   head: () => ({
@@ -43,6 +44,8 @@ function GuestProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [profileErrors, setProfileErrors] = useState({});
+  const [passwordErrors, setPasswordErrors] = useState({});
   
   const currentUser = authService.getCurrentUser() || {};
 
@@ -142,6 +145,26 @@ function GuestProfilePage() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    const validation = validateWithZod(guestProfileSchema, {
+      name: profileData.name,
+      phone: profileData.phone,
+      email: profileData.email || "guest@hourstay.com",
+      city: profileData.city,
+      country: profileData.country,
+      address: profileData.address
+    });
+
+    if (!validation.isValid) {
+      setProfileErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      setNotification({
+        tone: "error",
+        title: "Validation Error",
+        body: firstError
+      });
+      return;
+    }
+    setProfileErrors({});
     setSaving(true);
     
     try {
@@ -190,22 +213,23 @@ function GuestProfilePage() {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+    const validation = validateWithZod(changePasswordSchema, {
+      currentPassword: passwordData.currentPassword,
+      newPassword: passwordData.newPassword,
+      confirmPassword: passwordData.confirmNewPassword
+    });
+
+    if (!validation.isValid) {
+      setPasswordErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
       setNotification({
         tone: "error",
-        title: "Password Mismatch",
-        body: "Confirm password does not match new password."
+        title: "Validation Error",
+        body: firstError
       });
       return;
     }
-    if (passwordData.newPassword.length < 6) {
-      setNotification({
-        tone: "error",
-        title: "Weak Password",
-        body: "New password must be at least 6 characters long."
-      });
-      return;
-    }
+    setPasswordErrors({});
 
     try {
       const token = localStorage.getItem('hms_token');
@@ -416,10 +440,16 @@ function GuestProfilePage() {
                     <Input
                       id="edit-name"
                       value={profileData.name}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                      className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 rounded-xl"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, name: e.target.value }));
+                        if (profileErrors.name) setProfileErrors(prev => ({ ...prev, name: undefined }));
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.name ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 rounded-xl`}
                       required
                     />
+                    {profileErrors.name && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.name}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -427,10 +457,16 @@ function GuestProfilePage() {
                     <Input
                       id="edit-phone"
                       value={profileData.phone}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 rounded-xl"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, phone: e.target.value }));
+                        if (profileErrors.phone) setProfileErrors(prev => ({ ...prev, phone: undefined }));
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.phone ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 rounded-xl`}
                       required
                     />
+                    {profileErrors.phone && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.phone}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -438,10 +474,16 @@ function GuestProfilePage() {
                     <Input
                       id="edit-city"
                       value={profileData.city}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, city: e.target.value }))}
-                      className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 rounded-xl"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, city: e.target.value }));
+                        if (profileErrors.city) setProfileErrors(prev => ({ ...prev, city: undefined }));
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.city ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 rounded-xl`}
                       required
                     />
+                    {profileErrors.city && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.city}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -449,10 +491,16 @@ function GuestProfilePage() {
                     <Input
                       id="edit-country"
                       value={profileData.country}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, country: e.target.value }))}
-                      className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 rounded-xl"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, country: e.target.value }));
+                        if (profileErrors.country) setProfileErrors(prev => ({ ...prev, country: undefined }));
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.country ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 rounded-xl`}
                       required
                     />
+                    {profileErrors.country && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.country}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
@@ -460,10 +508,16 @@ function GuestProfilePage() {
                     <Input
                       id="edit-address"
                       value={profileData.address}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, address: e.target.value }))}
-                      className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 rounded-xl"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, address: e.target.value }));
+                        if (profileErrors.address) setProfileErrors(prev => ({ ...prev, address: undefined }));
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.address ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 rounded-xl`}
                       required
                     />
+                    {profileErrors.address && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.address}</p>
+                    )}
                   </div>
 
                 </div>
@@ -509,8 +563,11 @@ function GuestProfilePage() {
                       id="current-pw"
                       type={showCurrentPassword ? "text" : "password"}
                       value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                      className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 pr-10 rounded-xl"
+                      onChange={(e) => {
+                        setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }));
+                        if (passwordErrors.currentPassword) setPasswordErrors(prev => ({ ...prev, currentPassword: undefined }));
+                      }}
+                      className={`h-10 text-xs border ${passwordErrors.currentPassword ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 pr-10 rounded-xl`}
                       placeholder="••••••••"
                       required
                     />
@@ -522,6 +579,9 @@ function GuestProfilePage() {
                       {showCurrentPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   </div>
+                  {passwordErrors.currentPassword && (
+                    <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.currentPassword}</p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -532,8 +592,11 @@ function GuestProfilePage() {
                         id="new-pw"
                         type={showNewPassword ? "text" : "password"}
                         value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                        className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 pr-10 rounded-xl"
+                        onChange={(e) => {
+                          setPasswordData(prev => ({ ...prev, newPassword: e.target.value }));
+                          if (passwordErrors.newPassword) setPasswordErrors(prev => ({ ...prev, newPassword: undefined }));
+                        }}
+                        className={`h-10 text-xs border ${passwordErrors.newPassword ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 pr-10 rounded-xl`}
                         placeholder="••••••••"
                         required
                       />
@@ -545,6 +608,9 @@ function GuestProfilePage() {
                         {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    {passwordErrors.newPassword && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.newPassword}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -554,8 +620,11 @@ function GuestProfilePage() {
                         id="confirm-new-pw"
                         type={showConfirmPassword ? "text" : "password"}
                         value={passwordData.confirmNewPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                        className="h-10 text-xs border border-navy/15 font-semibold text-navy bg-cream/10 pr-10 rounded-xl"
+                        onChange={(e) => {
+                          setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }));
+                          if (passwordErrors.confirmPassword) setPasswordErrors(prev => ({ ...prev, confirmNewPassword: undefined }));
+                        }}
+                        className={`h-10 text-xs border ${passwordErrors.confirmPassword ? "border-rose-500" : "border-navy/15"} font-semibold text-navy bg-cream/10 pr-10 rounded-xl`}
                         placeholder="••••••••"
                         required
                       />
@@ -567,6 +636,9 @@ function GuestProfilePage() {
                         {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    {passwordErrors.confirmPassword && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.confirmPassword}</p>
+                    )}
                   </div>
                 </div>
 

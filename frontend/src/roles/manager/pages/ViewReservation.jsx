@@ -199,10 +199,22 @@ function ManagerViewReservation() {
               <h4 className="font-semibold text-navy text-sm">Financial Ledger</h4>
             </div>
             <div className="space-y-2.5 text-xs text-navy">
+              {Number(booking.discountAmount || 0) > 0 && (
+                <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/60 rounded-lg space-y-1">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-emerald-800 font-medium">Original Tariff:</span>
+                    <span className="line-through text-muted-foreground">₹{Number(booking.originalAmount || (Number(booking.totalAmount || booking.amount) + Number(booking.discountAmount))).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] font-bold text-emerald-700">
+                    <span>Coupon Promo ({booking.couponCode || 'APPLIED'}):</span>
+                    <span>-₹{Number(booking.discountAmount).toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</span>
-                  <p className="font-bold mt-0.5 text-sm text-navy">₹{(booking.amount || 0).toLocaleString("en-IN")}</p>
+                  <p className="font-bold mt-0.5 text-sm text-navy">₹{(Number(booking.totalAmount ?? booking.amount ?? 0)).toLocaleString("en-IN")}</p>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Outstanding</span>

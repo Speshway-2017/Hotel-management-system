@@ -55,6 +55,12 @@ export const superAdminService = {
   verifyIdProof: async (id, data) => {
     return await apiClient.post(`/super-admin/reservations/${id}/verify-id`, data);
   },
+  getGuestAadhaarStatus: async (id) => {
+    return await apiClient.get(`/super-admin/reservations/${id}/guest-aadhaar-status`);
+  },
+  lookupGuestAadhaar: async (params) => {
+    return await apiClient.get('/super-admin/guests/lookup-aadhaar', { params });
+  },
   deleteReservation: async (id) => {
     return await apiClient.delete(`/super-admin/reservations/${id}`);
   },
@@ -143,6 +149,9 @@ export const superAdminService = {
   },
   updateContactRequestStatus: async (id, status) => {
     return await apiClient.patch(`/super-admin/contacts/${id}/status`, { status });
+  },
+  replyContactRequest: async (id, data) => {
+    return await apiClient.post(`/super-admin/contacts/${id}/reply`, data);
   },
   deleteContactRequest: async (id) => {
     return await apiClient.delete(`/super-admin/contacts/${id}`);

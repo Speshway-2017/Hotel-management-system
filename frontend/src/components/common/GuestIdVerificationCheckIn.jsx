@@ -26,19 +26,24 @@ import {
   IndianRupee,
   Lock,
   Unlock,
-  Loader2
+  Loader2,
+  Fingerprint,
+  AlertTriangle
 } from "lucide-react";
 import { receptionistService } from "@/services/receptionist";
 import { managerService } from "@/services/manager";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
-import { emitRealtimeEvent } from "@/services/socket";
+import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
+import { validateWithZod, guestIdVerificationSchema } from "@/schemas";
 
 export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
   const params = useParams() || {};
   const id = params.id || (typeof window !== "undefined" ? window.location.pathname.split("/").pop() : "");
   const navigate = useNavigate();
+
+  const { serverTime, formattedServerTime } = useServerTime(2000);
 
   const [loading, setLoading] = useState(true);
   const [submittingVerification, setSubmittingVerification] = useState(false);
@@ -57,6 +62,43 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
   const [staffAttestation, setStaffAttestation] = useState(false);
   const [verificationNotes, setVerificationNotes] = useState("");
   const [uploadPreview, setUploadPreview] = useState(null);
+
+  // Aadhaar consistency state
+  const [aadhaarStatus, setAadhaarStatus] = useState(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const formatAadhaarInput = (value) => {
+    if (!value) return "";
+    const digits = String(value).replace(/\D/g, "").slice(0, 12);
+    const parts = [];
+    for (let i = 0; i < digits.length; i += 4) {
+      parts.push(digits.substring(i, i + 4));
+    }
+    return parts.join(" ");
+  };
+
+  const getRoleService = () => {
+    if (role === "admin") return adminService;
+    if (role === "manager") return managerService;
+    return receptionistService;
+  };
+
+  const fetchAadhaarStatus = async (bookingId) => {
+    try {
+      const srv = getRoleService();
+      if (srv.getGuestAadhaarStatus) {
+        const res = await srv.getGuestAadhaarStatus(bookingId);
+        if (res?.success && res?.data) {
+          setAadhaarStatus(res.data);
+          return res.data;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch guest Aadhaar status:", err);
+    }
+    return null;
+  };
 
   // Return navigation path based on role
   const returnUrl =
@@ -95,18 +137,29 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
           const initialRoom = found.roomNumber || (found.room ? String(found.room).match(/\b\d{3,4}\b/)?.[0] || found.room.split(" ")[0] : "101");
           setAssignedRoom(initialRoom);
 
-          if (found.idDocType) setIdDocType(found.idDocType);
-          if (found.idDocNumber) setIdDocNumber(found.idDocNumber);
+          const isAadhaar = (found.idDocType || "Aadhaar Card") === "Aadhaar Card";
+          setIdDocType(found.idDocType || "Aadhaar Card");
+          if (found.idDocNumber) {
+            setIdDocNumber(isAadhaar ? formatAadhaarInput(found.idDocNumber) : found.idDocNumber);
+          }
           if (found.idDocImage) {
             setIdDocImage(found.idDocImage);
             setUploadPreview(found.idDocImage);
           }
-          if (found.idVerification === "Verified" || (found.idDocNumber && found.idVerifiedAt)) {
+          if (
+            (found.idVerification === "Verified" || (found.idDocNumber && found.idVerifiedAt)) &&
+            found.idVerification !== "Mismatch"
+          ) {
             setIsVerified(true);
             setStaffAttestation(true);
             setVerifiedAt(found.idVerifiedAt || new Date().toISOString());
             setVerifiedBy(found.idVerifiedBy || "Front Desk Staff");
+          } else {
+            setIsVerified(false);
           }
+
+          // Fetch guest Aadhaar consistency profile
+          await fetchAadhaarStatus(found._id || found.id);
         } else {
           toast.error("Reservation record could not be found.");
         }
@@ -154,13 +207,65 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
     reader.readAsDataURL(file);
   };
 
+  const handleDocTypeChange = (e) => {
+    const val = e.target.value;
+    setIdDocType(val);
+    setVerificationError("");
+    if (val === "Aadhaar Card") {
+      setIdDocNumber((prev) => formatAadhaarInput(prev));
+    }
+  };
+
+  const handleDocNumberChange = (e) => {
+    const val = e.target.value;
+    setVerificationError("");
+    if (idDocType === "Aadhaar Card") {
+      setIdDocNumber(formatAadhaarInput(val));
+    } else {
+      setIdDocNumber(val);
+    }
+  };
+
+  const cleanAadhaar = idDocNumber ? String(idDocNumber).replace(/\D/g, "") : "";
+  const isAadhaarDoc = idDocType === "Aadhaar Card";
+  const isAadhaarMismatch = Boolean(
+    isAadhaarDoc &&
+    aadhaarStatus?.hasExistingAadhaar &&
+    cleanAadhaar.length === 12 &&
+    aadhaarStatus?.last4 &&
+    !cleanAadhaar.endsWith(aadhaarStatus.last4)
+  );
+
   // Step 1: Submit ID Verification
   const handleVerifyIdProof = async (e) => {
     e.preventDefault();
+    setVerificationError("");
 
-    if (!idDocNumber.trim()) {
-      toast.error("Please enter a valid ID document / card number.");
+    const val = validateWithZod(guestIdVerificationSchema, {
+      idDocType,
+      idDocNumber: isAadhaarDoc ? cleanAadhaar : idDocNumber,
+      assignedRoom: assignedRoom || booking?.roomNumber || "101"
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      setVerificationError(val.firstError);
+      toast.error(val.firstError);
       return;
+    }
+    setFieldErrors({});
+
+    if (isAadhaarDoc) {
+      if (!/^[2-9]/.test(cleanAadhaar)) {
+        toast.error("Invalid Aadhaar number (cannot start with 0 or 1).");
+        return;
+      }
+      if (isAadhaarMismatch) {
+        const msg = `Aadhaar Mismatch: Entered number does not match registered record (${aadhaarStatus?.maskedAadhaar}). Hotel policy requires the same Aadhaar across all bookings for a guest.`;
+        setVerificationError(msg);
+        toast.error(msg);
+        return;
+      }
     }
 
     if (!staffAttestation) {
@@ -172,35 +277,40 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
     try {
       const payload = {
         idDocType,
-        idDocNumber: idDocNumber.trim(),
+        idDocNumber: isAadhaarDoc ? cleanAadhaar : idDocNumber.trim(),
         idDocImage: idDocImage || uploadPreview || "",
         idVerification: "Verified",
         notes: verificationNotes
       };
 
-      let res;
-      if (role === "admin") {
-        res = await adminService.verifyIdProof(booking._id || booking.id, payload);
-      } else if (role === "manager") {
-        res = await managerService.verifyIdProof(booking._id || booking.id, payload);
-      } else {
-        res = await receptionistService.verifyIdProof(booking._id || booking.id, payload);
-      }
+      const srv = getRoleService();
+      const res = await srv.verifyIdProof(booking._id || booking.id, payload);
 
       if (res?.success || res?.data) {
         setIsVerified(true);
         setVerifiedAt(new Date().toISOString());
         setVerifiedBy(res?.data?.idVerifiedBy || "Authorized Staff");
+        setVerificationError("");
         toast.success("Guest ID proof verified and recorded successfully! You can now complete the check-in.");
+
+        // Refresh Aadhaar status and booking
+        await fetchAadhaarStatus(booking._id || booking.id);
+        if (res?.data?.booking) {
+          setBooking(res.data.booking);
+        }
       } else {
-        toast.error(res?.message || "Failed to submit ID proof verification.");
+        const errorMsg = res?.message || "Failed to submit ID proof verification.";
+        setVerificationError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (err) {
       console.error("ID verification error:", err);
-      // Fallback for resilient local update
-      setIsVerified(true);
-      setVerifiedAt(new Date().toISOString());
-      toast.success("Guest ID verified! Proceed to complete check-in.");
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "ID proof verification failed. Please verify the Aadhaar number.";
+      setVerificationError(errMsg);
+      toast.error(errMsg);
     } finally {
       setSubmittingVerification(false);
     }
@@ -208,6 +318,12 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
 
   // Step 2: Complete Check-In
   const handleCompleteCheckIn = async () => {
+    const checkInStatus = booking ? getCheckInStatusInfo(booking) : { isAllowed: true };
+    if (!checkInStatus.isAllowed) {
+      toast.error(checkInStatus.tooltip || "Check-in time has not arrived yet based on server time.");
+      return;
+    }
+
     if (!isVerified) {
       toast.error("ID verification is mandatory for website reservations before check-in.");
       return;
@@ -226,7 +342,7 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
         roomNumber: assignedRoom,
         idVerification: "Verified",
         idDocType,
-        idDocNumber: idDocNumber.trim(),
+        idDocNumber: isAadhaarDoc ? cleanAadhaar : idDocNumber.trim(),
         idDocImage: idDocImage || uploadPreview || ""
       };
 
@@ -264,7 +380,8 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
       }, 700);
     } catch (err) {
       console.error("Check-in error:", err);
-      toast.error(err.message || "Failed to complete check-in.");
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to complete check-in.";
+      toast.error(errMsg);
     } finally {
       setSubmittingCheckIn(false);
     }
@@ -355,6 +472,24 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                 <span>{booking.pax || "2 Adults"}</span>
               </div>
             </div>
+
+            {aadhaarStatus?.hasExistingAadhaar && (
+              <div className="bg-purple/5 border border-purple/20 rounded-xl p-3 flex items-start gap-2.5 mt-3">
+                <Fingerprint className="size-4.5 text-purple shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] font-bold text-navy">Verified Aadhaar on File</span>
+                    <Tag tone="success" className="text-[9px] px-1.5 py-0">Registered Guest</Tag>
+                  </div>
+                  <p className="text-xs font-mono font-bold text-purple mt-0.5 tracking-wider">
+                    {aadhaarStatus.maskedAadhaar || `•••• •••• ${aadhaarStatus.last4}`}
+                  </p>
+                  <p className="text-[10px] text-navy/70 mt-1 leading-tight">
+                    Strict Aadhaar Consistency Rule: The same Aadhaar must be presented across all stays for this guest.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Stay & Tariff Details */}
@@ -427,6 +562,28 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
             description="Inspect photo identity document and confirm authenticity against reservation records."
           >
             <form onSubmit={handleVerifyIdProof} className="p-6 space-y-5 bg-white rounded-b-2xl">
+              {booking?.idVerification === "Mismatch" && (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-start gap-3">
+                  <AlertTriangle className="size-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-rose-950">Aadhaar Consistency Flagged (Verification Blocked)</p>
+                    <p className="text-[11px] text-rose-800 mt-0.5 leading-relaxed">
+                      Previous ID submission was rejected because the entered Aadhaar differed from the guest's verified record ({aadhaarStatus?.maskedAadhaar || "on file"}). Enter the matching Aadhaar to clear this status.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {verificationError && (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-start gap-3">
+                  <AlertCircle className="size-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-rose-950">Verification Error</p>
+                    <p className="text-[11px] text-rose-800 mt-0.5 leading-relaxed">{verificationError}</p>
+                  </div>
+                </div>
+              )}
+
               {isVerified && (
                 <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -447,7 +604,7 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                   <label className="text-xs font-bold text-navy block mb-1.5">ID Document Type *</label>
                   <select
                     value={idDocType}
-                    onChange={(e) => setIdDocType(e.target.value)}
+                    onChange={handleDocTypeChange}
                     className="w-full h-11 px-3 bg-[#fcfcfc] border border-muted rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-2 focus:ring-purple/30 cursor-pointer"
                   >
                     <option value="Aadhaar Card">Aadhaar Card (UIDAI)</option>
@@ -460,15 +617,59 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-navy block mb-1.5">ID Document Number *</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-navy block">ID Document Number *</label>
+                    {isAadhaarDoc && aadhaarStatus?.hasExistingAadhaar && (
+                      <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
+                        On File: {aadhaarStatus.maskedAadhaar}
+                      </span>
+                    )}
+                  </div>
                   <Input
                     type="text"
                     required
-                    placeholder="e.g. 4589 1234 8901 or Z1234567"
+                    placeholder={isAadhaarDoc ? "e.g. 5489 1234 8901" : "e.g. Z1234567"}
                     value={idDocNumber}
-                    onChange={(e) => setIdDocNumber(e.target.value)}
-                    className="h-11 text-xs font-semibold"
+                    onChange={(e) => {
+                      handleDocNumberChange(e);
+                      if (fieldErrors.idDocNumber) setFieldErrors(prev => ({ ...prev, idDocNumber: null }));
+                    }}
+                    maxLength={isAadhaarDoc ? 14 : 30}
+                    className={`h-11 text-xs font-semibold ${
+                      isAadhaarMismatch || fieldErrors.idDocNumber
+                        ? "border-rose-500 focus-visible:ring-rose-400 bg-rose-50/30"
+                        : isAadhaarDoc && cleanAadhaar.length === 12 && aadhaarStatus?.hasExistingAadhaar && cleanAadhaar.endsWith(aadhaarStatus.last4)
+                        ? "border-emerald-500 focus-visible:ring-emerald-400 bg-emerald-50/30"
+                        : ""
+                    }`}
                   />
+                  {fieldErrors.idDocNumber && (
+                    <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.idDocNumber}</p>
+                  )}
+                  {isAadhaarDoc && (
+                    <div className="mt-1.5">
+                      {isAadhaarMismatch ? (
+                        <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                          <AlertCircle className="size-3.5 shrink-0" />
+                          Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is {aadhaarStatus.maskedAadhaar}. Verification blocked.
+                        </p>
+                      ) : cleanAadhaar.length === 12 && aadhaarStatus?.hasExistingAadhaar && cleanAadhaar.endsWith(aadhaarStatus.last4) ? (
+                        <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="size-3.5 shrink-0" />
+                          Matches verified guest record on file ({aadhaarStatus.maskedAadhaar}).
+                        </p>
+                      ) : cleanAadhaar.length === 12 && !aadhaarStatus?.hasExistingAadhaar ? (
+                        <p className="text-[11px] font-bold text-purple flex items-center gap-1">
+                          <Sparkles className="size-3.5 shrink-0" />
+                          Valid 12-digit Aadhaar. Will be saved to guest profile upon verification.
+                        </p>
+                      ) : cleanAadhaar.length > 0 && cleanAadhaar.length < 12 ? (
+                        <p className="text-[10px] text-muted-foreground">
+                          {12 - cleanAadhaar.length} digit(s) remaining (12 digits required)
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -519,8 +720,13 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
               <div className="flex justify-end pt-2">
                 <Button
                   type="submit"
-                  disabled={submittingVerification}
-                  className="h-11 px-6 text-xs font-bold rounded-xl bg-purple text-white hover:bg-purple-dark cursor-pointer transition-all shadow-soft flex items-center gap-2"
+                  disabled={submittingVerification || isAadhaarMismatch}
+                  title={isAadhaarMismatch ? "Verification blocked: Aadhaar mismatch with existing guest record" : undefined}
+                  className={`h-11 px-6 text-xs font-bold rounded-xl text-white transition-all shadow-soft flex items-center gap-2 ${
+                    isAadhaarMismatch
+                      ? "bg-rose-400 cursor-not-allowed opacity-60"
+                      : "bg-purple hover:bg-purple-dark cursor-pointer"
+                  }`}
                 >
                   {submittingVerification ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -559,6 +765,20 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                 </div>
               )}
 
+              {(() => {
+                const checkInStatus = booking ? getCheckInStatusInfo(booking) : { isAllowed: true };
+                if (checkInStatus.isAllowed) return null;
+                return (
+                  <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-semibold flex items-center gap-3">
+                    <Clock className="size-4 shrink-0 text-indigo-600" />
+                    <div>
+                      <span className="font-bold block">Check-In Opens at {booking?.checkInTime || '12:00 PM'} ({checkInStatus.timeRemainingStr})</span>
+                      <span className="text-[11px] text-indigo-700">Strict check-in rules require server time ({formattedServerTime}) to reach scheduled check-in time. Button unlocks automatically at 12:00 PM.</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex justify-end gap-3 pt-2">
                 <Button
                   type="button"
@@ -569,23 +789,33 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                   Cancel & Return
                 </Button>
 
-                <Button
-                  type="button"
-                  disabled={!isVerified || submittingCheckIn}
-                  onClick={handleCompleteCheckIn}
-                  className={`h-11 px-7 text-xs font-bold rounded-xl text-white cursor-pointer transition-all shadow-soft flex items-center gap-2 ${
-                    isVerified
-                      ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
-                      : "bg-navy/30 cursor-not-allowed"
-                  }`}
-                >
-                  {submittingCheckIn ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="size-4" />
-                  )}
-                  Complete Check-In (Confirmed → Checked-In)
-                </Button>
+                {(() => {
+                  const checkInStatus = booking ? getCheckInStatusInfo(booking) : { isAllowed: true };
+                  const canComplete = isVerified && checkInStatus.isAllowed && !submittingCheckIn;
+
+                  return (
+                    <Button
+                      type="button"
+                      disabled={!canComplete}
+                      onClick={handleCompleteCheckIn}
+                      title={!checkInStatus.isAllowed ? checkInStatus.tooltip : undefined}
+                      className={`h-11 px-7 text-xs font-bold rounded-xl text-white transition-all shadow-soft flex items-center gap-2 ${
+                        canComplete
+                          ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20 cursor-pointer"
+                          : "bg-navy/30 cursor-not-allowed opacity-60"
+                      }`}
+                    >
+                      {submittingCheckIn ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="size-4" />
+                      )}
+                      {!checkInStatus.isAllowed
+                        ? `Check-In Locked (${checkInStatus.timeRemainingStr})`
+                        : "Complete Check-In (Confirmed → Checked-In)"}
+                    </Button>
+                  );
+                })()}
               </div>
             </div>
           </Panel>

@@ -18,6 +18,15 @@ import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitt
 import { invalidatePropertyCache } from '../utils/propertyCache.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
+import { isCheckInAllowed, formatISTDateTime } from '../utils/dateUtils.js';
+import { processAutoCheckouts } from '../services/autoCheckout.service.js';
+import {
+  validateAadhaarConsistency,
+  validateBookingAadhaarConsistency,
+  syncVerifiedAadhaarToGuestProfile,
+  findExistingVerifiedAadhaar,
+  formatAadhaar
+} from '../utils/aadhaarValidator.js';
 
 const router = express.Router();
 
@@ -323,8 +332,8 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
   try {
     let query = {};
     if (req.user.role !== 'super-admin') {
-      const propId = req.user.propertyId || 'HS-JAI';
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
+      const propId = req.user.propertyId || 'HS-9HQ8P';
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
     }
     if (req.query.role) {
       query.role = req.query.role;
@@ -521,12 +530,12 @@ router.delete('/users/:id', checkPropertyStatus, async (req, res) => {
 // ==========================================
 router.get('/approvals', checkPropertyStatus, async (req, res) => {
   try {
-    const targetPropId = req.user.propertyId || 'HS-JAI';
+    const targetPropId = req.user.propertyId || 'HS-9HQ8P';
     let query = {};
     if (req.user.role === 'super-admin') {
       query = {};
     } else {
-      query = { $or: [{ propertyId: targetPropId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
+      query = { $or: [{ propertyId: targetPropId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
     }
     const list = await Approval.find(query).sort({ createdAt: -1 });
     return sendSuccess(res, 200, list, 'Approvals requests list retrieved.');
@@ -641,7 +650,7 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
       }
     }
 
-    const targetPropId = updated.propertyId || req.user.propertyId || 'HS-JAI';
+    const targetPropId = updated.propertyId || req.user.propertyId || 'HS-9HQ8P';
 
     const io = req.app.get('socketio');
     if (io) {
@@ -661,12 +670,13 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
 // ==========================================
 router.get('/reservations', checkPropertyStatus, async (req, res) => {
   try {
+    await processAutoCheckouts(req.app.get('socketio'));
     let query = {};
     if (req.user && req.user.role !== 'super-admin') {
-      const propId = req.user.propertyId || 'HS-JAI';
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }] };
+      const propId = req.user.propertyId || 'HS-9HQ8P';
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { hotelId: 'HS-9HQ8P' }, { hotelId: propId }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
     }
-    const bookings = await Booking.find(query).sort({ createdAt: -1 });
+    const bookings = await Booking.find(query).sort({ createdAt: -1, checkIn: -1, updatedAt: -1, _id: -1 });
     return sendSuccess(res, 200, bookings, 'Reservations retrieved successfully');
   } catch (error) {
     return sendError(res, 500, 'Failed to retrieve bookings');
@@ -677,9 +687,9 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
   try {
     const bookingData = { ...req.body };
     if (req.user.role !== 'super-admin' && !bookingData.propertyId) {
-      bookingData.propertyId = req.user.propertyId || 'HS-JAI';
+      bookingData.propertyId = req.user.propertyId || 'HS-9HQ8P';
     }
-    const targetPropId = bookingData.propertyId || 'HS-JAI';
+    const targetPropId = bookingData.propertyId || 'HS-9HQ8P';
 
     let guestId = bookingData.guestId || null;
     const cleanEmail = String(bookingData.email || '').trim().toLowerCase();
@@ -694,11 +704,47 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
         guestId = existingGuest._id || existingGuest.id;
       }
     }
+    // Aadhaar consistency validation on reservation creation / confirmation
+    const inputDocType = bookingData.idProofType || bookingData.idDocType || 'Aadhaar Card';
+    const inputDocNumber = bookingData.idProofNumber || bookingData.idDocNumber || '';
+
+    const aadhaarValidation = await validateBookingAadhaarConsistency({
+      guestId,
+      email: cleanEmail,
+      phone: cleanPhone,
+      name: bookingData.guest || bookingData.name,
+      idDocType: inputDocType,
+      idDocNumber: inputDocNumber
+    });
+
+    if (!aadhaarValidation.isValid) {
+      return sendError(res, 400, aadhaarValidation.error);
+    }
+
+    const isAadhaar = aadhaarValidation.isAadhaar;
+    const finalDocNumber = isAadhaar ? aadhaarValidation.formattedAadhaar : (inputDocNumber ? String(inputDocNumber).trim() : '');
+    const finalDocType = isAadhaar ? 'Aadhaar Card' : inputDocType;
+    const hasVerifiedId = Boolean(finalDocNumber && (isAadhaar || bookingData.status === 'Checked-in'));
+
     bookingData.guestId = guestId;
     bookingData.email = cleanEmail;
     bookingData.phone = cleanPhone;
+    bookingData.idDocType = finalDocType;
+    bookingData.idDocNumber = finalDocNumber;
+    bookingData.idVerification = hasVerifiedId ? 'Verified' : (bookingData.idVerification || 'Pending');
+    bookingData.idVerifiedAt = hasVerifiedId ? new Date() : (bookingData.idVerifiedAt || null);
+    bookingData.idVerifiedBy = hasVerifiedId ? (req.user?.name || 'Administrator') : (bookingData.idVerifiedBy || '');
 
     const booking = await Booking.create(bookingData);
+
+    if (hasVerifiedId && isAadhaar) {
+      await syncVerifiedAadhaarToGuestProfile({
+        booking,
+        idDocType: finalDocType,
+        idDocNumber: finalDocNumber,
+        verifiedBy: req.user?.name || 'Administrator'
+      });
+    }
     await logAction(req.user, 'Created Booking', `${booking.guest}`, req);
 
     const roomNum = extractRoomNumber(booking);
@@ -734,6 +780,57 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
 });
 
 // Verify ID proof details for a reservation (Super Admin / Admin)
+// Check existing Aadhaar verification status for a guest
+router.get('/reservations/:id/guest-aadhaar-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bookingQuery = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      bookingQuery.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: bookingQuery });
+    if (!booking) return sendError(res, 404, 'Reservation not found');
+
+    const existingRecord = await findExistingVerifiedAadhaar({
+      guestId: booking.guestId,
+      email: booking.email,
+      phone: booking.phone,
+      name: booking.guest
+    });
+
+    return sendSuccess(res, 200, {
+      hasExistingAadhaar: Boolean(existingRecord.existingAadhaar),
+      maskedAadhaar: existingRecord.maskedAadhaar || null,
+      source: existingRecord.source,
+      guestName: booking.guest,
+      currentStatus: booking.idVerification || 'Pending'
+    }, 'Guest Aadhaar status retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// Lookup Aadhaar status for an existing or prospective guest before booking creation
+router.get('/guests/lookup-aadhaar', async (req, res) => {
+  try {
+    const { phone, email, guestId, name } = req.query;
+    if (!phone && !email && !guestId) {
+      return sendSuccess(res, 200, { hasExistingAadhaar: false, maskedAadhaar: null });
+    }
+    const existingRecord = await findExistingVerifiedAadhaar({ phone, email, guestId, name });
+    return sendSuccess(res, 200, {
+      hasExistingAadhaar: Boolean(existingRecord.existingAadhaar),
+      maskedAadhaar: existingRecord.maskedAadhaar || null,
+      last4: existingRecord.existingAadhaar ? existingRecord.existingAadhaar.slice(-4) : null,
+      source: existingRecord.source,
+      guestName: existingRecord.guestUser?.name || name
+    }, 'Guest Aadhaar status retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 router.post('/reservations/:id/verify-id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -751,31 +848,33 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
     const booking = await Booking.findOne({ $or: bookingQuery });
     if (!booking) return sendError(res, 404, 'Reservation not found');
 
-    const verificationData = {
-      idDocType: idDocType || booking.idDocType || 'Aadhaar Card',
-      idDocNumber: idDocNumber.trim(),
-      idDocImage: idDocImage || booking.idDocImage || '',
-      idVerification: idVerification || 'Verified',
-      idVerifiedAt: new Date(),
-      idVerifiedBy: req.user?.name || req.user?.username || 'Administrator'
-    };
+    const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
 
-    const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, verificationData, { new: true });
+    // Authoritative Aadhaar consistency validation
+    const validation = await validateAadhaarConsistency({
+      booking,
+      idDocType: effectiveDocType,
+      idDocNumber
+    });
 
-    // Sync guest user profile
-    try {
-      if (booking.guestId) {
-        await User.findByIdAndUpdate(booking.guestId, {
-          idDocType: verificationData.idDocType,
-          idDocNumber: verificationData.idDocNumber
-        });
-      } else if (booking.email) {
-        await User.findOneAndUpdate({ email: booking.email.toLowerCase() }, {
-          idDocType: verificationData.idDocType,
-          idDocNumber: verificationData.idDocNumber
+    if (!validation.isValid) {
+      if (validation.mismatch) {
+        await Booking.findByIdAndUpdate(booking.id || booking._id, {
+          idVerification: 'Mismatch',
+          idDocNumber: idDocNumber.trim(),
+          idDocType: effectiveDocType
         });
       }
-    } catch (e) {}
+      return sendError(res, 400, validation.error);
+    }
+
+    const updated = await syncVerifiedAadhaarToGuestProfile({
+      booking,
+      idDocType: effectiveDocType,
+      idDocNumber: validation.formattedAadhaar || idDocNumber.trim(),
+      idDocImage: idDocImage || booking.idDocImage || '',
+      verifiedBy: req.user?.name || req.user?.username || 'Administrator'
+    });
 
     return sendSuccess(res, 200, updated, 'ID proof successfully verified.');
   } catch (err) {
@@ -796,6 +895,41 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
 
     const isWebsiteBooking = existingBooking.source && existingBooking.source !== 'Walk-in' && !existingBooking.source.toLowerCase().includes('walk-in');
 
+    // Strict server-time check-in enforcement
+    if (req.body.status === 'Checked-in') {
+      const serverNow = new Date();
+      if (!isCheckInAllowed(existingBooking, serverNow)) {
+        const checkInTime = existingBooking.checkInTime || '12:00 PM';
+        return sendError(res, 400, `Check-in is only permitted starting at ${checkInTime} on ${existingBooking.checkIn} (Current server time: ${formatISTDateTime(serverNow)}). Early check-in is locked.`);
+      }
+    }
+
+    // Block check-in if reservation is in Aadhaar mismatch state and no valid override provided
+    if (req.body.status === 'Checked-in' && existingBooking.idVerification === 'Mismatch' && !req.body.idDocNumber) {
+      return sendError(res, 400, 'Cannot check in guest: ID verification has an Aadhaar mismatch on file. Please complete ID proof verification first.');
+    }
+
+    // If ID document is submitted or updated during check-in, run Aadhaar consistency validation
+    if (req.body.idDocNumber) {
+      const effectiveDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      const validation = await validateAadhaarConsistency({
+        booking: existingBooking,
+        idDocType: effectiveDocType,
+        idDocNumber: req.body.idDocNumber
+      });
+
+      if (!validation.isValid) {
+        if (validation.mismatch) {
+          await Booking.findByIdAndUpdate(existingBooking.id || existingBooking._id, {
+            idVerification: 'Mismatch',
+            idDocNumber: req.body.idDocNumber.trim(),
+            idDocType: effectiveDocType
+          });
+        }
+        return sendError(res, 400, validation.error);
+      }
+    }
+
     if (req.body.status === 'Checked-in' && isWebsiteBooking) {
       const isAlreadyVerified = existingBooking.idVerification === 'Verified';
       const isProvidedNow = (req.body.idVerification === 'Verified' || req.body.idDocNumber);
@@ -806,19 +940,30 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
 
     const updatePayload = { ...req.body };
     if (req.body.idDocNumber) {
-      updatePayload.idDocNumber = req.body.idDocNumber.trim();
-      updatePayload.idDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      const effectiveDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      const isAadhaar = effectiveDocType.toLowerCase().includes('aadhaar');
+      updatePayload.idDocNumber = isAadhaar ? formatAadhaar(req.body.idDocNumber) : req.body.idDocNumber.trim();
+      updatePayload.idDocType = effectiveDocType;
       updatePayload.idDocImage = req.body.idDocImage || existingBooking.idDocImage || '';
       updatePayload.idVerification = 'Verified';
       updatePayload.idVerifiedAt = new Date();
       updatePayload.idVerifiedBy = req.user?.name || req.user?.username || 'Administrator';
+
+      // Sync guest profile in User collection
+      await syncVerifiedAadhaarToGuestProfile({
+        booking: existingBooking,
+        idDocType: updatePayload.idDocType,
+        idDocNumber: updatePayload.idDocNumber,
+        idDocImage: updatePayload.idDocImage,
+        verifiedBy: updatePayload.idVerifiedBy
+      });
     }
 
     const booking = await Booking.findOneAndUpdate({ $or: bookingQuery }, updatePayload, { new: true });
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Updated Booking', `${booking.guest}`, req);
 
-    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const roomNum = extractRoomNumber(booking);
 
     // Sync Room operational status on check-in, check-out, or cancellation
@@ -876,18 +1021,26 @@ router.put('/reservations/:id/extend', checkPropertyStatus, async (req, res) => 
       return sendError(res, 404, 'Booking reservation record not found.');
     }
 
+    const bStatus = String(booking.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled'].includes(bStatus)) {
+      return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
+    }
+
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
       { $or: bookingQuery },
       {
         checkOut: newCheckOut,
         nights: Number(booking.nights || 1) + Number(additionalNights),
-        amount: Number(booking.amount || 0) + Number(additionalAmount),
-        balance: Number(booking.balance || 0) + Number(additionalAmount)
+        amount: newAmount,
+        totalAmount: newAmount,
+        netAmount: newAmount,
+        balance: Number(booking.balance || 0) + Number(additionalAmount || 0)
       },
       { new: true }
     );
 
-    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, targetPropId, 'booking_updated', {
@@ -922,18 +1075,27 @@ router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) =>
       return sendError(res, 404, 'Booking reservation record not found.');
     }
 
+    const bStatusPost = String(booking.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled'].includes(bStatusPost)) {
+      return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
+    }
+
+
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
       { $or: bookingQuery },
       {
         checkOut: newCheckOut,
         nights: Number(booking.nights || 1) + Number(additionalNights),
-        amount: Number(booking.amount || 0) + Number(additionalAmount),
-        balance: Number(booking.balance || 0) + Number(additionalAmount)
+        amount: newAmount,
+        totalAmount: newAmount,
+        netAmount: newAmount,
+        balance: Number(booking.balance || 0) + Number(additionalAmount || 0)
       },
       { new: true }
     );
 
-    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, targetPropId, 'booking_updated', {
@@ -961,7 +1123,7 @@ router.delete('/reservations/:id', checkPropertyStatus, async (req, res) => {
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Deleted Booking', `${booking.guest}`, req);
 
-    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-JAI';
+    const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const rNum = extractRoomNumber(booking);
     if (rNum) {
       await syncRoomStatus(rNum, 'Available', targetPropId);
@@ -1708,6 +1870,33 @@ router.patch('/contacts/:id/status', authorize('super-admin'), async (req, res) 
     }
 
     return sendSuccess(res, 200, updated, `Contact request status updated to ${status}`);
+  } catch (error) {
+    return sendError(res, 500, error.message);
+  }
+});
+
+router.post('/contacts/:id/reply', authorize('super-admin'), async (req, res) => {
+  try {
+    const { replyMessage, status = 'Replied' } = req.body;
+    const contact = await ContactMessage.findById(req.params.id);
+    if (!contact) return sendError(res, 404, 'Contact request not found');
+
+    contact.status = status;
+    if (replyMessage) {
+      contact.replyMessage = replyMessage;
+      contact.repliedAt = new Date();
+    }
+    await contact.save();
+
+    await logAction(req.user, 'Replied to Contact Request', `${contact.name} (${contact.email}) - Status: ${status}`, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'global', 'contact_updated', { contact });
+      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'contact_updated' });
+    }
+
+    return sendSuccess(res, 200, contact, `Reply recorded and status updated to ${status}`);
   } catch (error) {
     return sendError(res, 500, error.message);
   }

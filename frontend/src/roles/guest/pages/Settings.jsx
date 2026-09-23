@@ -4,6 +4,7 @@ import {
   User, Lock, Bell, Globe, Save, RefreshCw, AlertCircle, 
   CheckCircle2, Shield, Eye, EyeOff, KeyRound, Sparkles, Mail, Phone, MapPin 
 } from "lucide-react";
+import { validateWithZod, guestProfileSchema, changePasswordSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/settings")({
   head: () => ({
@@ -16,14 +17,20 @@ export const Route = createFileRoute("/guest/settings")({
 });
 
 function GuestSettingsPage() {
-  const [activeTab, setActiveTab] = useState("account"); // 'account', 'notifications'
+  const [activeTab, setActiveTab] = useState("account"); // 'account', 'profile', 'notifications', 'security'
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingNotifs, setSavingNotifs] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   // Status Alerts
   const [profileMsg, setProfileMsg] = useState({ type: "", text: "" });
   const [notifMsg, setNotifMsg] = useState({ type: "", text: "" });
+  const [passwordMsg, setPasswordMsg] = useState({ type: "", text: "" });
+
+  // Field-level validation errors
+  const [profileErrors, setProfileErrors] = useState({});
+  const [passwordErrors, setPasswordErrors] = useState({});
 
   // 1. Profile Information State
   const [profile, setProfile] = useState({
@@ -109,11 +116,32 @@ function GuestSettingsPage() {
     fetchProfileData();
   }, []);
 
-  // Update Profile Form Handler
+  // Update Profile Form Handler with Zod Validation
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    setSavingProfile(true);
     setProfileMsg({ type: "", text: "" });
+
+    // Validate using guestProfileSchema
+    const validation = validateWithZod(guestProfileSchema, {
+      name: profile.name,
+      email: profile.email,
+      phone: profile.mobile,
+      city: profile.city,
+      address: profile.address
+    });
+
+    if (!validation.isValid) {
+      const errors = { ...validation.errors };
+      if (errors.phone && !errors.mobile) {
+        errors.mobile = errors.phone;
+      }
+      setProfileErrors(errors);
+      setProfileMsg({ type: "error", text: Object.values(errors)[0] });
+      return;
+    }
+
+    setProfileErrors({});
+    setSavingProfile(true);
 
     try {
       const token = localStorage.getItem('hms_token');
@@ -148,24 +176,25 @@ function GuestSettingsPage() {
     }
   };
 
-  // Change Password Handler
+  // Change Password Handler with Zod Validation
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!passwordForm.currentPassword) {
-      setPasswordMsg({ type: "error", text: "Please enter your current password." });
-      return;
-    }
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordMsg({ type: "error", text: "New password must be at least 6 characters long." });
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordMsg({ type: "error", text: "New password and confirmation do not match." });
+    setPasswordMsg({ type: "", text: "" });
+
+    const validation = validateWithZod(changePasswordSchema, {
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword,
+      confirmPassword: passwordForm.confirmPassword
+    });
+
+    if (!validation.isValid) {
+      setPasswordErrors(validation.errors);
+      setPasswordMsg({ type: "error", text: Object.values(validation.errors)[0] });
       return;
     }
 
+    setPasswordErrors({});
     setSavingPassword(true);
-    setPasswordMsg({ type: "", text: "" });
 
     try {
       const token = localStorage.getItem('hms_token');
@@ -247,7 +276,9 @@ function GuestSettingsPage() {
           <div className="flex rounded-xl border border-navy/10 bg-cream/30 p-1 gap-1 flex-wrap">
             {[
               { id: "account", label: "Account Settings", icon: Globe },
-              { id: "notifications", label: "Notifications", icon: Bell }
+              { id: "profile", label: "Profile Information", icon: User },
+              { id: "notifications", label: "Notifications", icon: Bell },
+              { id: "security", label: "Password & Security", icon: Lock }
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -270,7 +301,7 @@ function GuestSettingsPage() {
 
         {/* SECTION 1: PROFILE INFORMATION */}
         {activeTab === "profile" && (
-          <form onSubmit={handleUpdateProfile} className="space-y-6 animate-fade-in">
+          <form onSubmit={handleUpdateProfile} className="space-y-6 animate-fade-in" noValidate>
             <div className="border-b border-navy/5 pb-3">
               <h3 className="font-display text-base font-bold text-navy flex items-center gap-2">
                 <User className="size-4 text-purple" /> Personal Information
@@ -300,9 +331,14 @@ function GuestSettingsPage() {
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                     required
                     placeholder="Guest Full Name"
-                    className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                    className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                      profileErrors.name ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                    }`}
                   />
                 </div>
+                {profileErrors.name && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.name}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -315,9 +351,14 @@ function GuestSettingsPage() {
                     onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                     required
                     placeholder="guest@example.com"
-                    className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                    className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                      profileErrors.email ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                    }`}
                   />
                 </div>
+                {profileErrors.email && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.email}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -330,9 +371,14 @@ function GuestSettingsPage() {
                     onChange={(e) => setProfile({ ...profile, mobile: e.target.value })}
                     required
                     placeholder="+91 98765 43210"
-                    className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                    className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                      profileErrors.mobile || profileErrors.phone ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                    }`}
                   />
                 </div>
+                {(profileErrors.mobile || profileErrors.phone) && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.mobile || profileErrors.phone}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -344,9 +390,14 @@ function GuestSettingsPage() {
                     value={profile.city}
                     onChange={(e) => setProfile({ ...profile, city: e.target.value })}
                     placeholder="Hyderabad"
-                    className="w-full rounded-xl border border-navy/15 bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                    className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                      profileErrors.city ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                    }`}
                   />
                 </div>
+                {profileErrors.city && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.city}</p>
+                )}
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
@@ -356,8 +407,13 @@ function GuestSettingsPage() {
                   value={profile.address}
                   onChange={(e) => setProfile({ ...profile, address: e.target.value })}
                   placeholder="Hitech City, Hyderabad, Telangana"
-                  className="w-full rounded-xl border border-navy/15 bg-cream/10 px-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                  className={`w-full rounded-xl border bg-cream/10 px-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                    profileErrors.address ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                  }`}
                 />
+                {profileErrors.address && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.address}</p>
+                )}
               </div>
             </div>
 
@@ -541,7 +597,7 @@ function GuestSettingsPage() {
 
         {/* SECTION 4: CHANGE PASSWORD & SECURITY */}
         {activeTab === "security" && (
-          <form onSubmit={handleChangePassword} className="space-y-6 animate-fade-in">
+          <form onSubmit={handleChangePassword} className="space-y-6 animate-fade-in" noValidate>
             <div className="border-b border-navy/5 pb-3">
               <h3 className="font-display text-base font-bold text-navy flex items-center gap-2">
                 <KeyRound className="size-4 text-purple" /> Change Password & Security
@@ -571,7 +627,9 @@ function GuestSettingsPage() {
                     onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                     required
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-navy/15 bg-cream/10 px-3.5 py-2.5 pr-10 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                    className={`w-full rounded-xl border bg-cream/10 px-3.5 py-2.5 pr-10 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                      passwordErrors.currentPassword ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                    }`}
                   />
                   <button
                     type="button"
@@ -581,6 +639,9 @@ function GuestSettingsPage() {
                     {showCurrentPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
+                {passwordErrors.currentPassword && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.currentPassword}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -592,7 +653,9 @@ function GuestSettingsPage() {
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                     required
                     placeholder="Minimum 6 characters"
-                    className="w-full rounded-xl border border-navy/15 bg-cream/10 px-3.5 py-2.5 pr-10 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                    className={`w-full rounded-xl border bg-cream/10 px-3.5 py-2.5 pr-10 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                      passwordErrors.newPassword ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                    }`}
                   />
                   <button
                     type="button"
@@ -602,6 +665,9 @@ function GuestSettingsPage() {
                     {showNewPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
+                {passwordErrors.newPassword && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.newPassword}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -612,8 +678,13 @@ function GuestSettingsPage() {
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                   required
                   placeholder="Re-enter new password"
-                  className="w-full rounded-xl border border-navy/15 bg-cream/10 px-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none"
+                  className={`w-full rounded-xl border bg-cream/10 px-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
+                    passwordErrors.confirmPassword ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
+                  }`}
                 />
+                {passwordErrors.confirmPassword && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.confirmPassword}</p>
+                )}
               </div>
 
             </div>

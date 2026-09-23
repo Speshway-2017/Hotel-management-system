@@ -102,7 +102,7 @@ function GuestBookingsPage() {
     const storedPropId = localStorage.getItem('selected_property_id');
     const userPropId = user?.propertyId;
     const bookingPropId = bookings.find(b => b.propertyId)?.propertyId;
-    const targetPropertyId = storedPropId || userPropId || bookingPropId || 'HS-JAI';
+    const targetPropertyId = storedPropId || userPropId || bookingPropId || 'HS-9HQ8P';
     window.location.href = `/hotels/${targetPropertyId}`;
   };
 
@@ -295,7 +295,19 @@ function GuestBookingsPage() {
 
             <div className="text-left md:text-right">
               <span className="text-[10px] uppercase font-bold text-navy/50 tracking-wider block">Total Amount</span>
-              <span className="font-display text-2xl font-bold text-navy">{inr(b.amount || 0)}</span>
+              <div className="flex items-baseline gap-2 md:justify-end">
+                {Number(b.discountAmount || 0) > 0 && (
+                  <span className="text-xs text-muted-foreground line-through font-semibold">
+                    {inr(b.originalAmount || (Number(b.totalAmount || b.amount) + Number(b.discountAmount)))}
+                  </span>
+                )}
+                <span className="font-display text-2xl font-bold text-navy">{inr(b.totalAmount || b.amount || 0)}</span>
+              </div>
+              {Number(b.discountAmount || 0) > 0 && (
+                <span className="text-[10px] font-bold text-emerald-600 block">
+                  Coupon {b.couponCode || 'APPLIED'}: -{inr(b.discountAmount)} OFF
+                </span>
+              )}
               <span className={`text-[11px] font-semibold block mt-0.5 ${isCancelled ? 'text-rose-600' : 'text-emerald-600'}`}>
                 {isCancelled ? '• Booking Cancelled' : '✓ Payment Confirmed'}
               </span>
@@ -476,7 +488,7 @@ function GuestBookingsPage() {
   function renderCancelModal() {
     if (!cancelModalBooking) return null;
     const b = cancelModalBooking;
-    const totalAmount = Number(b.amount || b.totalAmount || 0);
+    const totalAmount = Number(b.totalAmount || b.amount || 0);
 
     return (
       <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-xs flex items-center justify-center p-4">

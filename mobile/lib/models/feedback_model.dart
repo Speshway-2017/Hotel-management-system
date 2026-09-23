@@ -28,7 +28,7 @@ class FeedbackModel {
     this.room = '101',
     this.roomType = 'Standard Room',
     this.propertyName = 'Hour Stay Property',
-    this.propertyId = 'HS-JAI',
+    this.propertyId = 'HS-9HQ8P',
     this.rating = 5.0,
     this.ratings = const {},
     this.category = 'General',
@@ -78,7 +78,7 @@ class FeedbackModel {
       room: json['room'] ?? json['roomNumber'] ?? '101',
       roomType: json['roomType'] ?? 'Standard Room',
       propertyName: json['propertyName'] ?? json['hotel'] ?? json['hotelName'] ?? 'Hour Stay Property',
-      propertyId: json['propertyId'] ?? 'HS-JAI',
+      propertyId: json['propertyId'] ?? 'HS-9HQ8P',
       rating: double.tryParse(json['rating']?.toString() ?? '5') ?? 5.0,
       ratings: json['ratings'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(json['ratings'] as Map)
