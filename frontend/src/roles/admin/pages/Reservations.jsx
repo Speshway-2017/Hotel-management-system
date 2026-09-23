@@ -21,6 +21,7 @@ import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 import {
   CalendarCheck,
   Bed,
@@ -102,6 +103,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
 
 function ReservationsPage() {
   const navigate = useNavigate();
+  useServerTime(2000);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -219,6 +221,15 @@ function ReservationsPage() {
 
   const handleStatusChange = async (bookingId, newStatus, notes = "", booking = null) => {
     const targetBooking = booking || reservations.find(r => r._id === bookingId || r.id === bookingId || r.bookingId === bookingId);
+
+    if (newStatus === "Checked-in" && targetBooking) {
+      const checkInStatus = getCheckInStatusInfo(targetBooking);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
+
     const source = targetBooking?.source || "";
     const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
 
@@ -362,34 +373,93 @@ function ReservationsPage() {
     currentPage * itemsPerPage
   );
 
-  // Dynamic Overbooking Checker
-  const parseDate = (dStr) => {
-    if (!dStr) return new Date();
-    return new Date(dStr);
+  // Dynamic Overbooking Checker - Only flags true room-level conflicts with overlapping stay dates
+  const parseStayDate = (dStr) => {
+    if (!dStr) return null;
+    const s = String(dStr).trim();
+    const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      return new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))).getTime();
+    }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).getTime();
+    }
+    return null;
   };
 
   const isInactiveBooking = (status) => {
     if (!status) return false;
     const s = String(status).toLowerCase().trim();
-    return s === "checked-out" || s === "checked out" || s === "cancelled" || s === "no-show" || s === "no show";
+    return (
+      s === "checked-out" ||
+      s === "checked out" ||
+      s === "cancelled" ||
+      s === "no-show" ||
+      s === "no show" ||
+      s === "refunded" ||
+      s === "rejected"
+    );
+  };
+
+  const getSpecificRoomNumber = (b) => {
+    if (!b) return null;
+    const extracted = extractRoomNumber(b);
+    if (extracted && /^\d{1,4}$/.test(extracted)) return extracted;
+    const rawNum = b.roomNumber ? String(b.roomNumber).trim() : "";
+    if (rawNum && /^\d{1,4}$/.test(rawNum)) return rawNum;
+    const rawRoom = b.room ? String(b.room).trim() : "";
+    const digitMatch = rawRoom.match(/\b\d{1,4}\b/);
+    if (digitMatch) return digitMatch[0];
+    return null;
   };
 
   const detectOverbookings = () => {
-    const active = reservations.filter(r => !isInactiveBooking(r.status) && r.room);
+    // Only consider active reservations that have an actual assigned physical room number
+    const activeWithRoom = reservations.filter(r => {
+      if (isInactiveBooking(r.status)) return false;
+      const roomNum = getSpecificRoomNumber(r);
+      return Boolean(roomNum);
+    });
+
     const conflicts = [];
-    for (let i = 0; i < active.length; i++) {
-      for (let j = i + 1; j < active.length; j++) {
-        const b1 = active[i];
-        const b2 = active[j];
-        const r1 = (b1.roomNumber || b1.room || "").match(/\b\d{3,4}\b/)?.[0] || b1.room;
-        const r2 = (b2.roomNumber || b2.room || "").match(/\b\d{3,4}\b/)?.[0] || b2.room;
+    const seenPairs = new Set();
+
+    for (let i = 0; i < activeWithRoom.length; i++) {
+      for (let j = i + 1; j < activeWithRoom.length; j++) {
+        const b1 = activeWithRoom[i];
+        const b2 = activeWithRoom[j];
+
+        // Ensure not comparing the exact same reservation
+        const id1 = String(b1._id || b1.id || b1.bookingId || '');
+        const id2 = String(b2._id || b2.id || b2.bookingId || '');
+        if (id1 && id2 && id1 === id2) continue;
+
+        const r1 = getSpecificRoomNumber(b1);
+        const r2 = getSpecificRoomNumber(b2);
+
+        // Real conflict requires the exact same physical room number
         if (r1 && r2 && r1 === r2) {
-          const s1 = parseDate(b1.checkIn);
-          const e1 = parseDate(b1.checkOut);
-          const s2 = parseDate(b2.checkIn);
-          const e2 = parseDate(b2.checkOut);
-          if (s1 < e2 && s2 < e1) {
-            conflicts.push({ b1, b2, room: r1 });
+          const s1 = parseStayDate(b1.checkIn);
+          const e1 = parseStayDate(b1.checkOut);
+          const s2 = parseStayDate(b2.checkIn);
+          const e2 = parseStayDate(b2.checkOut);
+
+          if (s1 && e1 && s2 && e2) {
+            // Overlap condition: start1 < end2 AND start2 < end1
+            if (s1 < e2 && s2 < e1) {
+              const pairKey = [id1, id2].sort().join('::');
+              if (!seenPairs.has(pairKey)) {
+                seenPairs.add(pairKey);
+                conflicts.push({
+                  b1,
+                  b2,
+                  room: r1,
+                  stay1: `${b1.checkIn} → ${b1.checkOut}`,
+                  stay2: `${b2.checkIn} → ${b2.checkOut}`
+                });
+              }
+            }
           }
         }
       }
@@ -423,7 +493,7 @@ function ReservationsPage() {
             <ul className="list-disc pl-4 mt-1.5 space-y-1 font-semibold">
               {overbookingConflicts.map((c, idx) => (
                 <li key={idx}>
-                  Room {c.room}: {c.b1.guest} vs {c.b2.guest}
+                  Room {c.room}: {c.b1.guest} ({c.stay1}) vs {c.b2.guest} ({c.stay2})
                 </li>
               ))}
             </ul>
@@ -685,6 +755,7 @@ function ReservationsPage() {
                                   <>
                                     {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
                                       <CheckInActionButton
+                                        booking={res}
                                         onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
                                       />
                                     )}

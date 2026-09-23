@@ -17,6 +17,7 @@ import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendSta
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
 import { extractRoomNumber } from "@/utils/roomUtils";
 import { receptionCache } from "@/services/receptionCache";
+import { useServerTime, isCheckInPermitted, getCheckInStatusInfo } from "@/utils/serverTime";
 
 export const Route = createFileRoute("/reception/reservations")({
   head: () => ({
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/reception/reservations")({
 
 function ReservationsPage() {
   const navigate = useNavigate();
+  useServerTime(2000);
   const cachedReservations = receptionCache.get('reservations');
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -45,7 +47,7 @@ function ReservationsPage() {
       .then(res => {
         if (res.success && res.data) {
           const list = res.data.map(r => {
-            const cleanRmNum = extractRoomNumber(r);
+            const cleanRmNum = extractRoomNumber(r) || (r.roomNumber ? String(r.roomNumber) : "");
             const rmNum = cleanRmNum || "Unassigned";
             const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : (r.room && !r.room.match(/\b\d{3,4}\b/) ? r.room : (cleanRmNum?.startsWith('2') ? 'Deluxe Room' : cleanRmNum?.startsWith('3') ? 'Executive Suite' : cleanRmNum?.startsWith('4') ? 'Presidential Suite' : 'Standard Room')));
             return {
@@ -115,6 +117,14 @@ function ReservationsPage() {
 
   // Action methods
   const handleCheckIn = async (id, roomNum, booking = null) => {
+    if (booking) {
+      const checkInStatus = getCheckInStatusInfo(booking);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
+
     // If it's a website / OTA booking, route to dedicated ID Verification & Check-in page
     const source = booking?.source || "";
     const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
@@ -372,6 +382,7 @@ function ReservationsPage() {
                                 {/* Check-In Button */}
                                 {(res.status === "Pending" || res.status === "Confirmed" || res.status === "Pre-checked") && (
                                   <CheckInActionButton
+                                    booking={res}
                                     onClick={() => handleCheckIn(res.id || res._id || res.bookingId, res.room || res.roomNumber, res)}
                                   />
                                 )}

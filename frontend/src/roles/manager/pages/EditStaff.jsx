@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import { emitRealtimeEvent } from "@/services/socket";
+import { validateWithZod, staffSchema } from "@/schemas";
 
 function ManagerEditStaff() {
   const params = useParams() || {};
@@ -42,6 +43,7 @@ function ManagerEditStaff() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form States
   const [name, setName] = useState(stateMember?.name || stateMember?.fullName || stateMember?.username || "");
@@ -188,6 +190,21 @@ function ManagerEditStaff() {
       toast.error("Employee not found");
       return;
     }
+
+    const val = validateWithZod(staffSchema, {
+      name,
+      email,
+      phone,
+      dept,
+      shift
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
+      return;
+    }
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = {
@@ -238,7 +255,7 @@ function ManagerEditStaff() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
-              <FormField label="Full Name" required id="name">
+              <FormField label="Full Name" required id="name" status={fieldErrors.name ? "error" : undefined} errorMsg={fieldErrors.name}>
                 <Input
                   id="name"
                   type="text"
@@ -247,6 +264,7 @@ function ManagerEditStaff() {
                   onChange={(e) => {
                     setName(e.target.value);
                     setIsDirty(true);
+                    if (fieldErrors.name) setFieldErrors(p => ({ ...p, name: null }));
                   }}
                   placeholder="Enter full name"
                   className="text-xs font-semibold text-navy bg-cream/5 border-muted h-9"
@@ -264,7 +282,7 @@ function ManagerEditStaff() {
               </FormField>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Contact Number" id="phone">
+                <FormField label="Contact Number" id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                   <Input
                     id="phone"
                     type="text"
@@ -272,6 +290,7 @@ function ManagerEditStaff() {
                     onChange={(e) => {
                       setPhone(e.target.value);
                       setIsDirty(true);
+                      if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null }));
                     }}
                     placeholder="+91 99999 88888"
                     className="text-xs font-semibold text-navy bg-cream/5 border-muted h-9"

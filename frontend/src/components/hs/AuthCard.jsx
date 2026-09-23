@@ -6,6 +6,14 @@ import { Notice } from "./kit";
 import { Logo } from "@/layouts/Logo";
 import { authService } from "../../services/auth";
 import { Eye, EyeOff } from "lucide-react";
+import {
+  validateWithZod,
+  loginSchema,
+  registerSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  otpSchema
+} from "@/schemas";
 
 export function AuthCard({
   mode = "login",
@@ -27,6 +35,7 @@ export function AuthCard({
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const searchParams = new URLSearchParams(window.location.search);
   const queryEmail = searchParams.get("email") || "";
@@ -35,23 +44,27 @@ export function AuthCard({
   const submit = async (e) => {
     e.preventDefault();
 
-    if (mode === "otp") {
-      if (otp.trim().length < 6) return setError("Enter a valid 6-digit verification code");
+    // Zod validation based on mode
+    let valResult = { isValid: true, errors: {} };
+    if (mode === "login") {
+      valResult = validateWithZod(loginSchema, { email, password });
+    } else if (mode === "register") {
+      valResult = validateWithZod(registerSchema, { name, email, password, mobile, role: "guest" });
+    } else if (mode === "forgot") {
+      valResult = validateWithZod(forgotPasswordSchema, { email });
     } else if (mode === "reset") {
-      if (password.length < 6) return setError("Password must be at least 6 characters");
-      if (password !== confirmPassword) return setError("Passwords do not match");
-    } else {
-      if (!/^\S+@\S+\.\S+$/.test(email) && mode !== "register") {
-        return setError("Enter a valid email address");
-      }
-      if (mode === "register" && !name.trim()) {
-        return setError("Full name is required");
-      }
-      if (mode !== "forgot" && password.length < 6) {
-        return setError("Password must be at least 6 characters");
-      }
+      valResult = validateWithZod(resetPasswordSchema, { password, confirmPassword });
+    } else if (mode === "otp") {
+      valResult = validateWithZod(otpSchema, { otp });
     }
 
+    if (!valResult.isValid) {
+      setFieldErrors(valResult.errors);
+      setError(valResult.firstError);
+      return;
+    }
+
+    setFieldErrors({});
     setError("");
     setLoading(true);
 
@@ -168,9 +181,15 @@ export function AuthCard({
                 className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all" 
                 placeholder="Full Name" 
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: null }));
+                }}
                 autoComplete="off"
               />
+              {fieldErrors.name && (
+                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.name}</p>
+              )}
             </div>
           )}
           
@@ -183,10 +202,16 @@ export function AuthCard({
                 className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all"
                 placeholder="E-mail"
                 value={email}
-                aria-invalid={!!error}
-                onChange={(e) => setEmail(e.target.value)} 
+                aria-invalid={!!error || !!fieldErrors.email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: null }));
+                }} 
                 autoComplete="off"
               />
+              {fieldErrors.email && (
+                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.email}</p>
+              )}
             </div>
           )}
 
@@ -200,9 +225,15 @@ export function AuthCard({
                 className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-center tracking-[0.4em] font-bold text-sm text-navy h-12 transition-all" 
                 placeholder="• • • • • •" 
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => {
+                  setOtp(e.target.value);
+                  if (fieldErrors.otp) setFieldErrors(prev => ({ ...prev, otp: null }));
+                }}
                 autoComplete="one-time-code"
               />
+              {fieldErrors.otp && (
+                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in text-center">{fieldErrors.otp}</p>
+              )}
               <div className="mt-2 text-center">
                 <button type="button" className="text-[11px] text-[#0099ff] hover:underline font-semibold bg-transparent border-none cursor-pointer">
                   Resend OTP Code
@@ -234,6 +265,9 @@ export function AuthCard({
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.password}</p>
+              )}
               {mode === "login" && (
                 <div className="mt-2 pl-2 text-left">
                   <Link to="/forgot-password" className="text-[11px] text-[#0099ff] hover:underline font-semibold">
@@ -299,9 +333,15 @@ export function AuthCard({
                 className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all" 
                 placeholder="Mobile Number" 
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
+                onChange={(e) => {
+                  setMobile(e.target.value);
+                  if (fieldErrors.mobile) setFieldErrors(prev => ({ ...prev, mobile: null }));
+                }}
                 autoComplete="off"
               />
+              {fieldErrors.mobile && (
+                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.mobile}</p>
+              )}
             </div>
           )}
           

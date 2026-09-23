@@ -7,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { cn } from "@/utils/utils";
 import { Eye, EyeOff } from "lucide-react";
+import { validateWithZod, propertySchema } from "@/schemas";
+import { toast } from "sonner";
 
 function AddProperty() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [adminMode, setAdminMode] = useState("create"); // "create" | "select"
   const [showPassword, setShowPassword] = useState(false);
@@ -48,19 +51,42 @@ function AddProperty() {
 
   const handlePropertySubmit = async (e) => {
     e.preventDefault();
+    const validation = validateWithZod(propertySchema, propertyForm);
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please correct the highlighted errors.");
+      return;
+    }
+
+    if (adminMode === "create") {
+      const adminValidationErrors = {};
+      if (!propertyForm.adminName?.trim()) {
+        adminValidationErrors.adminName = "Admin Full Name is required";
+      }
+      if (!propertyForm.adminEmail?.trim() || !propertyForm.adminEmail.includes("@")) {
+        adminValidationErrors.adminEmail = "Valid Admin Email is required";
+      }
+      if (!propertyForm.adminPassword || propertyForm.adminPassword.length < 6) {
+        adminValidationErrors.adminPassword = "Password must be at least 6 characters";
+      }
+      if (Object.keys(adminValidationErrors).length > 0) {
+        setFieldErrors(adminValidationErrors);
+        toast.error(Object.values(adminValidationErrors)[0]);
+        return;
+      }
+    } else {
+      if (!propertyForm.assignedAdmin) {
+        setFieldErrors({ assignedAdmin: "Please select an existing property admin" });
+        toast.error("Please select an existing property admin");
+        return;
+      }
+    }
+
+    setFieldErrors({});
     setSubmitting(true);
     setError(null);
     try {
-      if (adminMode === "create") {
-        if (!propertyForm.adminName.trim()) throw new Error("Admin Full Name is required");
-        if (!propertyForm.adminEmail.trim()) throw new Error("Admin Email is required");
-        if (!propertyForm.adminPassword || propertyForm.adminPassword.length < 6) {
-          throw new Error("Admin Password must be at least 6 characters");
-        }
-      } else {
-        if (!propertyForm.assignedAdmin) throw new Error("Please select an existing property admin");
-      }
-
       const payload = {
         name: propertyForm.name,
         city: propertyForm.city,
@@ -82,6 +108,7 @@ function AddProperty() {
 
       const res = await superAdminService.createProperty(payload);
       if (res.success) {
+        toast.success(`Property "${propertyForm.name}" registered successfully.`);
         navigate({ to: "/super-admin/properties" });
       }
     } catch (err) {
@@ -108,45 +135,81 @@ function AddProperty() {
           </div>
         ) : (
           <form onSubmit={handlePropertySubmit} className="max-w-2xl p-6 space-y-5 text-left font-sans">
-            <FormField label="Hotel Property Name" required id="prop-name">
+            <FormField
+              label="Hotel Property Name"
+              required
+              id="prop-name"
+              status={fieldErrors.name ? "error" : undefined}
+              errorMsg={fieldErrors.name}
+            >
               <Input
                 id="prop-name"
                 required
                 value={propertyForm.name}
-                onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                onChange={(e) => {
+                  setPropertyForm({ ...propertyForm, name: e.target.value });
+                  if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: undefined });
+                }}
                 placeholder="e.g. Hour Stay Rambagh Residency"
               />
             </FormField>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Location City" required id="prop-city">
+              <FormField
+                label="Location City"
+                required
+                id="prop-city"
+                status={fieldErrors.city ? "error" : undefined}
+                errorMsg={fieldErrors.city}
+              >
                 <Input
                   id="prop-city"
                   required
                   value={propertyForm.city}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
+                  onChange={(e) => {
+                    setPropertyForm({ ...propertyForm, city: e.target.value });
+                    if (fieldErrors.city) setFieldErrors({ ...fieldErrors, city: undefined });
+                  }}
                   placeholder="e.g. Jaipur"
                 />
               </FormField>
-              <FormField label="Property Category" required id="prop-type">
+              <FormField
+                label="Property Category"
+                required
+                id="prop-type"
+                status={fieldErrors.propertyType ? "error" : undefined}
+                errorMsg={fieldErrors.propertyType}
+              >
                 <Input
                   id="prop-type"
                   required
                   value={propertyForm.propertyType}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, propertyType: e.target.value })}
+                  onChange={(e) => {
+                    setPropertyForm({ ...propertyForm, propertyType: e.target.value });
+                    if (fieldErrors.propertyType) setFieldErrors({ ...fieldErrors, propertyType: undefined });
+                  }}
                   placeholder="e.g. Heritage Haveli"
                 />
               </FormField>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Total Room Keys" required id="prop-rooms">
+              <FormField
+                label="Total Room Keys"
+                required
+                id="prop-rooms"
+                status={fieldErrors.rooms ? "error" : undefined}
+                errorMsg={fieldErrors.rooms}
+              >
                 <Input
                   id="prop-rooms"
                   type="number"
                   required
                   value={propertyForm.rooms}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, rooms: Number(e.target.value) })}
+                  onChange={(e) => {
+                    setPropertyForm({ ...propertyForm, rooms: Number(e.target.value) });
+                    if (fieldErrors.rooms) setFieldErrors({ ...fieldErrors, rooms: undefined });
+                  }}
                 />
               </FormField>
               <FormField label="Onboarding Status" id="prop-status">
@@ -192,33 +255,60 @@ function AddProperty() {
 
               {adminMode === "create" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 bg-muted/10 border border-muted/50 p-4.5 rounded-xl animate-fade-in">
-                  <FormField label="Admin Full Name" required={adminMode === "create"} id="admin-name">
+                  <FormField
+                    label="Admin Full Name"
+                    required={adminMode === "create"}
+                    id="admin-name"
+                    status={fieldErrors.adminName ? "error" : undefined}
+                    errorMsg={fieldErrors.adminName}
+                  >
                     <Input
                       id="admin-name"
                       required={adminMode === "create"}
                       value={propertyForm.adminName}
-                      onChange={(e) => setPropertyForm({ ...propertyForm, adminName: e.target.value })}
+                      onChange={(e) => {
+                        setPropertyForm({ ...propertyForm, adminName: e.target.value });
+                        if (fieldErrors.adminName) setFieldErrors({ ...fieldErrors, adminName: undefined });
+                      }}
                       placeholder="e.g. Vikram Singh"
                     />
                   </FormField>
-                  <FormField label="Admin Email Address" required={adminMode === "create"} id="admin-email">
+                  <FormField
+                    label="Admin Email Address"
+                    required={adminMode === "create"}
+                    id="admin-email"
+                    status={fieldErrors.adminEmail ? "error" : undefined}
+                    errorMsg={fieldErrors.adminEmail}
+                  >
                     <Input
                       id="admin-email"
                       type="email"
                       required={adminMode === "create"}
                       value={propertyForm.adminEmail}
-                      onChange={(e) => setPropertyForm({ ...propertyForm, adminEmail: e.target.value })}
+                      onChange={(e) => {
+                        setPropertyForm({ ...propertyForm, adminEmail: e.target.value });
+                        if (fieldErrors.adminEmail) setFieldErrors({ ...fieldErrors, adminEmail: undefined });
+                      }}
                       placeholder="e.g. admin@resort.com"
                     />
                   </FormField>
-                  <FormField label="Security Password" required={adminMode === "create"} id="admin-password">
+                  <FormField
+                    label="Security Password"
+                    required={adminMode === "create"}
+                    id="admin-password"
+                    status={fieldErrors.adminPassword ? "error" : undefined}
+                    errorMsg={fieldErrors.adminPassword}
+                  >
                     <div className="relative w-full">
                       <Input
                         id="admin-password"
                         type={showPassword ? "text" : "password"}
                         required={adminMode === "create"}
                         value={propertyForm.adminPassword}
-                        onChange={(e) => setPropertyForm({ ...propertyForm, adminPassword: e.target.value })}
+                        onChange={(e) => {
+                          setPropertyForm({ ...propertyForm, adminPassword: e.target.value });
+                          if (fieldErrors.adminPassword) setFieldErrors({ ...fieldErrors, adminPassword: undefined });
+                        }}
                         placeholder="Min 6 characters"
                         className="pr-10"
                       />
@@ -232,11 +322,19 @@ function AddProperty() {
                       </button>
                     </div>
                   </FormField>
-                  <FormField label="Mobile Number" id="admin-mobile">
+                  <FormField
+                    label="Mobile Number"
+                    id="admin-mobile"
+                    status={fieldErrors.adminMobile ? "error" : undefined}
+                    errorMsg={fieldErrors.adminMobile}
+                  >
                     <Input
                       id="admin-mobile"
                       value={propertyForm.adminMobile}
-                      onChange={(e) => setPropertyForm({ ...propertyForm, adminMobile: e.target.value })}
+                      onChange={(e) => {
+                        setPropertyForm({ ...propertyForm, adminMobile: e.target.value });
+                        if (fieldErrors.adminMobile) setFieldErrors({ ...fieldErrors, adminMobile: undefined });
+                      }}
                       placeholder="e.g. 9876543210"
                     />
                   </FormField>

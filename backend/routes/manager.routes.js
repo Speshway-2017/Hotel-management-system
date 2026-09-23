@@ -20,6 +20,15 @@ import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCa
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
+import { isCheckInAllowed, formatISTDateTime } from '../utils/dateUtils.js';
+import { processAutoCheckouts } from '../services/autoCheckout.service.js';
+import {
+  validateAadhaarConsistency,
+  validateBookingAadhaarConsistency,
+  syncVerifiedAadhaarToGuestProfile,
+  findExistingVerifiedAadhaar,
+  formatAadhaar
+} from '../utils/aadhaarValidator.js';
 
 const router = express.Router();
 
@@ -68,7 +77,7 @@ const seedDefaultShifts = async (propertyId, staffMembers) => {
 // Helper to seed default attendance logs if empty or outdated (August)
 const seedDefaultAttendance = async (propertyId, staffMembers) => {
   if (!staffMembers || staffMembers.length === 0) return;
-  const propId = propertyId || 'HS-JAI';
+  const propId = propertyId || 'HS-9HQ8P';
 
   // Delete legacy hardcoded August records
   await Attendance.deleteMany({
@@ -80,7 +89,7 @@ const seedDefaultAttendance = async (propertyId, staffMembers) => {
   const todayStr = formatYMD(now);
 
   const hasToday = await Attendance.findOne({
-    $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }],
+    $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }],
     date: todayStr
   });
 
@@ -154,7 +163,7 @@ const seedDefaultApprovals = async (propertyId) => {
         reason: "Repeat corporate guest tariff override request.",
         description: "Guest requested standard corporate tariff discount match for 3-night stay in Room 102.",
         status: "Pending",
-        propertyId: propertyId || "HS-JAI"
+        propertyId: propertyId || "HS-9HQ8P"
       },
       {
         id: "APR-9102",
@@ -168,7 +177,7 @@ const seedDefaultApprovals = async (propertyId) => {
         reason: "AC malfunctioning in Room 103 during stay.",
         description: "Front desk processed room swap; guest requested refund waiver for first night inconvenience.",
         status: "Pending",
-        propertyId: propertyId || "HS-JAI"
+        propertyId: propertyId || "HS-9HQ8P"
       },
       {
         id: "APR-9103",
@@ -182,7 +191,7 @@ const seedDefaultApprovals = async (propertyId) => {
         reason: "Standard Room overbooked. Complimentary Deluxe upgrade proposal.",
         description: "High occupancy tier override: upgraded guest to Executive Suite 301 at standard room rate.",
         status: "Approved",
-        propertyId: propertyId || "HS-JAI",
+        propertyId: propertyId || "HS-9HQ8P",
         decisionReason: "Standard overbooking resolved with guest satisfaction.",
         decidedBy: "Vikram Rathore",
         decidedAt: new Date()
@@ -199,7 +208,7 @@ const seedDefaultApprovals = async (propertyId) => {
         reason: "Medical emergency cancellation.",
         description: "Guest provided medical proof for travel disruption and emergency hospital admission.",
         status: "Approved",
-        propertyId: propertyId || "HS-JAI",
+        propertyId: propertyId || "HS-9HQ8P",
         decisionReason: "Medical documentation verified.",
         decidedBy: "Vikram Rathore",
         decidedAt: new Date()
@@ -216,7 +225,7 @@ const seedDefaultApprovals = async (propertyId) => {
         reason: "Late checkout until 4:00 PM without additional fee.",
         description: "Flight departure delayed by 5 hours. Requested complimentary late check-out authorization.",
         status: "Rejected",
-        propertyId: propertyId || "HS-JAI",
+        propertyId: propertyId || "HS-9HQ8P",
         decisionReason: "Room needed immediately for 2:00 PM incoming check-in arrival.",
         decidedBy: "Vikram Rathore",
         decidedAt: new Date()
@@ -233,7 +242,7 @@ const seedDefaultApprovals = async (propertyId) => {
         reason: "Early arrival at 8:00 AM requesting complimentary room access.",
         description: "Room 101 was vacant and inspected since yesterday; requested early key release.",
         status: "Pending",
-        propertyId: propertyId || "HS-JAI"
+        propertyId: propertyId || "HS-9HQ8P"
       }
     ];
     await Approval.insertMany(defaults);
@@ -256,14 +265,14 @@ const seedDefaultNotifications = async (propertyId) => {
           message: "Booking BK-10101 confirmed via MakeMyTrip for Standard Room.",
           category: "Reservations",
           isRead: false,
-          propertyId: propertyId || 'HS-JAI'
+          propertyId: propertyId || 'HS-9HQ8P'
         },
         {
           title: "Housekeeping Alert",
           message: "Room 102 reported priority cleaning completed.",
           category: "Operations",
           isRead: false,
-          propertyId: propertyId || 'HS-JAI'
+          propertyId: propertyId || 'HS-9HQ8P'
         }
       ];
       await ManagerNotification.insertMany(defaults);
@@ -347,12 +356,13 @@ router.get('/property', async (req, res) => {
 // ==========================================
 router.get('/reservations', async (req, res) => {
   try {
-    const propId = req.user?.propertyId;
+    await processAutoCheckouts(req.app.get('socketio'));
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
     let query = {};
     if (req.user?.role !== 'super-admin' && propId) {
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { hotelId: 'HS-9HQ8P' }, { hotelId: propId }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
     }
-    const bookings = await Booking.find(query).sort({ createdAt: -1 });
+    const bookings = await Booking.find(query).sort({ createdAt: -1, checkIn: -1, updatedAt: -1, _id: -1 });
     return sendSuccess(res, 200, bookings, 'Property reservations retrieved.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -376,7 +386,7 @@ router.get('/reservations/:id', async (req, res) => {
 
 router.post('/reservations', async (req, res) => {
   try {
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
     const bookingId = req.body.bookingId || req.body.id || `BK-${Date.now().toString().slice(-5)}`;
     
     let roomNum = extractRoomNumber(req.body);
@@ -395,6 +405,28 @@ router.post('/reservations', async (req, res) => {
       }
     }
 
+    // Aadhaar consistency validation on reservation creation / confirmation
+    const inputDocType = req.body.idProofType || req.body.idDocType || 'Aadhaar Card';
+    const inputDocNumber = req.body.idProofNumber || req.body.idDocNumber || '';
+
+    const aadhaarValidation = await validateBookingAadhaarConsistency({
+      guestId,
+      email: cleanEmail,
+      phone: cleanPhone,
+      name: req.body.guest || req.body.name,
+      idDocType: inputDocType,
+      idDocNumber: inputDocNumber
+    });
+
+    if (!aadhaarValidation.isValid) {
+      return sendError(res, 400, aadhaarValidation.error);
+    }
+
+    const isAadhaar = aadhaarValidation.isAadhaar;
+    const finalDocNumber = isAadhaar ? aadhaarValidation.formattedAadhaar : (inputDocNumber ? String(inputDocNumber).trim() : '');
+    const finalDocType = isAadhaar ? 'Aadhaar Card' : inputDocType;
+    const hasVerifiedId = Boolean(finalDocNumber && (isAadhaar || (req.body.source === 'Walk-in' && req.body.status === 'Checked-in')));
+
     const payload = {
       ...req.body,
       bookingId,
@@ -403,6 +435,11 @@ router.post('/reservations', async (req, res) => {
       propertyId: propId,
       email: cleanEmail,
       phone: cleanPhone,
+      idDocType: finalDocType,
+      idDocNumber: finalDocNumber,
+      idVerification: hasVerifiedId ? 'Verified' : (req.body.idVerification || 'Pending'),
+      idVerifiedAt: hasVerifiedId ? new Date() : (req.body.idVerifiedAt || null),
+      idVerifiedBy: hasVerifiedId ? (req.user?.name || 'Property Manager') : (req.body.idVerifiedBy || ''),
       room: req.body.room || (roomNum ? `${roomNum} · ${req.body.roomType || 'Standard Room'}` : ''),
       roomNumber: roomNum,
       roomType: req.body.roomType || 'Standard Room',
@@ -411,6 +448,15 @@ router.post('/reservations', async (req, res) => {
     };
 
     const newBooking = await Booking.create(payload);
+
+    if (hasVerifiedId && isAadhaar) {
+      await syncVerifiedAadhaarToGuestProfile({
+        booking: newBooking,
+        idDocType: finalDocType,
+        idDocNumber: finalDocNumber,
+        verifiedBy: req.user?.name || 'Property Manager'
+      });
+    }
 
     // If room is assigned, update room status
     if (roomNum) {
@@ -444,6 +490,57 @@ router.post('/reservations', async (req, res) => {
 });
 
 // Verify ID proof details for a reservation
+// Check existing Aadhaar verification status for a guest
+router.get('/reservations/:id/guest-aadhaar-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = [{ id }, { bookingId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      query.unshift({ _id: id });
+    }
+
+    const booking = await Booking.findOne({ $or: query });
+    if (!booking) return sendError(res, 404, 'Reservation not found');
+
+    const existingRecord = await findExistingVerifiedAadhaar({
+      guestId: booking.guestId,
+      email: booking.email,
+      phone: booking.phone,
+      name: booking.guest
+    });
+
+    return sendSuccess(res, 200, {
+      hasExistingAadhaar: Boolean(existingRecord.existingAadhaar),
+      maskedAadhaar: existingRecord.maskedAadhaar || null,
+      source: existingRecord.source,
+      guestName: booking.guest,
+      currentStatus: booking.idVerification || 'Pending'
+    }, 'Guest Aadhaar status retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// Lookup Aadhaar status for an existing or prospective guest before booking creation
+router.get('/guests/lookup-aadhaar', async (req, res) => {
+  try {
+    const { phone, email, guestId, name } = req.query;
+    if (!phone && !email && !guestId) {
+      return sendSuccess(res, 200, { hasExistingAadhaar: false, maskedAadhaar: null });
+    }
+    const existingRecord = await findExistingVerifiedAadhaar({ phone, email, guestId, name });
+    return sendSuccess(res, 200, {
+      hasExistingAadhaar: Boolean(existingRecord.existingAadhaar),
+      maskedAadhaar: existingRecord.maskedAadhaar || null,
+      last4: existingRecord.existingAadhaar ? existingRecord.existingAadhaar.slice(-4) : null,
+      source: existingRecord.source,
+      guestName: existingRecord.guestUser?.name || name
+    }, 'Guest Aadhaar status retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
 router.post('/reservations/:id/verify-id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -461,31 +558,33 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
     const booking = await Booking.findOne({ $or: query });
     if (!booking) return sendError(res, 404, 'Reservation not found');
 
-    const verificationData = {
-      idDocType: idDocType || booking.idDocType || 'Aadhaar Card',
-      idDocNumber: idDocNumber.trim(),
-      idDocImage: idDocImage || booking.idDocImage || '',
-      idVerification: idVerification || 'Verified',
-      idVerifiedAt: new Date(),
-      idVerifiedBy: req.user?.name || req.user?.username || 'Property Manager'
-    };
+    const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
 
-    const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, verificationData, { new: true });
+    // Authoritative Aadhaar consistency validation
+    const validation = await validateAadhaarConsistency({
+      booking,
+      idDocType: effectiveDocType,
+      idDocNumber
+    });
 
-    // Sync user collection
-    try {
-      if (booking.guestId) {
-        await User.findByIdAndUpdate(booking.guestId, {
-          idDocType: verificationData.idDocType,
-          idDocNumber: verificationData.idDocNumber
-        });
-      } else if (booking.email) {
-        await User.findOneAndUpdate({ email: booking.email.toLowerCase() }, {
-          idDocType: verificationData.idDocType,
-          idDocNumber: verificationData.idDocNumber
+    if (!validation.isValid) {
+      if (validation.mismatch) {
+        await Booking.findByIdAndUpdate(booking.id || booking._id, {
+          idVerification: 'Mismatch',
+          idDocNumber: idDocNumber.trim(),
+          idDocType: effectiveDocType
         });
       }
-    } catch (e) {}
+      return sendError(res, 400, validation.error);
+    }
+
+    const updated = await syncVerifiedAadhaarToGuestProfile({
+      booking,
+      idDocType: effectiveDocType,
+      idDocNumber: validation.formattedAadhaar || idDocNumber.trim(),
+      idDocImage: idDocImage || booking.idDocImage || '',
+      verifiedBy: req.user?.name || req.user?.username || 'Property Manager'
+    });
 
     return sendSuccess(res, 200, updated, 'ID proof successfully verified.');
   } catch (err) {
@@ -496,7 +595,7 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
 router.put('/reservations/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
     const query = [{ id }, { bookingId: id }];
     if (mongoose.Types.ObjectId.isValid(id)) {
       query.unshift({ _id: id });
@@ -506,6 +605,41 @@ router.put('/reservations/:id', async (req, res) => {
     if (!existingBooking) return sendError(res, 404, 'Reservation not found');
 
     const isWebsiteBooking = existingBooking.source && existingBooking.source !== 'Walk-in' && !existingBooking.source.toLowerCase().includes('walk-in');
+
+    // Strict server-time check-in enforcement
+    if (req.body.status === 'Checked-in') {
+      const serverNow = new Date();
+      if (!isCheckInAllowed(existingBooking, serverNow)) {
+        const checkInTime = existingBooking.checkInTime || '12:00 PM';
+        return sendError(res, 400, `Check-in is only permitted starting at ${checkInTime} on ${existingBooking.checkIn} (Current server time: ${formatISTDateTime(serverNow)}). Early check-in is locked.`);
+      }
+    }
+
+    // Block check-in if reservation is in Aadhaar mismatch state and no valid override provided
+    if (req.body.status === 'Checked-in' && existingBooking.idVerification === 'Mismatch' && !req.body.idDocNumber) {
+      return sendError(res, 400, 'Cannot check in guest: ID verification has an Aadhaar mismatch on file. Please complete ID proof verification first.');
+    }
+
+    // If ID document is submitted or updated during check-in, run Aadhaar consistency validation
+    if (req.body.idDocNumber) {
+      const effectiveDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      const validation = await validateAadhaarConsistency({
+        booking: existingBooking,
+        idDocType: effectiveDocType,
+        idDocNumber: req.body.idDocNumber
+      });
+
+      if (!validation.isValid) {
+        if (validation.mismatch) {
+          await Booking.findByIdAndUpdate(existingBooking.id || existingBooking._id, {
+            idVerification: 'Mismatch',
+            idDocNumber: req.body.idDocNumber.trim(),
+            idDocType: effectiveDocType
+          });
+        }
+        return sendError(res, 400, validation.error);
+      }
+    }
 
     if (req.body.status === 'Checked-in' && isWebsiteBooking) {
       const isAlreadyVerified = existingBooking.idVerification === 'Verified';
@@ -524,12 +658,23 @@ router.put('/reservations/:id', async (req, res) => {
     }
 
     if (req.body.idDocNumber) {
-      updatePayload.idDocNumber = req.body.idDocNumber.trim();
-      updatePayload.idDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      const effectiveDocType = req.body.idDocType || existingBooking.idDocType || 'Aadhaar Card';
+      const isAadhaar = effectiveDocType.toLowerCase().includes('aadhaar');
+      updatePayload.idDocNumber = isAadhaar ? formatAadhaar(req.body.idDocNumber) : req.body.idDocNumber.trim();
+      updatePayload.idDocType = effectiveDocType;
       updatePayload.idDocImage = req.body.idDocImage || existingBooking.idDocImage || '';
       updatePayload.idVerification = 'Verified';
       updatePayload.idVerifiedAt = new Date();
       updatePayload.idVerifiedBy = req.user?.name || req.user?.username || 'Property Manager';
+
+      // Sync guest profile in User collection
+      await syncVerifiedAadhaarToGuestProfile({
+        booking: existingBooking,
+        idDocType: updatePayload.idDocType,
+        idDocNumber: updatePayload.idDocNumber,
+        idDocImage: updatePayload.idDocImage,
+        verifiedBy: updatePayload.idVerifiedBy
+      });
     }
 
     const updated = await Booking.findOneAndUpdate(
@@ -581,7 +726,7 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
   try {
     const { id } = req.params;
     const { roomNumber, roomType } = req.body;
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
 
     const query = [{ id }, { bookingId: id }];
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -632,7 +777,7 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
 router.delete('/reservations/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
     const query = [{ id }, { bookingId: id }];
     if (mongoose.Types.ObjectId.isValid(id)) {
       query.unshift({ _id: id });
@@ -672,8 +817,8 @@ router.get('/rooms', async (req, res) => {
       { $set: { category: "Standard Room", baseRate: 3000, currentRate: 3000, dailyRate: 3000, ratePlan: "Standard Plan" } }
     );
 
-    const propId = req.user?.propertyId || 'HS-JAI';
-    let rooms = await Room.find({ $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] }).sort({ roomNumber: 1 });
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
+    let rooms = await Room.find({ $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }] }).sort({ roomNumber: 1 });
     if (!rooms || rooms.length === 0) {
       rooms = await Room.find().sort({ roomNumber: 1 });
     }
@@ -888,7 +1033,7 @@ router.get('/guests', async (req, res) => {
     const propId = req.user?.propertyId;
     let query = {};
     if (req.user?.role !== 'super-admin' && propId) {
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
     }
     const bookings = await Booking.find(query).sort({ createdAt: -1 });
     
@@ -944,13 +1089,13 @@ router.get('/guests', async (req, res) => {
 // ==========================================
 router.get('/approvals', async (req, res) => {
   try {
-    const targetPropId = req.user.propertyId || 'HS-JAI';
+    const targetPropId = req.user.propertyId || 'HS-9HQ8P';
     await seedDefaultApprovals(targetPropId);
     let query = {};
     if (req.user.role === 'super-admin') {
       query = {};
     } else {
-      query = { $or: [{ propertyId: targetPropId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
+      query = { $or: [{ propertyId: targetPropId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
     }
     const list = await Approval.find(query).sort({ createdAt: -1 });
     return sendSuccess(res, 200, list, 'Approvals desk requests list retrieved.');
@@ -1048,7 +1193,7 @@ router.post('/approvals/:id', async (req, res) => {
       }
     }
 
-    const targetPropId = updated.propertyId || req.user.propertyId || 'HS-JAI';
+    const targetPropId = updated.propertyId || req.user.propertyId || 'HS-9HQ8P';
 
     try {
       // 1. Notify Guest directly
@@ -1121,7 +1266,7 @@ router.get('/staff', async (req, res) => {
     const propId = req.user?.propertyId;
     let query = { role: 'receptionist' };
     if (req.user?.role !== 'super-admin' && propId) {
-      query.$or = [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
+      query.$or = [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
     }
     const staff = await User.find(query).select('-password');
     
@@ -1338,12 +1483,12 @@ router.get('/shifts', async (req, res) => {
     let staffQuery = { role: 'receptionist' };
     let shiftQuery = {};
     if (req.user?.role !== 'super-admin' && propId) {
-      staffQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
-      shiftQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
+      staffQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
+      shiftQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
     }
     const receptionistStaff = await User.find(staffQuery);
     
-    await seedDefaultShifts(propId || 'HS-JAI', receptionistStaff);
+    await seedDefaultShifts(propId || 'HS-9HQ8P', receptionistStaff);
     const shifts = await Shift.find(shiftQuery);
     return sendSuccess(res, 200, shifts, 'Shift schedule allocations retrieved.');
   } catch (err) {
@@ -1399,12 +1544,12 @@ router.get('/attendance', async (req, res) => {
     let staffQuery = { role: 'receptionist' };
     let attQuery = {};
     if (req.user?.role !== 'super-admin' && propId) {
-      staffQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
-      attQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
+      staffQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
+      attQuery.$or = [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }];
     }
     const receptionistStaff = await User.find(staffQuery);
 
-    await seedDefaultAttendance(propId || 'HS-JAI', receptionistStaff);
+    await seedDefaultAttendance(propId || 'HS-9HQ8P', receptionistStaff);
     const list = await Attendance.find(attQuery).sort({ date: -1 });
     return sendSuccess(res, 200, list, 'Daily attendance records log index retrieved.');
   } catch (err) {
@@ -1418,7 +1563,7 @@ router.post('/attendance', async (req, res) => {
     if (!userId || !date) {
       return sendError(res, 400, 'userId and date are required.');
     }
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
     const record = await Attendance.create({
       userId: String(userId),
       username: username || 'Staff Member',
@@ -1446,7 +1591,7 @@ router.put('/attendance/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { checkIn, checkOut, workingHours, status } = req.body;
-    const propId = req.user?.propertyId || 'HS-JAI';
+    const propId = req.user?.propertyId || 'HS-9HQ8P';
 
     const query = [{ id }];
     if (mongoose.Types.ObjectId.isValid(id)) {
@@ -1480,9 +1625,9 @@ router.put('/attendance/:id', async (req, res) => {
 // ==========================================
 router.get('/feedback', async (req, res) => {
   try {
-    const propId = req.query.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = req.query.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const query = (propId && propId !== 'all')
-      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
+      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-9HQ8P' }] }
       : {};
     const list = await getUnifiedFeedbacksAndReviews(query);
     return sendSuccess(res, 200, list, 'Reviews and guest feedback list retrieved from MongoDB.');
@@ -1493,7 +1638,7 @@ router.get('/feedback', async (req, res) => {
 
 router.post('/feedback', async (req, res) => {
   try {
-    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const {
       bookingId = `BK-${Date.now().toString().slice(-5)}`,
       guestName,
@@ -1715,6 +1860,10 @@ const ensureRealPayments = async (propId) => {
       }
 
       const amount = Number(b.totalAmount || b.amount || 0);
+      const discountAmount = Number(b.discountAmount || 0);
+      const originalAmount = Number(b.originalAmount || (amount + discountAmount));
+      const couponCode = b.couponCode || null;
+      const paidAmount = Number(b.paidAmount || (b.paymentStatus === 'Paid' ? amount : Math.max(0, amount - Number(b.balance || 0))));
       const paymentMethod = b.paymentMethod || 'UPI';
       const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
       const status = isRefunded
@@ -1740,6 +1889,10 @@ const ensureRealPayments = async (propId) => {
           guestName,
           roomNumber,
           amount: amount > 0 ? amount : 3500,
+          originalAmount,
+          discountAmount,
+          couponCode,
+          paidAmount,
           paymentMethod,
           status,
           propertyId: b.propertyId || propId || 'HS-9HQ8P',
@@ -1756,6 +1909,10 @@ const ensureRealPayments = async (propId) => {
         let needsUpdate = false;
         if (existing.bookingId !== cleanBookingId) { existing.bookingId = cleanBookingId; needsUpdate = true; }
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
+        if (originalAmount > 0 && existing.originalAmount !== originalAmount) { existing.originalAmount = originalAmount; needsUpdate = true; }
+        if (discountAmount !== undefined && existing.discountAmount !== discountAmount) { existing.discountAmount = discountAmount; needsUpdate = true; }
+        if (couponCode !== undefined && existing.couponCode !== couponCode) { existing.couponCode = couponCode; needsUpdate = true; }
+        if (paidAmount !== undefined && existing.paidAmount !== paidAmount) { existing.paidAmount = paidAmount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
@@ -1776,7 +1933,7 @@ router.get('/payments', async (req, res) => {
     const propId = req.user?.propertyId || 'HS-9HQ8P';
     await ensureRealPayments(propId);
     let payments = await Payment.find({
-      $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }]
+      $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }]
     }).sort({ createdAt: -1 });
     if (!payments || payments.length === 0) {
       payments = await Payment.find({}).sort({ createdAt: -1 });
@@ -1884,7 +2041,7 @@ router.delete('/payments/:id', async (req, res) => {
 // ==========================================
 router.get('/notifications', async (req, res) => {
   try {
-    const propertyId = req.user.propertyId || 'HS-JAI';
+    const propertyId = req.user.propertyId || 'HS-9HQ8P';
     setImmediate(() => {
       seedDefaultNotifications(propertyId).catch(() => {});
       syncManagerBookingNotifications(propertyId).catch(() => {});
@@ -1897,7 +2054,7 @@ router.get('/notifications', async (req, res) => {
       { role: null },
       { userId: req.user.id || req.user._id },
       { propertyId },
-      { propertyId: 'HS-JAI' },
+      { propertyId: 'HS-9HQ8P' },
       { propertyId: 'HS-9HQ8P' }
     ];
 
@@ -1990,7 +2147,7 @@ const handleMarkNotificationRead = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const propId = req.user?.propertyId || 'HS-JAI';
+      const propId = req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, propId, 'unread_notifications_count_updated', { propertyId: propId });
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'notification_read', id });
     }
@@ -2037,7 +2194,7 @@ const handleMarkNotificationUnread = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const propId = req.user?.propertyId || 'HS-JAI';
+      const propId = req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, propId, 'unread_notifications_count_updated', { propertyId: propId });
       emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'notification_unread', id });
     }
@@ -2054,10 +2211,10 @@ router.put('/notifications/:id/unread', handleMarkNotificationUnread);
 
 const handleMarkAllNotificationsRead = async (req, res) => {
   try {
-    const propertyId = req.user?.propertyId || 'HS-JAI';
+    const propertyId = req.user?.propertyId || 'HS-9HQ8P';
     const propQuery = [
       { propertyId },
-      { propertyId: 'HS-JAI' },
+      { propertyId: 'HS-9HQ8P' },
       { propertyId: 'HS-9HQ8P' },
       { propertyId: { $exists: false } },
       { propertyId: null },
@@ -2115,13 +2272,22 @@ const handleExtendReservation = async (req, res) => {
       return sendError(res, 404, 'Booking reservation record not found.');
     }
 
+    const bStatus = String(booking.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled'].includes(bStatus)) {
+      return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
+    }
+
+
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
       { $or: bookingQuery },
       {
         checkOut: newCheckOut,
         nights: Number(booking.nights || 1) + Number(additionalNights),
-        amount: Number(booking.amount || 0) + Number(additionalAmount),
-        balance: Number(booking.balance || 0) + Number(additionalAmount)
+        amount: newAmount,
+        totalAmount: newAmount,
+        netAmount: newAmount,
+        balance: Number(booking.balance || 0) + Number(additionalAmount || 0)
       },
       { new: true }
     );

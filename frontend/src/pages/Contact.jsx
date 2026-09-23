@@ -9,8 +9,8 @@ import { publicService } from "@/services/public";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/hs/kit";
+import { validateWithZod, contactFormSchema } from "@/schemas";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -111,7 +111,7 @@ function Contact() {
       .catch(err => {});
 
     const fetchActiveProperty = () => {
-      const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+      const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
       publicService.getProperty(activeId)
         .then(res => {
           if (res.success && res.data) {
@@ -154,19 +154,22 @@ function Contact() {
   const submit = async (e) => {
     e.preventDefault();
     setServerError("");
-    const next = {};
-    if (!form.name.trim()) next["name"] = "Please enter your name";
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) next["email"] = "Enter a valid email address";
-    if (!/^(\+91[\s-]?)?[6-9]\d{9}$/.test(form.phone.replace(/\s/g, ""))) {
-      next["phone"] = "Enter a valid 10-digit Indian mobile number";
-    }
-    if (!form.hotelName.trim()) next["hotelName"] = "Please enter your hotel/property name";
-    if (form.message.trim().length < 10) next["message"] = "Tell us a little more (10+ characters)";
-    
-    setErrors(next);
-    const hasNoErrors = Object.keys(next).length === 0;
-    if (!hasNoErrors) return;
 
+    const validation = validateWithZod(contactFormSchema, {
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      hotelName: form.hotelName,
+      subject: form.hotelName,
+      message: form.message
+    });
+
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      return;
+    }
+
+    setErrors({});
     setSubmitting(true);
     try {
       const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';

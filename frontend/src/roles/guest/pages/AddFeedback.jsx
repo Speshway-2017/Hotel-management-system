@@ -6,6 +6,7 @@ import { apiClient, invalidateApiCache } from "@/services/apiClient";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { emitRealtimeEvent } from "@/services/socket";
+import { validateWithZod, feedbackSchema } from "@/schemas";
 import {
   Star,
   Sparkles,
@@ -47,6 +48,7 @@ export default function AddFeedbackPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -163,10 +165,22 @@ export default function AddFeedbackPage() {
       return;
     }
 
-    if (!comments.trim()) {
-      toast.error("Please write a few words about your stay experience.");
+    const validation = validateWithZod(feedbackSchema, {
+      rating: overallRating,
+      title,
+      comments,
+      bookingId: selectedBookingId,
+      recommend,
+      categories
+    });
+
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please write a few words about your stay experience.");
       return;
     }
+    setFieldErrors({});
 
     setSubmitting(true);
     try {
@@ -186,7 +200,7 @@ export default function AddFeedbackPage() {
         guestEmail: user?.email || selectedBookingObj?.email || "",
         guestPhone: user?.mobile || selectedBookingObj?.phone || "",
         propertyId:
-          selectedBookingObj?.propertyId || user?.propertyId || "HS-JAI",
+          selectedBookingObj?.propertyId || user?.propertyId || "HS-9HQ8P",
         room: selectedBookingObj?.room || "101 · Standard Room",
         roomType: selectedBookingObj?.roomType || "Standard Room",
         rating: overallRating,
@@ -505,9 +519,15 @@ export default function AddFeedbackPage() {
                 type="text"
                 placeholder="Review Headline (e.g. Exceptional stay! Courteous staff and spotless suite)"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl bg-[#fafafa] border border-navy/15 text-xs font-semibold text-navy focus:outline-none focus:ring-2 focus:ring-purple/20 focus:border-purple transition-all hover:bg-white"
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (fieldErrors.title) setFieldErrors({ ...fieldErrors, title: undefined });
+                }}
+                className={`w-full h-11 px-3.5 rounded-xl bg-[#fafafa] border ${fieldErrors.title ? "border-rose-500" : "border-navy/15"} text-xs font-semibold text-navy focus:outline-none focus:ring-2 focus:ring-purple/20 focus:border-purple transition-all hover:bg-white`}
               />
+              {fieldErrors.title && (
+                <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.title}</p>
+              )}
             </div>
 
             {/* Comments Textarea */}
@@ -517,11 +537,17 @@ export default function AddFeedbackPage() {
                 required
                 placeholder="Tell us more about your stay... What did you enjoy most, and how can our hotel team make your next visit even more memorable?"
                 value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                className="w-full p-3.5 rounded-xl bg-[#fafafa] border border-navy/15 text-xs font-medium text-navy focus:outline-none focus:ring-2 focus:ring-purple/20 focus:border-purple transition-all hover:bg-white leading-relaxed resize-none"
+                onChange={(e) => {
+                  setComments(e.target.value);
+                  if (fieldErrors.comments) setFieldErrors({ ...fieldErrors, comments: undefined });
+                }}
+                className={`w-full p-3.5 rounded-xl bg-[#fafafa] border ${fieldErrors.comments ? "border-rose-500" : "border-navy/15"} text-xs font-medium text-navy focus:outline-none focus:ring-2 focus:ring-purple/20 focus:border-purple transition-all hover:bg-white leading-relaxed resize-none`}
               />
+              {fieldErrors.comments && (
+                <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.comments}</p>
+              )}
               <div className="flex justify-between items-center text-[10px] text-navy/40 mt-1">
-                <span>Please share detailed constructive feedback.</span>
+                <span>Please share detailed constructive feedback (minimum 5 characters).</span>
                 <span>{comments.length} characters</span>
               </div>
             </div>

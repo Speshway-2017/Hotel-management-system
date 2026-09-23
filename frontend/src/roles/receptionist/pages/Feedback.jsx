@@ -210,7 +210,7 @@ export function ReceptionistFeedbackPage() {
       const res = await receptionistService.createFeedback({
         ...newFeedbackForm,
         rating: Number(newFeedbackForm.rating) || 5,
-        propertyId: currentUser?.propertyId || "HS-JAI"
+        propertyId: currentUser?.propertyId || "HS-9HQ8P"
       });
 
       if (res && (res.success || res.data)) {

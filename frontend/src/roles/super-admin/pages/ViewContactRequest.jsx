@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHeader, Panel, Tag, Notice, LoadingRows } from "@/components/hs/kit";
@@ -10,10 +10,13 @@ import {
   Phone,
   Building,
   Calendar,
-  MessageSquare,
-  Clock,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Copy,
+  Check,
+  ExternalLink,
+  Send,
+  CornerDownRight
 } from "lucide-react";
 
 export const Route = createFileRoute("/super-admin/contacts/view/$id")({
@@ -32,13 +35,31 @@ export function ViewContactRequest() {
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [copiedEmail, setCopiedEmail] = useState(false);
 
   useEffect(() => {
     const fetchDetails = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await superAdminService.getContactRequest(id);
+        let targetId = id;
+        // If route is /super-admin/contacts/view/ without an ID, pick the most recent inquiry
+        if (!targetId) {
+          const listRes = await superAdminService.getContactRequests();
+          const items = listRes?.data?.items || (Array.isArray(listRes?.data) ? listRes.data : []);
+          if (items.length > 0) {
+            targetId = items[0]._id || items[0].id;
+            navigate({ to: `/super-admin/contacts/view/${targetId}` }, { replace: true });
+          }
+        }
+
+        if (!targetId) {
+          setError("No contact inquiries found in the system.");
+          setLoading(false);
+          return;
+        }
+
+        const res = await superAdminService.getContactRequest(targetId);
         if (res && res.success && res.data) {
           setContact(res.data);
         } else {
@@ -50,8 +71,9 @@ export function ViewContactRequest() {
         setLoading(false);
       }
     };
-    if (id) fetchDetails();
-  }, [id]);
+
+    fetchDetails();
+  }, [id, navigate]);
 
   const handleStatusChange = async (newStatus) => {
     if (!contact) return;
@@ -80,22 +102,60 @@ export function ViewContactRequest() {
     }
   };
 
+  const handleOpenGmail = () => {
+    if (!contact?.email) return;
+    const subject = `Re: ${contact.subject || "Hour Stay Inquiry"}`;
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contact.email)}&su=${encodeURIComponent(subject)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    navigator.clipboard?.writeText?.(contact.email);
+    toast.success("Opening Gmail in new tab! Recipient email copied to clipboard.");
+  };
+
+  const handleOpenDefaultMail = () => {
+    if (!contact?.email) return;
+    navigator.clipboard?.writeText?.(contact.email);
+    window.location.href = `mailto:${encodeURIComponent(contact.email)}?subject=Re: ${encodeURIComponent(contact.subject || "Hour Stay Inquiry")}`;
+    toast.info("Triggered default mail app. Recipient email copied to clipboard.");
+  };
+
+  const handleCopyEmail = () => {
+    if (!contact?.email) return;
+    navigator.clipboard?.writeText?.(contact.email);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
+    toast.success(`Copied "${contact.email}" to clipboard!`);
+  };
+
   const getStatusBadge = (status) => {
     const norm = (status || "New").toLowerCase();
     if (norm === "new") return <Tag tone="brand" className="font-semibold text-xs px-2.5 py-0.5">New</Tag>;
     if (norm === "in progress") return <Tag tone="warning" className="font-semibold text-xs px-2.5 py-0.5">In Progress</Tag>;
-    if (norm === "resolved" || norm === "replied") return <Tag tone="success" className="font-semibold text-xs px-2.5 py-0.5">Resolved</Tag>;
+    if (norm === "resolved" || norm === "replied") return <Tag tone="success" className="font-semibold text-xs px-2.5 py-0.5">{status || "Resolved"}</Tag>;
     return <Tag tone="neutral" className="font-semibold text-xs px-2.5 py-0.5">{status}</Tag>;
   };
 
   return (
     <div className="space-y-6 text-left font-ui">
+      {/* Page Header */}
       <PageHeader
         title={contact ? `Inquiry: ${contact.subject || "Contact Submission"}` : "Contact Inquiry Details"}
         subtitle="Full message content, contact coordinates, and status management."
       />
 
-      {error && <Notice tone="error" title="Inquiry Notice">{error}</Notice>}
+      {error && (
+        <Notice tone="error" title="Inquiry Notice">
+          <div className="space-y-2">
+            <p>{error}</p>
+            <Button
+              size="sm"
+              onClick={() => navigate({ to: "/super-admin/contacts" })}
+              className="rounded-full bg-navy text-white text-xs cursor-pointer"
+            >
+              Go to Contact Requests
+            </Button>
+          </div>
+        </Notice>
+      )}
 
       {loading ? (
         <LoadingRows count={4} />
@@ -107,10 +167,10 @@ export function ViewContactRequest() {
               <div className="p-5 bg-white rounded-b-xl space-y-4 text-xs font-sans">
                 <div className="flex items-center gap-3 p-4 border border-navy/10 rounded-xl bg-cream/30">
                   <div className="size-12 rounded-full bg-purple/10 text-purple flex items-center justify-center font-extrabold text-lg shrink-0">
-                    {contact.name.charAt(0).toUpperCase()}
+                    {contact.name?.charAt(0)?.toUpperCase() || "C"}
                   </div>
-                  <div>
-                    <h4 className="font-bold text-navy text-sm">{contact.name}</h4>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-navy text-sm truncate">{contact.name}</h4>
                     <span className="text-[11px] text-muted-foreground font-semibold">Public Inquiry Lead</span>
                   </div>
                 </div>
@@ -121,11 +181,19 @@ export function ViewContactRequest() {
                     <div>{getStatusBadge(contact.status)}</div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 pb-2 border-b border-navy/5">
-                    <Mail className="size-4 text-purple shrink-0" />
-                    <a href={`mailto:${contact.email}`} className="truncate text-navy font-semibold hover:underline">
-                      {contact.email}
-                    </a>
+                  <div className="flex items-center justify-between gap-2.5 pb-2 border-b border-navy/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Mail className="size-4 text-purple shrink-0" />
+                      <span className="truncate text-navy font-semibold">{contact.email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyEmail}
+                      className="shrink-0 p-1 rounded hover:bg-cream/60 text-muted-foreground hover:text-navy transition-colors cursor-pointer"
+                      title="Copy email address"
+                    >
+                      {copiedEmail ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                    </button>
                   </div>
 
                   {contact.phone && (
@@ -137,11 +205,6 @@ export function ViewContactRequest() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2.5 pb-2 border-b border-navy/5">
-                    <Building className="size-4 text-navy/40 shrink-0" />
-                    <span>Property Scope: <strong className="text-navy">{contact.propertyId || "General Lead"}</strong></span>
-                  </div>
-
                   <div className="flex items-center gap-2.5">
                     <Calendar className="size-4 text-navy/40 shrink-0" />
                     <span>
@@ -150,18 +213,39 @@ export function ViewContactRequest() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-4 border-t border-navy/10 space-y-2">
+                {/* Primary Actions */}
+                <div className="pt-4 border-t border-navy/10 space-y-2.5">
+                  {/* Reply via Email opens dedicated reply page */}
                   <Button
-                    asChild
                     size="sm"
-                    className="w-full rounded-full bg-purple hover:bg-purple/90 text-white text-xs font-bold cursor-pointer"
+                    onClick={() => navigate({ to: `/super-admin/contacts/reply/${contact._id || contact.id}` })}
+                    className="w-full rounded-full bg-purple hover:bg-purple/90 text-white text-xs font-bold cursor-pointer shadow-sm hover:shadow transition-all"
                   >
-                    <a href={`mailto:${contact.email}?subject=Re: ${contact.subject || "Hour Stay Inquiry"}`}>
-                      <Mail className="size-3.5 mr-1.5" />
-                      Reply via Email
-                    </a>
+                    <Mail className="size-3.5 mr-1.5" />
+                    Reply via Email
                   </Button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenGmail}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border border-rose-200 bg-rose-50/60 hover:bg-rose-50 text-rose-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                      title="Open message in Gmail compose tab"
+                    >
+                      <ExternalLink className="size-3" />
+                      Gmail Tab
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenDefaultMail}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border border-navy/15 bg-white hover:bg-cream/40 text-navy text-[11px] font-semibold transition-colors cursor-pointer"
+                      title="Open default email client"
+                    >
+                      <Mail className="size-3" />
+                      Mail App
+                    </button>
+                  </div>
 
                   <Button
                     variant="outline"
@@ -192,6 +276,36 @@ export function ViewContactRequest() {
                     {contact.message}
                   </div>
                 </div>
+
+                {/* Show Admin Response Log if previously replied */}
+                {(contact.replyMessage || contact.status === "Replied") && (
+                  <div className="p-4 rounded-xl bg-purple/5 border border-purple/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple flex items-center gap-1.5">
+                        <CheckCircle2 className="size-3.5 text-purple" />
+                        Admin Reply Record
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {contact.repliedAt ? new Date(contact.repliedAt).toLocaleString("en-IN") : "Replied"}
+                      </span>
+                    </div>
+                    {contact.replyMessage && (
+                      <p className="text-xs text-navy whitespace-pre-wrap font-sans bg-white p-3.5 rounded-lg border border-purple/10 leading-relaxed">
+                        {contact.replyMessage}
+                      </p>
+                    )}
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => navigate({ to: `/super-admin/contacts/reply/${contact._id || contact.id}` })}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-purple hover:underline cursor-pointer"
+                      >
+                        <CornerDownRight className="size-3" />
+                        Send Follow-up Email
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Quick Status Changers */}
                 <div className="p-4 rounded-xl border border-navy/10 bg-muted/10 flex flex-wrap items-center justify-between gap-3">

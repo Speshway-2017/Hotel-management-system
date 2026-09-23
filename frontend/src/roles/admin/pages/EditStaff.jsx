@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import { emitRealtimeEvent } from "@/services/socket";
+import { validateWithZod, staffSchema } from "@/schemas";
 
 function EditStaff() {
   const params = useParams() || {};
@@ -43,6 +44,7 @@ function EditStaff() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form States (pre-filled from stateMember if available)
   const [name, setName] = useState(stateMember?.name || stateMember?.fullName || stateMember?.username || "");
@@ -250,6 +252,24 @@ function EditStaff() {
       toast.error("Staff identifier not found.");
       return;
     }
+
+    const val = validateWithZod(staffSchema, {
+      name,
+      email: email || "staff@hourstay.com",
+      phone,
+      role,
+      dept,
+      shift,
+      status
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
+      return;
+    }
+    setFieldErrors({});
+
     setSaving(true);
     try {
       const payload = {
@@ -298,7 +318,7 @@ function EditStaff() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
-              <FormField label="Full Name" required id="name">
+              <FormField label="Full Name" required id="name" status={fieldErrors.name ? "error" : undefined} errorMsg={fieldErrors.name}>
                 <Input
                   id="name"
                   type="text"
@@ -307,6 +327,7 @@ function EditStaff() {
                   onChange={(e) => {
                     setName(e.target.value);
                     setIsDirty(true);
+                    if (fieldErrors.name) setFieldErrors(p => ({ ...p, name: null }));
                   }}
                   placeholder="Enter employee full name"
                 />
@@ -321,7 +342,7 @@ function EditStaff() {
                     value={email}
                   />
                 </FormField>
-                <FormField label="Phone Number" required id="phone">
+                <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                   <Input
                     id="phone"
                     type="text"
@@ -330,6 +351,7 @@ function EditStaff() {
                     onChange={(e) => {
                       setPhone(e.target.value);
                       setIsDirty(true);
+                      if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null }));
                     }}
                     placeholder="+91 98765 43210"
                   />

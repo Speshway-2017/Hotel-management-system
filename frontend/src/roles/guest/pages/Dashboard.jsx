@@ -61,7 +61,7 @@ function GuestDashboardPage() {
     const storedPropId = localStorage.getItem('selected_property_id');
     const userPropId = user?.propertyId;
     const bookingPropId = data?.recentBookings?.find(b => b.propertyId)?.propertyId;
-    const targetPropertyId = storedPropId || userPropId || bookingPropId || 'HS-JAI';
+    const targetPropertyId = storedPropId || userPropId || bookingPropId || 'HS-9HQ8P';
     window.location.href = `/hotels/${targetPropertyId}`;
   };
 

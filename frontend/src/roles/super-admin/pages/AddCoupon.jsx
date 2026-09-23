@@ -5,6 +5,7 @@ import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
+import { validateWithZod, couponSchema } from "@/schemas";
 
 function AddCoupon() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ function AddCoupon() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
     code: "",
@@ -45,10 +47,14 @@ function AddCoupon() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.code || !formData.discountValue || !formData.validFrom || !formData.validUntil || !formData.usageLimit) {
-      toast.error("Please fill in all required fields.");
+    const validation = validateWithZod(couponSchema, formData);
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please correct the highlighted errors.");
       return;
     }
+    setFieldErrors({});
 
     setSubmitting(true);
     setError(null);
@@ -100,13 +106,22 @@ function AddCoupon() {
 
       <Panel title="Coupon Configuration" description="Specify rates, valid periods, and limits.">
         <form onSubmit={handleSubmit} className="p-5 space-y-4 bg-white rounded-b-xl">
-          <FormField label="Coupon Code" required id="code">
+          <FormField
+            label="Coupon Code"
+            required
+            id="code"
+            status={fieldErrors.code ? "error" : undefined}
+            errorMsg={fieldErrors.code}
+          >
             <Input
               id="code"
               required
               placeholder="e.g. WELCOME25, FLAT1000"
               value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+              onChange={(e) => {
+                setFormData({ ...formData, code: e.target.value.toUpperCase() });
+                if (fieldErrors.code) setFieldErrors({ ...fieldErrors, code: undefined });
+              }}
               className="uppercase"
             />
           </FormField>
@@ -135,6 +150,8 @@ function AddCoupon() {
               label={formData.discountType === "percentage" ? "Percentage Value (%)" : "Value (INR)"}
               required
               id="discountValue"
+              status={fieldErrors.discountValue ? "error" : undefined}
+              errorMsg={fieldErrors.discountValue}
             >
               <Input
                 id="discountValue"
@@ -143,34 +160,61 @@ function AddCoupon() {
                 min="1"
                 placeholder={formData.discountType === "percentage" ? "e.g. 15" : "e.g. 500"}
                 value={formData.discountValue}
-                onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, discountValue: e.target.value });
+                  if (fieldErrors.discountValue) setFieldErrors({ ...fieldErrors, discountValue: undefined });
+                }}
               />
             </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Valid From" required id="validFrom">
+            <FormField
+              label="Valid From"
+              required
+              id="validFrom"
+              status={fieldErrors.validFrom ? "error" : undefined}
+              errorMsg={fieldErrors.validFrom}
+            >
               <Input
                 id="validFrom"
                 type="date"
                 required
                 value={formData.validFrom}
-                onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, validFrom: e.target.value });
+                  if (fieldErrors.validFrom) setFieldErrors({ ...fieldErrors, validFrom: undefined });
+                }}
               />
             </FormField>
-            <FormField label="Valid Until" required id="validUntil">
+            <FormField
+              label="Valid Until"
+              required
+              id="validUntil"
+              status={fieldErrors.validUntil ? "error" : undefined}
+              errorMsg={fieldErrors.validUntil}
+            >
               <Input
                 id="validUntil"
                 type="date"
                 required
                 value={formData.validUntil}
-                onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, validUntil: e.target.value });
+                  if (fieldErrors.validUntil) setFieldErrors({ ...fieldErrors, validUntil: undefined });
+                }}
               />
             </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Max Redemptions Limit" required id="usageLimit">
+            <FormField
+              label="Max Redemptions Limit"
+              required
+              id="usageLimit"
+              status={fieldErrors.usageLimit ? "error" : undefined}
+              errorMsg={fieldErrors.usageLimit}
+            >
               <Input
                 id="usageLimit"
                 type="number"
@@ -178,10 +222,19 @@ function AddCoupon() {
                 min="1"
                 placeholder="e.g. 150"
                 value={formData.usageLimit}
-                onChange={(e) => setFormData({ ...formData, usageLimit: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, usageLimit: e.target.value });
+                  if (fieldErrors.usageLimit) setFieldErrors({ ...fieldErrors, usageLimit: undefined });
+                }}
               />
             </FormField>
-            <FormField label="Min Spend Threshold" required id="minimumSubscriptionAmount">
+            <FormField
+              label="Min Spend Threshold"
+              required
+              id="minimumSubscriptionAmount"
+              status={fieldErrors.minimumSubscriptionAmount ? "error" : undefined}
+              errorMsg={fieldErrors.minimumSubscriptionAmount}
+            >
               <Input
                 id="minimumSubscriptionAmount"
                 type="number"
@@ -189,7 +242,10 @@ function AddCoupon() {
                 min="0"
                 placeholder="e.g. 3000"
                 value={formData.minimumSubscriptionAmount}
-                onChange={(e) => setFormData({ ...formData, minimumSubscriptionAmount: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, minimumSubscriptionAmount: e.target.value });
+                  if (fieldErrors.minimumSubscriptionAmount) setFieldErrors({ ...fieldErrors, minimumSubscriptionAmount: undefined });
+                }}
                 suffix="₹"
               />
             </FormField>

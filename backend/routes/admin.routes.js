@@ -13,7 +13,7 @@ import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
-import { extractRoomNumber } from '../utils/roomHelper.js';
+import { extractRoomNumber, calculatePropertyStats } from '../utils/roomHelper.js';
 
 const router = express.Router();
 
@@ -210,7 +210,7 @@ router.get('/property', async (req, res) => {
     let propertyId = req.user?.propertyId;
     let property = await findPropertySafely(propertyId, req.user);
     if (!property) {
-      const defaultId = propertyId || "HS-JAI";
+      const defaultId = propertyId || "HS-9HQ8P";
       property = await Property.create({
         _id: defaultId,
         id: defaultId,
@@ -343,6 +343,10 @@ const ensureRealPayments = async (propId) => {
       }
 
       const amount = Number(b.totalAmount || b.amount || 0);
+      const discountAmount = Number(b.discountAmount || 0);
+      const originalAmount = Number(b.originalAmount || (amount + discountAmount));
+      const couponCode = b.couponCode || null;
+      const paidAmount = Number(b.paidAmount || (b.paymentStatus === 'Paid' ? amount : Math.max(0, amount - Number(b.balance || 0))));
       const paymentMethod = b.paymentMethod || 'UPI';
       const isRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
       const status = isRefunded
@@ -368,6 +372,10 @@ const ensureRealPayments = async (propId) => {
           guestName,
           roomNumber,
           amount: amount > 0 ? amount : 3500,
+          originalAmount,
+          discountAmount,
+          couponCode,
+          paidAmount,
           paymentMethod,
           status,
           propertyId: b.propertyId || propId || 'HS-9HQ8P',
@@ -384,6 +392,10 @@ const ensureRealPayments = async (propId) => {
         let needsUpdate = false;
         if (existing.bookingId !== cleanBookingId) { existing.bookingId = cleanBookingId; needsUpdate = true; }
         if (amount > 0 && existing.amount !== amount) { existing.amount = amount; needsUpdate = true; }
+        if (originalAmount > 0 && existing.originalAmount !== originalAmount) { existing.originalAmount = originalAmount; needsUpdate = true; }
+        if (discountAmount !== undefined && existing.discountAmount !== discountAmount) { existing.discountAmount = discountAmount; needsUpdate = true; }
+        if (couponCode !== undefined && existing.couponCode !== couponCode) { existing.couponCode = couponCode; needsUpdate = true; }
+        if (paidAmount !== undefined && existing.paidAmount !== paidAmount) { existing.paidAmount = paidAmount; needsUpdate = true; }
         if (roomNumber && existing.roomNumber !== roomNumber) { existing.roomNumber = roomNumber; needsUpdate = true; }
         if (guestName && guestName !== 'Guest' && existing.guestName !== guestName) { existing.guestName = guestName; needsUpdate = true; }
         if (status && existing.status !== status) { existing.status = status; needsUpdate = true; }
@@ -405,7 +417,7 @@ router.get('/payments', async (req, res) => {
     await ensureRealPayments(propId);
     let query = {};
     if (propId) {
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }] };
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }] };
     }
     let payments = await Payment.find(query).sort({ createdAt: -1 });
     if (!payments || payments.length === 0) {
@@ -525,7 +537,7 @@ router.get('/feedback', async (req, res) => {
   try {
     const propId = req.query.propertyId;
     const query = (propId && propId !== 'all')
-      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-JAI' }] }
+      ? { $or: [{ propertyId: propId }, { propertyId: { $exists: false } }, { propertyId: '' }, { propertyId: 'HS-9HQ8P' }] }
       : {};
     const list = await getUnifiedFeedbacksAndReviews(query);
     return sendSuccess(res, 200, list, 'Feedback & guest reviews retrieved successfully from MongoDB.');
@@ -536,7 +548,7 @@ router.get('/feedback', async (req, res) => {
 
 router.post('/feedback', async (req, res) => {
   try {
-    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = req.body?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const {
       bookingId = `BK-${Date.now().toString().slice(-5)}`,
       guestName,
@@ -901,11 +913,11 @@ router.delete('/coupons/:id', async (req, res) => {
 // ==========================================
 const handleGetUsersOrStaff = async (req, res) => {
   try {
-    const propId = req.user.propertyId || 'HS-JAI';
+    const propId = req.user.propertyId || 'HS-9HQ8P';
     const query = {
       $or: [
         { propertyId: propId },
-        { propertyId: 'HS-JAI' },
+        { propertyId: 'HS-9HQ8P' },
         { propertyId: 'HS-9HQ8P' },
         { propertyId: null },
         { propertyId: { $exists: false } }
@@ -1034,7 +1046,7 @@ const handleCreateUserOrStaff = async (req, res) => {
     if (!name || !email) {
       return sendError(res, 400, 'Name and email are required');
     }
-    const propId = propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const existing = await User.findOne({ email });
     if (existing) return sendError(res, 400, 'User with this email already exists');
 
@@ -1112,7 +1124,7 @@ const handleUpdateUserOrStaff = async (req, res) => {
         const uId = String(updated._id || updated.id || targetUser._id || targetUser.id || id);
         await Shift.findOneAndUpdate(
           { $or: [{ userId: uId }, { username: updated.name }] },
-          { shiftType: shift, username: updated.name, propertyId: updated.propertyId || req.user?.propertyId || 'HS-JAI' },
+          { shiftType: shift, username: updated.name, propertyId: updated.propertyId || req.user?.propertyId || 'HS-9HQ8P' },
           { upsert: true, new: true }
         );
       }

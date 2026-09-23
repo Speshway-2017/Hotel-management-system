@@ -17,10 +17,13 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
-  Camera
+  Camera,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { authService } from "@/services/auth";
 import { superAdminService } from "@/services/superAdmin";
+import { validateWithZod, changePasswordSchema, staffSchema } from "@/schemas";
 
 const settingsTabs = [
   { label: "Settings", to: "/admin/settings", icon: User },
@@ -46,6 +49,11 @@ function AdminProfilePage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [profileErrors, setProfileErrors] = useState({});
+  const [passwordErrors, setPasswordErrors] = useState({});
   
   const [profileData, setProfileData] = useState({
     name: currentUser.name || "Madhu",
@@ -132,6 +140,23 @@ function AdminProfilePage() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+
+    const val = validateWithZod(staffSchema, {
+      name: profileData.name,
+      email: profileData.email || "admin@speshway.com",
+      phone: profileData.phone
+    });
+
+    if (!val.isValid) {
+      setProfileErrors(val.errors);
+      setNotification({
+        tone: "error",
+        title: "Validation Error",
+        body: val.firstError
+      });
+      return;
+    }
+    setProfileErrors({});
     setIsEditing(false);
     
     try {
@@ -165,14 +190,23 @@ function AdminProfilePage() {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+
+    const val = validateWithZod(changePasswordSchema, {
+      currentPassword: passwordData.currentPassword,
+      newPassword: passwordData.newPassword,
+      confirmNewPassword: passwordData.confirmNewPassword
+    });
+
+    if (!val.isValid) {
+      setPasswordErrors(val.errors);
       setNotification({
         tone: "error",
-        title: "Password Mismatch",
-        body: "Confirm password does not match new password."
+        title: "Validation Error",
+        body: val.firstError
       });
       return;
     }
+    setPasswordErrors({});
     
     try {
       const res = await authService.changePassword(passwordData.currentPassword, passwordData.newPassword);
@@ -336,20 +370,28 @@ function AdminProfilePage() {
                     <Input
                       id="edit-name"
                       value={profileData.name}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, name: e.target.value }));
+                        if (profileErrors.name) setProfileErrors(p => ({ ...p, name: null }));
+                      }}
+                      className={`h-10 text-xs border font-semibold text-navy bg-cream/10 ${profileErrors.name ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"}`}
                       required
                     />
+                    {profileErrors.name && <p className="text-[11px] font-bold text-rose-600">{profileErrors.name}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
                     <Input
                       id="edit-phone"
                       value={profileData.phone}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      onChange={(e) => {
+                        setProfileData(prev => ({ ...prev, phone: e.target.value }));
+                        if (profileErrors.phone) setProfileErrors(p => ({ ...p, phone: null }));
+                      }}
+                      className={`h-10 text-xs border font-semibold text-navy bg-cream/10 ${profileErrors.phone ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"}`}
                       required
                     />
+                    {profileErrors.phone && <p className="text-[11px] font-bold text-rose-600">{profileErrors.phone}</p>}
                   </div>
                 </div>
                 <div className="flex gap-2.5 pt-3">
@@ -375,8 +417,11 @@ function AdminProfilePage() {
                       id="current-pw"
                       type={showCurrentPassword ? "text" : "password"}
                       value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                      onChange={(e) => {
+                        setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }));
+                        if (passwordErrors.currentPassword) setPasswordErrors(p => ({ ...p, currentPassword: null }));
+                      }}
+                      className={`h-10 text-xs border font-semibold text-navy bg-cream/10 pr-10 ${passwordErrors.currentPassword ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"}`}
                       placeholder="••••••••"
                       required
                     />
@@ -388,6 +433,7 @@ function AdminProfilePage() {
                       {showCurrentPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   </div>
+                  {passwordErrors.currentPassword && <p className="text-[11px] font-bold text-rose-600">{passwordErrors.currentPassword}</p>}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -397,8 +443,11 @@ function AdminProfilePage() {
                         id="new-pw"
                         type={showNewPassword ? "text" : "password"}
                         value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        onChange={(e) => {
+                          setPasswordData(prev => ({ ...prev, newPassword: e.target.value }));
+                          if (passwordErrors.newPassword) setPasswordErrors(p => ({ ...p, newPassword: null }));
+                        }}
+                        className={`h-10 text-xs border font-semibold text-navy bg-cream/10 pr-10 ${passwordErrors.newPassword ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"}`}
                         placeholder="••••••••"
                         required
                       />
@@ -410,6 +459,7 @@ function AdminProfilePage() {
                         {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    {passwordErrors.newPassword && <p className="text-[11px] font-bold text-rose-600">{passwordErrors.newPassword}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="confirm-new-pw" className="text-navy font-semibold text-xs">Confirm New Password</Label>
@@ -418,8 +468,11 @@ function AdminProfilePage() {
                         id="confirm-new-pw"
                         type={showConfirmPassword ? "text" : "password"}
                         value={passwordData.confirmNewPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        onChange={(e) => {
+                          setPasswordData(prev => ({ ...prev, confirmNewPassword: e.target.value }));
+                          if (passwordErrors.confirmNewPassword) setPasswordErrors(p => ({ ...p, confirmNewPassword: null }));
+                        }}
+                        className={`h-10 text-xs border font-semibold text-navy bg-cream/10 pr-10 ${passwordErrors.confirmNewPassword ? "border-rose-500 ring-1 ring-rose-500" : "border-muted"}`}
                         placeholder="••••••••"
                         required
                       />
@@ -431,6 +484,7 @@ function AdminProfilePage() {
                         {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    {passwordErrors.confirmNewPassword && <p className="text-[11px] font-bold text-rose-600">{passwordErrors.confirmNewPassword}</p>}
                   </div>
                 </div>
                 <div className="flex gap-2.5 pt-3">

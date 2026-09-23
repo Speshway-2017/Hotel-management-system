@@ -6,6 +6,7 @@ import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Textarea } from "@/components/hs/FormFields";
 import { toast } from "sonner";
+import { validateWithZod, planSchema } from "@/schemas";
 
 function EditPlan() {
   const params = useParams() || {};
@@ -14,6 +15,7 @@ function EditPlan() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -61,6 +63,15 @@ function EditPlan() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validation = validateWithZod(planSchema, formData);
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please correct the highlighted errors.");
+      return;
+    }
+    setFieldErrors({});
+
     setSubmitting(true);
     setError(null);
 
@@ -105,13 +116,22 @@ function EditPlan() {
       ) : (
         <Panel title="Plan Details Update" description="Submit tier adjustments.">
           <form onSubmit={handleSubmit} className="p-5 space-y-4 bg-white rounded-b-xl">
-            <FormField label="Plan Name" required id="name">
+            <FormField
+              label="Plan Name"
+              required
+              id="name"
+              status={fieldErrors.name ? "error" : undefined}
+              errorMsg={fieldErrors.name}
+            >
               <Input
                 id="name"
                 required
                 placeholder="e.g. Starter Tier, Professional Suite"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: undefined });
+                }}
               />
             </FormField>
 
@@ -125,7 +145,13 @@ function EditPlan() {
             </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Monthly Tariff" required id="monthlyPrice">
+              <FormField
+                label="Monthly Tariff"
+                required
+                id="monthlyPrice"
+                status={fieldErrors.monthlyPrice ? "error" : undefined}
+                errorMsg={fieldErrors.monthlyPrice}
+              >
                 <Input
                   id="monthlyPrice"
                   type="number"
@@ -133,11 +159,20 @@ function EditPlan() {
                   min="0"
                   placeholder="e.g. 5999"
                   value={formData.monthlyPrice}
-                  onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, monthlyPrice: e.target.value });
+                    if (fieldErrors.monthlyPrice) setFieldErrors({ ...fieldErrors, monthlyPrice: undefined });
+                  }}
                   suffix="₹"
                 />
               </FormField>
-              <FormField label="Yearly Tariff" required id="yearlyPrice">
+              <FormField
+                label="Yearly Tariff"
+                required
+                id="yearlyPrice"
+                status={fieldErrors.yearlyPrice ? "error" : undefined}
+                errorMsg={fieldErrors.yearlyPrice}
+              >
                 <Input
                   id="yearlyPrice"
                   type="number"
@@ -145,14 +180,23 @@ function EditPlan() {
                   min="0"
                   placeholder="e.g. 59990"
                   value={formData.yearlyPrice}
-                  onChange={(e) => setFormData({ ...formData, yearlyPrice: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, yearlyPrice: e.target.value });
+                    if (fieldErrors.yearlyPrice) setFieldErrors({ ...fieldErrors, yearlyPrice: undefined });
+                  }}
                   suffix="₹"
                 />
               </FormField>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Properties Onboard Limit" required id="propertyLimit">
+              <FormField
+                label="Properties Onboard Limit"
+                required
+                id="propertyLimit"
+                status={fieldErrors.propertyLimit ? "error" : undefined}
+                errorMsg={fieldErrors.propertyLimit}
+              >
                 <Input
                   id="propertyLimit"
                   type="number"
@@ -160,10 +204,19 @@ function EditPlan() {
                   min="1"
                   placeholder="e.g. 3"
                   value={formData.propertyLimit}
-                  onChange={(e) => setFormData({ ...formData, propertyLimit: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, propertyLimit: e.target.value });
+                    if (fieldErrors.propertyLimit) setFieldErrors({ ...fieldErrors, propertyLimit: undefined });
+                  }}
                 />
               </FormField>
-              <FormField label="Rooms Onboard Limit (Per Prop)" required id="roomLimit">
+              <FormField
+                label="Rooms Onboard Limit (Per Prop)"
+                required
+                id="roomLimit"
+                status={fieldErrors.roomLimit ? "error" : undefined}
+                errorMsg={fieldErrors.roomLimit}
+              >
                 <Input
                   id="roomLimit"
                   type="number"
@@ -171,7 +224,10 @@ function EditPlan() {
                   min="1"
                   placeholder="e.g. 150"
                   value={formData.roomLimit}
-                  onChange={(e) => setFormData({ ...formData, roomLimit: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, roomLimit: e.target.value });
+                    if (fieldErrors.roomLimit) setFieldErrors({ ...fieldErrors, roomLimit: undefined });
+                  }}
                 />
               </FormField>
             </div>

@@ -23,10 +23,12 @@ import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 
 function ViewReservation() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  useServerTime(2000);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [booking, setBooking] = useState(null);
@@ -68,6 +70,15 @@ function ViewReservation() {
 
   async function handleStatusChange(newStatus, notes = "") {
     if (!booking) return;
+
+    if (newStatus === "Checked-in") {
+      const checkInStatus = getCheckInStatusInfo(booking);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
+
     try {
       const payload = { status: newStatus };
       if (notes) payload.notes = notes;
@@ -143,14 +154,29 @@ function ViewReservation() {
 
         {booking && booking.status !== "Checked-out" && booking.status !== "Checked Out" && (
           <div className="flex items-center gap-2 select-none">
-            {booking.status === "Pending" && (
-              <Button
-                onClick={() => handleStatusChange("Checked-in")}
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-full shadow-soft cursor-pointer"
-              >
-                <CheckCircle className="size-3.5 mr-1.5" /> Check-In
-              </Button>
+            {(booking.status === "Pending" || booking.status === "Confirmed" || booking.status === "Pre-checked") && (
+              getCheckInStatusInfo(booking).allowed ? (
+                <Button
+                  onClick={() => handleStatusChange("Checked-in")}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-full shadow-soft cursor-pointer"
+                >
+                  <CheckCircle className="size-3.5 mr-1.5" /> Check-In
+                </Button>
+              ) : (
+                <div className="relative group inline-block" title={getCheckInStatusInfo(booking).reason}>
+                  <Button
+                    disabled
+                    size="sm"
+                    className="bg-emerald-600/40 text-white/80 font-bold text-xs h-9 px-4 rounded-full shadow-soft cursor-not-allowed select-none"
+                  >
+                    <Clock className="size-3.5 mr-1.5" /> Check-in at {getCheckInStatusInfo(booking).checkInTime}
+                  </Button>
+                  <div className="absolute top-full mt-1 right-0 hidden group-hover:block z-50 w-64 p-2 bg-slate-900 text-white text-[11px] rounded shadow-lg">
+                    {getCheckInStatusInfo(booking).reason}
+                  </div>
+                </div>
+              )
             )}
             {(booking.status === "Checked-in" || booking.status === "Checked In" || booking.status === "Staying" || booking.status === "Staying-In") && (
               <>
@@ -288,10 +314,22 @@ function ViewReservation() {
                 <h4 className="font-bold text-navy text-sm">Tariff & Billing Ledger</h4>
               </div>
               <div className="space-y-3 text-xs text-navy">
+                {Number(booking.discountAmount || 0) > 0 && (
+                  <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/60 rounded-lg space-y-1">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-emerald-800 font-medium">Original Tariff:</span>
+                      <span className="line-through text-muted-foreground">₹{Number(booking.originalAmount || (Number(booking.totalAmount || booking.amount) + Number(booking.discountAmount))).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px] font-bold text-emerald-700">
+                      <span>Coupon Promo ({booking.couponCode || 'APPLIED'}):</span>
+                      <span>-₹{Number(booking.discountAmount).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Invoiced Tariff</span>
-                    <p className="font-bold text-base text-navy mt-0.5">₹{(booking.amount || 0).toLocaleString("en-IN")}</p>
+                    <p className="font-bold text-base text-navy mt-0.5">₹{(Number(booking.totalAmount ?? booking.amount ?? 0)).toLocaleString("en-IN")}</p>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Ledger Balance</span>

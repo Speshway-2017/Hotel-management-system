@@ -56,6 +56,25 @@ app.get('/api/v1/health', (_req, res) => {
   res.status(200).json({ status: 'ok', service: 'hourstay-hms-backend' });
 });
 
+// Server Time Endpoints
+const handleServerTime = (_req, res) => {
+  const now = new Date();
+  res.status(200).json({
+    success: true,
+    data: {
+      serverTime: now.toISOString(),
+      serverTimestamp: now.getTime(),
+      timezone: 'Asia/Kolkata',
+      standardCheckInTime: '12:00 PM',
+      standardCheckOutTime: '11:00 AM'
+    }
+  });
+};
+app.get('/server-time', handleServerTime);
+app.get('/api/server-time', handleServerTime);
+app.get('/api/v1/server-time', handleServerTime);
+
+
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 import {
   Search,
   Eye,
@@ -56,6 +57,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
 
 function ManagerReservationsPage() {
   const navigate = useNavigate();
+  useServerTime(2000);
   const [currentUser, setCurrentUser] = useState(null);
   const [property, setProperty] = useState(null);
   const [reservations, setReservations] = useState([]);
@@ -151,6 +153,15 @@ function ManagerReservationsPage() {
   // Status Handlers
   async function handleStatusChange(bookingId, newStatus, notes = "", booking = null) {
     const targetBooking = booking || reservations.find(r => r._id === bookingId || r.id === bookingId || r.bookingId === bookingId);
+    
+    if (newStatus === "Checked-in" && targetBooking) {
+      const checkInStatus = getCheckInStatusInfo(targetBooking);
+      if (!checkInStatus.allowed) {
+        toast.error(checkInStatus.reason);
+        return;
+      }
+    }
+
     const source = targetBooking?.source || "";
     const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
 
@@ -489,6 +500,7 @@ function ManagerReservationsPage() {
                               <>
                                 {(res.status === "Confirmed" || res.status === "Pending" || res.status === "Pre-checked") && (
                                   <CheckInActionButton
+                                    booking={res}
                                     onClick={() => handleStatusChange(res._id || res.id, "Checked-in", "", res)}
                                   />
                                 )}

@@ -19,6 +19,12 @@ export const managerService = {
   verifyIdProof: async (id, idData) => {
     return await apiClient.post(`/manager/reservations/${id}/verify-id`, idData);
   },
+  getGuestAadhaarStatus: async (id) => {
+    return await apiClient.get(`/manager/reservations/${id}/guest-aadhaar-status`);
+  },
+  lookupGuestAadhaar: async (params) => {
+    return await apiClient.get('/manager/guests/lookup-aadhaar', { params });
+  },
   assignRoom: async (id, roomNumber, roomType) => {
     return await apiClient.post(`/manager/reservations/${id}/assign-room`, { roomNumber, roomType });
   },

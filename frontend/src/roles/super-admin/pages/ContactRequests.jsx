@@ -22,7 +22,8 @@ import {
   X,
   Sparkles,
   Filter,
-  Check
+  Check,
+  ExternalLink
 } from "lucide-react";
 
 export const Route = createFileRoute("/super-admin/contacts")({
@@ -312,7 +313,6 @@ export function ContactRequestsPage() {
 
                       <td className="p-3.5 font-medium text-navy text-xs max-w-[200px]">
                         <div className="truncate font-semibold">{c.subject || "General Inquiry"}</div>
-                        <div className="text-[11px] text-muted-foreground">{c.propertyId || "General Lead"}</div>
                       </td>
 
                       <td className="p-3.5 text-muted-foreground text-xs max-w-[280px]">
@@ -397,10 +397,6 @@ export function ContactRequestsPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[11px]">Assigned Property Scope</span>
-                  <span className="font-bold text-navy text-xs">{selectedContact.propertyId || "General Group"}</span>
-                </div>
-                <div>
                   <span className="text-muted-foreground block text-[11px]">Current Status</span>
                   <div className="mt-1">{getStatusBadge(selectedContact.status)}</div>
                 </div>
@@ -448,16 +444,32 @@ export function ContactRequestsPage() {
                 Close
               </Button>
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Button
-                  asChild
                   size="sm"
-                  className="rounded-full bg-purple hover:bg-purple/90 text-white text-xs cursor-pointer"
+                  variant="outline"
+                  onClick={() => {
+                    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selectedContact.email)}&su=${encodeURIComponent(`Re: ${selectedContact.subject || "Hour Stay Inquiry"}`)}`;
+                    window.open(url, "_blank", "noopener,noreferrer");
+                    navigator.clipboard?.writeText?.(selectedContact.email);
+                    toast.success("Opening Gmail Compose! Recipient email copied to clipboard.");
+                  }}
+                  className="rounded-full text-xs font-semibold cursor-pointer border-navy/20 hover:bg-cream"
                 >
-                  <a href={`mailto:${selectedContact.email}?subject=Re: ${selectedContact.subject || "Hour Stay Inquiry"}`}>
-                    <Mail className="size-3.5 mr-1.5" />
-                    Reply via Email
-                  </a>
+                  <ExternalLink className="size-3.5 mr-1.5" />
+                  Gmail
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedContact(null);
+                    navigate({ to: `/super-admin/contacts/reply/${selectedContact._id || selectedContact.id}` });
+                  }}
+                  className="rounded-full bg-purple hover:bg-purple/90 text-white text-xs font-bold cursor-pointer"
+                >
+                  <Mail className="size-3.5 mr-1.5" />
+                  Reply via Email
                 </Button>
               </div>
             </div>

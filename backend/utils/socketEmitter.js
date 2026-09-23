@@ -29,7 +29,7 @@ export const broadcastCheckinCheckout = (io, propertyId, { action, booking, room
   if (!io) return;
 
   const resolvedRoomNum = roomNumber || booking?.roomNumber || (booking?.room ? String(booking.room).match(/\b\d{3,4}\b/)?.[0] : null);
-  const targetPropId = propertyId || booking?.propertyId || 'HS-JAI';
+  const targetPropId = propertyId || booking?.propertyId || 'HS-9HQ8P';
 
   const data = {
     action, // 'checkin' | 'checkout' | 'room_assigned' | 'status_change' | 'payment' | 'walkin'

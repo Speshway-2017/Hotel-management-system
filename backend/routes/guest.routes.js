@@ -14,6 +14,7 @@ import { calculateStayNights } from '../utils/dateUtils.js';
 import { extractRoomNumber } from '../utils/roomHelper.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { findPropertySafely } from '../utils/propertyCache.js';
+import { processAutoCheckouts } from '../services/autoCheckout.service.js';
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.use(guestAuth);
 
 router.get('/rooms', async (req, res) => {
   try {
-    const targetPropId = req.user?.propertyId || 'HS-JAI';
+    const targetPropId = req.user?.propertyId || 'HS-9HQ8P';
     let dbRooms = await Room.find({ propertyId: targetPropId }).sort({ roomNumber: 1 });
     if (!dbRooms || dbRooms.length === 0) {
       dbRooms = await Room.find().sort({ roomNumber: 1 });
@@ -88,21 +89,63 @@ export const getBookingEffectiveAmounts = (b) => {
   return { totalAmount, originalAmount, discountAmount, couponCode: b.couponCode || null };
 };
 
+export const buildGuestBookingQuery = (user, req) => {
+  const userId = user._id || user.id;
+  const userIdStr = String(userId || '');
+  const userEmail = (user?.email || '').trim();
+  const userPhone = (user?.mobile || user?.phone || '').trim();
+  const userName = (user?.name || '').trim();
+
+  const query = [
+    { guestId: userId },
+    { guestId: userIdStr },
+    { userId: userId },
+    { userId: userIdStr }
+  ];
+
+  if (userEmail) {
+    const escapedEmail = userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.push({ email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } });
+    query.push({ guestEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } });
+  }
+
+  if (userName) {
+    const escapedName = userName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.push({ guest: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
+    query.push({ guestName: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
+  }
+
+  if (userPhone) {
+    query.push({ phone: userPhone });
+    query.push({ guestPhone: userPhone });
+    const digitsOnly = userPhone.replace(/[^0-9]/g, '');
+    if (digitsOnly.length >= 7) {
+      query.push({ phone: { $regex: digitsOnly.slice(-10) } });
+      query.push({ guestPhone: { $regex: digitsOnly.slice(-10) } });
+    }
+  }
+
+  // Only filter by property if explicitly requested via query parameter and not 'all'
+  const explicitPropId = req?.query?.propertyId || req?.headers?.['x-property-id'];
+  if (explicitPropId && explicitPropId !== 'all') {
+    return {
+      $and: [
+        { $or: query },
+        { $or: [{ propertyId: explicitPropId }, { hotelId: explicitPropId }] }
+      ]
+    };
+  }
+
+  return { $or: query };
+};
+
 router.get('/bookings', async (req, res) => {
   try {
+    await processAutoCheckouts(req.app.get('socketio'));
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    const query = [{ guestId: userId }];
-    if (req.user?.email) query.push({ email: req.user.email });
-    if (req.user?.mobile) query.push({ phone: req.user.mobile });
-    if (req.user?.name) query.push({ guest: req.user.name });
-
-    // Show bookings linked to the logged-in guest for their related property only
-    const targetPropId = req.query.propertyId || req.headers['x-property-id'] || req.user?.propertyId || 'HS-JAI';
-    const bookingQuery = targetPropId
-      ? { $and: [{ $or: query }, { $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }] }] }
-      : { $or: query };
+    const bookingQuery = buildGuestBookingQuery(req.user, req);
 
     const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
@@ -163,7 +206,7 @@ router.get('/bookings', async (req, res) => {
         city: city,
         room: b.room || b.roomType || 'Standard Room',
         roomNumber: b.roomNumber || '',
-        propertyId: b.propertyId || prop?._id || prop?.id || 'HS-JAI',
+        propertyId: b.propertyId || prop?._id || prop?.id || 'HS-9HQ8P',
         checkIn: checkIn,
         checkOut: checkOut,
         nights: calculateStayNights(checkIn, checkOut) || Number(b.nights) || 1,
@@ -198,19 +241,11 @@ router.get('/bookings', async (req, res) => {
 
 router.get('/dashboard', async (req, res) => {
   try {
+    await processAutoCheckouts(req.app.get('socketio'));
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    const query = [{ guestId: userId }];
-    if (req.user?.email) query.push({ email: req.user.email });
-    if (req.user?.mobile) query.push({ phone: req.user.mobile });
-    if (req.user?.name) query.push({ guest: req.user.name });
-
-    // Show bookings linked to the logged-in guest for their related property only
-    const targetPropId = req.query.propertyId || req.headers['x-property-id'] || req.user?.propertyId || 'HS-JAI';
-    const bookingQuery = targetPropId
-      ? { $and: [{ $or: query }, { $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }] }] }
-      : { $or: query };
+    const bookingQuery = buildGuestBookingQuery(req.user, req);
 
     const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
@@ -272,16 +307,7 @@ router.get('/folio', async (req, res) => {
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    const query = [{ guestId: userId }];
-    if (req.user?.email) query.push({ email: req.user.email });
-    if (req.user?.mobile) query.push({ phone: req.user.mobile });
-    if (req.user?.name) query.push({ guest: req.user.name });
-
-    // Show folios linked to the logged-in guest for their related property only
-    const targetPropId = req.query.propertyId || req.headers['x-property-id'] || req.user?.propertyId || 'HS-JAI';
-    const bookingQuery = targetPropId
-      ? { $and: [{ $or: query }, { $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }] }] }
-      : { $or: query };
+    const bookingQuery = buildGuestBookingQuery(req.user, req);
 
     const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
@@ -295,17 +321,18 @@ router.get('/folio', async (req, res) => {
 
       const { totalAmount, originalAmount, discountAmount } = getBookingEffectiveAmounts(b);
       const baseAmount = totalAmount;
-      const roomCharges = Math.round(baseAmount * 0.82);
-      const gstTax = Math.round(baseAmount * 0.18);
+      const discount = discountAmount || Number(b.discount || 0);
+      const originalGross = originalAmount > 0 ? originalAmount : (baseAmount + discount);
+      const roomCharges = Math.round(originalGross / 1.18);
+      const gstTax = originalGross - roomCharges;
       
       const services = Array.isArray(b.services) && b.services.length > 0
         ? b.services
         : [];
       
       const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
-      const discount = discountAmount || Number(b.discount || 0);
-      const totalCharges = baseAmount + serviceTotal;
-      const paidAmount = b.paymentStatus === 'Paid' || b.status === 'Confirmed' ? baseAmount : Number(b.paidAmount || 0);
+      const totalCharges = (originalGross - discount) + serviceTotal;
+      const paidAmount = b.paymentStatus === 'Paid' || b.status === 'Confirmed' ? (b.paidAmount !== undefined ? Number(b.paidAmount) : totalCharges) : Number(b.paidAmount || 0);
       const balance = Math.max(0, totalCharges - paidAmount);
       const paymentStatus = balance === 0 ? 'Settled' : (paidAmount > 0 ? 'Pending Balance' : 'Unpaid');
 
@@ -396,7 +423,7 @@ router.post('/feedback', async (req, res) => {
     }
 
     // Find matching booking for room details & propertyId
-    let propertyId = req.body.propertyId || 'HS-JAI';
+    let propertyId = req.body.propertyId || 'HS-9HQ8P';
     let room = req.body.room || '101';
     let roomType = req.body.roomType || 'Standard Room';
     let guestName = customGuestName || req.user?.name || 'Valued Guest';
@@ -416,7 +443,7 @@ router.post('/feedback', async (req, res) => {
       }
       const b = await Booking.findOne({ $or: bQuery });
       if (b) {
-        propertyId = b.propertyId || 'HS-JAI';
+        propertyId = b.propertyId || 'HS-9HQ8P';
         room = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
         roomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
         if (b.hotel || b.hotelName) hotelName = b.hotel || b.hotelName;
@@ -685,7 +712,7 @@ const syncGuestBookingNotifications = async (user) => {
       const checkIn = b.checkIn || b.checkInDate || 'Today';
       const checkOut = b.checkOut || b.checkOutDate || 'Tomorrow';
       const status = (b.status || '').toLowerCase();
-      const propId = b.propertyId || 'HS-JAI';
+      const propId = b.propertyId || 'HS-9HQ8P';
 
       if (!existingRefs.has(bIdLower)) {
         existingRefs.add(bIdLower);
@@ -884,7 +911,7 @@ const handleMarkGuestNotificationRead = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const targetProp = notif?.propertyId || 'HS-JAI';
+      const targetProp = notif?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, targetProp, 'unread_notifications_count_updated', { userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, targetProp, 'dashboard_sync', { action: 'guest_notification_read', id });
     }
@@ -934,7 +961,7 @@ const handleMarkGuestNotificationUnread = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const targetProp = notif?.propertyId || 'HS-JAI';
+      const targetProp = notif?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, targetProp, 'unread_notifications_count_updated', { userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, targetProp, 'dashboard_sync', { action: 'guest_notification_unread', id });
     }
@@ -1059,6 +1086,12 @@ const handleGuestExtendStay = async (req, res) => {
       return sendError(res, 404, 'Stay booking record not found.');
     }
 
+    const bStatus = String(booking.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled'].includes(bStatus)) {
+      return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
+    }
+
+
     const currentNights = Number(booking.nights || 1);
     const currentAmount = Number(booking.amount || booking.totalAmount || 0);
     const dailyRate = currentNights > 0 ? (currentAmount / currentNights) : 3000;
@@ -1103,7 +1136,7 @@ const handleGuestExtendStay = async (req, res) => {
           amount: finalAdditionalAmount,
           paymentMethod: paymentMethod || 'UPI',
           status: 'Settled',
-          propertyId: booking.propertyId || 'HS-JAI'
+          propertyId: booking.propertyId || 'HS-9HQ8P'
         });
       } catch (_) {}
     } else {
@@ -1124,7 +1157,7 @@ const handleGuestExtendStay = async (req, res) => {
       { new: true }
     );
 
-    const propId = booking.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
 
     // Single unified alert to Manager & Receptionist
     await triggerNotification({
@@ -1214,7 +1247,7 @@ const handleGuestRefundRequest = async (req, res) => {
 
     const refundAmount = Number(amount) > 0 ? Number(amount) : Number(booking.amount || booking.totalAmount || 0);
     const guestName = booking.guest || req.user?.name || 'Valued Guest';
-    const propId = booking.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const refId = booking.bookingId || booking._id || booking.id;
 
     const refundData = {
@@ -1346,14 +1379,13 @@ const handleGuestRefundRequest = async (req, res) => {
 // Get guest refund requests history
 const handleGetGuestRefundRequests = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
-    const query = [{ guestId: userId }];
-    if (req.user?.email) query.push({ email: req.user.email });
-    if (req.user?.mobile) query.push({ phone: req.user.mobile });
+    const bookingQuery = buildGuestBookingQuery(req.user, req);
 
     const bookingsWithRefund = await Booking.find({
-      $or: query,
-      refundRequest: { $exists: true, $ne: null }
+      $and: [
+        bookingQuery,
+        { refundRequest: { $exists: true, $ne: null } }
+      ]
     }).sort({ 'refundRequest.requestedAt': -1 });
 
     const list = bookingsWithRefund.map(b => ({
@@ -1428,7 +1460,7 @@ const handleGetSingleBooking = async (req, res) => {
       hotel: booking.hotel || booking.hotelName || prop?.settings?.hotelName || prop?.name || 'Hour Stay Luxury Hotel',
       room: booking.room || booking.roomType || 'Standard Room',
       roomNumber: booking.roomNumber || '',
-      propertyId: booking.propertyId || prop?._id || prop?.id || 'HS-JAI',
+      propertyId: booking.propertyId || prop?._id || prop?.id || 'HS-9HQ8P',
       checkIn,
       checkOut,
       dates: `${checkIn} → ${checkOut}`,
@@ -1526,7 +1558,7 @@ const handleGuestCancelBooking = async (req, res) => {
       { new: true }
     );
 
-    const propId = booking.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const guestName = booking.guest || req.user?.name || 'Valued Guest';
     const refId = booking.bookingId || booking._id || booking.id;
 
@@ -1619,13 +1651,10 @@ router.get('/payments', async (req, res) => {
     const properties = await Property.find({});
     const userId = req.user._id || req.user.id;
 
-    const query = [{ guestId: userId }];
-    if (req.user?.email) query.push({ email: req.user.email });
-    if (req.user?.mobile) query.push({ phone: req.user.mobile });
-    if (req.user?.name) query.push({ guest: req.user.name });
+    const bookingQuery = buildGuestBookingQuery(req.user, req);
 
     // Fetch all bookings belonging strictly to the logged-in guest
-    const guestBookings = await Booking.find({ $or: query }).sort({ createdAt: -1 });
+    const guestBookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
     const bookingIds = guestBookings.map(b => b.bookingId || b._id || b.id).filter(Boolean);
     const stringIds = guestBookings.map(b => String(b._id)).filter(Boolean);
@@ -1727,7 +1756,7 @@ router.get('/payments', async (req, res) => {
               city: city,
               address: address,
               gstNo: gstNo,
-              propertyId: b.propertyId || prop?._id || 'HS-JAI',
+              propertyId: b.propertyId || prop?._id || 'HS-9HQ8P',
               room: b.room || b.roomType || 'Standard Room',
               roomNumber: b.roomNumber || p.roomNumber || extractRoomNumber(b.room) || '101',
               amount: effectivePayAmount,
@@ -1784,7 +1813,7 @@ router.get('/payments', async (req, res) => {
             city: city,
             address: address,
             gstNo: gstNo,
-            propertyId: b.propertyId || prop?._id || 'HS-JAI',
+            propertyId: b.propertyId || prop?._id || 'HS-9HQ8P',
             room: b.room || b.roomType || 'Standard Room',
             roomNumber: b.roomNumber || extractRoomNumber(b.room) || '101',
             amount: isPaid ? (totalAmount - balance || totalAmount) : totalAmount,
@@ -1893,7 +1922,7 @@ router.post('/payments/pay-balance', async (req, res) => {
     }
     await booking.save();
 
-    const propId = booking.propertyId || req.user?.propertyId || 'HS-JAI';
+    const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
     const guestName = booking.guest || req.user.name || 'Valued Guest';
     const refId = booking.bookingId || booking._id || booking.id;
 
@@ -2255,7 +2284,7 @@ router.post('/delete-account-request', async (req, res) => {
       category: 'Guest Account',
       submittedBy: user.name,
       status: 'Pending',
-      propertyId: user.propertyId || 'HS-JAI'
+      propertyId: user.propertyId || 'HS-9HQ8P'
     });
 
     return sendSuccess(res, 200, {}, 'Your account deletion request has been submitted to support and will be processed within 48 hours.');

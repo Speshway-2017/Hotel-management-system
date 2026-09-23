@@ -187,19 +187,47 @@ export function UnifiedPaymentDetailsView({ role = "admin" }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/40 font-semibold">
-                  <tr>
-                    <td className="py-3 font-bold text-navy">Room Tariff & Accommodation Charges</td>
-                    <td className="py-3 text-muted-foreground">Room Plan Charges</td>
-                    <td className="py-3 text-right font-bold text-navy">₹{Math.round(payment.amount / 1.18).toLocaleString()}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 font-bold text-navy">Integrated Goods & Service Tax (IGST 18%)</td>
-                    <td className="py-3 text-muted-foreground">Statutory GST Slab</td>
-                    <td className="py-3 text-right font-bold text-navy">₹{(payment.amount - Math.round(payment.amount / 1.18)).toLocaleString()}</td>
-                  </tr>
+                  {Number(payment.discountAmount || 0) > 0 ? (
+                    <>
+                      <tr>
+                        <td className="py-3 font-bold text-navy">Room Tariff & Accommodation Charges</td>
+                        <td className="py-3 text-muted-foreground">Standard Room Plan</td>
+                        <td className="py-3 text-right font-bold text-navy">
+                          ₹{Math.round(Number(payment.originalAmount || (Number(payment.amount) + Number(payment.discountAmount))) / 1.18).toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-bold text-navy">Statutory GST (18%)</td>
+                        <td className="py-3 text-muted-foreground">GST Taxes</td>
+                        <td className="py-3 text-right font-bold text-navy">
+                          ₹{(Number(payment.originalAmount || (Number(payment.amount) + Number(payment.discountAmount))) - Math.round(Number(payment.originalAmount || (Number(payment.amount) + Number(payment.discountAmount))) / 1.18)).toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr className="text-emerald-700 bg-emerald-50/40">
+                        <td className="py-3 font-bold">Coupon Promo Discount ({payment.couponCode || 'PROMO'})</td>
+                        <td className="py-3 text-emerald-600">Promo Code Deduction</td>
+                        <td className="py-3 text-right font-bold">
+                          -₹{Number(payment.discountAmount).toLocaleString()}
+                        </td>
+                      </tr>
+                    </>
+                  ) : (
+                    <>
+                      <tr>
+                        <td className="py-3 font-bold text-navy">Room Tariff & Accommodation Charges</td>
+                        <td className="py-3 text-muted-foreground">Room Plan Charges</td>
+                        <td className="py-3 text-right font-bold text-navy">₹{Math.round(payment.amount / 1.18).toLocaleString()}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-bold text-navy">Integrated Goods & Service Tax (IGST 18%)</td>
+                        <td className="py-3 text-muted-foreground">Statutory GST Slab</td>
+                        <td className="py-3 text-right font-bold text-navy">₹{(payment.amount - Math.round(payment.amount / 1.18)).toLocaleString()}</td>
+                      </tr>
+                    </>
+                  )}
                   <tr className="bg-muted/15 font-black text-sm">
                     <td className="py-3 px-2 text-navy" colSpan="2">Total Paid Amount</td>
-                    <td className="py-3 px-2 text-right text-emerald-600 font-display">₹{payment.amount.toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right text-emerald-600 font-display">₹{Number(payment.amount || 0).toLocaleString()}</td>
                   </tr>
                 </tbody>
               </table>

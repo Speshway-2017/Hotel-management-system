@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import { CalendarPlus } from "lucide-react";
+import { validateWithZod, walkInBookingSchema } from "@/schemas";
 
 function EditReservation() {
   const params = useParams() || {};
@@ -18,6 +19,7 @@ function EditReservation() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [booking, setBooking] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form states
   const [guest, setGuest] = useState("");
@@ -230,6 +232,29 @@ function EditReservation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const val = validateWithZod(walkInBookingSchema, {
+      guest,
+      phone,
+      email: email || undefined,
+      idProofType,
+      idProofNumber,
+      room,
+      checkIn,
+      checkOut,
+      nights: Number(nights) || 1,
+      amount,
+      balance: balance ? Number(balance) : 0,
+      pax
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
+      return;
+    }
+    setFieldErrors({});
+
     setSaving(true);
     try {
       const payload = {
@@ -308,34 +333,43 @@ function EditReservation() {
           ) : (
             <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Guest Name" required className="col-span-2" id="guest">
+                <FormField label="Guest Name" required className="col-span-2" id="guest" status={fieldErrors.guest ? "error" : undefined} errorMsg={fieldErrors.guest}>
                   <Input
                     id="guest"
                     type="text"
                     required
                     value={guest}
-                    onChange={(e) => setGuest(e.target.value)}
+                    onChange={(e) => {
+                      setGuest(e.target.value);
+                      if (fieldErrors.guest) setFieldErrors(p => ({ ...p, guest: null }));
+                    }}
                     placeholder="Enter guest's full name"
                   />
                 </FormField>
 
-                <FormField label="Phone Number" required id="phone">
+                <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                   <Input
                     id="phone"
                     type="text"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null }));
+                    }}
                     placeholder="+91 XXXXX XXXXX"
                   />
                 </FormField>
 
-                <FormField label="Email Address" id="email">
+                <FormField label="Email Address" id="email" status={fieldErrors.email ? "error" : undefined} errorMsg={fieldErrors.email}>
                   <Input
                     id="email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: null }));
+                    }}
                     placeholder="guest@example.com"
                   />
                 </FormField>
@@ -355,12 +389,17 @@ function EditReservation() {
                   </Select>
                 </FormField>
 
-                <FormField label="ID Proof Number" id="idProofNumber">
+                <FormField label="ID Proof Number" id="idProofNumber" status={fieldErrors.idProofNumber || fieldErrors.aadhaarNumber ? "error" : undefined} errorMsg={fieldErrors.idProofNumber || fieldErrors.aadhaarNumber}>
                   <Input
                     id="idProofNumber"
                     type="text"
                     value={idProofNumber}
-                    onChange={(e) => setIdProofNumber(e.target.value)}
+                    onChange={(e) => {
+                      setIdProofNumber(e.target.value);
+                      if (fieldErrors.idProofNumber || fieldErrors.aadhaarNumber) {
+                        setFieldErrors(p => ({ ...p, idProofNumber: null, aadhaarNumber: null }));
+                      }
+                    }}
                     placeholder="e.g. 1234 5678 9012"
                   />
                 </FormField>
@@ -450,13 +489,16 @@ function EditReservation() {
                   </Select>
                 </FormField>
 
-                <FormField label="Total Amount" required id="amount">
+                <FormField label="Total Amount" required id="amount" status={fieldErrors.amount ? "error" : undefined} errorMsg={fieldErrors.amount}>
                   <Input
                     id="amount"
                     type="number"
                     required
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      if (fieldErrors.amount) setFieldErrors(p => ({ ...p, amount: null }));
+                    }}
                     placeholder="Total tariff cost"
                     suffix="₹"
                   />

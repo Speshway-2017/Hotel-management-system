@@ -4,8 +4,8 @@
     "guest": "Surya",
     "email": "surya@gmail.com",
     "phone": "+91 47362 54654",
-    "room": "103 · Standard Room",
-    "roomNumber": "103",
+    "room": "Unassigned",
+    "roomNumber": "",
     "roomType": "Standard Room",
     "checkIn": "2026-09-24",
     "checkOut": "2026-09-26",
@@ -17,8 +17,10 @@
     "totalAmount": 8500,
     "balance": 0,
     "paymentStatus": "Paid",
-    "propertyId": "HS-JAI",
-    "updatedAt": "2026-09-22T07:16:23.386Z"
+    "propertyId": "HS-9HQ8P",
+    "updatedAt": "2026-09-22T07:16:23.386Z",
+    "hotelId": "HS-9HQ8P",
+    "createdAt": "2026-09-22T07:16:23.386Z"
   },
   {
     "bookingId": "BK-10101",
@@ -39,15 +41,29 @@
     "balance": 0,
     "paymentStatus": "Paid",
     "propertyId": "HS-9HQ8P",
-    "updatedAt": "2026-09-22T08:00:00.000Z"
+    "updatedAt": "2026-09-22T16:49:20.000Z",
+    "id": "BK-10101",
+    "guestName": "Mounika",
+    "name": "Mounika",
+    "dates": "2026-09-22 → 2026-09-24",
+    "paidAmount": 11400,
+    "hotelId": "HS-9HQ8P",
+    "hotel": "Speshway Luxury Hotel",
+    "hotelName": "Speshway Luxury Hotel",
+    "propertyName": "Speshway Luxury Hotel",
+    "city": "Madhapur, Hyderabad",
+    "idVerification": "Verified",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "2355 4563 7654",
+    "createdAt": "2026-09-22T09:15:00.000Z"
   },
   {
     "bookingId": "BK-10102",
     "guest": "Mani",
     "email": "mani@gmail.com",
     "phone": "+91 98765 43210",
-    "room": "103 · Standard Room",
-    "roomNumber": "103",
+    "room": "Unassigned",
+    "roomNumber": "",
     "roomType": "Standard Room",
     "checkIn": "2026-09-18",
     "checkOut": "2026-09-21",
@@ -59,16 +75,18 @@
     "totalAmount": 8500,
     "balance": 0,
     "paymentStatus": "Paid",
-    "propertyId": "HS-JAI",
-    "updatedAt": "2026-09-22T08:00:00.000Z"
+    "propertyId": "HS-9HQ8P",
+    "updatedAt": "2026-09-22T08:00:00.000Z",
+    "hotelId": "HS-9HQ8P",
+    "createdAt": "2026-09-22T08:00:00.000Z"
   },
   {
     "bookingId": "BK-20202",
     "guest": "Aswini",
     "email": "aswini@gmail.com",
     "phone": "+91 98840 20203",
-    "room": "202 · Deluxe Room",
-    "roomNumber": "202",
+    "room": "Unassigned",
+    "roomNumber": "",
     "roomType": "Deluxe Room",
     "checkIn": "2026-09-02",
     "checkOut": "2026-09-05",
@@ -80,15 +98,17 @@
     "totalAmount": 14500,
     "balance": 0,
     "paymentStatus": "Paid",
-    "propertyId": "HS-JAI"
+    "propertyId": "HS-9HQ8P",
+    "hotelId": "HS-9HQ8P",
+    "createdAt": "2026-09-02T09:00:00.000Z"
   },
   {
     "bookingId": "BK-10202",
     "guest": "Vamsi",
     "email": "vamsi@gmail.com",
     "phone": "+91 98765 10202",
-    "room": "102 · Standard Room",
-    "roomNumber": "102",
+    "room": "Unassigned",
+    "roomNumber": "",
     "roomType": "Standard Room",
     "checkIn": "2026-09-25",
     "checkOut": "2026-09-27",
@@ -100,16 +120,18 @@
     "totalAmount": 7000,
     "balance": 0,
     "paymentStatus": "Paid",
-    "propertyId": "HS-JAI",
-    "updatedAt": "2026-09-22T07:16:23.390Z"
+    "propertyId": "HS-9HQ8P",
+    "updatedAt": "2026-09-22T07:16:23.390Z",
+    "hotelId": "HS-9HQ8P",
+    "createdAt": "2026-09-22T07:16:23.390Z"
   },
   {
     "bookingId": "BK-30101",
     "guest": "Sai",
     "email": "sai@gmail.com",
     "phone": "+91 98765 10404",
-    "room": "301 · Executive Suite",
-    "roomNumber": "301",
+    "room": "Unassigned",
+    "roomNumber": "",
     "roomType": "Executive Suite",
     "checkIn": "2026-09-26",
     "checkOut": "2026-09-28",
@@ -121,8 +143,10 @@
     "totalAmount": 21000,
     "balance": 0,
     "paymentStatus": "Paid",
-    "propertyId": "HS-JAI",
-    "updatedAt": "2026-09-22T07:16:23.392Z"
+    "propertyId": "HS-9HQ8P",
+    "updatedAt": "2026-09-22T07:16:23.392Z",
+    "hotelId": "HS-9HQ8P",
+    "createdAt": "2026-09-22T07:16:23.392Z"
   },
   {
     "bookingId": "BK-20101",
@@ -144,7 +168,21 @@
     "balance": 0,
     "paymentStatus": "Paid",
     "propertyId": "HS-9HQ8P",
-    "updatedAt": "2026-09-22T08:00:00.000Z"
+    "updatedAt": "2026-09-22T16:49:20.000Z",
+    "id": "BK-20101",
+    "guestName": "Sunny",
+    "name": "Sunny",
+    "dates": "2026-09-22 → 2026-09-24",
+    "paidAmount": 9500,
+    "hotelId": "HS-9HQ8P",
+    "hotel": "Speshway Luxury Hotel",
+    "hotelName": "Speshway Luxury Hotel",
+    "propertyName": "Speshway Luxury Hotel",
+    "city": "Madhapur, Hyderabad",
+    "idVerification": "Verified",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "6353 7576 4646",
+    "createdAt": "2026-09-22T08:30:00.000Z"
   },
   {
     "bookingId": "BK-10201",
@@ -165,6 +203,12 @@
     "totalAmount": 7500,
     "balance": 0,
     "paymentStatus": "Paid",
-    "propertyId": "HS-JAI"
+    "propertyId": "HS-9HQ8P",
+    "hotelId": "HS-9HQ8P",
+    "createdAt": "2026-09-05T09:00:00.000Z",
+    "hotel": "Speshway Luxury Hotel",
+    "hotelName": "Speshway Luxury Hotel",
+    "propertyName": "Speshway Luxury Hotel",
+    "city": "Madhapur, Hyderabad"
   }
 ]

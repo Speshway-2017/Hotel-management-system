@@ -301,7 +301,7 @@ export function AdminViewFeedbackPage() {
                 <div className="p-3 bg-cream/20 rounded-xl border border-navy/5">
                   <span className="text-[10px] font-bold text-navy/50 uppercase block">Property</span>
                   <strong className="text-navy font-bold text-sm block mt-0.5">
-                    {feedback.propertyId || "HS-JAI"}
+                    {feedback.propertyId || "HS-9HQ8P"}
                   </strong>
                 </div>
               </div>

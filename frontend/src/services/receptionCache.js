@@ -210,7 +210,7 @@ class ReceptionDataCache {
         receptionistService.getReservations().then(res => {
           if (res?.success && res.data) {
             const list = res.data.map(r => {
-              const cleanRmNum = extractRoomNumber(r);
+              const cleanRmNum = extractRoomNumber(r) || (r.roomNumber ? String(r.roomNumber) : "");
               const rmNum = cleanRmNum || "Unassigned";
               const rmType = r.roomType || (r.room && r.room.includes('·') ? r.room.split('·')[1]?.trim() : (r.room && !r.room.match(/\b\d{3,4}\b/) ? r.room : (cleanRmNum?.startsWith('2') ? 'Deluxe Room' : cleanRmNum?.startsWith('3') ? 'Executive Suite' : cleanRmNum?.startsWith('4') ? 'Presidential Suite' : 'Standard Room')));
               return {

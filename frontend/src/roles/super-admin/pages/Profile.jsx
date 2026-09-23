@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { User, Shield, Lock, LogOut, Mail, Phone, Edit3, Eye, EyeOff, Camera } from "lucide-react";
 import { authService } from "@/services/auth";
+import { validateWithZod, staffSchema, changePasswordSchema } from "@/schemas";
 
 function SuperAdminProfile() {
   const currentUser = authService.getCurrentUser() || {
@@ -19,6 +20,8 @@ function SuperAdminProfile() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [profileErrors, setProfileErrors] = useState({});
+  const [passwordErrors, setPasswordErrors] = useState({});
   const [profileData, setProfileData] = useState({
     name: currentUser.name || "Nandini Rao Rao",
     email: currentUser.email || "superadmin@hourstay.com",
@@ -98,6 +101,23 @@ function SuperAdminProfile() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    const validation = validateWithZod(staffSchema, {
+      name: profileData.name,
+      email: profileData.email,
+      phone: profileData.phone
+    });
+
+    if (!validation.isValid) {
+      setProfileErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      setNotification({
+        tone: "error",
+        title: "Validation Error",
+        body: firstError
+      });
+      return;
+    }
+    setProfileErrors({});
     setIsEditing(false);
     
     try {
@@ -131,14 +151,23 @@ function SuperAdminProfile() {
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmNewPassword) {
+    const validation = validateWithZod(changePasswordSchema, {
+      currentPassword: passwordData.currentPassword,
+      newPassword: passwordData.newPassword,
+      confirmPassword: passwordData.confirmNewPassword
+    });
+
+    if (!validation.isValid) {
+      setPasswordErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
       setNotification({
         tone: "error",
-        title: "Password Mismatch",
-        body: "New passwords do not match."
+        title: "Validation Error",
+        body: firstError
       });
       return;
     }
+    setPasswordErrors({});
     
     try {
       const res = await authService.changePassword(passwordData.currentPassword, passwordData.newPassword);
@@ -299,18 +328,30 @@ function SuperAdminProfile() {
                     <Input
                       id="edit-name"
                       value={profileData.name}
-                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      onChange={(e) => {
+                        setProfileData({ ...profileData, name: e.target.value });
+                        if (profileErrors.name) setProfileErrors({ ...profileErrors, name: undefined });
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.name ? "border-rose-500" : "border-muted"} font-semibold text-navy bg-cream/10`}
                     />
+                    {profileErrors.name && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.name}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
                     <Input
                       id="edit-phone"
                       value={profileData.phone}
-                      onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10"
+                      onChange={(e) => {
+                        setProfileData({ ...profileData, phone: e.target.value });
+                        if (profileErrors.phone) setProfileErrors({ ...profileErrors, phone: undefined });
+                      }}
+                      className={`h-10 text-xs border ${profileErrors.phone ? "border-rose-500" : "border-muted"} font-semibold text-navy bg-cream/10`}
                     />
+                    {profileErrors.phone && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{profileErrors.phone}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2.5 pt-3">
@@ -336,8 +377,11 @@ function SuperAdminProfile() {
                       id="current-pw"
                       type={showPass.current ? "text" : "password"}
                       value={passwordData.currentPassword}
-                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                      className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                      onChange={(e) => {
+                        setPasswordData({ ...passwordData, currentPassword: e.target.value });
+                        if (passwordErrors.currentPassword) setPasswordErrors({ ...passwordErrors, currentPassword: undefined });
+                      }}
+                      className={`h-10 text-xs border ${passwordErrors.currentPassword ? "border-rose-500" : "border-muted"} font-semibold text-navy bg-cream/10 pr-10`}
                       placeholder="••••••••"
                     />
                     <button
@@ -348,6 +392,9 @@ function SuperAdminProfile() {
                       {showPass.current ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   </div>
+                  {passwordErrors.currentPassword && (
+                    <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.currentPassword}</p>
+                  )}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -357,8 +404,11 @@ function SuperAdminProfile() {
                         id="new-pw"
                         type={showPass.new ? "text" : "password"}
                         value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        onChange={(e) => {
+                          setPasswordData({ ...passwordData, newPassword: e.target.value });
+                          if (passwordErrors.newPassword) setPasswordErrors({ ...passwordErrors, newPassword: undefined });
+                        }}
+                        className={`h-10 text-xs border ${passwordErrors.newPassword ? "border-rose-500" : "border-muted"} font-semibold text-navy bg-cream/10 pr-10`}
                         placeholder="••••••••"
                       />
                       <button
@@ -369,6 +419,9 @@ function SuperAdminProfile() {
                         {showPass.new ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    {passwordErrors.newPassword && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.newPassword}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="confirm-new-pw" className="text-navy font-semibold text-xs">Confirm New Password</Label>
@@ -377,8 +430,11 @@ function SuperAdminProfile() {
                         id="confirm-new-pw"
                         type={showPass.confirm ? "text" : "password"}
                         value={passwordData.confirmNewPassword}
-                        onChange={(e) => setPasswordData({ ...passwordData, confirmNewPassword: e.target.value })}
-                        className="h-10 text-xs border border-muted font-semibold text-navy bg-cream/10 pr-10"
+                        onChange={(e) => {
+                          setPasswordData({ ...passwordData, confirmNewPassword: e.target.value });
+                          if (passwordErrors.confirmPassword) setPasswordErrors({ ...passwordErrors, confirmPassword: undefined });
+                        }}
+                        className={`h-10 text-xs border ${passwordErrors.confirmPassword ? "border-rose-500" : "border-muted"} font-semibold text-navy bg-cream/10 pr-10`}
                         placeholder="••••••••"
                       />
                       <button
@@ -389,6 +445,9 @@ function SuperAdminProfile() {
                         {showPass.confirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    {passwordErrors.confirmPassword && (
+                      <p className="text-[11px] font-bold text-rose-600 mt-1">{passwordErrors.confirmPassword}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2.5 pt-3">

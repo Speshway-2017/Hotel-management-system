@@ -40,7 +40,7 @@ function AdminViewApproval() {
       bookingId: matched.bookingId || ("BK26-" + String(aid).substring(0, 4).toUpperCase()),
       guest: matched.guest || "Stay Folio Request",
       type: matched.category === "Discount" ? "Discounts" : matched.category === "Refund" ? "Refunds" : matched.category === "Upgrade" ? "Complimentary Upgrades" : (matched.category || "Override Request"),
-      propertyId: matched.propertyId || "HS-JAI",
+      propertyId: matched.propertyId || "HS-9HQ8P",
       propertyName: matched.propertyName || "Speshway Luxury Hotel",
       amountChange: matched.amount > 0 ? `₹${Number(matched.amount).toLocaleString('en-IN')}` : "Value Override",
       originalValue: matched.originalValue || (matched.amount > 0 ? `₹${Number(matched.amount).toLocaleString('en-IN')}` : "--"),

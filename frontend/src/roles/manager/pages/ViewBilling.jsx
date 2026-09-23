@@ -59,9 +59,14 @@ function ManagerViewBilling() {
         if (billingRes.success && billingRes.data) {
           const list = billingRes.data.map((r, idx) => {
             const rid = r._id || r.id;
-            const totalAmount = r.amount || 4500;
-            const balance = r.balance === undefined ? totalAmount : r.balance;
-            const paidAmount = Math.max(0, totalAmount - balance);
+            const totalAmount = Number(r.totalAmount !== undefined && r.totalAmount !== null ? r.totalAmount : (r.amount || 0));
+            const balance = r.balance === undefined ? 0 : Number(r.balance);
+            const paidAmount = r.paidAmount !== undefined ? Number(r.paidAmount) : Math.max(0, totalAmount - balance);
+            const discountAmount = Number(r.discountAmount || r.discount || 0);
+            const couponCode = r.couponCode || null;
+            const originalAmount = Number(r.originalAmount || (totalAmount + discountAmount));
+            const baseRoomCharges = Math.round(originalAmount / 1.18);
+            const gstTaxes = originalAmount - baseRoomCharges;
             const paymentStatus = balance === 0 ? "Paid" : balance === totalAmount ? "Unpaid" : "Partial";
             const invoiceStatus = r.status === "Cancelled" ? "Cancelled" : "Issued";
 
@@ -72,10 +77,11 @@ function ManagerViewBilling() {
               room: r.room || "101",
               checkIn: r.checkIn,
               checkOut: r.checkOut,
-              roomCharges: Math.round(totalAmount * 0.75),
-              serviceCharges: Math.round(totalAmount * 0.1),
-              discounts: Math.round(totalAmount * 0.05),
-              taxes: totalAmount - (Math.round(totalAmount * 0.75) + Math.round(totalAmount * 0.1) - Math.round(totalAmount * 0.05)),
+              roomCharges: baseRoomCharges,
+              serviceCharges: 0,
+              discounts: discountAmount,
+              couponCode: couponCode,
+              taxes: gstTaxes,
               totalAmount,
               paidAmount,
               balance,
@@ -249,16 +255,20 @@ function ManagerViewBilling() {
                   <span className="text-muted-foreground">Room Tariff Charges</span>
                   <span className="font-mono text-navy-deep">{formatRupee(invoice.roomCharges)}</span>
                 </div>
+                {invoice.serviceCharges > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Add-on / Service Charges</span>
+                    <span className="font-mono text-navy-deep">{formatRupee(invoice.serviceCharges)}</span>
+                  </div>
+                )}
+                {invoice.discounts > 0 && (
+                  <div className="flex justify-between items-center text-emerald-600 font-semibold">
+                    <span>Coupon Promo ({invoice.couponCode || 'APPLIED'})</span>
+                    <span className="font-mono">-{formatRupee(invoice.discounts)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Add-on / Service Charges</span>
-                  <span className="font-mono text-navy-deep">{formatRupee(invoice.serviceCharges)}</span>
-                </div>
-                <div className="flex justify-between items-center text-destructive">
-                  <span>Discounts Applied</span>
-                  <span className="font-mono">-{formatRupee(invoice.discounts)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">GST Taxes (Taxes sum)</span>
+                  <span className="text-muted-foreground">GST Taxes (18% Statutory)</span>
                   <span className="font-mono text-navy-deep">{formatRupee(invoice.taxes)}</span>
                 </div>
                 

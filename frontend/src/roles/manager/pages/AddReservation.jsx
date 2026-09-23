@@ -1,25 +1,29 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Panel, Notice, LoadingRows, Crumbs } from "@/components/hs/kit";
+import { Panel, Notice, LoadingRows, Crumbs, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
+import { CheckCircle2, AlertCircle, Fingerprint, ShieldCheck } from "lucide-react";
+import { validateWithZod, walkInBookingSchema } from "@/schemas";
 
 function ManagerAddReservation() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [rooms, setRooms] = useState([]);
   const [property, setProperty] = useState(null);
+  const [existingGuestAadhaar, setExistingGuestAadhaar] = useState(null);
 
   const [form, setForm] = useState({
     guest: "",
     phone: "",
     email: "",
-    idProofType: "",
+    idProofType: "Aadhaar Card",
     idProofNumber: "",
     roomNumber: "",
     roomType: "",
@@ -36,6 +40,44 @@ function ManagerAddReservation() {
     corporateName: "",
     isGroupBooking: false
   });
+
+  const formatAadhaarInput = (value) => {
+    if (!value) return "";
+    const digits = String(value).replace(/\D/g, "").slice(0, 12);
+    const parts = [];
+    for (let i = 0; i < digits.length; i += 4) {
+      parts.push(digits.substring(i, i + 4));
+    }
+    return parts.join(" ");
+  };
+
+  useEffect(() => {
+    const cleanPhone = String(form.phone || '').replace(/\D/g, '');
+    const cleanEmail = String(form.email || '').trim().toLowerCase();
+    if (cleanPhone.length >= 10 || (cleanEmail && cleanEmail.includes('@') && cleanEmail.includes('.'))) {
+      managerService.lookupGuestAadhaar({ phone: cleanPhone, email: cleanEmail, name: form.guest })
+        .then(res => {
+          if (res?.success && res?.data?.hasExistingAadhaar) {
+            setExistingGuestAadhaar(res.data);
+          } else {
+            setExistingGuestAadhaar(null);
+          }
+        })
+        .catch(() => setExistingGuestAadhaar(null));
+    } else {
+      setExistingGuestAadhaar(null);
+    }
+  }, [form.phone, form.email, form.guest]);
+
+  const cleanAadhaar = form.idProofNumber ? String(form.idProofNumber).replace(/\D/g, '') : '';
+  const isAadhaarType = form.idProofType === 'Aadhaar Card';
+  const isAadhaarMismatch = Boolean(
+    isAadhaarType &&
+    existingGuestAadhaar?.hasExistingAadhaar &&
+    cleanAadhaar.length === 12 &&
+    existingGuestAadhaar.last4 &&
+    !cleanAadhaar.endsWith(existingGuestAadhaar.last4)
+  );
 
   useEffect(() => {
     const user = authService.getCurrentUser();
@@ -161,23 +203,37 @@ function ManagerAddReservation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.guest || !form.phone) {
-      toast.error("Please provide guest full name and contact number.");
+
+    const val = validateWithZod(walkInBookingSchema, {
+      guest: form.guest,
+      phone: form.phone,
+      email: form.email,
+      idProofType: form.idProofType,
+      idProofNumber: isAadhaarType ? cleanAadhaar : form.idProofNumber,
+      roomNumber: form.roomNumber,
+      roomType: form.roomType,
+      checkIn: form.checkIn,
+      checkOut: form.checkOut,
+      amount: form.amount,
+      balance: form.balance,
+      nights: form.nights,
+      pax: form.pax,
+      paymentMethod: form.paymentMethod,
+      notes: form.notes
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      setError(val.firstError);
+      toast.error(val.firstError);
       return;
     }
+    setFieldErrors({});
 
-    if (!form.idProofType || !form.idProofNumber) {
-      toast.error("Government ID Proof Type and Document Number are mandatory.");
-      return;
-    }
-
-    if (!form.checkIn || !form.checkOut) {
-      toast.error("Please select stay Check-In and Check-Out dates.");
-      return;
-    }
-
-    if (!form.roomType) {
-      toast.error("Please select a room category.");
+    if (isAadhaarMismatch) {
+      const msg = `Cannot confirm reservation: The entered Aadhaar does not match the verified Aadhaar on file (${existingGuestAadhaar.maskedAadhaar}) for this guest. The same guest must use their registered Aadhaar across all bookings.`;
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -201,7 +257,7 @@ function ManagerAddReservation() {
         phone: form.phone,
         email: form.email || `${form.guest.toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
         idProofType: form.idProofType,
-        idProofNumber: form.idProofNumber,
+        idProofNumber: isAadhaarType ? cleanAadhaar : form.idProofNumber,
         roomNumber: form.roomNumber || "",
         room: form.roomNumber ? `${form.roomNumber} · ${form.roomType}` : (form.roomType || ""),
         roomType: form.roomType,
@@ -231,8 +287,9 @@ function ManagerAddReservation() {
         toast.error(res.message || "Failed to create reservation");
       }
     } catch (err) {
-      setError(err.message || "Failed to register reservation");
-      toast.error(err.message || "Error creating reservation");
+      const errMsg = err?.response?.data?.message || err.message || "Failed to register reservation";
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setSaving(false);
     }
@@ -240,7 +297,7 @@ function ManagerAddReservation() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">
-      {error && <Notice tone="error" title="Registration Error">{error}</Notice>}
+      {error && <Notice tone="error" title="Reservation Blocked">{error}</Notice>}
 
       {loading ? (
         <LoadingRows rows={5} />
@@ -281,10 +338,17 @@ function ManagerAddReservation() {
                 <Select
                   required
                   value={form.idProofType}
-                  onChange={(e) => setForm({ ...form, idProofType: e.target.value })}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setForm(prev => ({
+                      ...prev,
+                      idProofType: newType,
+                      idProofNumber: newType === "Aadhaar Card" ? formatAadhaarInput(prev.idProofNumber) : prev.idProofNumber
+                    }));
+                  }}
                 >
                   <option value="">Select ID Proof Type</option>
-                  <option value="Aadhaar Card">Aadhaar Card</option>
+                  <option value="Aadhaar Card">Aadhaar Card (UIDAI)</option>
                   <option value="Passport">Passport</option>
                   <option value="Driving License">Driving License</option>
                   <option value="Voter ID">Voter ID</option>
@@ -292,14 +356,55 @@ function ManagerAddReservation() {
                 </Select>
               </FormField>
 
-              <FormField label="ID Proof Document Number *" required>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-navy block">ID Proof Document Number *</label>
+                  {isAadhaarType && existingGuestAadhaar?.hasExistingAadhaar && (
+                    <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
+                      On Record: {existingGuestAadhaar.maskedAadhaar}
+                    </span>
+                  )}
+                </div>
                 <Input
                   required
-                  placeholder="Enter ID number (e.g. 1234 5678 9012)"
+                  placeholder={isAadhaarType ? "Enter 12-digit Aadhaar (e.g. 1234 5678 9012)" : "Enter ID document number"}
                   value={form.idProofNumber}
-                  onChange={(e) => setForm({ ...form, idProofNumber: e.target.value })}
+                  maxLength={isAadhaarType ? 14 : 30}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm(prev => ({
+                      ...prev,
+                      idProofNumber: isAadhaarType ? formatAadhaarInput(val) : val
+                    }));
+                  }}
+                  className={
+                    isAadhaarMismatch
+                      ? "border-rose-500 focus-visible:ring-rose-400 bg-rose-50/30 text-rose-900"
+                      : isAadhaarType && cleanAadhaar.length === 12 && existingGuestAadhaar?.hasExistingAadhaar && cleanAadhaar.endsWith(existingGuestAadhaar.last4)
+                      ? "border-emerald-500 focus-visible:ring-emerald-400 bg-emerald-50/30"
+                      : ""
+                  }
                 />
-              </FormField>
+                {isAadhaarType && (
+                  <div className="mt-1.5">
+                    {isAadhaarMismatch ? (
+                      <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
+                        <AlertCircle className="size-3.5 shrink-0" />
+                        Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is {existingGuestAadhaar.maskedAadhaar}. Booking cannot be confirmed.
+                      </p>
+                    ) : cleanAadhaar.length === 12 && existingGuestAadhaar?.hasExistingAadhaar && cleanAadhaar.endsWith(existingGuestAadhaar.last4) ? (
+                      <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                        <CheckCircle2 className="size-3.5 shrink-0" />
+                        Matches verified guest record on file ({existingGuestAadhaar.maskedAadhaar}).
+                      </p>
+                    ) : cleanAadhaar.length > 0 && cleanAadhaar.length < 12 ? (
+                      <p className="text-[10px] text-muted-foreground">
+                        {12 - cleanAadhaar.length} digit(s) remaining (12 digits required)
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
 
               <FormField label="Guest Capacity (Pax)">
                 <Select
@@ -466,10 +571,10 @@ function ManagerAddReservation() {
             </Button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || isAadhaarMismatch}
               className="h-9 px-6 text-xs font-bold bg-[#0d1b2a] text-white hover:bg-[#1a2e40] active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-md hover:shadow-lg transition-all rounded-lg border border-navy/30 flex items-center gap-2"
             >
-              {saving ? "Registering..." : (form.source === "Walk-in" ? "Complete Walk-In Check-In" : "Confirm New Reservation")}
+              {saving ? "Registering..." : isAadhaarMismatch ? "Aadhaar Mismatch - Resolve Before Confirming" : (form.source === "Walk-in" ? "Complete Walk-In Check-In" : "Confirm New Reservation")}
             </button>
           </div>
         </form>

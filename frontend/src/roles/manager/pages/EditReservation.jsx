@@ -8,6 +8,7 @@ import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
+import { validateWithZod, walkInBookingSchema } from "@/schemas";
 
 function ManagerEditReservation() {
   const params = useParams() || {};
@@ -18,6 +19,7 @@ function ManagerEditReservation() {
   const [error, setError] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form states
   const [guest, setGuest] = useState("");
@@ -139,6 +141,28 @@ function ManagerEditReservation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const val = validateWithZod(walkInBookingSchema, {
+      guest,
+      phone,
+      room,
+      roomType,
+      checkIn,
+      checkOut,
+      nights: Number(nights) || 1,
+      amount,
+      balance: balance ? Number(balance) : 0,
+      pax,
+      notes
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
+      return;
+    }
+    setFieldErrors({});
+
     setSaving(true);
     try {
       const payload = {
@@ -214,19 +238,25 @@ function ManagerEditReservation() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <Panel title="Guest Identification" description="Contact and identification parameters">
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Guest Full Name" required>
+              <FormField label="Guest Full Name" required status={fieldErrors.guest ? "error" : undefined} errorMsg={fieldErrors.guest}>
                 <Input
                   required
                   value={guest}
-                  onChange={(e) => setGuest(e.target.value)}
+                  onChange={(e) => {
+                    setGuest(e.target.value);
+                    if (fieldErrors.guest) setFieldErrors(p => ({ ...p, guest: null }));
+                  }}
                 />
               </FormField>
 
-              <FormField label="Contact Phone Number" required>
+              <FormField label="Contact Phone Number" required status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   required
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null }));
+                  }}
                 />
               </FormField>
             </div>
@@ -320,11 +350,14 @@ function ManagerEditReservation() {
                 </Select>
               </FormField>
 
-              <FormField label="Total Tariff (₹)">
+              <FormField label="Total Tariff (₹)" status={fieldErrors.amount ? "error" : undefined} errorMsg={fieldErrors.amount}>
                 <Input
                   type="number"
                   value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                  onChange={(e) => {
+                    setAmount(Number(e.target.value) || 0);
+                    if (fieldErrors.amount) setFieldErrors(p => ({ ...p, amount: null }));
+                  }}
                 />
               </FormField>
 

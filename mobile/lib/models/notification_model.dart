@@ -16,7 +16,7 @@ class NotificationModel {
     required this.message,
     this.category = 'Operations',
     this.isRead = false,
-    this.propertyId = 'HS-JAI',
+    this.propertyId = 'HS-9HQ8P',
     this.createdAt = '',
     String? type,
   });
@@ -28,7 +28,7 @@ class NotificationModel {
       message: json['message']?.toString() ?? '',
       category: (json['category'] ?? json['type'] ?? 'Operations').toString(),
       isRead: json['isRead'] == true,
-      propertyId: json['propertyId']?.toString() ?? 'HS-JAI',
+      propertyId: json['propertyId']?.toString() ?? 'HS-9HQ8P',
       createdAt: json['createdAt']?.toString() ?? '',
     );
   }

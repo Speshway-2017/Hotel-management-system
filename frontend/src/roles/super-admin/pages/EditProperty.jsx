@@ -5,6 +5,8 @@ import { PageHeader, Panel, Notice, LoadingRows } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { validateWithZod, propertySchema } from "@/schemas";
+import { toast } from "sonner";
 
 function EditProperty() {
   const params = useParams() || {};
@@ -13,6 +15,7 @@ function EditProperty() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   const [propertyForm, setPropertyForm] = useState({
@@ -73,6 +76,15 @@ function EditProperty() {
 
   const handlePropertySubmit = async (e) => {
     e.preventDefault();
+    const validation = validateWithZod(propertySchema, propertyForm);
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please correct the highlighted errors.");
+      return;
+    }
+    setFieldErrors({});
+
     setSubmitting(true);
     setError(null);
     try {
@@ -89,6 +101,7 @@ function EditProperty() {
 
       const res = await superAdminService.updateProperty(id, payload);
       if (res.success) {
+        toast.success(`Property "${propertyForm.name}" updated successfully.`);
         navigate({ to: "/super-admin/properties" });
       }
     } catch (err) {
@@ -115,45 +128,81 @@ function EditProperty() {
           </div>
         ) : (
           <form onSubmit={handlePropertySubmit} className="max-w-2xl p-6 space-y-5 text-left font-sans">
-            <FormField label="Hotel Property Name" required id="prop-name">
+            <FormField
+              label="Hotel Property Name"
+              required
+              id="prop-name"
+              status={fieldErrors.name ? "error" : undefined}
+              errorMsg={fieldErrors.name}
+            >
               <Input
                 id="prop-name"
                 required
                 value={propertyForm.name}
-                onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                onChange={(e) => {
+                  setPropertyForm({ ...propertyForm, name: e.target.value });
+                  if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: undefined });
+                }}
                 placeholder="e.g. Hour Stay Rambagh Residency"
               />
             </FormField>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Location City" required id="prop-city">
+              <FormField
+                label="Location City"
+                required
+                id="prop-city"
+                status={fieldErrors.city ? "error" : undefined}
+                errorMsg={fieldErrors.city}
+              >
                 <Input
                   id="prop-city"
                   required
                   value={propertyForm.city}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
+                  onChange={(e) => {
+                    setPropertyForm({ ...propertyForm, city: e.target.value });
+                    if (fieldErrors.city) setFieldErrors({ ...fieldErrors, city: undefined });
+                  }}
                   placeholder="e.g. Jaipur"
                 />
               </FormField>
-              <FormField label="Property Category" required id="prop-type">
+              <FormField
+                label="Property Category"
+                required
+                id="prop-type"
+                status={fieldErrors.propertyType ? "error" : undefined}
+                errorMsg={fieldErrors.propertyType}
+              >
                 <Input
                   id="prop-type"
                   required
                   value={propertyForm.propertyType}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, propertyType: e.target.value })}
+                  onChange={(e) => {
+                    setPropertyForm({ ...propertyForm, propertyType: e.target.value });
+                    if (fieldErrors.propertyType) setFieldErrors({ ...fieldErrors, propertyType: undefined });
+                  }}
                   placeholder="e.g. Heritage Haveli"
                 />
               </FormField>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <FormField label="Total Room Keys" required id="prop-rooms">
+              <FormField
+                label="Total Room Keys"
+                required
+                id="prop-rooms"
+                status={fieldErrors.rooms ? "error" : undefined}
+                errorMsg={fieldErrors.rooms}
+              >
                 <Input
                   id="prop-rooms"
                   type="number"
                   required
                   value={propertyForm.rooms}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, rooms: Number(e.target.value) })}
+                  onChange={(e) => {
+                    setPropertyForm({ ...propertyForm, rooms: Number(e.target.value) });
+                    if (fieldErrors.rooms) setFieldErrors({ ...fieldErrors, rooms: undefined });
+                  }}
                 />
               </FormField>
               <FormField label="Onboarding Status" id="prop-status">

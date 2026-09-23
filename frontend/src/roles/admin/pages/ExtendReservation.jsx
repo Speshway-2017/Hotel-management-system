@@ -16,6 +16,7 @@ import {
   Sparkles, Check, ChevronRight, User, ShieldCheck, 
   AlertCircle, Info, Building, ArrowRight, Receipt, Plus
 } from "lucide-react";
+import { validateWithZod, extendStaySchema } from "@/schemas";
 
 // Formatting helpers
 function parseDateString(str) {
@@ -242,8 +243,25 @@ function AdminExtendReservation() {
 
   const handleConfirmExtend = async (e) => {
     if (e) e.preventDefault();
+    const statusLower = String(booking?.status || '').toLowerCase().trim();
+    if (['checked-out', 'checked out', 'completed', 'cancelled', 'canceled'].includes(statusLower)) {
+      toast.error("Cannot extend stay for a checked-out booking.");
+      return;
+    }
     if (!calculation.isValid) {
       toast.error("Please select a new check-out date/time that is after the current check-out.");
+      return;
+    }
+
+    const val = validateWithZod(extendStaySchema, {
+      extendDays: calculation.additionalNights > 0 ? calculation.additionalNights : (calculation.totalHours / 24),
+      newCheckOut: newCheckOutDate,
+      additionalAmount: calculation.totalAdditionalAmount,
+      notes: notes || undefined
+    });
+
+    if (!val.isValid) {
+      toast.error(val.firstError);
       return;
     }
 
@@ -344,6 +362,18 @@ function AdminExtendReservation() {
           </p>
         </div>
       </div>
+
+      {['checked-out', 'checked out', 'completed', 'cancelled', 'canceled'].includes(String(booking.status || '').toLowerCase().trim()) && (
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center gap-3">
+          <AlertCircle className="size-5 text-amber-600 shrink-0" />
+          <div>
+            <h4 className="font-bold text-sm">Stay Already Checked-Out</h4>
+            <p className="text-xs text-amber-800">
+              This reservation has been marked as <strong>Checked-out</strong>. Extending stay duration is only permitted for active in-house stays.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 2. Main Grid Layout */}
       <form onSubmit={handleConfirmExtend} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

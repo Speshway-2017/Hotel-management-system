@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Bed, ArrowLeft, Upload, Trash2, Save } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
+import { validateWithZod, roomSchema } from "@/schemas";
 
 export const Route = createFileRoute("/admin/rooms/edit/$id")({
   head: () => ({
@@ -25,6 +26,7 @@ function EditRoomPage() {
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState([]);
   const [dbRoomId, setDbRoomId] = useState(targetId);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Load existing room types from database
   const [roomTypes, setRoomTypes] = useState([
@@ -222,17 +224,23 @@ function EditRoomPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!roomNumber) {
-      toast.error("Please enter a room number.");
+
+    const val = validateWithZod(roomSchema, {
+      roomNumber,
+      type: selectedType === "new" ? newTypeName : selectedType,
+      floor,
+      baseRate,
+      capacity
+    });
+
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
+    setFieldErrors({});
 
     const finalRate = Number(baseRate);
-    if (!baseRate || isNaN(finalRate) || finalRate <= 0) {
-      toast.error("Please enter a valid Base Rate (₹) greater than 0.");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -304,13 +312,16 @@ function EditRoomPage() {
           <form onSubmit={handleSubmit} className="p-6 space-y-5 text-left">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Room Number" required id="roomNumber">
+              <FormField label="Room Number" required id="roomNumber" status={fieldErrors.roomNumber ? "error" : undefined} errorMsg={fieldErrors.roomNumber}>
                 <Input
                   id="roomNumber"
                   required
                   placeholder="e.g. 101, 204, 305"
                   value={roomNumber}
-                  onChange={(e) => setRoomNumber(e.target.value)}
+                  onChange={(e) => {
+                    setRoomNumber(e.target.value);
+                    if (fieldErrors.roomNumber) setFieldErrors(p => ({ ...p, roomNumber: null }));
+                  }}
                   className="font-mono font-bold"
                 />
               </FormField>
@@ -403,14 +414,19 @@ function EditRoomPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Base Rate (₹)" required id="baseRate">
+              <FormField label="Base Rate (₹)" required id="baseRate" status={fieldErrors.pricePerNight || fieldErrors.baseRate ? "error" : undefined} errorMsg={fieldErrors.pricePerNight || fieldErrors.baseRate}>
                 <Input
                   id="baseRate"
                   type="number"
                   required
                   placeholder="e.g. 12000"
                   value={baseRate}
-                  onChange={(e) => setBaseRate(e.target.value)}
+                  onChange={(e) => {
+                    setBaseRate(e.target.value);
+                    if (fieldErrors.pricePerNight || fieldErrors.baseRate) {
+                      setFieldErrors(p => ({ ...p, pricePerNight: null, baseRate: null }));
+                    }
+                  }}
                 />
               </FormField>
 

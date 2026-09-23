@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, Input } from "@/components/hs/FormFields";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { validateWithZod, adminUserSchema } from "@/schemas";
 
 function EditAdmin() {
   const params = useParams() || {};
@@ -16,6 +17,7 @@ function EditAdmin() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -70,10 +72,14 @@ function EditAdmin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name) {
-      toast.error("Please enter a name.");
+    const validation = validateWithZod(adminUserSchema, formData);
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please correct the highlighted errors.");
       return;
     }
+    setFieldErrors({});
 
     setSubmitting(true);
     setError(null);
@@ -111,13 +117,22 @@ function EditAdmin() {
       ) : (
         <Panel title="Update Credentials" description="Adjust fields for this administrator.">
           <form onSubmit={handleSubmit} className="p-5 space-y-4 bg-white rounded-b-xl max-w-xl">
-            <FormField label="Full Name" required id="admin-name">
+            <FormField
+              label="Full Name"
+              required
+              id="admin-name"
+              status={fieldErrors.name ? "error" : undefined}
+              errorMsg={fieldErrors.name}
+            >
               <Input
                 id="admin-name"
                 required
                 placeholder="e.g. Vikram Rathore"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: undefined });
+                }}
                 className="h-10 text-xs"
               />
             </FormField>
@@ -133,12 +148,20 @@ function EditAdmin() {
               />
             </FormField>
 
-            <FormField label="Mobile Number" id="admin-mobile">
+            <FormField
+              label="Mobile Number"
+              id="admin-mobile"
+              status={fieldErrors.mobile ? "error" : undefined}
+              errorMsg={fieldErrors.mobile}
+            >
               <Input
                 id="admin-mobile"
                 placeholder="e.g. 98290 11223"
                 value={formData.mobile}
-                onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, mobile: e.target.value });
+                  if (fieldErrors.mobile) setFieldErrors({ ...fieldErrors, mobile: undefined });
+                }}
                 className="h-10 text-xs"
               />
             </FormField>

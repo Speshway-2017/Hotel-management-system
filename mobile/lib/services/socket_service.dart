@@ -50,9 +50,9 @@ class SocketService {
       _socket!.onConnect((_) {
         _isConnected = true;
         debugPrint('⚡ Socket.IO Connected: ${_socket?.id}');
-        final prop = propertyId ?? 'HS-JAI';
+        final prop = propertyId ?? 'HS-9HQ8P';
         _socket!.emit('join_property', prop);
-        _socket!.emit('join_property', 'HS-JAI');
+        _socket!.emit('join_property', 'HS-9HQ8P');
         _socket!.emit('join_property', 'HS-9HQ8P');
         _socket!.emit('join_property', 'HS-MUM');
         _socket!.emit('join_property', 'HS-UDA');

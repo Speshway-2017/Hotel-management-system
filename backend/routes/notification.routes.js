@@ -27,7 +27,7 @@ const seedNotificationsIfNeeded = async (user) => {
       ]
     });
     if (count === 0) {
-      const propertyId = user.propertyId || 'HS-JAI';
+      const propertyId = user.propertyId || 'HS-9HQ8P';
       if (user.role === 'super-admin') {
         await Notification.create({
           role: 'super-admin',
@@ -173,7 +173,7 @@ router.get('/', protect, async (req, res) => {
           { userId },
           { role: { $in: ['manager', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -183,7 +183,7 @@ router.get('/', protect, async (req, res) => {
           { userId },
           { role: { $in: ['receptionist', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -321,7 +321,7 @@ router.get('/unread-count', protect, async (req, res) => {
           { userId },
           { role: { $in: ['manager', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -331,7 +331,7 @@ router.get('/unread-count', protect, async (req, res) => {
           { userId },
           { role: { $in: ['receptionist', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -463,7 +463,7 @@ const handleMarkNotificationRead = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const prop = existing?.propertyId || req.user?.propertyId || 'HS-JAI';
+      const prop = existing?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, prop, 'unread_notifications_count_updated', { propertyId: prop, userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, 'global', 'unread_notifications_count_updated', { userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, prop, 'dashboard_sync', { action: 'notification_read', id });
@@ -498,7 +498,7 @@ const handleMarkNotificationUnread = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const prop = existing?.propertyId || req.user?.propertyId || 'HS-JAI';
+      const prop = existing?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, prop, 'unread_notifications_count_updated', { propertyId: prop, userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, 'global', 'unread_notifications_count_updated', { userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, prop, 'dashboard_sync', { action: 'notification_unread', id });
@@ -539,7 +539,7 @@ const handleMarkAllNotificationsRead = async (req, res) => {
           { role: null },
           { role: { $exists: false } },
           { propertyId: propId },
-          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' },
           { propertyId: null },
           { propertyId: { $exists: false } }
@@ -553,7 +553,7 @@ const handleMarkAllNotificationsRead = async (req, res) => {
           { role: null },
           { role: { $exists: false } },
           { propertyId: propId },
-          { propertyId: 'HS-JAI' },
+          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -620,7 +620,7 @@ const handleMarkAllNotificationsRead = async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      const targetProp = propId || 'HS-JAI';
+      const targetProp = propId || 'HS-9HQ8P';
       emitRealtimeSync(io, targetProp, 'unread_notifications_count_updated', { propertyId: targetProp, userId });
       emitRealtimeSync(io, 'global', 'unread_notifications_count_updated', { userId });
       emitRealtimeSync(io, targetProp, 'dashboard_sync', { action: 'all_notifications_read' });

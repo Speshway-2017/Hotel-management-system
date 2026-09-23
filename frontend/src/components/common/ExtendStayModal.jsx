@@ -5,6 +5,7 @@ import { managerService } from "@/services/manager";
 import { superAdminService } from "@/services/superAdmin";
 import { receptionistService } from "@/services/receptionist";
 import { emitRealtimeEvent } from "@/services/socket";
+import { validateWithZod, extendStaySchema } from "@/schemas";
 import { 
   Calendar, Clock, DollarSign, Sparkles, X, Plus, AlertCircle, 
   Info, Bed, User, CalendarPlus, Check, ChevronRight, ShieldCheck, ArrowRight
@@ -49,6 +50,19 @@ export function ExtendStayButton({
   title = "Extend guest stay dates"
 }) {
   const navigate = useNavigate();
+
+  // Hide Extend Stay completely after check-out or cancellation
+  const statusLower = String(booking?.status || "").toLowerCase().trim();
+  const isCheckedOut =
+    statusLower === "checked-out" ||
+    statusLower === "checked out" ||
+    statusLower === "completed" ||
+    statusLower === "cancelled" ||
+    statusLower === "canceled";
+
+  if (isCheckedOut) {
+    return null;
+  }
 
   const handleClick = (e) => {
     if (disabled) return;
@@ -199,8 +213,14 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
   };
 
   const handleConfirmExtend = async () => {
-    if (additionalNights <= 0) {
-      toast.error("Please select a new check-out date after current check-out.");
+    const val = validateWithZod(extendStaySchema, {
+      extraDays: additionalNights,
+      additionalAmount: totalAdditionalAmount,
+      reason: notes
+    });
+
+    if (!val.isValid) {
+      toast.error(val.firstError);
       return;
     }
 

@@ -30,7 +30,7 @@ function Confirmation() {
       } catch (e) {}
     }
 
-    const activeId = localStorage.getItem('selected_property_id') || 'HS-JAI';
+    const activeId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
     publicService.getProperty(activeId)
       .then(res => {
         if (res.success && res.data) {

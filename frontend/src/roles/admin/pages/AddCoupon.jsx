@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea, FormField } from "@/components/hs/FormFields";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
+import { validateWithZod, couponSchema } from "@/schemas";
 import {
   Ticket,
   Percent,
@@ -17,6 +18,7 @@ import {
 function AddCoupon() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -44,20 +46,13 @@ function AddCoupon() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.code || !formData.code.trim()) {
-      toast.error("Please enter a valid coupon code.");
+    const val = validateWithZod(couponSchema, formData);
+    if (!val.isValid) {
+      setFieldErrors(val.errors);
+      toast.error(val.firstError);
       return;
     }
-
-    if (Number(formData.discountValue) <= 0) {
-      toast.error("Discount value must be greater than 0.");
-      return;
-    }
-
-    if (new Date(formData.validUntil) < new Date(formData.validFrom)) {
-      toast.error("Expiry date cannot be earlier than start date.");
-      return;
-    }
+    setFieldErrors({});
 
     setLoading(true);
     try {
@@ -104,14 +99,17 @@ function AddCoupon() {
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Coupon Code" required id="code" helper="Unique promotional code (e.g. FESTIVE25, STAY500)">
+              <FormField label="Coupon Code" required id="code" helper="Unique promotional code (e.g. FESTIVE25, STAY500)" status={fieldErrors.code ? "error" : undefined} errorMsg={fieldErrors.code}>
                 <div className="relative">
                   <Input
                     id="code"
                     type="text"
                     required
                     value={formData.code}
-                    onChange={(e) => handleChange("code", e.target.value)}
+                    onChange={(e) => {
+                      handleChange("code", e.target.value);
+                      if (fieldErrors.code) setFieldErrors(p => ({ ...p, code: null }));
+                    }}
                     placeholder="e.g. WELCOME10"
                     className="font-mono font-bold tracking-wider uppercase text-navy"
                   />

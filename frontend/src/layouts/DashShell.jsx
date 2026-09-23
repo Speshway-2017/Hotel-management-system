@@ -1183,6 +1183,7 @@ export function DashShell({ role, children }) {
                 "/super-admin/channel-manager": [{ label: "Channel Manager" }],
                 "/super-admin/contacts": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests" }],
                 "/super-admin/contacts/view": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests", to: "/super-admin/contacts" }, { label: "Inquiry Details" }],
+                "/super-admin/contacts/reply": [{ label: "Operations", to: "/super-admin/properties" }, { label: "Contact Requests", to: "/super-admin/contacts" }, { label: "Reply via Email" }],
                 "/super-admin/branding": [{ label: "Branding" }],
                 "/super-admin/coupons": [{ label: "Promo Coupons" }],
                 "/super-admin/coupons/add": [{ label: "Promo Coupons", to: "/super-admin/coupons" }, { label: "Add Coupon" }],
