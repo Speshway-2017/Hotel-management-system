@@ -308,6 +308,33 @@ export const seedUsers = async () => {
     for (const u of usersData) {
       const exists = await User.findOne({ email: u.email });
       const targetId = u.id || u._id;
+      const userData = {
+        _id: targetId,
+        id: targetId,
+        name: u.name,
+        email: u.email,
+        password: u.password,
+        role: u.role,
+        mobile: u.mobile,
+        propertyId: u.propertyId || 'HS-JAI',
+        status: u.status || 'Active',
+        dept: u.dept || 'Front Desk',
+        shift: u.shift || 'Morning (06:00 - 14:00)',
+        avatar: u.avatar || null,
+        city: u.city || '',
+        state: u.state || '',
+        country: u.country || 'India',
+        address: u.address || '',
+        type: u.type || 'Regular',
+        preferences: u.preferences || '',
+        idDocType: u.idDocType || 'Aadhaar Card',
+        idDocNumber: u.idDocNumber || '',
+        loyaltyPoints: u.loyaltyPoints || 0,
+        notes: u.notes || '',
+        fcmToken: u.fcmToken || null,
+        fcmTokens: u.fcmTokens || []
+      };
+
       if (exists) {
         if (exists._id.toString() !== targetId) {
           if (mongoose.connection.readyState === 1) {
@@ -315,32 +342,25 @@ export const seedUsers = async () => {
           } else {
             await User.findByIdAndDelete(exists._id || exists.id);
           }
-          await User.create({
-            _id: targetId,
-            name: u.name,
-            email: u.email,
-            password: u.password,
-            role: u.role,
-            mobile: u.mobile,
-            propertyId: u.propertyId || 'HS-JAI',
-            status: u.status || 'Active'
-          });
+          await User.create(userData);
           console.log(`🔄 Re-seeded user with correct string ID: ${u.email}`);
-        } else if (u.propertyId && exists.propertyId !== u.propertyId) {
-          exists.propertyId = u.propertyId;
-          await exists.save();
+        } else {
+          // Sync any newly added profile fields if missing
+          const syncFields = {};
+          ['city', 'address', 'state', 'country', 'avatar', 'preferences', 'mobile', 'name'].forEach(field => {
+            if (u[field] && !exists[field]) {
+              syncFields[field] = u[field];
+            }
+          });
+          if (u.propertyId && exists.propertyId !== u.propertyId) {
+            syncFields.propertyId = u.propertyId;
+          }
+          if (Object.keys(syncFields).length > 0) {
+            await User.findOneAndUpdate({ email: u.email }, syncFields);
+          }
         }
       } else {
-        await User.create({
-          _id: targetId,
-          name: u.name,
-          email: u.email,
-          password: u.password,
-          role: u.role,
-          mobile: u.mobile,
-          propertyId: u.propertyId || 'HS-JAI',
-          status: u.status || 'Active'
-        });
+        await User.create(userData);
         console.log(`🌱 Seeded user: ${u.email}`);
       }
     }

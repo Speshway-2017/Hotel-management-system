@@ -27,6 +27,7 @@ import {
   X
 } from "lucide-react";
 import { authService } from "@/services/auth";
+import { subscribeRealtimeSync } from "@/services/socket";
 import { validateWithZod, guestProfileSchema, changePasswordSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/profile")({
@@ -88,6 +89,18 @@ function GuestProfilePage() {
       if (result && result.success && result.data) {
         const fresh = result.data;
         const u = authService.getCurrentUser() || {};
+        const updatedUser = {
+          ...u,
+          name: fresh.name || u?.name || "Guest",
+          email: fresh.email || u?.email || "",
+          mobile: fresh.mobile || fresh.phone || u?.mobile || "",
+          phone: fresh.mobile || fresh.phone || u?.mobile || "",
+          city: fresh.city || "Hyderabad",
+          address: fresh.address || "Hitech City, Hyderabad",
+          country: fresh.country || "India",
+          avatar: fresh.avatar !== undefined ? fresh.avatar : u?.avatar
+        };
+        authService.setUser(updatedUser);
         setProfileData({
           name: fresh.name || u?.name || "Guest",
           email: fresh.email || u?.email || "",
@@ -97,7 +110,7 @@ function GuestProfilePage() {
           country: fresh.country || "India",
           role: "Guest Member",
           status: "Active",
-          avatar: fresh.avatar || null,
+          avatar: fresh.avatar || u?.avatar || null,
           createdAt: fresh.createdAt ? new Date(fresh.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : "August 2026"
         });
       }
@@ -110,6 +123,14 @@ function GuestProfilePage() {
 
   useEffect(() => {
     fetchProfileData();
+    const unsubscribe = subscribeRealtimeSync((event) => {
+      if (event === 'user_updated' || event === 'guest_updated' || event === 'dashboard_sync') {
+        fetchProfileData();
+      }
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleAvatarChange = async (e) => {
@@ -439,6 +460,7 @@ function GuestProfilePage() {
                     <Label htmlFor="edit-name" className="text-navy font-bold text-xs">Full Name</Label>
                     <Input
                       id="edit-name"
+                      nameOnly
                       value={profileData.name}
                       onChange={(e) => {
                         setProfileData(prev => ({ ...prev, name: e.target.value }));
@@ -456,6 +478,7 @@ function GuestProfilePage() {
                     <Label htmlFor="edit-phone" className="text-navy font-bold text-xs">Phone / Mobile</Label>
                     <Input
                       id="edit-phone"
+                      type="tel"
                       value={profileData.phone}
                       onChange={(e) => {
                         setProfileData(prev => ({ ...prev, phone: e.target.value }));
@@ -473,6 +496,7 @@ function GuestProfilePage() {
                     <Label htmlFor="edit-city" className="text-navy font-bold text-xs">City</Label>
                     <Input
                       id="edit-city"
+                      textOnly
                       value={profileData.city}
                       onChange={(e) => {
                         setProfileData(prev => ({ ...prev, city: e.target.value }));
@@ -490,6 +514,7 @@ function GuestProfilePage() {
                     <Label htmlFor="edit-country" className="text-navy font-bold text-xs">Country</Label>
                     <Input
                       id="edit-country"
+                      textOnly
                       value={profileData.country}
                       onChange={(e) => {
                         setProfileData(prev => ({ ...prev, country: e.target.value }));

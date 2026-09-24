@@ -29,6 +29,7 @@ import {
   findExistingVerifiedAadhaar,
   formatAadhaar
 } from '../utils/aadhaarValidator.js';
+import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 
 const router = express.Router();
 
@@ -372,11 +373,7 @@ router.get('/reservations', async (req, res) => {
 router.get('/reservations/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const query = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query.unshift({ _id: id });
-    }
-    const booking = await Booking.findOne({ $or: query });
+    const booking = await Booking.findOne(buildBookingLookupQuery(id));
     if (!booking) return sendError(res, 404, 'Reservation not found');
     return sendSuccess(res, 200, booking, 'Reservation retrieved successfully');
   } catch (err) {
@@ -494,12 +491,7 @@ router.post('/reservations', async (req, res) => {
 router.get('/reservations/:id/guest-aadhaar-status', async (req, res) => {
   try {
     const { id } = req.params;
-    const query = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query.unshift({ _id: id });
-    }
-
-    const booking = await Booking.findOne({ $or: query });
+    const booking = await Booking.findOne(buildBookingLookupQuery(id));
     if (!booking) return sendError(res, 404, 'Reservation not found');
 
     const existingRecord = await findExistingVerifiedAadhaar({
@@ -550,12 +542,7 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
       return sendError(res, 400, 'ID Document Number is required for verification.');
     }
 
-    const query = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query.unshift({ _id: id });
-    }
-
-    const booking = await Booking.findOne({ $or: query });
+    const booking = await Booking.findOne(buildBookingLookupQuery(id));
     if (!booking) return sendError(res, 404, 'Reservation not found');
 
     const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
@@ -596,12 +583,9 @@ router.put('/reservations/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const propId = req.user?.propertyId || 'HS-9HQ8P';
-    const query = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query.unshift({ _id: id });
-    }
+    const lookupQuery = buildBookingLookupQuery(id);
 
-    const existingBooking = await Booking.findOne({ $or: query });
+    const existingBooking = await Booking.findOne(lookupQuery);
     if (!existingBooking) return sendError(res, 404, 'Reservation not found');
 
     const isWebsiteBooking = existingBooking.source && existingBooking.source !== 'Walk-in' && !existingBooking.source.toLowerCase().includes('walk-in');
@@ -678,7 +662,7 @@ router.put('/reservations/:id', async (req, res) => {
     }
 
     const updated = await Booking.findOneAndUpdate(
-      { $or: query },
+      lookupQuery,
       updatePayload,
       { new: true }
     );
@@ -727,14 +711,10 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
     const { id } = req.params;
     const { roomNumber, roomType } = req.body;
     const propId = req.user?.propertyId || 'HS-9HQ8P';
-
-    const query = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query.unshift({ _id: id });
-    }
+    const lookupQuery = buildBookingLookupQuery(id);
 
     const updated = await Booking.findOneAndUpdate(
-      { $or: query },
+      lookupQuery,
       {
         roomNumber: String(roomNumber),
         room: `${roomNumber} · ${roomType || 'Standard Room'}`,
@@ -778,12 +758,9 @@ router.delete('/reservations/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const propId = req.user?.propertyId || 'HS-9HQ8P';
-    const query = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query.unshift({ _id: id });
-    }
+    const lookupQuery = buildBookingLookupQuery(id);
 
-    const deleted = await Booking.findOneAndDelete({ $or: query });
+    const deleted = await Booking.findOneAndDelete(lookupQuery);
     if (!deleted) return sendError(res, 404, 'Reservation not found');
 
     const deletedRoomNum = extractRoomNumber(deleted);
@@ -1033,16 +1010,38 @@ router.get('/guests', async (req, res) => {
     const propId = req.user?.propertyId;
     let query = {};
     if (req.user?.role !== 'super-admin' && propId) {
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }, { propertyId: null }, { propertyId: '' }] };
     }
-    const bookings = await Booking.find(query).sort({ createdAt: -1 });
+    const [bookings, guestUsers] = await Promise.all([
+      Booking.find(query).sort({ createdAt: -1 }),
+      User.find({ role: 'guest' })
+    ]);
+
+    // Build fast lookup map of registered guest user accounts
+    const userMap = new Map();
+    guestUsers.forEach(u => {
+      if (u.email) userMap.set(u.email.toLowerCase().trim(), u);
+      if (u.mobile) userMap.set(u.mobile.replace(/\D/g, ''), u);
+      if (u._id) userMap.set(String(u._id), u);
+      if (u.id) userMap.set(String(u.id), u);
+    });
     
     // Compile unique guests lists
     const guestsMap = {};
     bookings.forEach(b => {
-      const guestName = b.guest || b.guestName || b.customerName;
+      let guestName = b.guest || b.guestName || b.customerName;
       if (!guestName) return;
-      const key = guestName.trim().toLowerCase();
+
+      // Cross-reference registered user profile
+      const userMatch = (b.guestId && userMap.get(String(b.guestId))) ||
+        (b.email && userMap.get(b.email.toLowerCase().trim())) ||
+        (b.phone && userMap.get(String(b.phone).replace(/\D/g, '')));
+
+      if (userMatch && userMatch.name) {
+        guestName = userMatch.name;
+      }
+      
+      const key = (userMatch?.email || b.email || guestName).trim().toLowerCase();
       
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
       const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : (b.room || '--')));
@@ -1052,17 +1051,21 @@ router.get('/guests', async (req, res) => {
       const guestData = {
         id: b._id || b.id || b.bookingId,
         _id: b._id || b.id || b.bookingId,
-        name: guestName,
-        guest: guestName,
-        phone: b.phone || b.mobile || '--',
-        email: b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        name: userMatch?.name || guestName,
+        guest: userMatch?.name || guestName,
+        phone: userMatch?.mobile || userMatch?.phone || b.phone || b.mobile || '--',
+        email: userMatch?.email || b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        avatar: userMatch?.avatar || null,
+        city: userMatch?.city || userMatch?.address || b.city || 'Hyderabad',
+        address: userMatch?.address || userMatch?.city || b.address || '',
         room: rmNum,
         roomNumber: rmNum,
         checkIn: b.checkIn || b.checkInDate || '',
         checkOut: b.checkOut || b.checkOutDate || '',
         status: statusStr,
         paymentStatus: (b.balance === 0 || b.paymentStatus === 'Paid') ? 'Paid' : 'Pending',
-        bookingId: b.bookingId || b._id || b.id
+        bookingId: b.bookingId || b._id || b.id,
+        loyaltyPoints: userMatch?.loyaltyPoints || 0
       };
 
       if (!guestsMap[key]) {
@@ -1072,7 +1075,34 @@ router.get('/guests', async (req, res) => {
         guestsMap[key] = {
           ...guestData,
           phone: guestData.phone !== '--' ? guestData.phone : guestsMap[key].phone,
-          email: guestData.email || guestsMap[key].email
+          email: guestData.email || guestsMap[key].email,
+          avatar: guestData.avatar || guestsMap[key].avatar
+        };
+      }
+    });
+
+    // Also include registered guests who may not have past bookings yet
+    guestUsers.forEach(u => {
+      const key = (u.email || u.name || '').trim().toLowerCase();
+      if (key && !guestsMap[key]) {
+        guestsMap[key] = {
+          id: u.id || u._id,
+          _id: u.id || u._id,
+          name: u.name,
+          guest: u.name,
+          phone: u.mobile || u.phone || '--',
+          email: u.email,
+          avatar: u.avatar || null,
+          city: u.city || u.address || 'Hyderabad',
+          address: u.address || u.city || '',
+          room: '--',
+          roomNumber: '--',
+          checkIn: '',
+          checkOut: '',
+          status: 'Registered',
+          paymentStatus: 'Paid',
+          bookingId: u.id || u._id,
+          loyaltyPoints: u.loyaltyPoints || 0
         };
       }
     });
@@ -1150,10 +1180,7 @@ router.post('/approvals/:id', async (req, res) => {
     let linkedBooking = null;
     if (updated.category === 'Refund' || updated.bookingId) {
       try {
-        const cleanBkId = String(updated.bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
-        const bkQuery = [{ bookingId: updated.bookingId }, { id: updated.bookingId }, { bookingId: cleanBkId }, { id: cleanBkId }];
-        if (mongoose.Types.ObjectId.isValid(cleanBkId)) bkQuery.unshift({ _id: cleanBkId });
-        if (mongoose.Types.ObjectId.isValid(updated.bookingId)) bkQuery.unshift({ _id: updated.bookingId });
+        const bkQuery = buildBookingLookupQuery(updated.bookingId);
 
         const updateSet = {
           'refundRequest.status': finalAction,
@@ -1172,7 +1199,7 @@ router.post('/approvals/:id', async (req, res) => {
         }
 
         linkedBooking = await Booking.findOneAndUpdate(
-          { $or: bkQuery },
+          bkQuery,
           { $set: updateSet },
           { new: true }
         );
@@ -1800,7 +1827,8 @@ router.post('/billing/:id/payment', async (req, res) => {
       return sendError(res, 400, 'amountPaid value parameter required.');
     }
 
-    const booking = await Booking.findOne({ _id: req.params.id, propertyId: req.user.propertyId });
+    const lookupQuery = buildBookingLookupQuery(req.params.id);
+    const booking = await Booking.findOne({ ...lookupQuery, propertyId: req.user.propertyId });
     if (!booking) {
       return sendError(res, 404, 'Invoice folio record not found.');
     }
@@ -2262,12 +2290,9 @@ const handleExtendReservation = async (req, res) => {
     }
 
     const { id } = req.params;
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
+    const bookingQuery = buildBookingLookupQuery(id);
 
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const booking = await Booking.findOne(bookingQuery);
     if (!booking) {
       return sendError(res, 404, 'Booking reservation record not found.');
     }
@@ -2280,7 +2305,7 @@ const handleExtendReservation = async (req, res) => {
 
     const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
-      { $or: bookingQuery },
+      bookingQuery,
       {
         checkOut: newCheckOut,
         nights: Number(booking.nights || 1) + Number(additionalNights),

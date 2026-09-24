@@ -371,6 +371,7 @@ function ReceptionProfilePage() {
                     <Label htmlFor="edit-name" className="text-navy font-semibold text-xs">Full Name</Label>
                     <Input
                       id="edit-name"
+                      nameOnly
                       value={profileData.name}
                       onChange={(e) => {
                         setProfileData(prev => ({ ...prev, name: e.target.value }));
@@ -385,6 +386,7 @@ function ReceptionProfilePage() {
                     <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
                     <Input
                       id="edit-phone"
+                      type="tel"
                       value={profileData.phone}
                       onChange={(e) => {
                         setProfileData(prev => ({ ...prev, phone: e.target.value }));

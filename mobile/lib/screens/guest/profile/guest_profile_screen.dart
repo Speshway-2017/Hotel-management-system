@@ -9,6 +9,7 @@ import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_folio_provider.dart';
 import '../settings/guest_settings_screen.dart';
 import 'package:hour_stay_mobile/colours.dart';
+import 'package:hour_stay_mobile/core/utils/input_validators.dart';
 
 class GuestProfileScreen extends StatefulWidget {
   const GuestProfileScreen({super.key});
@@ -770,6 +771,8 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
     final mobileCtrl = TextEditingController(text: user.mobile);
     final addressCtrl = TextEditingController(text: user.address.isNotEmpty ? user.address : user.city);
     final avatarCtrl = TextEditingController(text: user.avatar ?? '');
+    String? nameError;
+    String? mobileError;
     bool isSaving = false;
     String? formError;
 
@@ -859,15 +862,32 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: nameCtrl,
+                      onChanged: (val) {
+                        setModalState(() {
+                          nameError = InputValidators.validateName(val, required: true);
+                        });
+                      },
                       decoration: InputDecoration(
                         hintText: 'Enter full name',
                         prefixIcon: const Icon(Icons.person_outline, size: 18, color: muted),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: purple, width: 1.5)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: nameError != null ? InputValidators.errorRed : cardBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: nameError != null ? InputValidators.errorRed : cardBorder)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: nameError != null ? InputValidators.errorRed : purple, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       ),
                     ),
+                    if (nameError != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(nameError!, style: InputValidators.errorTextStyle),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 14),
 
                     // Phone
@@ -876,15 +896,32 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
                     TextField(
                       controller: mobileCtrl,
                       keyboardType: TextInputType.phone,
+                      onChanged: (val) {
+                        setModalState(() {
+                          mobileError = val.trim().isNotEmpty ? InputValidators.validatePhone(val, required: false) : null;
+                        });
+                      },
                       decoration: InputDecoration(
                         hintText: '+91 9876543210',
                         prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: muted),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: cardBorder)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: purple, width: 1.5)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: mobileError != null ? InputValidators.errorRed : cardBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: mobileError != null ? InputValidators.errorRed : cardBorder)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: mobileError != null ? InputValidators.errorRed : purple, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       ),
                     ),
+                    if (mobileError != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(mobileError!, style: InputValidators.errorTextStyle),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 14),
 
                     // Address / City
@@ -955,8 +992,14 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
                                     final address = addressCtrl.text.trim();
                                     final avatar = avatarCtrl.text.trim();
 
-                                    if (name.isEmpty) {
-                                      setModalState(() => formError = 'Name cannot be empty');
+                                    final nErr = InputValidators.validateName(name, required: true);
+                                    final mErr = mobile.isNotEmpty ? InputValidators.validatePhone(mobile, required: false) : null;
+
+                                    if (nErr != null || mErr != null) {
+                                      setModalState(() {
+                                        nameError = nErr;
+                                        mobileError = mErr;
+                                      });
                                       return;
                                     }
 
@@ -982,6 +1025,7 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
                                       if (ctx.mounted) {
                                         Navigator.of(ctx).pop();
                                       }
+                                      await authProvider.refreshProfile();
                                       messenger.showSnackBar(
                                         const SnackBar(
                                           content: Text('Profile updated successfully!'),

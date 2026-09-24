@@ -27,19 +27,136 @@ export const Route = createFileRoute("/features")({
   component: Features
 });
 
-const PASTEL_PALETTES = [
-  { tab: "#93C5FD", iconBg: "#EFF6FF", iconText: "#0284C7", bullet: "#60A5FA" }, // Sky Blue
-  { tab: "#86EFAC", iconBg: "#F0FDF4", iconText: "#16A34A", bullet: "#4ADE80" }, // Mint Green
-  { tab: "#C4B5FD", iconBg: "#F5F3FF", iconText: "#7C3AED", bullet: "#A78BFA" }, // Lavender
-  { tab: "#FDBA74", iconBg: "#FFF7ED", iconText: "#EA580C", bullet: "#FB923C" }, // Peach / Apricot
-  { tab: "#F9A8D4", iconBg: "#FDF2F8", iconText: "#DB2777", bullet: "#F472B6" }, // Soft Rose
-  { tab: "#FDE047", iconBg: "#FEFCE8", iconText: "#CA8A04", bullet: "#FACC15" }, // Butter Honey
-  { tab: "#5EEAD4", iconBg: "#F0FDFA", iconText: "#0D9488", bullet: "#2DD4BF" }, // Aqua Teal
-  { tab: "#A5B4FC", iconBg: "#EEF2FF", iconText: "#4F46E5", bullet: "#818CF8" }, // Periwinkle / Indigo
-  { tab: "#FCA5A5", iconBg: "#FEF2F2", iconText: "#DC2626", bullet: "#F87171" }, // Coral Blush
-  { tab: "#BEF264", iconBg: "#F7FEE7", iconText: "#65A30D", bullet: "#A3E635" }, // Sage Lime
-  { tab: "#67E8F9", iconBg: "#ECFEFF", iconText: "#0891B2", bullet: "#22D3EE" }, // Ice Cyan
-  { tab: "#F0ABFC", iconBg: "#FDF4FF", iconText: "#C026D3", bullet: "#E879F9" }, // Pastel Orchid
+const FEATURE_CARD_PALETTES = [
+  {
+    // Royal Purple
+    backBg: "bg-[#7C3AED]/12",
+    backBorder: "border-[#7C3AED]/25",
+    accentGlow: "rgba(124, 58, 237, 0.18)",
+    iconBg: "bg-[#7C3AED]/10 text-[#7C3AED]",
+    badgeBg: "bg-[#7C3AED]/10 text-[#7C3AED] border-[#7C3AED]/25",
+    bullet: "#7C3AED",
+    hoverTitle: "group-hover:text-[#7C3AED]",
+  },
+  {
+    // Ocean Sky Blue
+    backBg: "bg-[#0284C7]/12",
+    backBorder: "border-[#0284C7]/25",
+    accentGlow: "rgba(2, 132, 199, 0.18)",
+    iconBg: "bg-[#0284C7]/10 text-[#0284C7]",
+    badgeBg: "bg-[#0284C7]/10 text-[#0284C7] border-[#0284C7]/25",
+    bullet: "#0284C7",
+    hoverTitle: "group-hover:text-[#0284C7]",
+  },
+  {
+    // Warm Amber / Gold
+    backBg: "bg-[#D97706]/12",
+    backBorder: "border-[#D97706]/25",
+    accentGlow: "rgba(217, 119, 6, 0.18)",
+    iconBg: "bg-[#D97706]/10 text-[#D97706]",
+    badgeBg: "bg-[#D97706]/10 text-[#D97706] border-[#D97706]/25",
+    bullet: "#D97706",
+    hoverTitle: "group-hover:text-[#D97706]",
+  },
+  {
+    // Emerald Green
+    backBg: "bg-[#059669]/12",
+    backBorder: "border-[#059669]/25",
+    accentGlow: "rgba(5, 150, 105, 0.18)",
+    iconBg: "bg-[#059669]/10 text-[#059669]",
+    badgeBg: "bg-[#059669]/10 text-[#059669] border-[#059669]/25",
+    bullet: "#059669",
+    hoverTitle: "group-hover:text-[#059669]",
+  },
+  {
+    // Coral Rose
+    backBg: "bg-[#E11D48]/12",
+    backBorder: "border-[#E11D48]/25",
+    accentGlow: "rgba(225, 29, 72, 0.18)",
+    iconBg: "bg-[#E11D48]/10 text-[#E11D48]",
+    badgeBg: "bg-[#E11D48]/10 text-[#E11D48] border-[#E11D48]/25",
+    bullet: "#E11D48",
+    hoverTitle: "group-hover:text-[#E11D48]",
+  },
+  {
+    // Periwinkle Indigo
+    backBg: "bg-[#4F46E5]/12",
+    backBorder: "border-[#4F46E5]/25",
+    accentGlow: "rgba(79, 70, 229, 0.18)",
+    iconBg: "bg-[#4F46E5]/10 text-[#4F46E5]",
+    badgeBg: "bg-[#4F46E5]/10 text-[#4F46E5] border-[#4F46E5]/25",
+    bullet: "#4F46E5",
+    hoverTitle: "group-hover:text-[#4F46E5]",
+  },
+  {
+    // Aqua Teal
+    backBg: "bg-[#0D9488]/12",
+    backBorder: "border-[#0D9488]/25",
+    accentGlow: "rgba(13, 148, 136, 0.18)",
+    iconBg: "bg-[#0D9488]/10 text-[#0D9488]",
+    badgeBg: "bg-[#0D9488]/10 text-[#0D9488] border-[#0D9488]/25",
+    bullet: "#0D9488",
+    hoverTitle: "group-hover:text-[#0D9488]",
+  },
+  {
+    // Sunset Orange
+    backBg: "bg-[#EA580C]/12",
+    backBorder: "border-[#EA580C]/25",
+    accentGlow: "rgba(234, 88, 12, 0.18)",
+    iconBg: "bg-[#EA580C]/10 text-[#EA580C]",
+    badgeBg: "bg-[#EA580C]/10 text-[#EA580C] border-[#EA580C]/25",
+    bullet: "#EA580C",
+    hoverTitle: "group-hover:text-[#EA580C]",
+  },
+  {
+    // Berry Orchid
+    backBg: "bg-[#C026D3]/12",
+    backBorder: "border-[#C026D3]/25",
+    accentGlow: "rgba(192, 38, 211, 0.18)",
+    iconBg: "bg-[#C026D3]/10 text-[#C026D3]",
+    badgeBg: "bg-[#C026D3]/10 text-[#C026D3] border-[#C026D3]/25",
+    bullet: "#C026D3",
+    hoverTitle: "group-hover:text-[#C026D3]",
+  },
+  {
+    // Cobalt Blue
+    backBg: "bg-[#2563EB]/12",
+    backBorder: "border-[#2563EB]/25",
+    accentGlow: "rgba(37, 99, 235, 0.18)",
+    iconBg: "bg-[#2563EB]/10 text-[#2563EB]",
+    badgeBg: "bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/25",
+    bullet: "#2563EB",
+    hoverTitle: "group-hover:text-[#2563EB]",
+  },
+  {
+    // Sage Lime
+    backBg: "bg-[#65A30D]/12",
+    backBorder: "border-[#65A30D]/25",
+    accentGlow: "rgba(101, 163, 13, 0.18)",
+    iconBg: "bg-[#65A30D]/10 text-[#65A30D]",
+    badgeBg: "bg-[#65A30D]/10 text-[#65A30D] border-[#65A30D]/25",
+    bullet: "#65A30D",
+    hoverTitle: "group-hover:text-[#65A30D]",
+  },
+  {
+    // Midnight Slate / Navy
+    backBg: "bg-[#0D1B2A]/10",
+    backBorder: "border-[#0D1B2A]/20",
+    accentGlow: "rgba(13, 27, 42, 0.15)",
+    iconBg: "bg-[#0D1B2A]/10 text-[#0D1B2A]",
+    badgeBg: "bg-[#0D1B2A]/10 text-[#0D1B2A] border-[#0D1B2A]/20",
+    bullet: "#0D1B2A",
+    hoverTitle: "group-hover:text-[#5B21B6]",
+  },
+];
+
+const TILT_CONFIGS = [
+  { initial: "rotate-[2.2deg]", hover: "group-hover:rotate-[3.8deg] group-hover:scale-[1.01]" },
+  { initial: "-rotate-[2deg]", hover: "group-hover:-rotate-[3.6deg] group-hover:scale-[1.01]" },
+  { initial: "rotate-[1.8deg]", hover: "group-hover:rotate-[3.2deg] group-hover:scale-[1.01]" },
+  { initial: "-rotate-[2.2deg]", hover: "group-hover:-rotate-[3.8deg] group-hover:scale-[1.01]" },
+  { initial: "rotate-[2deg]", hover: "group-hover:rotate-[3.5deg] group-hover:scale-[1.01]" },
+  { initial: "-rotate-[1.8deg]", hover: "group-hover:-rotate-[3.2deg] group-hover:scale-[1.01]" },
 ];
 
 const FEATURE_ICONS = [
@@ -418,7 +535,7 @@ function Features() {
       </section>
 
       {/* Complete Product Feature Directory Section */}
-      <section className="bg-[#EEF3F8] py-20 border-t border-slate-200/70 animate-fade-up">
+      <section className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80 animate-fade-up">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>
@@ -430,52 +547,80 @@ function Features() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6 text-left font-ui">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-7 text-left font-ui">
             {featuresToRender.map((mod, idx) => {
-              const pastel = PASTEL_PALETTES[idx % PASTEL_PALETTES.length];
+              const palette = FEATURE_CARD_PALETTES[idx % FEATURE_CARD_PALETTES.length];
+              const tilt = TILT_CONFIGS[idx % TILT_CONFIGS.length];
               const IconComponent = getFeatureIcon(idx, mod.title);
+
+              // Extract badge number and clean Playfair title
+              const badgeMatch = mod.title.match(/^(\d+)/);
+              const badgeNumber = badgeMatch ? badgeMatch[1].padStart(2, "0") : String(idx + 1).padStart(2, "0");
+              const cleanTitle = mod.title.replace(/^\d+[\.\s\-]+\s*/, "") || mod.title;
 
               return (
                 <div 
                   key={idx} 
-                  className="group relative bg-white rounded-2xl p-5 pt-6 border border-white/90 ring-1 ring-slate-900/[0.04] shadow-[0_10px_25px_-5px_rgba(20,30,60,0.06),0_4px_10px_-2px_rgba(20,30,60,0.02),inset_0_1px_1px_rgba(255,255,255,1)] hover:-translate-y-1 hover:shadow-[0_18px_35px_-6px_rgba(20,30,60,0.09),0_6px_12px_-2px_rgba(20,30,60,0.03)] transition-all duration-300 flex flex-col justify-between"
+                  className="group relative pt-2 pb-3.5 px-1.5 flex flex-col justify-stretch cursor-default"
                 >
-                  {/* Small colored horizontal tab attached to the top center */}
-                  <div 
-                    className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-14 h-2 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.7)] border border-white/60 transition-all duration-300 group-hover:w-16"
-                    style={{ backgroundColor: pastel.tab }}
+                  {/* Slanted / Tilted Colored Back Layer (Clean 3D Layered Effect) */}
+                  <div
+                    className={`absolute inset-x-1.5 inset-y-2 rounded-2xl border ${palette.backBg} ${palette.backBorder} ${tilt.initial} ${tilt.hover} transition-all duration-300 ease-out origin-center pointer-events-none`}
+                    style={{
+                      boxShadow: `0 10px 24px -8px ${palette.accentGlow}`
+                    }}
                     aria-hidden="true"
                   />
 
-                  <div>
-                    {/* Small Line Icon in pastel soft-depth container */}
-                    <div 
-                      className="size-9 rounded-xl flex items-center justify-center mb-3.5 shadow-[inset_0_1px_2px_rgba(255,255,255,0.9),0_2px_4px_rgba(20,30,60,0.04)] border border-white/90"
-                      style={{ backgroundColor: pastel.iconBg, color: pastel.iconText }}
-                    >
-                      <IconComponent className="size-4.5" strokeWidth={1.9} />
+                  {/* Front White Rounded Card */}
+                  <div className="relative z-10 flex flex-col justify-between h-full bg-white rounded-2xl border border-[#0D1B2A]/8 p-5 sm:p-5.5 shadow-[0_8px_20px_-6px_rgba(13,27,42,0.06),0_2px_6px_-1px_rgba(13,27,42,0.03)] transition-all duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_32px_-8px_rgba(13,27,42,0.12)] group-hover:border-[#0D1B2A]/15">
+                    <div>
+                      {/* Top Row: Small Icon & Feature Number Badge */}
+                      <div className="flex items-center justify-between mb-3.5">
+                        {/* Small Icon in accent-tinted container */}
+                        <div 
+                          className={`size-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-xs ${palette.iconBg}`}
+                        >
+                          <IconComponent className="size-4.5" strokeWidth={1.8} />
+                        </div>
+
+                        {/* Feature Number Badge */}
+                        <span 
+                          className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-transform duration-300 group-hover:scale-105 shadow-xs ${palette.badgeBg}`}
+                        >
+                          #{badgeNumber}
+                        </span>
+                      </div>
+
+                      {/* Bold Playfair Heading */}
+                      <h3 
+                        className={`font-display text-[16.5px] sm:text-[17.5px] font-bold text-navy leading-snug tracking-tight mb-2 ${palette.hoverTitle} transition-colors duration-200`}
+                        style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
+                      >
+                        {cleanTitle}
+                      </h3>
+
+                      {/* Short Muted Description */}
+                      <p className="text-xs text-[#525F70] leading-relaxed mb-4 font-ui">
+                        {mod.desc}
+                      </p>
                     </div>
 
-                    <h3 className="font-display text-[15px] sm:text-base font-bold text-navy leading-snug mb-2">
-                      {mod.title}
-                    </h3>
-                    <p className="text-xs text-[#525F70] leading-relaxed mb-4 font-ui">
-                      {mod.desc}
-                    </p>
+                    {/* Feature Points / Tags */}
+                    {mod.points && mod.points.length > 0 && (
+                      <ul className="space-y-1.5 pt-3 border-t border-slate-100 font-ui mt-auto">
+                        {mod.points.map((pt, pIdx) => (
+                          <li key={pIdx} className="flex items-center gap-2 text-[11px] font-medium text-slate-700">
+                            <span 
+                              className="size-1.5 rounded-full shrink-0 shadow-xs" 
+                              style={{ backgroundColor: palette.bullet }}
+                            />
+                            <span className="truncate">{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-
-                  {/* Feature bullet points */}
-                  <ul className="space-y-1.5 pt-3 border-t border-slate-100 font-ui">
-                    {mod.points.map((pt, pIdx) => (
-                      <li key={pIdx} className="flex items-center gap-2 text-[11px] font-medium text-slate-700">
-                        <span 
-                          className="size-1.5 rounded-full shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.1)]" 
-                          style={{ backgroundColor: pastel.bullet }}
-                        />
-                        <span className="truncate">{pt}</span>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               );
             })}

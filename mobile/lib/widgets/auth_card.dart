@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/utils/input_validators.dart';
 
 enum AuthMode { login, register, forgot, otp, reset }
 
@@ -60,6 +61,10 @@ class _AuthCardState extends State<AuthCard> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
+
+  String? _nameError;
+  String? _emailError;
+  String? _mobileError;
 
   @override
   void initState() {
@@ -187,24 +192,33 @@ class _AuthCardState extends State<AuthCard> {
       return true;
     }
 
+    // Name validation
+    if (widget.mode == AuthMode.register) {
+      final nameErr = InputValidators.validateName(_nameController.text, fieldName: 'Full Name');
+      if (nameErr != null) {
+        setError(nameErr);
+        setState(() => _nameError = nameErr);
+        return false;
+      }
+    }
+
     // Email validation
     final email = _emailController.text.trim();
-    final emailRegex = RegExp(r'^\S+@\S+\.\S+$');
-    if (!emailRegex.hasMatch(email) && widget.mode != AuthMode.register) {
-      setError('Enter a valid email address');
-      return false;
+    if (widget.mode == AuthMode.login || widget.mode == AuthMode.register || widget.mode == AuthMode.forgot) {
+      final emailErr = InputValidators.validateEmail(email);
+      if (emailErr != null) {
+        setError(emailErr);
+        setState(() => _emailError = emailErr);
+        return false;
+      }
     }
+
+    // Mobile validation
     if (widget.mode == AuthMode.register) {
-      if (_nameController.text.trim().isEmpty) {
-        setError('Full name is required');
-        return false;
-      }
-      if (!emailRegex.hasMatch(email)) {
-        setError('Enter a valid email address');
-        return false;
-      }
-      if (_mobileController.text.trim().isEmpty) {
-        setError('Mobile number is required');
+      final phoneErr = InputValidators.validatePhone(_mobileController.text);
+      if (phoneErr != null) {
+        setError(phoneErr);
+        setState(() => _mobileError = phoneErr);
         return false;
       }
     }
@@ -256,90 +270,124 @@ class _AuthCardState extends State<AuthCard> {
     TextStyle? customTextStyle,
     TextInputAction textInputAction = TextInputAction.next,
     void Function(String)? onSubmitted,
+    void Function(String)? onChanged,
+    String? errorText,
   }) {
     return Focus(
       child: Builder(
         builder: (context) {
           final isFocused = Focus.of(context).hasFocus;
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0xFFE7E9EE),
-                  blurRadius: 10,
-                  offset: Offset(0, 8),
-                  spreadRadius: -3,
-                ),
-              ],
-              border: Border.all(
-                color: isFocused ? const Color(0xFF0D1B2A) : Colors.transparent,
-                width: 2.0,
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                TextField(
-                  controller: controller,
-                  keyboardType: keyboardType,
-                  obscureText: obscureText,
-                  maxLength: maxLength,
-                  textAlign: textAlign,
-                  textInputAction: textInputAction,
-                  onSubmitted: onSubmitted,
-                  style: customTextStyle ??
-                      GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF0D1B2A),
-                        fontWeight: FontWeight.w500,
-                      ),
-                  decoration: InputDecoration(
-                    hintText: placeholder,
-                    hintStyle: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF98A2B3),
-                      fontWeight: FontWeight.w400,
+          final hasError = errorText != null && errorText.isNotEmpty;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0xFFE7E9EE),
+                      blurRadius: 10,
+                      offset: Offset(0, 8),
+                      spreadRadius: -3,
                     ),
-                    isDense: true,
-                    filled: false,
-                    fillColor: Colors.transparent,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.only(
-                      left: 20,
-                      right: hasToggle ? 46 : 20,
-                      top: 14,
-                      bottom: 14,
-                    ),
-                    counterText: '',
+                  ],
+                  border: Border.all(
+                    color: hasError
+                        ? const Color(0xFFDC2626)
+                        : (isFocused ? const Color(0xFF0D1B2A) : Colors.transparent),
+                    width: 2.0,
                   ),
                 ),
-                if (hasToggle)
-                  Positioned(
-                    right: 14,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onTogglePressed,
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Icon(
-                          isToggled ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          size: 16,
-                          color: const Color(0x660D1B2A),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      keyboardType: keyboardType,
+                      obscureText: obscureText,
+                      maxLength: maxLength,
+                      textAlign: textAlign,
+                      textInputAction: textInputAction,
+                      onSubmitted: onSubmitted,
+                      onChanged: onChanged,
+                      style: customTextStyle ??
+                          GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF0D1B2A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                      decoration: InputDecoration(
+                        hintText: placeholder,
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF98A2B3),
+                          fontWeight: FontWeight.w400,
+                        ),
+                        isDense: true,
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.only(
+                          left: 20,
+                          right: hasToggle ? 46 : 20,
+                          top: 14,
+                          bottom: 14,
+                        ),
+                        counterText: '',
+                      ),
+                    ),
+                    if (hasToggle)
+                      Positioned(
+                        right: 14,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onTogglePressed,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Icon(
+                              isToggled ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 16,
+                              color: const Color(0x660D1B2A),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                  ],
+                ),
+              ),
+              if (hasError) ...[
+                const SizedBox(height: 5),
+                Padding(
+                  padding: const EdgeInsets.only(left: 14),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 13),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          errorText,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
               ],
-            ),
+            ],
           );
         },
       ),
@@ -630,6 +678,17 @@ class _AuthCardState extends State<AuthCard> {
                         controller: _nameController,
                         placeholder: 'Full Name',
                         keyboardType: TextInputType.name,
+                        errorText: _nameError,
+                        onChanged: (val) {
+                          setState(() {
+                            if (RegExp(r'\d').hasMatch(val)) {
+                              _nameError = 'Name must contain letters only; numbers are not allowed';
+                            } else {
+                              _nameError = null;
+                            }
+                            if (_errorMessage != null) _errorMessage = null;
+                          });
+                        },
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -642,6 +701,42 @@ class _AuthCardState extends State<AuthCard> {
                         controller: _emailController,
                         placeholder: 'E-mail',
                         keyboardType: TextInputType.emailAddress,
+                        errorText: _emailError,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val.contains(' ')) {
+                              _emailError = 'Email cannot contain spaces';
+                            } else if (val.contains('@') && val.contains('.')) {
+                              _emailError = InputValidators.validateEmail(val, required: false);
+                            } else {
+                              _emailError = null;
+                            }
+                            if (_errorMessage != null) _errorMessage = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Mobile Field (Register Mode)
+                    if (widget.mode == AuthMode.register) ...[
+                      _buildWebStyledInputField(
+                        controller: _mobileController,
+                        placeholder: 'Mobile Number',
+                        keyboardType: TextInputType.phone,
+                        errorText: _mobileError,
+                        onChanged: (val) {
+                          setState(() {
+                            if (RegExp(r'[a-zA-Z]').hasMatch(val)) {
+                              _mobileError = 'Phone number must contain numbers only; letters are not allowed';
+                            } else if (val.replaceAll(RegExp(r'\D'), '').length > 15) {
+                              _mobileError = 'Phone number must be at most 15 digits';
+                            } else {
+                              _mobileError = null;
+                            }
+                            if (_errorMessage != null) _errorMessage = null;
+                          });
+                        },
                       ),
                       const SizedBox(height: 16),
                     ],

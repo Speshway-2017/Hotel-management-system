@@ -18,7 +18,7 @@ async function run() {
   const db = mongoose.connection.db;
 
   const allBookings = await db.collection('bookings').find({}).sort({ createdAt: -1 }).toArray();
-  const roles = ['super-admin', 'admin', 'manager', 'receptionist'];
+  const roles = ['admin', 'manager', 'receptionist'];
 
   for (const b of allBookings) {
     const bId = b.bookingId || String(b._id) || b.id;

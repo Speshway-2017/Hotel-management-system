@@ -194,6 +194,7 @@ function EditCoupon() {
                 <Input
                   id="discountValue"
                   type="number"
+                  step="0.01"
                   required
                   min="1"
                   placeholder={formData.discountType === "percentage" ? "e.g. 15" : "e.g. 500"}
@@ -276,6 +277,7 @@ function EditCoupon() {
                 <Input
                   id="minimumSubscriptionAmount"
                   type="number"
+                  step="0.01"
                   required
                   min="0"
                   placeholder="e.g. 3000"

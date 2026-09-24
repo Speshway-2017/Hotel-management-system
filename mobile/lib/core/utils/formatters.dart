@@ -148,6 +148,86 @@ class Formatters {
 
   static String checkOutDateTime(dynamic dateInput) => formatCheckOutDateTime(dateInput);
 
+  static DateTime parseScheduledCheckIn(dynamic dateInput, [String? timeStr]) {
+    final parsed = parseDateSafe(dateInput);
+    if (parsed == null) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day, 12, 0);
+    }
+    if (parsed.hour != 0 || parsed.minute != 0) {
+      return parsed;
+    }
+    if (timeStr != null && timeStr.trim().isNotEmpty) {
+      final t = _parseTimeString(timeStr);
+      if (t != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day, t.hour, t.minute);
+      }
+    }
+    return DateTime(parsed.year, parsed.month, parsed.day, 12, 0);
+  }
+
+  static DateTime parseScheduledCheckOut(dynamic dateInput, [String? timeStr]) {
+    final parsed = parseDateSafe(dateInput);
+    if (parsed == null) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day, 11, 0);
+    }
+    if (parsed.hour != 0 || parsed.minute != 0) {
+      return parsed;
+    }
+    if (timeStr != null && timeStr.trim().isNotEmpty) {
+      final t = _parseTimeString(timeStr);
+      if (t != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day, t.hour, t.minute);
+      }
+    }
+    return DateTime(parsed.year, parsed.month, parsed.day, 11, 0);
+  }
+
+  static ({int hour, int minute})? _parseTimeString(String timeStr) {
+    final clean = timeStr.trim().toUpperCase();
+    final match = RegExp(r'^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$').firstMatch(clean);
+    if (match != null) {
+      var h = int.tryParse(match.group(1)!) ?? 12;
+      final m = match.group(2) != null ? (int.tryParse(match.group(2)!) ?? 0) : 0;
+      final ampm = match.group(3);
+      if (ampm == 'PM' && h < 12) h += 12;
+      if (ampm == 'AM' && h == 12) h = 0;
+      return (hour: h, minute: m);
+    }
+    return null;
+  }
+
+  static bool isCheckInAllowed(dynamic dateInput, [String? timeStr, DateTime? customNow]) {
+    final scheduled = parseScheduledCheckIn(dateInput, timeStr);
+    final now = customNow ?? DateTime.now();
+    return now.isAfter(scheduled) || now.isAtSameMomentAs(scheduled);
+  }
+
+  static bool isCheckOutDue(dynamic dateInput, [String? timeStr, DateTime? customNow]) {
+    final scheduled = parseScheduledCheckOut(dateInput, timeStr);
+    final now = customNow ?? DateTime.now();
+    return now.isAfter(scheduled);
+  }
+
+  static String getCheckInTimeRemaining(dynamic dateInput, [String? timeStr, DateTime? customNow]) {
+    final scheduled = parseScheduledCheckIn(dateInput, timeStr);
+    final now = customNow ?? DateTime.now();
+    if (now.isAfter(scheduled) || now.isAtSameMomentAs(scheduled)) {
+      return 'Check-in is now open';
+    }
+    final diff = scheduled.difference(now);
+    if (diff.inDays > 0) {
+      return 'Check-in opens in ${diff.inDays}d ${diff.inHours % 24}h (${checkInDateTime(dateInput)})';
+    } else if (diff.inHours > 0) {
+      return 'Check-in opens in ${diff.inHours}h ${diff.inMinutes % 60}m (at ${DateFormat('hh:mm a').format(scheduled)})';
+    } else if (diff.inMinutes > 0) {
+      return 'Check-in opens in ${diff.inMinutes}m (at ${DateFormat('hh:mm a').format(scheduled)})';
+    } else {
+      return 'Check-in opens in less than a minute';
+    }
+  }
+
   static String capitalize(String? text) {
     if (text == null || text.isEmpty) return '';
     return text.replaceAll('_', ' ').split(' ').map((word) {

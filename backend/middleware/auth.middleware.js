@@ -5,9 +5,22 @@ import Property from '../models/property.model.js';
 
 const userCache = new Map();
 
-export const clearUserCache = (userId) => {
-  if (userId) userCache.delete(String(userId));
-  else userCache.clear();
+export const clearUserCache = (userIdOrEmail) => {
+  if (userIdOrEmail) {
+    const key = String(userIdOrEmail).toLowerCase().trim();
+    userCache.delete(key);
+    for (const [k, v] of userCache.entries()) {
+      if (
+        String(v?.user?._id) === key ||
+        String(v?.user?.id) === key ||
+        (v?.user?.email && v.user.email.toLowerCase().trim() === key)
+      ) {
+        userCache.delete(k);
+      }
+    }
+  } else {
+    userCache.clear();
+  }
 };
 
 export const protect = async (req, res, next) => {

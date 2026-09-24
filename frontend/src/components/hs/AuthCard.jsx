@@ -174,23 +174,44 @@ export function AuthCard({
 
         <form onSubmit={submit} noValidate className="mt-6 text-left space-y-4">
           {mode === "register" && (
-            <div>
-              <Label htmlFor="name" className="sr-only">Full Name</Label>
-              <Input 
-                id="name" 
-                className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all" 
-                placeholder="Full Name" 
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: null }));
-                }}
-                autoComplete="off"
-              />
-              {fieldErrors.name && (
-                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.name}</p>
-              )}
-            </div>
+            <>
+              <div>
+                <Label htmlFor="name" className="sr-only">Full Name</Label>
+                <Input 
+                  id="name" 
+                  nameOnly
+                  className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all" 
+                  placeholder="Full Name" 
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: null }));
+                  }}
+                  autoComplete="off"
+                />
+                {fieldErrors.name && (
+                  <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.name}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="mobile" className="sr-only">Mobile Number</Label>
+                <Input 
+                  id="mobile" 
+                  type="tel"
+                  className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all" 
+                  placeholder="Mobile Number (10 digits)" 
+                  value={mobile}
+                  onChange={(e) => {
+                    setMobile(e.target.value);
+                    if (fieldErrors.mobile) setFieldErrors(prev => ({ ...prev, mobile: null }));
+                  }}
+                  autoComplete="tel"
+                />
+                {fieldErrors.mobile && (
+                  <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.mobile}</p>
+                )}
+              </div>
+            </>
           )}
           
           {(mode === "login" || mode === "register" || mode === "forgot") && (

@@ -88,6 +88,12 @@ export const ALL_REALTIME_EVENTS = [
   'feedback_updated',
   'feedback_deleted',
   'notification_created',
+  'notification_received',
+  'new_notification',
+  'guest_notification',
+  'manager_notification',
+  'notification_updated',
+  'notification_deleted',
   'unread_notifications_count_updated',
   'dashboard_sync'
 ];

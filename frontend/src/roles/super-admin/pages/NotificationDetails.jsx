@@ -11,19 +11,16 @@ import {
   AlertTriangle
 } from "lucide-react";
 
+import { superAdminService } from "@/services/superAdmin";
+
 function getToneForType(type) {
-  switch (type) {
-    case "OTA Sync":
-    case "Payment Alert":
-      return "warning";
-    case "Property Audit":
-      return "success";
-    case "Security Warning":
-      return "error";
-    case "Access Control":
-    default:
-      return "brand";
-  }
+  const t = (type || "").toLowerCase();
+  if (t.includes("setup") || t.includes("onboard") || t.includes("property update") || t.includes("audit")) return "success";
+  if (t.includes("staff") || t.includes("roster")) return "brand";
+  if (t.includes("config") || t.includes("setting") || t.includes("subscription")) return "purple";
+  if (t.includes("sync") || t.includes("ota") || t.includes("warning")) return "warning";
+  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("issue") || t.includes("maintenance")) return "error";
+  return "brand";
 }
 
 import { notificationsService } from "@/services/notifications";
@@ -35,18 +32,24 @@ function SuperAdminNotificationDetails() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    notificationsService.getNotifications()
-      .then(res => {
+    Promise.all([
+      superAdminService.getProperties().catch(() => ({})),
+      notificationsService.getNotifications().catch(() => ({}))
+    ])
+      .then(([propRes, res]) => {
+        const propertiesList = propRes?.success && propRes?.data ? propRes.data : [];
         if (res.success && res.data) {
           const item = res.data.find(n => (n._id || n.id) === id);
           if (item) {
+            const matched = propertiesList.find(p => p._id === item.propertyId || p.id === item.propertyId);
             const mapped = {
               id: item._id || item.id,
               title: item.title,
               message: item.message,
               type: item.category || 'General',
-              propertyName: item.propertyId === 'All' || !item.propertyId ? 'Global System' : 'Assigned Hotel',
-              timestamp: new Date(item.createdAt).toLocaleDateString(),
+              propertyId: item.propertyId,
+              propertyName: matched ? matched.name : (item.propertyId === 'All' || !item.propertyId ? 'Global System' : (item.propertyId || 'Admin-Managed Property')),
+              timestamp: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Today',
               read: item.isRead,
               body: item.message
             };
@@ -144,7 +147,7 @@ function SuperAdminNotificationDetails() {
                 <div className="flex items-start gap-2 bg-warning/5 border border-warning/10 p-3 rounded-lg text-[11px] text-warning-deep mt-2">
                   <AlertTriangle className="size-4 text-warning shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold">Next Steps:</span> If this sync mismatch or payment exception remains unresolved, please verify integration access keys, check API connections, or coordinate with the on-site GM/Admin.
+                    <span className="font-bold">Next Steps:</span> Please review the property configuration, verify channel parity integrations, inspect staff rosters, or coordinate directly with the assigned property Admin.
                   </div>
                 </div>
               </div>

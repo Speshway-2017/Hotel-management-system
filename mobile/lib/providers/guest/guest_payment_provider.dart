@@ -169,6 +169,8 @@ class GuestPaymentProvider with ChangeNotifier {
     try {
       final response = await ApiService.post(ApiEndpoints.guestPayBalance, {
         'bookingId': bookingId,
+        'id': bookingId,
+        'paymentId': bookingId,
         'amount': amount,
         'paymentMethod': paymentMethod,
       });

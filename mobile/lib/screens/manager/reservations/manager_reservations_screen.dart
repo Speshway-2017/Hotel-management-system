@@ -70,11 +70,21 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
     final provider = context.watch<ReservationProvider>();
     final allReservations = provider.reservations;
 
+    final now = DateTime.now();
+    String effectiveStatus(ReservationModel r) {
+      final st = r.status.toLowerCase();
+      final isStay = st == 'checked-in' || st == 'checked_in' || st == 'active' || st == 'staying';
+      if (isStay && Formatters.isCheckOutDue(r.checkOut, null, now)) {
+        return 'Checked-out';
+      }
+      return r.status;
+    }
+
     // Filter by status
     var filteredList = allReservations;
     if (_selectedFilter != 'all') {
       filteredList = filteredList.where((r) {
-        final st = r.status.toLowerCase();
+        final st = effectiveStatus(r).toLowerCase();
         if (_selectedFilter == 'checked_in') {
           return st == 'checked-in' || st == 'checked_in' || st == 'active' || st == 'staying';
         }
@@ -102,17 +112,17 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
       if (filterKey == 'all') return allReservations.length;
       if (filterKey == 'checked_in') {
         return allReservations.where((r) {
-          final st = r.status.toLowerCase();
+          final st = effectiveStatus(r).toLowerCase();
           return st == 'checked-in' || st == 'checked_in' || st == 'active' || st == 'staying';
         }).length;
       }
       if (filterKey == 'checked_out') {
         return allReservations.where((r) {
-          final st = r.status.toLowerCase();
+          final st = effectiveStatus(r).toLowerCase();
           return st == 'checked-out' || st == 'checked_out' || st == 'completed';
         }).length;
       }
-      return allReservations.where((r) => r.status.toLowerCase() == filterKey.toLowerCase()).length;
+      return allReservations.where((r) => effectiveStatus(r).toLowerCase() == filterKey.toLowerCase()).length;
     }
 
     final isInitialLoading = provider.isLoading && allReservations.isEmpty;
@@ -429,7 +439,15 @@ class _ManagerReservationsScreenState extends State<ManagerReservationsScreen> {
                         ),
                       ],
                     ),
-                    StatusBadge(status: res.status),
+                    StatusBadge(
+                      status: (res.status.toLowerCase() == 'checked-in' ||
+                              res.status.toLowerCase() == 'checked_in' ||
+                              res.status.toLowerCase() == 'active' ||
+                              res.status.toLowerCase() == 'staying') &&
+                              Formatters.isCheckOutDue(res.checkOut)
+                          ? 'Checked-out'
+                          : res.status,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),

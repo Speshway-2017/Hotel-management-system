@@ -115,6 +115,7 @@ function AddPlan() {
               <Input
                 id="monthlyPrice"
                 type="number"
+                step="0.01"
                 required
                 min="0"
                 placeholder="e.g. 5999"
@@ -136,6 +137,7 @@ function AddPlan() {
               <Input
                 id="yearlyPrice"
                 type="number"
+                step="0.01"
                 required
                 min="0"
                 placeholder="e.g. 59990"

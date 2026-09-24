@@ -115,26 +115,31 @@ const writeUsers = (users) => {
 class UserInstance {
   constructor(data) {
     Object.assign(this, data);
-    const cleanId = data.id || data._id;
-    this.id = cleanId;
-    this._id = cleanId;
+    const cleanId = data.id || data._id || Math.random().toString(36).substring(2, 15);
+    this.id = String(cleanId);
+    this._id = String(cleanId);
   }
   async comparePassword(candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
   }
   async save() {
     const users = readUsers();
-    const cleanId = this.id || this._id;
-    const index = users.findIndex(u => u.id === cleanId || u.email === this.email);
+    const cleanId = String(this.id || this._id || '');
+    const cleanEmail = (this.email || '').toLowerCase().trim();
+    const index = users.findIndex(u => 
+      (cleanId && (String(u.id) === cleanId || String(u._id) === cleanId)) ||
+      (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail)
+    );
     this.updatedAt = new Date().toISOString();
     if (this.password && !this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password, salt);
     }
     const updatedUser = {
+      ...(index !== -1 ? users[index] : {}),
       ...this,
-      id: cleanId,
-      _id: cleanId
+      id: cleanId || (index !== -1 ? (users[index].id || users[index]._id) : Math.random().toString(36).substring(2, 15)),
+      _id: cleanId || (index !== -1 ? (users[index]._id || users[index].id) : Math.random().toString(36).substring(2, 15))
     };
     if (index !== -1) {
       users[index] = updatedUser;
@@ -153,7 +158,7 @@ const MockUser = {
       list = list.filter(u => query.$or.some(q => {
         if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
         if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
-        if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
+        if (q.email && u.email && u.email.toLowerCase().trim() === String(q.email).toLowerCase().trim()) return true;
         if (q.role && u.role === q.role) return true;
         if (q.propertyId && u.propertyId === q.propertyId) return true;
         return false;
@@ -174,16 +179,16 @@ const MockUser = {
         return query.$or.some(q => {
           if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
           if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
-          if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
-          if (q.name && u.name && u.name.toLowerCase() === String(q.name).toLowerCase()) return true;
+          if (q.email && u.email && u.email.toLowerCase().trim() === String(q.email).toLowerCase().trim()) return true;
+          if (q.name && u.name && u.name.toLowerCase().trim() === String(q.name).toLowerCase().trim()) return true;
           return false;
         });
       }
       if (query.email && query.otp) {
-        return u.email === query.email.toLowerCase() && u.otp === query.otp && new Date(u.otpExpires) > new Date();
+        return u.email && u.email.toLowerCase().trim() === query.email.toLowerCase().trim() && u.otp === query.otp && new Date(u.otpExpires) > new Date();
       }
       if (query.email) {
-        return u.email === query.email.toLowerCase();
+        return u.email && u.email.toLowerCase().trim() === query.email.toLowerCase().trim();
       }
       const queryId = query._id || query.id;
       if (queryId) {
@@ -253,13 +258,13 @@ const MockUser = {
       idx = list.findIndex(u => query.$or.some(q => {
         if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
         if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
-        if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
-        if (q.name && u.name && u.name.toLowerCase() === String(q.name).toLowerCase()) return true;
+        if (q.email && u.email && u.email.toLowerCase().trim() === String(q.email).toLowerCase().trim()) return true;
+        if (q.name && u.name && u.name.toLowerCase().trim() === String(q.name).toLowerCase().trim()) return true;
         return false;
       }));
     } else {
       idx = list.findIndex(u => {
-        if (query.email && u.email === query.email.toLowerCase()) return true;
+        if (query.email && u.email && u.email.toLowerCase().trim() === query.email.toLowerCase().trim()) return true;
         const qId = query._id || query.id;
         if (qId && (String(u.id) === String(qId) || String(u._id) === String(qId))) return true;
         return false;
@@ -306,12 +311,12 @@ const MockUser = {
       idx = list.findIndex(u => query.$or.some(q => {
         if (q._id && (String(u._id) === String(q._id) || String(u.id) === String(q._id))) return true;
         if (q.id && (String(u.id) === String(q.id) || String(u._id) === String(q.id))) return true;
-        if (q.email && u.email && u.email.toLowerCase() === String(q.email).toLowerCase()) return true;
+        if (q.email && u.email && u.email.toLowerCase().trim() === String(q.email).toLowerCase().trim()) return true;
         return false;
       }));
     } else {
       idx = list.findIndex(u => {
-        if (query.email && u.email === query.email.toLowerCase()) return true;
+        if (query.email && u.email && u.email.toLowerCase().trim() === query.email.toLowerCase().trim()) return true;
         const qId = query._id || query.id;
         if (qId && (String(u.id) === String(qId) || String(u._id) === String(qId))) return true;
         return false;
@@ -352,8 +357,11 @@ class QueryWrapper {
           query = query.select(fields);
         }
         result = await query;
-        if (!result) {
-          result = await this.executor(false);
+        if (!result || (Array.isArray(result) && result.length === 0)) {
+          const fallback = await this.executor(false);
+          if (fallback && (!Array.isArray(fallback) || fallback.length > 0)) {
+            result = fallback;
+          }
         }
       } else {
         result = await this.executor(false);
@@ -406,48 +414,59 @@ const User = {
   findById: (id) => {
     return new QueryWrapper((isMongoose) => {
       if (isMongoose) {
-        return MongooseUser.findOne({ $or: [{ _id: String(id) }, { _id: id }, { id: String(id) }] });
+        const query = [{ _id: String(id) }, { id: String(id) }];
+        if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id)) {
+          query.unshift({ _id: new mongoose.Types.ObjectId(id) });
+        }
+        return MongooseUser.findOne({ $or: query });
       }
       return MockUser.findById(id);
     });
   },
   create: async (...args) => {
     if (mongoose.connection.readyState === 1) {
-      const created = await MongooseUser.create(...args);
+      let created = null;
       try {
-        const instance = new UserInstance({
-          id: created._id.toString(),
-          _id: created._id.toString(),
-          name: created.name,
-          email: created.email,
-          password: created.password,
-          role: created.role,
-          mobile: created.mobile,
-          propertyId: created.propertyId || null,
-          status: created.status || 'Active',
-          dept: created.dept || 'Front Desk',
-          shift: created.shift || 'Morning (06:00 - 14:00)',
-          avatar: created.avatar || null,
-          city: created.city || '',
-          state: created.state || '',
-          country: created.country || 'India',
-          address: created.address || '',
-          type: created.type || 'Regular',
-          preferences: created.preferences || '',
-          idDocType: created.idDocType || 'Aadhaar Card',
-          idDocNumber: created.idDocNumber || '',
-          loyaltyPoints: created.loyaltyPoints || 0,
-          notes: created.notes || '',
-          fcmToken: created.fcmToken || null,
-          fcmTokens: created.fcmTokens || [],
-          createdAt: created.createdAt || new Date().toISOString(),
-          updatedAt: created.updatedAt || new Date().toISOString()
-        });
-        await instance.save();
-      } catch (err) {
-        console.warn('Mock dual-write failed:', err.message);
+        created = await MongooseUser.create(...args);
+      } catch (e) {
+        console.warn('Mongoose User create failed, fallback to mock:', e.message);
       }
-      return created;
+      if (created) {
+        try {
+          const instance = new UserInstance({
+            id: created._id.toString(),
+            _id: created._id.toString(),
+            name: created.name,
+            email: created.email,
+            password: created.password,
+            role: created.role,
+            mobile: created.mobile,
+            propertyId: created.propertyId || null,
+            status: created.status || 'Active',
+            dept: created.dept || 'Front Desk',
+            shift: created.shift || 'Morning (06:00 - 14:00)',
+            avatar: created.avatar || null,
+            city: created.city || '',
+            state: created.state || '',
+            country: created.country || 'India',
+            address: created.address || '',
+            type: created.type || 'Regular',
+            preferences: created.preferences || '',
+            idDocType: created.idDocType || 'Aadhaar Card',
+            idDocNumber: created.idDocNumber || '',
+            loyaltyPoints: created.loyaltyPoints || 0,
+            notes: created.notes || '',
+            fcmToken: created.fcmToken || null,
+            fcmTokens: created.fcmTokens || [],
+            createdAt: created.createdAt || new Date().toISOString(),
+            updatedAt: created.updatedAt || new Date().toISOString()
+          });
+          await instance.save();
+        } catch (err) {
+          console.warn('Mock dual-write failed:', err.message);
+        }
+        return created;
+      }
     }
     return await MockUser.create(...args);
   },
@@ -459,7 +478,12 @@ const User = {
   },
   findOneAndUpdate: async (query, update, options = {}) => {
     if (mongoose.connection.readyState === 1) {
-      const updated = await MongooseUser.findOneAndUpdate(query, update, { new: true, ...options });
+      let updated = null;
+      try {
+        updated = await MongooseUser.findOneAndUpdate(query, update, { new: true, ...options });
+      } catch (e) {
+        console.warn('Mongoose findOneAndUpdate failed, fallback to mock:', e.message);
+      }
       if (updated) {
         try {
           const instance = new UserInstance({
@@ -494,8 +518,10 @@ const User = {
         } catch (err) {
           console.warn('Mock dual-write update failed:', err.message);
         }
+        return updated;
       }
-      return updated;
+      // Seamless fallback to MockUser
+      return await MockUser.findOneAndUpdate(query, update, options);
     }
     return await MockUser.findOneAndUpdate(query, update, options);
   },

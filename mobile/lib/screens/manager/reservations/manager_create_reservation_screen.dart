@@ -5,6 +5,7 @@ import 'package:hour_stay_mobile/models/room_model.dart';
 import 'package:hour_stay_mobile/providers/manager/reservation_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/colours.dart';
+import 'package:hour_stay_mobile/core/utils/input_validators.dart';
 
 class ManagerCreateReservationScreen extends StatefulWidget {
   final String? preselectedRoomNumber;
@@ -234,11 +235,23 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
   }
 
   Future<void> _handleSubmit() async {
+    if (_selectedRoomNumber == null || _selectedRoomNumber!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select room'),
+          backgroundColor: ruby,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill all mandatory fields (Guest Name, Phone, ID Proof).'),
+          content: Text('Please fill all mandatory fields.'),
           backgroundColor: ruby,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -569,13 +582,14 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
           // Guest Full Name
           TextFormField(
             controller: _guestNameController,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: navy),
             decoration: _inputDecoration(
               label: 'Guest Full Name *',
               hint: 'e.g. Rahul Sharma',
               prefixIcon: Icons.person_rounded,
             ),
-            validator: (v) => v == null || v.trim().isEmpty ? 'Guest full name is required' : null,
+            validator: (v) => InputValidators.validateName(v, fieldName: 'Guest Full Name'),
           ),
           const SizedBox(height: 10),
 
@@ -583,13 +597,14 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
           TextFormField(
             controller: _guestPhoneController,
             keyboardType: TextInputType.phone,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: navy),
             decoration: _inputDecoration(
               label: 'Contact Phone Number *',
               hint: 'e.g. +91 98765 43210',
               prefixIcon: Icons.phone_rounded,
             ),
-            validator: (v) => v == null || v.trim().isEmpty ? 'Contact phone number is required' : null,
+            validator: (v) => InputValidators.validatePhone(v),
           ),
           const SizedBox(height: 10),
 
@@ -597,12 +612,14 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
           TextFormField(
             controller: _guestEmailController,
             keyboardType: TextInputType.emailAddress,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: navy),
             decoration: _inputDecoration(
               label: 'Email Address (Optional)',
               hint: 'e.g. guest@example.com',
               prefixIcon: Icons.email_rounded,
             ),
+            validator: (v) => v == null || v.trim().isEmpty ? null : InputValidators.validateEmail(v, required: false),
           ),
           const SizedBox(height: 10),
 
@@ -847,13 +864,7 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
               if (val != null) {
                 setState(() {
                   _selectedCategory = val;
-                  if (_selectedRoomNumber != null) {
-                    final roomProvider = context.read<RoomProvider>();
-                    final room = roomProvider.rooms.where((r) => r.roomNumber == _selectedRoomNumber).firstOrNull;
-                    if (room != null && room.category.trim().toLowerCase() != val.trim().toLowerCase()) {
-                      _selectedRoomNumber = null;
-                    }
-                  }
+                  _selectedRoomNumber = null;
                 });
                 _updateTariffAndBalance();
               }
@@ -861,47 +872,92 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
           ),
           const SizedBox(height: 10),
 
-          // Room Assignment Dropdown
-          DropdownButtonFormField<String>(
-            initialValue: _selectedRoomNumber,
-            isExpanded: true,
-            decoration: _inputDecoration(
-              label: 'Assign Room Number (Optional)',
-              hint: 'Select or Auto-allocate',
-              prefixIcon: Icons.door_front_door_rounded,
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: '',
-                child: Text('Auto-allocate upon Check-in', style: TextStyle(fontSize: 12.5, color: muted)),
-              ),
-              ...availableRooms.map((rm) => DropdownMenuItem(
-                    value: rm.roomNumber,
-                    child: Text(
-                      'Room ${rm.roomNumber} (${rm.category}) - ${rm.status}',
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: navy),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  )),
-              if (availableRooms.isEmpty) ...[
-                const DropdownMenuItem(value: '101', child: Text('Room 101 (Standard Room)')),
-                const DropdownMenuItem(value: '102', child: Text('Room 102 (Standard Room)')),
-                const DropdownMenuItem(value: '201', child: Text('Room 201 (Deluxe Room)')),
-                const DropdownMenuItem(value: '301', child: Text('Room 301 (Executive Suite)')),
-              ]
-            ],
-            onChanged: (val) {
-              setState(() {
-                _selectedRoomNumber = (val == null || val.isEmpty) ? null : val;
-                if (_selectedRoomNumber != null) {
-                  final roomProvider = context.read<RoomProvider>();
-                  final room = roomProvider.rooms.where((r) => r.roomNumber == _selectedRoomNumber).firstOrNull;
-                  if (room != null && room.category.isNotEmpty) {
-                    _selectedCategory = room.category;
+          // Room Assignment Dropdown (Strictly filtered by selected category)
+          Builder(
+            builder: (context) {
+              // Filter available rooms by category
+              final categoryFilteredRooms = (_selectedCategory != null && _selectedCategory!.isNotEmpty)
+                  ? availableRooms.where((r) {
+                      final rc = r.category.trim().toLowerCase();
+                      final sc = _selectedCategory!.trim().toLowerCase();
+                      return rc == sc || rc.contains(sc) || sc.contains(rc);
+                    }).toList()
+                  : availableRooms;
+
+              // Fallback rooms if room provider has no active rooms loaded
+              List<Map<String, String>> fallbackRooms = [];
+              final catName = (_selectedCategory ?? '').trim().toLowerCase();
+              if (catName.contains('executive')) {
+                fallbackRooms = [
+                  {'num': '301', 'cat': 'Executive Suite'},
+                  {'num': '302', 'cat': 'Executive Suite'},
+                ];
+              } else if (catName.contains('deluxe')) {
+                fallbackRooms = [
+                  {'num': '201', 'cat': 'Deluxe Room'},
+                  {'num': '202', 'cat': 'Deluxe Room'},
+                ];
+              } else if (catName.contains('penthouse')) {
+                fallbackRooms = [
+                  {'num': '401', 'cat': 'Penthouse Suite'},
+                ];
+              } else {
+                fallbackRooms = [
+                  {'num': '101', 'cat': 'Standard Room'},
+                  {'num': '102', 'cat': 'Standard Room'},
+                ];
+              }
+
+              final validRoomNumbers = categoryFilteredRooms.isNotEmpty
+                  ? categoryFilteredRooms.map((rm) => rm.roomNumber).toSet()
+                  : fallbackRooms.map((rm) => rm['num']!).toSet();
+
+              final currentRoomValue = (_selectedRoomNumber != null && validRoomNumbers.contains(_selectedRoomNumber))
+                  ? _selectedRoomNumber
+                  : null;
+
+              return DropdownButtonFormField<String>(
+                key: ValueKey('room_allotment_${_selectedCategory}_$currentRoomValue'),
+                initialValue: currentRoomValue,
+                isExpanded: true,
+                decoration: _inputDecoration(
+                  label: 'Room Allotment *',
+                  hint: 'Select Room',
+                  prefixIcon: Icons.door_front_door_rounded,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Please select room';
                   }
-                }
-              });
-              _updateTariffAndBalance();
+                  return null;
+                },
+                items: [
+                  ...categoryFilteredRooms.map((rm) => DropdownMenuItem(
+                        value: rm.roomNumber,
+                        child: Text(
+                          'Room ${rm.roomNumber} (${rm.category}) - ${rm.status}',
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: navy),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )),
+                  if (categoryFilteredRooms.isEmpty) ...[
+                    ...fallbackRooms.map((rm) => DropdownMenuItem(
+                          value: rm['num']!,
+                          child: Text(
+                            'Room ${rm['num']} (${rm['cat']}) - Available',
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: navy),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )),
+                  ]
+                ],
+                onChanged: (val) {
+                  setState(() {
+                    _selectedRoomNumber = (val == null || val.isEmpty) ? null : val;
+                  });
+                  _updateTariffAndBalance();
+                },
+              );
             },
           ),
         ],
@@ -1002,13 +1058,15 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
               Expanded(
                 child: TextFormField(
                   controller: _amountController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: navy),
                   decoration: _inputDecoration(
                     label: 'Tariff (₹) *',
                     hint: 'Auto: ₹$totalAutoTariff',
                     prefixIcon: Icons.payments_rounded,
                   ),
+                  validator: (v) => InputValidators.validateAmount(v, fieldName: 'Tariff', required: true),
                   onChanged: (val) {
                     setState(() {});
                   },
@@ -1018,13 +1076,15 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
               Expanded(
                 child: TextFormField(
                   controller: _balanceController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: ruby),
                   decoration: _inputDecoration(
                     label: 'Balance Due (₹) *',
                     hint: '0 (Paid in Full)',
                     prefixIcon: Icons.account_balance_wallet_rounded,
                   ),
+                  validator: (v) => InputValidators.validateAmount(v, fieldName: 'Balance Due', required: false, allowZero: true),
                 ),
               ),
             ],
@@ -1241,10 +1301,9 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: navy, width: 1.4),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ruby),
-      ),
+      errorStyle: InputValidators.errorTextStyle,
+      errorBorder: InputValidators.errorOutlineBorder(radius: 10),
+      focusedErrorBorder: InputValidators.errorOutlineBorder(radius: 10, width: 2.0),
     );
   }
 }

@@ -178,6 +178,7 @@ function EditGuestPage() {
                 <Input
                   id="name"
                   type="text"
+                  nameOnly
                   required
                   value={formData.name}
                   onChange={handleChange}
@@ -210,7 +211,7 @@ function EditGuestPage() {
               <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
-                  type="text"
+                  type="tel"
                   required
                   value={formData.phone}
                   onChange={handleChange}
@@ -223,6 +224,7 @@ function EditGuestPage() {
                 <Input
                   id="city"
                   type="text"
+                  textOnly
                   value={formData.city}
                   onChange={handleChange}
                 />
@@ -231,6 +233,7 @@ function EditGuestPage() {
                 <Input
                   id="state"
                   type="text"
+                  textOnly
                   value={formData.state}
                   onChange={handleChange}
                 />
@@ -239,6 +242,7 @@ function EditGuestPage() {
                 <Input
                   id="country"
                   type="text"
+                  textOnly
                   value={formData.country}
                   onChange={handleChange}
                 />

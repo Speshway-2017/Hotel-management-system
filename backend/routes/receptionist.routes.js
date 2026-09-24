@@ -26,6 +26,7 @@ import {
   findExistingVerifiedAadhaar,
   formatAadhaar
 } from '../utils/aadhaarValidator.js';
+import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 
 import mongoose from 'mongoose';
 
@@ -34,15 +35,9 @@ const router = express.Router();
 // Helper to query booking by ObjectId, bookingId string, or id string safely
 const findBookingById = async (id, propertyId) => {
   if (!id) return null;
-  const queries = [
-    { bookingId: id },
-    { id: id }
-  ];
-  if (mongoose.Types.ObjectId.isValid(id)) {
-    queries.unshift({ _id: id });
-  }
+  const lookupQuery = buildBookingLookupQuery(id);
   const propQuery = propertyId ? { propertyId } : {};
-  return await Booking.findOne({ $and: [{ $or: queries }, propQuery] });
+  return await Booking.findOne({ $and: [lookupQuery, propQuery] });
 };
 
 // All receptionist routes are protected and restricted to receptionist / admin / manager role
@@ -392,7 +387,18 @@ router.get('/guests', async (req, res) => {
       $or: [{ propertyId: propId }, { hotelId: propId }],
       status: { $in: ['Checked-in', 'Checked In', 'Staying'] }
     };
-    const bookings = await Booking.find(query).sort({ createdAt: -1 });
+    const [bookings, guestUsers] = await Promise.all([
+      Booking.find(query).sort({ createdAt: -1 }),
+      User.find({ role: 'guest' })
+    ]);
+
+    const userMap = new Map();
+    guestUsers.forEach(u => {
+      if (u.email) userMap.set(u.email.toLowerCase().trim(), u);
+      if (u.mobile) userMap.set(u.mobile.replace(/\D/g, ''), u);
+      if (u._id) userMap.set(String(u._id), u);
+      if (u.id) userMap.set(String(u.id), u);
+    });
     
     const seenGuests = new Set();
     const guestList = [];
@@ -400,8 +406,13 @@ router.get('/guests', async (req, res) => {
       const match = String(b.room || "").match(/\b\d{3,4}\b/);
       const rmNum = b.roomNumber || (match ? match[0] : (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : '101'));
       const rmCategory = b.roomType || b.category || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : 'Standard Room');
-      const guestName = b.guest || b.guestName || 'Guest';
-      const dedupKey = `${guestName.trim().toLowerCase()}_${rmNum}`;
+      
+      const userMatch = (b.guestId && userMap.get(String(b.guestId))) ||
+        (b.email && userMap.get(b.email.toLowerCase().trim())) ||
+        (b.phone && userMap.get(String(b.phone).replace(/\D/g, '')));
+
+      const guestName = userMatch?.name || b.guest || b.guestName || 'Guest';
+      const dedupKey = `${(userMatch?.email || guestName).trim().toLowerCase()}_${rmNum}`;
 
       if (!seenGuests.has(dedupKey)) {
         seenGuests.add(dedupKey);
@@ -411,8 +422,11 @@ router.get('/guests', async (req, res) => {
           bookingId: b.bookingId || b.id || b._id,
           name: guestName,
           guest: guestName,
-          phone: b.phone || '--',
-          email: b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+          phone: userMatch?.mobile || userMatch?.phone || b.phone || '--',
+          email: userMatch?.email || b.email || `${guestName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+          avatar: userMatch?.avatar || null,
+          city: userMatch?.city || userMatch?.address || b.city || 'Hyderabad',
+          address: userMatch?.address || userMatch?.city || b.address || '',
           room: rmNum,
           roomNumber: rmNum,
           roomType: rmCategory,
@@ -676,6 +690,16 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
       message: `Room ${req.params.roomNumber} status updated to: ${status || housekeeping}.`,
       category: 'Maintenance'
     });
+
+    if (status === 'Maintenance' || housekeeping === 'Maintenance' || status === 'Out of Order' || status === 'Blocked') {
+      await triggerNotification({
+        role: 'super-admin',
+        propertyId,
+        title: 'Property Maintenance Issue',
+        message: `Room ${req.params.roomNumber} placed on ${status || housekeeping} at property.`,
+        category: 'Property Issue'
+      });
+    }
 
     // Notify Realtime (Socket.io)
     const io = req.app.get('socketio');

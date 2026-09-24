@@ -451,7 +451,7 @@ function Booking() {
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <Label htmlFor="guestName" className="text-xs font-bold text-navy">Full Name</Label>
-                    <Input id="guestName" className="mt-1.5 h-11 text-xs font-medium" value={guestName} onChange={e => { setGuestName(e.target.value); if (fieldErrors.guestName) setFieldErrors(p => ({ ...p, guestName: null })); }} placeholder="e.g. Surya Sharma" required />
+                    <Input id="guestName" nameOnly className="mt-1.5 h-11 text-xs font-medium" value={guestName} onChange={e => { setGuestName(e.target.value); if (fieldErrors.guestName) setFieldErrors(p => ({ ...p, guestName: null })); }} placeholder="e.g. Surya Sharma" required />
                     {fieldErrors.guestName && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.guestName}</p>}
                   </div>
                   <div>
@@ -466,7 +466,7 @@ function Booking() {
                   </div>
                   <div>
                     <Label htmlFor="ct" className="text-xs font-bold text-navy">City</Label>
-                    <Input id="ct" className="mt-1.5 h-11 text-xs font-medium" value={city || (property?.settings?.city || property?.city || "Hyderabad")} onChange={e => { setCity(e.target.value); if (fieldErrors.city) setFieldErrors(p => ({ ...p, city: null })); }} placeholder="e.g. Hyderabad" />
+                    <Input id="ct" textOnly className="mt-1.5 h-11 text-xs font-medium" value={city || (property?.settings?.city || property?.city || "Hyderabad")} onChange={e => { setCity(e.target.value); if (fieldErrors.city) setFieldErrors(p => ({ ...p, city: null })); }} placeholder="e.g. Hyderabad" />
                     {fieldErrors.city && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.city}</p>}
                   </div>
                   <div>

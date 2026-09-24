@@ -241,6 +241,7 @@ function ManagerEditReservation() {
               <FormField label="Guest Full Name" required status={fieldErrors.guest ? "error" : undefined} errorMsg={fieldErrors.guest}>
                 <Input
                   required
+                  nameOnly
                   value={guest}
                   onChange={(e) => {
                     setGuest(e.target.value);
@@ -252,6 +253,7 @@ function ManagerEditReservation() {
               <FormField label="Contact Phone Number" required status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   required
+                  type="tel"
                   value={phone}
                   onChange={(e) => {
                     setPhone(e.target.value);
@@ -353,6 +355,7 @@ function ManagerEditReservation() {
               <FormField label="Total Tariff (₹)" status={fieldErrors.amount ? "error" : undefined} errorMsg={fieldErrors.amount}>
                 <Input
                   type="number"
+                  step="0.01"
                   value={amount}
                   onChange={(e) => {
                     setAmount(Number(e.target.value) || 0);
@@ -364,6 +367,7 @@ function ManagerEditReservation() {
               <FormField label="Outstanding Balance (₹)">
                 <Input
                   type="number"
+                  step="0.01"
                   value={balance}
                   onChange={(e) => setBalance(Number(e.target.value) || 0)}
                 />

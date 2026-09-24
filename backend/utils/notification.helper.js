@@ -1,10 +1,183 @@
 import Notification from '../models/notification.model.js';
+import Property from '../models/property.model.js';
 import { ManagerNotification } from '../models/managerData.model.js';
 import User from '../models/user.model.js';
 import { emitRealtimeSync } from './socketEmitter.js';
 
 // In-memory 60-second duplicate suppression cache
 const recentNotificationCache = new Map();
+
+/**
+ * Retrieves the set of property IDs that are currently managed by an Admin
+ * (either assignedAdmin is set on Property or an Admin user is assigned to the property).
+ */
+export const getAdminManagedPropertyIds = async () => {
+  try {
+    const adminPropIds = new Set();
+    const allProperties = await Property.find({});
+    for (const p of (allProperties || [])) {
+      if (p.assignedAdmin && String(p.assignedAdmin).trim()) {
+        if (p._id) adminPropIds.add(String(p._id).trim());
+        if (p.id) adminPropIds.add(String(p.id).trim());
+      }
+    }
+    const adminUsers = await User.find({ role: 'admin' });
+    for (const u of (adminUsers || [])) {
+      if (u.propertyId && String(u.propertyId).trim()) {
+        adminPropIds.add(String(u.propertyId).trim());
+      }
+    }
+    return adminPropIds;
+  } catch (err) {
+    console.error('Failed to get Admin-managed property IDs:', err.message);
+    return new Set();
+  }
+};
+
+/**
+ * Checks if a notification contains disallowed content for Super Admin
+ * (e.g. booking, guest, check-in/check-out, payment, reservation, or service notifications).
+ */
+export const isDisallowedForSuperAdmin = (title = '', message = '', category = '') => {
+  const t = (title || '').toLowerCase();
+  const m = (message || '').toLowerCase();
+  const c = (category || '').toLowerCase();
+
+  // If explicitly categorized as property setup, staff, configuration, maintenance, or system, it's not a guest/booking transaction
+  const isAllowedCategory = c.includes('property') || c.includes('staff') || c.includes('config') || c.includes('system') || c.includes('ota') || c.includes('security') || c.includes('maintenance') || c.includes('issue');
+
+  // Exception: System / OTA / Security alerts that may mention an OTA channel or sync
+  const isOtaOrSystem = c.includes('ota') || c.includes('channel') || c.includes('security') ||
+                        t.includes('ota') || t.includes('parity') || t.includes('unauthorized') ||
+                        m.includes('booking.com') || m.includes('failed login');
+  if (isOtaOrSystem) {
+    return false;
+  }
+
+  // 1. Guest Booking & Reservation events
+  if (
+    c.includes('reserv') || c.includes('book') ||
+    t.includes('reservation') || t.includes('online reservation') || t.includes('new booking') ||
+    m.includes('booked ') || (m.includes('reservation') && !isAllowedCategory) || m.includes('[ref: #')
+  ) {
+    return true;
+  }
+
+  // 2. Guest Check-in / Check-out events
+  if (
+    t.includes('guest check-in') || t.includes('guest check-out') || t.includes('check-in confirmed') || t.includes('check-out completed') ||
+    m.includes('checked into') || m.includes('checked out from') || (m.includes('check-in') && !isAllowedCategory) || (m.includes('check-out') && !isAllowedCategory)
+  ) {
+    return true;
+  }
+
+  // 3. Guest feedback / Guest experience
+  if (
+    c.includes('guest') || c.includes('feedback') || c.includes('review') ||
+    t.includes('feedback') || t.includes('review') ||
+    m.includes('star review') || m.includes('submitted a review') || (m.includes('guest ') && !isAllowedCategory)
+  ) {
+    return true;
+  }
+
+  // 4. Payment / Billing / Refund events
+  if (
+    c.includes('payment') || c.includes('refund') || c.includes('finance') || c.includes('billing') ||
+    t.includes('payment') || t.includes('refund') ||
+    m.includes('payment of') || m.includes('refund request') || m.includes('payment received')
+  ) {
+    return true;
+  }
+
+  // 5. Service / Housekeeping / Room Service
+  if (
+    c.includes('service') || c.includes('housekeeping') || c.includes('room service') ||
+    t.includes('room service') || t.includes('guest service') || t.includes('food order') ||
+    m.includes('room service') || m.includes('housekeeping request')
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Checks if a notification is a property-related alert for Super Admin
+ * (e.g. property setup/updates, staff, configuration, system, and property-level issues).
+ */
+export const isPropertyRelatedForSuperAdmin = (title = '', message = '', category = '') => {
+  if (isDisallowedForSuperAdmin(title, message, category)) return false;
+
+  const t = (title || '').toLowerCase();
+  const m = (message || '').toLowerCase();
+  const c = (category || '').toLowerCase();
+  const combined = `${t} ${m} ${c}`;
+
+  // 1. Property Setup / Updates
+  if (
+    c.includes('property') || t.includes('property') ||
+    combined.includes('onboard') || combined.includes('property update') || combined.includes('admin assign')
+  ) {
+    return true;
+  }
+
+  // 2. Staff Management
+  if (
+    c.includes('staff') || t.includes('staff') || combined.includes('staff member') ||
+    combined.includes('employee') || combined.includes('roster')
+  ) {
+    return true;
+  }
+
+  // 3. Configuration & Subscriptions
+  if (
+    c.includes('config') || c.includes('settings') || c.includes('subscription') ||
+    t.includes('configuration') || t.includes('settings') || t.includes('subscription') ||
+    combined.includes('plan upgrade')
+  ) {
+    return true;
+  }
+
+  // 4. System & Security Alerts
+  if (
+    c.includes('system') || c.includes('security') || c.includes('ota') || c.includes('sync') || c.includes('access control') ||
+    t.includes('system') || t.includes('security') || t.includes('sync') || t.includes('unauthorized') ||
+    combined.includes('login attempt') || combined.includes('parity')
+  ) {
+    return true;
+  }
+
+  // 5. Property-level issues & Maintenance
+  if (
+    c.includes('maintenance') || c.includes('issue') || c.includes('compliance') || c.includes('facility') ||
+    t.includes('maintenance') || t.includes('issue') || t.includes('out of order') ||
+    combined.includes('maintenance alert') || combined.includes('facility issue') || combined.includes('room status')
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Validates whether a notification is allowed to be dispatched to Super Admin.
+ */
+export const isAllowedForSuperAdminNotification = async ({ title, message, category, propertyId }, cachedAdminPropIds = null) => {
+  if (isDisallowedForSuperAdmin(title, message, category)) {
+    return false;
+  }
+  if (!isPropertyRelatedForSuperAdmin(title, message, category)) {
+    return false;
+  }
+  // Property scope check: if propertyId is provided, must be an Admin-managed property
+  if (propertyId && propertyId !== 'all' && propertyId !== 'All' && propertyId !== 'global') {
+    const adminPropIds = cachedAdminPropIds || await getAdminManagedPropertyIds();
+    if (!adminPropIds.has(String(propertyId))) {
+      return false; // Exclude non-Admin-managed properties
+    }
+  }
+  return true;
+};
 
 /**
  * Centrally triggers/logs a user, role, or property scoped system alert
@@ -17,6 +190,20 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
 
     const cleanTitle = (title || '').trim();
     const cleanMsg = (message || '').trim();
+
+    // Guard: Super Admin receives ONLY property-related notifications for Admin-managed properties
+    if (role === 'super-admin') {
+      const allowed = await isAllowedForSuperAdminNotification({
+        title: cleanTitle,
+        message: cleanMsg,
+        category,
+        propertyId: targetPropId
+      });
+      if (!allowed) {
+        return null;
+      }
+    }
+
     const dedupKey = `${role || 'all'}:::${targetPropId || 'all'}:::${userId || 'none'}:::${cleanTitle.toLowerCase()}:::${cleanMsg.toLowerCase()}`;
 
     // 1. In-memory check (60-second duplicate suppression)
@@ -205,17 +392,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       category = 'Operations';
     }
 
-    // 1. Notify Super Admin & Admin (Global)
-    await triggerNotification({
-      req,
-      io: socketIo,
-      role: 'super-admin',
-      title,
-      message: msg,
-      category,
-      data: { bookingId, guestName, room: roomInfo, action }
-    });
-
+    // 1. Notify Admin (Global)
     await triggerNotification({
       req,
       io: socketIo,
@@ -328,9 +505,8 @@ export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = '
       const title = `New Guest Feedback (${ratingStars})`;
       const msg = `${feedback.guestName || 'A guest'} submitted a ${feedback.rating || 5}-star review for ${feedback.room || feedback.roomType || 'Stay'}: "${snippet}..."`;
 
-      // 1. Notify Admin & Super Admin
+      // 1. Notify Admin
       await triggerNotification({ req, io: socketIo, role: 'admin', title, message: msg, category: 'Guest Experience' });
-      await triggerNotification({ req, io: socketIo, role: 'super-admin', title, message: msg, category: 'Guest Experience' });
       
       // 2. Notify Property Manager & Receptionist
       await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: propId, title, message: msg, category: 'Guest Experience' });

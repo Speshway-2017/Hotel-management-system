@@ -9,6 +9,7 @@ import 'package:hour_stay_mobile/widgets/status_badge.dart';
 import '../feedback/guest_add_feedback_screen.dart';
 import '../folio/guest_folio_screen.dart';
 import 'package:hour_stay_mobile/services/pdf_invoice_service.dart';
+import 'package:hour_stay_mobile/core/utils/input_validators.dart';
 
 class GuestBookingDetailScreen extends StatefulWidget {
   final ReservationModel booking;
@@ -21,10 +22,6 @@ class GuestBookingDetailScreen extends StatefulWidget {
 
 class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
   late ReservationModel _booking;
-  int _extendNights = 1;
-  int _extendHours = 2;
-  bool _isExtending = false;
-  String _paymentOption = 'UPI / Online';
 
   @override
   void initState() {
@@ -32,102 +29,11 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
     _booking = widget.booking;
   }
 
-  double get _dailyRate {
-    final nights = _booking.nights > 0 ? _booking.nights : 1;
-    if (_booking.totalAmount > 0 && nights > 0) {
-      return (_booking.totalAmount / nights).roundToDouble();
-    }
-    return 3000.0;
-  }
-
-  double get _hourlyRate {
-    return (_dailyRate / 24).roundToDouble().clamp(150.0, 1000.0);
-  }
-
-  bool get _isHourly => _booking.stayType.toLowerCase() == 'hourly';
-
-  double get _additionalAmount {
-    if (_isHourly) {
-      return _hourlyRate * _extendHours;
-    } else {
-      return _dailyRate * _extendNights;
-    }
-  }
-
-  DateTime get _currentCheckOutDt {
-    final parsed = Formatters.parseDateSafe(_booking.checkOut);
-    if (parsed != null) {
-      if (parsed.hour == 0 && parsed.minute == 0) {
-        return DateTime(parsed.year, parsed.month, parsed.day, 11, 0);
-      }
-      return parsed;
-    }
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, 11, 0);
-  }
-
-  DateTime get _newCheckOutDt {
-    if (_isHourly) {
-      return _currentCheckOutDt.add(Duration(hours: _extendHours));
-    } else {
-      final base = _currentCheckOutDt;
-      return DateTime(base.year, base.month, base.day + _extendNights, 11, 0);
-    }
-  }
-
-  Future<void> _handleConfirmExtension() async {
-    setState(() => _isExtending = true);
-    final provider = context.read<GuestBookingProvider>();
-    final messenger = ScaffoldMessenger.of(context);
-
-    final newCheckOutIso = _newCheckOutDt.toIso8601String();
-    final amountToAdd = _additionalAmount;
-
-    final success = await provider.extendBooking(
-      bookingId: _booking.id,
-      newCheckOut: newCheckOutIso,
-      additionalNights: _isHourly ? null : _extendNights,
-      extendHours: _isHourly ? _extendHours : null,
-      additionalAmount: amountToAdd,
-      paymentMethod: _paymentOption,
-      paidNow: true,
-    );
-
-    setState(() => _isExtending = false);
-
-    if (success && mounted) {
-      setState(() {
-        _booking = _booking.copyWith(
-          checkOut: newCheckOutIso,
-          nights: _isHourly ? _booking.nights : (_booking.nights + _extendNights),
-          hours: _isHourly ? ((_booking.hours ?? 0) + _extendHours) : _booking.hours,
-          amount: _booking.amount + amountToAdd,
-          paymentStatus: 'Paid',
-        );
-      });
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Stay extended to ${Formatters.checkOutDateTime(newCheckOutIso)}! Payment of ${Formatters.currency(amountToAdd)} confirmed.',
-          ),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    } else if (mounted) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(provider.errorMessage ?? 'Failed to extend stay. Please check with reception.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
-  }
-
   // Handle Booking Cancellation (Only allowed before check-in)
   Future<void> _showCancelBookingDialog(BuildContext context, ReservationModel currentBooking) async {
     final reasonController = TextEditingController();
     final remarksController = TextEditingController();
+    String? reasonError;
     bool isSubmitting = false;
 
     await showDialog(
@@ -162,13 +68,32 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                     TextField(
                       controller: reasonController,
                       style: const TextStyle(fontSize: 13),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          reasonError = val.trim().isEmpty ? 'Cancellation reason is required' : null;
+                        });
+                      },
                       decoration: InputDecoration(
                         hintText: 'e.g. Change of travel plans',
                         hintStyle: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: reasonError != null ? InputValidators.errorRed : AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: reasonError != null ? InputValidators.errorRed : AppColors.border)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: reasonError != null ? InputValidators.errorRed : AppColors.primary, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                     ),
+                    if (reasonError != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(reasonError!, style: InputValidators.errorTextStyle),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     const Text(
                       'Additional Remarks (Optional)',
@@ -202,13 +127,9 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                   onPressed: isSubmitting
                       ? null
                       : () async {
-                          if (reasonController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a cancellation reason'),
-                                backgroundColor: AppColors.error,
-                              ),
-                            );
+                          final rErr = reasonController.text.trim().isEmpty ? 'Cancellation reason is required' : null;
+                          if (rErr != null) {
+                            setDialogState(() => reasonError = rErr);
                             return;
                           }
                           setDialogState(() => isSubmitting = true);
@@ -266,6 +187,10 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
     final ifscController = TextEditingController();
     final bankNameController = TextEditingController();
     final remarksController = TextEditingController();
+    String? upiError;
+    String? holderError;
+    String? accountNumError;
+    String? ifscError;
 
     String refundMethod = 'UPI';
     bool isSubmitting = false;
@@ -457,25 +382,63 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                       TextField(
                         controller: upiController,
                         style: const TextStyle(fontSize: 13),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            upiError = InputValidators.validateUpi(val, required: true);
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'e.g. mobile@okaxis or user@upi',
                           hintStyle: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: upiError != null ? InputValidators.errorRed : AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: upiError != null ? InputValidators.errorRed : AppColors.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: upiError != null ? InputValidators.errorRed : AppColors.primary, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                      if (upiError != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(upiError!, style: InputValidators.errorTextStyle),
+                            ),
+                          ],
+                        ),
+                      ],
                     ] else ...[
                       const Text('Account Holder Name *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       TextField(
                         controller: holderController,
                         style: const TextStyle(fontSize: 13),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            holderError = InputValidators.validateName(val, fieldName: 'Account holder name', required: true);
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'Name as per bank records',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: holderError != null ? InputValidators.errorRed : AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: holderError != null ? InputValidators.errorRed : AppColors.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: holderError != null ? InputValidators.errorRed : AppColors.primary, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                      if (holderError != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(holderError!, style: InputValidators.errorTextStyle),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       const Text('Bank Account Number *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
@@ -483,12 +446,31 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                         controller: accountNumController,
                         keyboardType: TextInputType.number,
                         style: const TextStyle(fontSize: 13),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            accountNumError = InputValidators.validateAccountNumber(val, required: true);
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'e.g. 01234567890123',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: accountNumError != null ? InputValidators.errorRed : AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: accountNumError != null ? InputValidators.errorRed : AppColors.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: accountNumError != null ? InputValidators.errorRed : AppColors.primary, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                      if (accountNumError != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(accountNumError!, style: InputValidators.errorTextStyle),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -502,12 +484,30 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                                   controller: ifscController,
                                   textCapitalization: TextCapitalization.characters,
                                   style: const TextStyle(fontSize: 13),
+                                  onChanged: (val) {
+                                    setSheetState(() {
+                                      final trimmed = val.trim();
+                                      if (trimmed.isEmpty) {
+                                        ifscError = 'IFSC code is required';
+                                      } else if (trimmed.length < 8 || trimmed.length > 11) {
+                                        ifscError = 'IFSC must be 8-11 characters';
+                                      } else {
+                                        ifscError = null;
+                                      }
+                                    });
+                                  },
                                   decoration: InputDecoration(
                                     hintText: 'e.g. HDFC0001234',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ifscError != null ? InputValidators.errorRed : AppColors.border)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ifscError != null ? InputValidators.errorRed : AppColors.border)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ifscError != null ? InputValidators.errorRed : AppColors.primary, width: 1.5)),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                   ),
                                 ),
+                                if (ifscError != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(ifscError!, style: InputValidators.errorTextStyle),
+                                ],
                               ],
                             ),
                           ),
@@ -567,18 +567,28 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
                         onPressed: isSubmitting
                             ? null
                             : () async {
-                                if (refundMethod == 'UPI' && upiController.text.trim().isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter a valid UPI ID'), backgroundColor: AppColors.error),
-                                  );
-                                  return;
-                                }
-                                if (refundMethod == 'Bank Transfer' &&
-                                    (accountNumController.text.trim().isEmpty || ifscController.text.trim().isEmpty)) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter Account Number and IFSC Code'), backgroundColor: AppColors.error),
-                                  );
-                                  return;
+                                if (refundMethod == 'UPI') {
+                                  final uErr = InputValidators.validateUpi(upiController.text, required: true);
+                                  if (uErr != null) {
+                                    setSheetState(() => upiError = uErr);
+                                    return;
+                                  }
+                                } else {
+                                  final hErr = InputValidators.validateName(holderController.text, fieldName: 'Account holder name', required: true);
+                                  final aErr = InputValidators.validateAccountNumber(accountNumController.text, required: true);
+                                  final ifscTrim = ifscController.text.trim();
+                                  final iErr = ifscTrim.isEmpty
+                                      ? 'IFSC code is required'
+                                      : (ifscTrim.length < 8 || ifscTrim.length > 11 ? 'IFSC must be 8-11 characters' : null);
+
+                                  if (hErr != null || aErr != null || iErr != null) {
+                                    setSheetState(() {
+                                      holderError = hErr;
+                                      accountNumError = aErr;
+                                      ifscError = iErr;
+                                    });
+                                    return;
+                                  }
                                 }
 
                                 setSheetState(() => isSubmitting = true);
@@ -951,12 +961,6 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
     final isCancelled = currentBooking.isCancelled || statusLower == 'cancelled';
     final isUpcoming = !isCancelled && !isCurrent && !isCompleted;
 
-    final isStayActive = !isCancelled &&
-        !isCompleted &&
-        (isCurrent ||
-            statusLower == 'confirmed' ||
-            statusLower == 'paid');
-
     final canCancelBeforeCheckIn = isUpcoming;
 
     return Scaffold(
@@ -1223,234 +1227,6 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Extend Stay Box with Dynamic Payment Breakdown
-            if (isStayActive) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withAlpha(15),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.secondary.withAlpha(80)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withAlpha(30),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.more_time_rounded, color: AppColors.secondary, size: 22),
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Extend Your Stay',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondary),
-                              ),
-                              Text(
-                                'Select extra duration & calculate payment instantly',
-                                style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Duration Selector
-                    if (_isHourly) ...[
-                      const Text(
-                        'Additional Hours:',
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [1, 2, 3, 6].map((h) {
-                          final isSel = _extendHours == h;
-                          return ChoiceChip(
-                            label: Text('+$h Hours'),
-                            selected: isSel,
-                            selectedColor: AppColors.secondary,
-                            labelStyle: TextStyle(
-                              color: isSel ? Colors.white : AppColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                            onSelected: (val) {
-                              if (val) setState(() => _extendHours = h);
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    ] else ...[
-                      const Text(
-                        'Additional Nights:',
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 8,
-                        children: [1, 2, 3, 4, 5].map((n) {
-                          final isSel = _extendNights == n;
-                          return ChoiceChip(
-                            label: Text('+$n Night${n > 1 ? "s" : ""}'),
-                            selected: isSel,
-                            selectedColor: AppColors.secondary,
-                            labelStyle: TextStyle(
-                              color: isSel ? Colors.white : AppColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                            onSelected: (val) {
-                              if (val) setState(() => _extendNights = n);
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    ],
-
-                    const SizedBox(height: 14),
-
-                    // Real-Time Dynamic Payment & Schedule Card
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Current Check-Out:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              Text(
-                                Formatters.checkOutDateTime(_currentCheckOutDt.toIso8601String()),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.event_available_rounded, size: 14, color: AppColors.success),
-                                  SizedBox(width: 4),
-                                  Text('New Check-Out:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                                ],
-                              ),
-                              Text(
-                                Formatters.checkOutDateTime(_newCheckOutDt.toIso8601String()),
-                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primary),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 14),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _isHourly ? 'Rate per Hour:' : 'Rate per Night:',
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                              ),
-                              Text(
-                                _isHourly ? '${Formatters.currency(_hourlyRate)} / hr' : '${Formatters.currency(_dailyRate)} / night',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Additional Tariff:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                              Text(
-                                Formatters.currency(_additionalAmount),
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.primary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('New Total Stay Cost:', style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary)),
-                              Text(
-                                Formatters.currency(currentBooking.totalAmount + _additionalAmount),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Payment Mode Selector
-                    Row(
-                      children: [
-                        const Text('Payment:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _paymentOption,
-                                isDense: true,
-                                icon: const Icon(Icons.arrow_drop_down_rounded, size: 20),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                                items: const [
-                                  DropdownMenuItem(value: 'UPI / Online', child: Text('UPI / Online')),
-                                  DropdownMenuItem(value: 'Card Payment', child: Text('Credit / Debit Card')),
-                                  DropdownMenuItem(value: 'Pay at Front Desk', child: Text('Pay at Front Desk')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _paymentOption = val);
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Extension Action Button
-                    CustomButton(
-                      text: 'Confirm Extension & Pay ${Formatters.currency(_additionalAmount)}',
-                      backgroundColor: AppColors.secondary,
-                      icon: Icons.check_circle_outline_rounded,
-                      isLoading: _isExtending,
-                      onPressed: _handleConfirmExtension,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
 
             // Cancel Booking Button (for upcoming stays prior to check-in)
             if (canCancelBeforeCheckIn) ...[

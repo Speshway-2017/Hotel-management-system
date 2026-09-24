@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Close Confirmation - Hour Stay HMS</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-drag: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: transparent;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    /* Modal Container Card */
+    .modal-card {
+      position: relative;
+      width: 100%;
+      max-width: 410px;
+      background: linear-gradient(165deg, #0d1527 0%, #080c16 100%);
+      border: 1px solid rgba(139, 92, 246, 0.28);
+      border-radius: 20px;
+      box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 0 40px -10px rgba(124, 58, 237, 0.35);
+      padding: 26px 28px 24px;
+      text-align: center;
+      color: #f8fafc;
+      animation: modalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes modalFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.94) translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    /* Top Close Icon Button (X) */
+    .close-icon-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .close-icon-btn:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      transform: scale(1.05);
+    }
+
+    .close-icon-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke-width: 2.2;
+    }
+
+    /* Logo & Icon Badge */
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.25) 0%, rgba(99, 102, 241, 0.15) 100%);
+      border: 1px solid rgba(139, 92, 246, 0.45);
+      box-shadow: 0 8px 20px -4px rgba(124, 58, 237, 0.4);
+      margin-bottom: 16px;
+    }
+
+    .logo-badge svg {
+      width: 30px;
+      height: 30px;
+      color: #c4b5fd;
+    }
+
+    /* Brand Header Pill */
+    .brand-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #fef08a; /* Cream gold accent */
+      background: rgba(254, 240, 138, 0.08);
+      border: 1px solid rgba(254, 240, 138, 0.2);
+      padding: 3px 10px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+
+    /* Modal Title */
+    .modal-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #fdfbf7; /* Cream white */
+      letter-spacing: -0.3px;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    /* Modal Short Message */
+    .modal-message {
+      font-size: 13.5px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+
+    /* Actions Button Container */
+    .actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 42px;
+      padding: 0 16px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+    }
+
+    /* Cancel Button (Cream / Slate Outline) */
+    .btn-cancel {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #f1f5f9;
+    }
+
+    .btn-cancel:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .btn-cancel:active {
+      transform: translateY(0);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Close App Button (Purple Gradient) */
+    .btn-close-app {
+      background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      color: #ffffff;
+      box-shadow: 0 4px 14px -1px rgba(124, 58, 237, 0.5);
+    }
+
+    .btn-close-app:hover {
+      background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%);
+      border-color: rgba(196, 181, 253, 0.6);
+      box-shadow: 0 6px 20px -1px rgba(124, 58, 237, 0.65);
+      transform: translateY(-1px);
+    }
+
+    .btn-close-app:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="modal-card">
+    <!-- Top-right Close Button -->
+    <button class="close-icon-btn" id="btnIconClose" title="Cancel & Keep Open">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+
+    <!-- Centered Hour Stay Brand Logo -->
+    <div>
+      <div class="logo-badge">
+        <!-- Hotel & HourStay SVG Icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21h18"></path>
+          <path d="M5 21V7l8-4v18"></path>
+          <path d="M19 21V11l-6-4"></path>
+          <path d="M9 9v.01"></path>
+          <path d="M9 12v.01"></path>
+          <path d="M9 15v.01"></path>
+          <path d="M9 18v.01"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Brand Pill -->
+    <div>
+      <span class="brand-pill">
+        <span>👑</span> Hour Stay Desk
+      </span>
+    </div>
+
+    <!-- Title & Message -->
+    <h2 class="modal-title">Do you want to close the app?</h2>
+    <p class="modal-message">
+      You are about to exit the Receptionist Desk. Any ongoing local session actions will be closed.
+    </p>
+
+    <!-- Action Buttons -->
+    <div class="actions-row">
+      <button class="btn btn-cancel" id="btnCancel">
+        Cancel
+      </button>
+      <button class="btn btn-close-app" id="btnCloseApp">
+        Close App
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const cancelAction = () => {
+      if (window.dialogAPI && typeof window.dialogAPI.cancel === 'function') {
+        window.dialogAPI.cancel();
+      }
+    };
+
+    const closeAppAction = () => {
+      if (window.dialogAPI && typeof window.dialogAPI.closeApp === 'function') {
+        window.dialogAPI.closeApp();
+      }
+    };
+
+    document.getElementById('btnCancel').addEventListener('click', cancelAction);
+    document.getElementById('btnIconClose').addEventListener('click', cancelAction);
+    document.getElementById('btnCloseApp').addEventListener('click', closeAppAction);
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        cancelAction();
+      } else if (e.key === 'Enter') {
+        closeAppAction();
+      }
+    });
+  </script>
+</body>
+</html>

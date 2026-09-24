@@ -386,7 +386,7 @@ export function ReceptionistFeedbackPage() {
                   <th className="py-3.5 px-4 whitespace-nowrap">Rating</th>
                   <th className="py-3.5 px-4 whitespace-nowrap">Sentiment</th>
                   <th className="py-3.5 px-4">Guest Comments</th>
-                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Status</th>
+                  <th className="py-3.5 px-4 text-left whitespace-nowrap">Status</th>
                   <th className="py-3.5 px-4 text-left whitespace-nowrap min-w-[90px]">Actions</th>
                 </tr>
               </thead>
@@ -463,7 +463,7 @@ export function ReceptionistFeedbackPage() {
                       </td>
 
                       {/* Status */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap">
                         <StatusBadge status={f.status || (f.response ? "Resolved" : "Published")} />
                       </td>
 
@@ -527,7 +527,9 @@ export function ReceptionistFeedbackPage() {
             <form onSubmit={handleCreateFeedback} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-navy">Guest Name *</label>
+                  <label className="text-xs font-bold text-navy">
+                    Guest Name <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   <input
                     required
                     placeholder="Full Guest Name"
@@ -583,7 +585,9 @@ export function ReceptionistFeedbackPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-navy">Guest Remarks / Comments *</label>
+                <label className="text-xs font-bold text-navy">
+                  Guest Remarks / Comments <span className="text-red-600 font-bold ml-1">*</span>
+                </label>
                 <textarea
                   required
                   rows={3}

@@ -35,13 +35,13 @@
     "nights": 2,
     "pax": "2 Adults",
     "source": "MakeMyTrip",
-    "status": "Checked-in",
+    "status": "Checked-out",
     "amount": 11400,
     "totalAmount": 11400,
     "balance": 0,
     "paymentStatus": "Paid",
     "propertyId": "HS-9HQ8P",
-    "updatedAt": "2026-09-22T16:49:20.000Z",
+    "updatedAt": "2026-09-24T08:11:48.972Z",
     "id": "BK-10101",
     "guestName": "Mounika",
     "name": "Mounika",
@@ -55,7 +55,11 @@
     "idVerification": "Verified",
     "idDocType": "Aadhaar Card",
     "idDocNumber": "2355 4563 7654",
-    "createdAt": "2026-09-22T09:15:00.000Z"
+    "createdAt": "2026-09-22T09:15:00.000Z",
+    "checkedOutAt": "2026-09-24T08:11:48.771Z",
+    "autoCheckedOut": true,
+    "autoCheckedOutAt": "2026-09-24T08:11:48.771Z",
+    "folioStatus": "Closed"
   },
   {
     "bookingId": "BK-10102",
