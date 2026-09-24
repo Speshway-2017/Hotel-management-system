@@ -5,6 +5,7 @@ import '../../../models/reservation_model.dart';
 import '../../../providers/guest/guest_booking_provider.dart';
 import '../../../providers/guest/guest_feedback_provider.dart';
 import 'package:hour_stay_mobile/colours.dart';
+import '../../../core/utils/input_validators.dart';
 
 class GuestAddFeedbackScreen extends StatefulWidget {
   final String? reservationId;
@@ -369,12 +370,14 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
                     TextFormField(
                       controller: _commentController,
                       maxLines: 5,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       style: const TextStyle(fontSize: 13.5, color: navy, height: 1.4),
                       decoration: InputDecoration(
                         hintText: 'What did you like the most about your stay? Any feedback for staff, room comfort, or food quality?',
                         hintStyle: const TextStyle(fontSize: 12.5, color: muted),
                         filled: true,
                         fillColor: background,
+                        errorStyle: InputValidators.errorTextStyle,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(color: cardBorder),
@@ -387,6 +390,8 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(color: purple, width: 1.5),
                         ),
+                        errorBorder: InputValidators.errorOutlineBorder(radius: 14),
+                        focusedErrorBorder: InputValidators.errorOutlineBorder(radius: 14, width: 2.0),
                         contentPadding: const EdgeInsets.all(14),
                       ),
                       validator: (value) {

@@ -2,7 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
-import { protect } from '../middleware/auth.middleware.js';
+import Booking from '../models/booking.model.js';
+import { protect, clearUserCache } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
@@ -204,7 +205,15 @@ router.post('/reset-password', async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 router.get('/profile', protect, async (req, res) => {
-  const user = req.user;
+  const userId = req.user._id || req.user.id;
+  let user = null;
+  try {
+    user = await User.findOne({
+      $or: [{ _id: String(userId) }, { id: String(userId) }, { email: req.user.email }]
+    });
+  } catch (_) {}
+  if (!user) user = req.user;
+
   return sendSuccess(res, 200, {
     id: user.id || user._id,
     _id: user.id || user._id,
@@ -216,6 +225,11 @@ router.get('/profile', protect, async (req, res) => {
     status: user.status || 'Active',
     propertyId: user.propertyId || null,
     avatar: user.avatar || null,
+    city: user.city || '',
+    address: user.address || user.city || '',
+    state: user.state || '',
+    country: user.country || 'India',
+    preferences: user.preferences || '',
     dept: user.dept || 'Front Desk',
     shift: user.shift || 'Morning (06:00 - 14:00)'
   }, 'Profile details retrieved');
@@ -225,11 +239,16 @@ router.get('/profile', protect, async (req, res) => {
 // @route   PUT /api/auth/profile
 // @access  Private
 router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
-  const { name, mobile, avatar, phone } = req.body;
+  const { name, mobile, avatar, phone, address, city, state, country, preferences } = req.body;
   const updateData = {};
   if (name !== undefined) updateData.name = name;
-  if (mobile !== undefined) updateData.mobile = mobile;
-  if (phone !== undefined && mobile === undefined) updateData.mobile = phone;
+  const effectiveMobile = mobile !== undefined ? mobile : phone;
+  if (effectiveMobile !== undefined) updateData.mobile = effectiveMobile;
+  if (address !== undefined) updateData.address = address;
+  if (city !== undefined) updateData.city = city;
+  if (state !== undefined) updateData.state = state;
+  if (country !== undefined) updateData.country = country;
+  if (preferences !== undefined) updateData.preferences = preferences;
 
   try {
     if (req.file) {
@@ -240,14 +259,60 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
     }
 
     const userId = req.user._id || req.user.id;
-    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    const query = [{ _id: String(userId) }, { id: String(userId) }, { email: req.user.email }];
     if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
       query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
     }
 
-    const updatedUser = await User.findOneAndUpdate({ $or: query }, updateData, { new: true });
+    let updatedUser = await User.findOneAndUpdate({ $or: query }, updateData, { new: true });
+    if (!updatedUser) {
+      const existing = await User.findOne({ $or: query });
+      if (existing) {
+        Object.assign(existing, updateData);
+        await existing.save();
+        updatedUser = existing;
+      }
+    }
+
     if (!updatedUser) {
       return sendError(res, 404, 'User not found');
+    }
+
+    // Clear auth caches immediately so next request gets fresh profile
+    clearUserCache();
+
+    // Synchronize all associated bookings for this guest
+    try {
+      const userIdentities = [
+        { guestId: String(userId) },
+        { guestId: updatedUser.id || updatedUser._id },
+        { email: req.user.email },
+        { email: updatedUser.email },
+        ...(req.user.mobile ? [{ phone: req.user.mobile }] : []),
+        ...(updatedUser.mobile ? [{ phone: updatedUser.mobile }] : [])
+      ];
+
+      const bookingSyncFields = {};
+      if (updateData.name) {
+        bookingSyncFields.guest = updateData.name;
+        bookingSyncFields.guestName = updateData.name;
+      }
+      if (effectiveMobile) {
+        bookingSyncFields.phone = effectiveMobile;
+        bookingSyncFields.mobile = effectiveMobile;
+      }
+      if (updateData.city) {
+        bookingSyncFields.city = updateData.city;
+      }
+      if (updateData.address) {
+        bookingSyncFields.address = updateData.address;
+      }
+
+      if (Object.keys(bookingSyncFields).length > 0) {
+        await Booking.updateMany({ $or: userIdentities }, { $set: bookingSyncFields });
+      }
+    } catch (syncErr) {
+      console.warn('Booking sync warning on profile update:', syncErr.message);
     }
 
     const io = req.app.get('socketio');
@@ -255,8 +320,14 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
       try {
         if (typeof emitRealtimeSync === 'function') {
           emitRealtimeSync(io, 'all', 'user_updated', updatedUser);
-          emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'profile_updated', id: userId });
+          emitRealtimeSync(io, 'all', 'guest_updated', { ...updatedUser, guestId: userId });
+          emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'profile_updated', id: userId, user: updatedUser });
+          emitRealtimeSync(io, 'all', 'booking_updated', { guest: updatedUser.name, phone: updatedUser.mobile });
         }
+        io.emit('user_updated', updatedUser);
+        io.emit('guest_updated', updatedUser);
+        io.emit('dashboard_sync', { action: 'profile_updated', id: userId, user: updatedUser });
+        io.emit('booking_updated', { guest: updatedUser.name, phone: updatedUser.mobile });
       } catch (socketErr) {
         console.warn('Socket broadcast warning on profile update:', socketErr.message);
       }
@@ -273,6 +344,11 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
       status: updatedUser.status,
       propertyId: updatedUser.propertyId || null,
       avatar: updatedUser.avatar || null,
+      city: updatedUser.city || '',
+      address: updatedUser.address || updatedUser.city || '',
+      state: updatedUser.state || '',
+      country: updatedUser.country || 'India',
+      preferences: updatedUser.preferences || '',
       dept: updatedUser.dept || 'Front Desk',
       shift: updatedUser.shift || 'Morning (06:00 - 14:00)'
     }, 'Profile updated successfully');

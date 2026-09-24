@@ -169,6 +169,15 @@ router.put('/settings', async (req, res) => {
       emitRealtimeSync(io, propertyId, 'dashboard_sync', { propertyId, action: 'settings_updated' });
     }
 
+    await triggerNotification({
+      req,
+      role: 'super-admin',
+      propertyId,
+      title: 'Property Configuration Updated',
+      message: `${req.user?.name || 'Admin'} updated configuration settings for ${hotelName || 'property'}.`,
+      category: 'Configuration'
+    });
+
     return sendSuccess(res, 200, {
       ...updatedProperty.settings,
       name: updatedProperty.name,
@@ -1076,6 +1085,16 @@ const handleCreateUserOrStaff = async (req, res) => {
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_created', id: newUser._id || newUser.id });
     }
 
+    const staffPropId = newUser.propertyId || req.user?.propertyId;
+    await triggerNotification({
+      req,
+      role: 'super-admin',
+      propertyId: staffPropId,
+      title: 'New Staff Member Added',
+      message: `Staff member ${newUser.name} (${newUser.role}) was added to property by Admin ${req.user?.name || 'Admin'}.`,
+      category: 'Staff'
+    });
+
     return sendSuccess(res, 201, {
       id: newUser.id || newUser._id,
       _id: newUser.id || newUser._id,
@@ -1138,6 +1157,16 @@ const handleUpdateUserOrStaff = async (req, res) => {
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id });
     }
 
+    const updatedPropId = updated.propertyId || req.user?.propertyId;
+    await triggerNotification({
+      req,
+      role: 'super-admin',
+      propertyId: updatedPropId,
+      title: 'Staff Profile Updated',
+      message: `Staff member ${updated.name} profile was updated by Admin ${req.user?.name || 'Admin'}.`,
+      category: 'Staff'
+    });
+
     return sendSuccess(res, 200, {
       id: updated.id || updated._id,
       _id: updated.id || updated._id,
@@ -1171,6 +1200,16 @@ const handleDeleteUserOrStaff = async (req, res) => {
       emitRealtimeSync(io, 'all', 'user_deleted', { id });
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_deleted', id });
     }
+
+    const deletedPropId = targetUser.propertyId || req.user?.propertyId;
+    await triggerNotification({
+      req,
+      role: 'super-admin',
+      propertyId: deletedPropId,
+      title: 'Staff Member Removed',
+      message: `Staff member ${targetUser.name} was removed by Admin ${req.user?.name || 'Admin'}.`,
+      category: 'Staff'
+    });
 
     return sendSuccess(res, 200, { id }, 'Staff profile deleted successfully');
   } catch (error) {

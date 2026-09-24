@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, shell, nativeImage, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
 const { createReceptionMenu } = require('./menu');
@@ -15,6 +15,7 @@ if (!gotTheLock) {
 }
 
 let mainWindow = null;
+let isAppClosing = false;
 
 const FRONTEND_DEV_URL = process.env.ELECTRON_START_URL || 'http://localhost:5173';
 const RECEPTION_DEFAULT_PATH = '/reception';
@@ -128,6 +129,69 @@ function getConnectingHtml(targetUrl) {
   `;
 }
 
+let activeDialogWin = null;
+
+/**
+ * Displays the custom Hour Stay close confirmation modal dialog
+ */
+function showCustomCloseConfirmation(parentWin) {
+  return new Promise((resolve) => {
+    if (activeDialogWin && !activeDialogWin.isDestroyed()) {
+      activeDialogWin.focus();
+      return;
+    }
+
+    activeDialogWin = new BrowserWindow({
+      width: 440,
+      height: 350,
+      parent: parentWin && !parentWin.isDestroyed() ? parentWin : null,
+      modal: true,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: true,
+      center: true,
+      show: false,
+      backgroundColor: '#00000000',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'dialog-preload.js')
+      }
+    });
+
+    activeDialogWin.loadFile(path.join(__dirname, 'close-dialog.html'));
+
+    activeDialogWin.once('ready-to-show', () => {
+      if (activeDialogWin && !activeDialogWin.isDestroyed()) {
+        activeDialogWin.show();
+      }
+    });
+
+    let resolved = false;
+    const cleanup = (shouldClose) => {
+      if (resolved) return;
+      resolved = true;
+      ipcMain.removeListener('close-dialog:action', handleAction);
+      if (activeDialogWin && !activeDialogWin.isDestroyed()) {
+        activeDialogWin.destroy();
+      }
+      activeDialogWin = null;
+      resolve(shouldClose);
+    };
+
+    const handleAction = (_event, action) => {
+      cleanup(action === 'close');
+    };
+
+    ipcMain.on('close-dialog:action', handleAction);
+
+    activeDialogWin.on('closed', () => {
+      cleanup(false);
+    });
+  });
+}
+
 /**
  * Creates and initializes the primary Receptionist desktop window
  */
@@ -176,6 +240,30 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // Intercept window close to show custom Hour Stay confirmation dialog
+  mainWindow.on('close', async (event) => {
+    if (isAppClosing) {
+      return;
+    }
+
+    event.preventDefault();
+
+    try {
+      const shouldClose = await showCustomCloseConfirmation(mainWindow);
+      if (shouldClose) {
+        isAppClosing = true;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.close();
+        }
+      }
+    } catch (err) {
+      isAppClosing = true;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.destroy();
+      }
+    }
   });
 
   mainWindow.on('closed', () => {

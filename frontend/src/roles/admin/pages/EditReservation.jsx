@@ -337,6 +337,7 @@ function EditReservation() {
                   <Input
                     id="guest"
                     type="text"
+                    nameOnly
                     required
                     value={guest}
                     onChange={(e) => {
@@ -350,7 +351,7 @@ function EditReservation() {
                 <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                   <Input
                     id="phone"
-                    type="text"
+                    type="tel"
                     required
                     value={phone}
                     onChange={(e) => {

@@ -116,6 +116,7 @@ function AddGuestPage() {
                 <Input
                   id="name"
                   type="text"
+                  nameOnly
                   required
                   placeholder="e.g. Surya"
                   value={formData.name}
@@ -150,7 +151,7 @@ function AddGuestPage() {
               <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
-                  type="text"
+                  type="tel"
                   required
                   placeholder="+91 XXXXX XXXXX"
                   value={formData.phone}
@@ -164,6 +165,7 @@ function AddGuestPage() {
                 <Input
                   id="city"
                   type="text"
+                  textOnly
                   placeholder="e.g. Mumbai"
                   value={formData.city}
                   onChange={handleChange}
@@ -173,6 +175,7 @@ function AddGuestPage() {
                 <Input
                   id="state"
                   type="text"
+                  textOnly
                   placeholder="e.g. Maharashtra"
                   value={formData.state}
                   onChange={handleChange}
@@ -182,6 +185,7 @@ function AddGuestPage() {
                 <Input
                   id="country"
                   type="text"
+                  textOnly
                   placeholder="e.g. India"
                   value={formData.country}
                   onChange={handleChange}

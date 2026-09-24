@@ -101,6 +101,7 @@ function AddAdmin() {
             <Input
               id="admin-name"
               required
+              nameOnly
               placeholder="e.g. Vikram Rathore"
               value={formData.name}
               onChange={(e) => {
@@ -169,6 +170,7 @@ function AddAdmin() {
           >
             <Input
               id="admin-mobile"
+              type="tel"
               placeholder="e.g. 98290 11223"
               value={formData.mobile}
               onChange={(e) => {

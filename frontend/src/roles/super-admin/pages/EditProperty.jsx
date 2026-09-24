@@ -158,6 +158,7 @@ function EditProperty() {
                 <Input
                   id="prop-city"
                   required
+                  textOnly
                   value={propertyForm.city}
                   onChange={(e) => {
                     setPropertyForm({ ...propertyForm, city: e.target.value });

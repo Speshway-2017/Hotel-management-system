@@ -1179,8 +1179,13 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
                           ? null
                           : () async {
                               setModalState(() => isProcessing = true);
+                              final effectiveBookingId = payment.bookingId.trim().isNotEmpty
+                                  ? payment.bookingId.trim()
+                                  : (payment.paymentId.trim().isNotEmpty
+                                      ? payment.paymentId.trim()
+                                      : payment.id.trim());
                               final success = await context.read<GuestPaymentProvider>().payBalance(
-                                    bookingId: payment.bookingId,
+                                    bookingId: effectiveBookingId,
                                     amount: payment.balance,
                                     paymentMethod: selectedMethod,
                                   );
@@ -1188,12 +1193,15 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
 
                               if (context.mounted) {
                                 Navigator.of(ctx).pop();
+                                final errorMsg = context.read<GuestPaymentProvider>().errorMessage;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       success
                                           ? 'Payment of ${Formatters.currency(payment.balance)} processed successfully!'
-                                          : 'Payment failed. Please try again.',
+                                          : (errorMsg != null && errorMsg.isNotEmpty
+                                              ? errorMsg
+                                              : 'Payment failed. Please try again.'),
                                     ),
                                     backgroundColor: success ? emeraldDark : rubyDark,
                                     behavior: SnackBarBehavior.floating,

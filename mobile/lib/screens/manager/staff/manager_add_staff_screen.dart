@@ -130,7 +130,8 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
                       label: 'Staff Full Name',
                       hint: 'e.g. Rahul Sharma',
                       prefixIcon: Icons.person_outline_rounded,
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Full name is required' : null,
+                      validationType: FieldValidationType.name,
+                      required: true,
                     ),
                     const SizedBox(height: 14),
                     CustomTextField(
@@ -139,7 +140,8 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
                       hint: 'rahul@hourstay.com',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+                      validationType: FieldValidationType.email,
+                      required: true,
                     ),
                     const SizedBox(height: 14),
                     CustomTextField(
@@ -148,6 +150,8 @@ class _ManagerAddStaffScreenState extends State<ManagerAddStaffScreen> {
                       hint: '+91 98765 43210',
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
+                      validationType: FieldValidationType.phone,
+                      required: true,
                     ),
                     const SizedBox(height: 14),
                     CustomTextField(

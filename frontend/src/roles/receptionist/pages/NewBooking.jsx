@@ -226,17 +226,27 @@ function ReceptionistNewBooking() {
     const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, category);
 
     // Filter available rooms of selected type if matching
-    const matchingRoom = availableRoomsList.find(r => r.type === category);
-    const assignedRoomNum = matchingRoom ? matchingRoom.num : form.roomNumber;
+    const matchingRooms = availableRoomsList.filter(r => {
+      const rType = String(r.type || '').trim().toLowerCase();
+      const cType = String(category || '').trim().toLowerCase();
+      return rType === cType || rType.includes(cType) || cType.includes(rType);
+    });
+
+    const isCurrentRoomValid = form.roomNumber && matchingRooms.some(r => String(r.num) === String(form.roomNumber));
+    const assignedRoomNum = isCurrentRoomValid ? form.roomNumber : "";
 
     setForm(prev => ({
       ...prev,
       roomType: category,
-      roomNumber: assignedRoomNum || prev.roomNumber,
+      roomNumber: assignedRoomNum,
       nights: nights,
       amount: amount !== "" ? amount : prev.amount,
       balance: 0
     }));
+
+    if (fieldErrors.roomNumber && assignedRoomNum) {
+      setFieldErrors(prev => ({ ...prev, roomNumber: null }));
+    }
   };
 
   const handleNightsChange = (val) => {
@@ -274,6 +284,14 @@ function ReceptionistNewBooking() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!form.roomNumber || !String(form.roomNumber).trim()) {
+      const msg = "Please select room";
+      setFieldErrors(prev => ({ ...prev, roomNumber: msg }));
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
 
     const val = validateWithZod(walkInBookingSchema, {
       guest: form.guest,
@@ -367,13 +385,25 @@ function ReceptionistNewBooking() {
 
   // Filter available rooms in dropdown based on selected room category if category is chosen
   const filteredAvailableRooms = form.roomType
-    ? availableRoomsList.filter(r => r.type === form.roomType)
+    ? availableRoomsList.filter(r => {
+        const rType = String(r.type || '').trim().toLowerCase();
+        const fType = String(form.roomType || '').trim().toLowerCase();
+        return rType === fType || rType.includes(fType) || fType.includes(rType);
+      })
     : availableRoomsList;
 
-  const displayRooms = filteredAvailableRooms.length > 0 ? filteredAvailableRooms : availableRoomsList;
+  const displayRooms = form.roomType ? filteredAvailableRooms : availableRoomsList;
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">
+      <Crumbs
+        items={[
+          { label: "Front Desk", to: "/reception" },
+          { label: "Reservations", to: "/reception/reservations" },
+          { label: "New Reservation" }
+        ]}
+      />
+
       {error && <Notice tone="error" title="Reservation Blocked">{error}</Notice>}
 
       {loading ? (
@@ -383,9 +413,10 @@ function ReceptionistNewBooking() {
           {/* Guest Profile & Mandatory ID Proof Details */}
           <Panel title="Guest Identification & Mandatory ID Proof" description="Primary guest profile and government ID verification">
             <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <FormField label="Guest Full Name *" required status={fieldErrors.guest ? "error" : undefined} errorMsg={fieldErrors.guest}>
+              <FormField label="Guest Full Name" required status={fieldErrors.guest ? "error" : undefined} errorMsg={fieldErrors.guest}>
                 <Input
                   required
+                  nameOnly
                   placeholder="Enter guest full name"
                   value={form.guest}
                   onChange={(e) => {
@@ -395,9 +426,10 @@ function ReceptionistNewBooking() {
                 />
               </FormField>
 
-              <FormField label="Contact Phone Number *" required status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
+              <FormField label="Contact Phone Number" required status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   required
+                  type="tel"
                   placeholder="Enter contact number (+91 98765 43210)"
                   value={form.phone}
                   onChange={(e) => {
@@ -420,7 +452,7 @@ function ReceptionistNewBooking() {
               </FormField>
 
               {/* Mandatory ID Proof Fields */}
-              <FormField label="ID Proof Type *" required>
+              <FormField label="ID Proof Type" required>
                 <Select
                   required
                   value={form.idProofType}
@@ -444,7 +476,9 @@ function ReceptionistNewBooking() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-navy block">ID Proof Document Number *</label>
+                  <label className="text-xs font-bold text-navy block">
+                    ID Proof Document Number <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   {isAadhaarType && existingGuestAadhaar?.hasExistingAadhaar && (
                     <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
                       On Record: {existingGuestAadhaar.maskedAadhaar}
@@ -511,7 +545,7 @@ function ReceptionistNewBooking() {
           {/* Stay & Room Configuration */}
           <Panel title="Stay Itinerary & Room Allocation" description="Schedule dates, category tier, and available room allotment">
             <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <FormField label="Check-In Date *" required>
+              <FormField label="Check-In Date" required>
                 <Input
                   type="date"
                   required
@@ -521,7 +555,7 @@ function ReceptionistNewBooking() {
                 />
               </FormField>
 
-              <FormField label="Check-Out Date *" required>
+              <FormField label="Check-Out Date" required>
                 <Input
                   type="date"
                   required
@@ -541,7 +575,7 @@ function ReceptionistNewBooking() {
                 />
               </FormField>
 
-              <FormField label="Room Category *" required>
+              <FormField label="Room Category" required>
                 <Select
                   required
                   value={form.roomType}
@@ -554,10 +588,22 @@ function ReceptionistNewBooking() {
                 </Select>
               </FormField>
 
-              <FormField label="Room Allotment (Available Only)">
+              <FormField 
+                label="Room Allotment (Available Only)" 
+                required 
+                status={fieldErrors.roomNumber ? "error" : undefined} 
+                errorMsg={fieldErrors.roomNumber}
+              >
                 <Select
+                  required
                   value={form.roomNumber}
-                  onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm({ ...form, roomNumber: val });
+                    if (fieldErrors.roomNumber) {
+                      setFieldErrors(p => ({ ...p, roomNumber: null }));
+                    }
+                  }}
                 >
                   <option value="">Select Available Room</option>
                   {displayRooms.length > 0 ? (
@@ -567,7 +613,9 @@ function ReceptionistNewBooking() {
                       </option>
                     ))
                   ) : (
-                    <option value="" disabled>No vacant rooms available for this type</option>
+                    <option value="" disabled>
+                      {form.roomType ? `No vacant rooms available for ${form.roomType}` : "No vacant rooms available"}
+                    </option>
                   )}
                 </Select>
               </FormField>
@@ -594,6 +642,7 @@ function ReceptionistNewBooking() {
               <FormField label="Total Tariff Amount (₹) [Auto-Calculated]">
                 <Input
                   type="number"
+                  step="0.01"
                   placeholder="Auto-calculated tariff (₹)"
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: Number(e.target.value) || 0 })}
@@ -603,6 +652,7 @@ function ReceptionistNewBooking() {
               <FormField label="Outstanding Balance (₹)">
                 <Input
                   type="number"
+                  step="0.01"
                   placeholder="0 (Paid)"
                   value={form.balance}
                   onChange={(e) => setForm({ ...form, balance: Number(e.target.value) || 0 })}

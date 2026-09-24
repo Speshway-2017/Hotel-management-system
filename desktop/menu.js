@@ -58,7 +58,13 @@ function createReceptionMenu(mainWindow, frontendBaseUrl = 'http://localhost:517
         {
           label: 'Exit Desk',
           accelerator: 'Alt+F4',
-          click: () => app.quit()
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.close();
+            } else {
+              app.quit();
+            }
+          }
         }
       ]
     },

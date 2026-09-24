@@ -11,6 +11,7 @@ import '../folio/guest_folio_screen.dart';
 import '../search/guest_search_screen.dart';
 import 'guest_booking_detail_screen.dart';
 import 'package:hour_stay_mobile/colours.dart';
+import 'package:hour_stay_mobile/core/utils/input_validators.dart';
 
 
 class GuestBookingsScreen extends StatefulWidget {
@@ -898,48 +899,50 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
 
   // --- UPCOMING ACTIONS ---
   Widget _buildUpcomingActions(BuildContext context, ReservationModel b) {
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            // Pre-Check-in Button
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: navy,
-                  foregroundColor: white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 16, color: gold),
-                label: const Text(
-                  'Pre-Check-in',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-                onPressed: () => _showPreCheckInBottomSheet(context, b),
-              ),
+        // View Details Button
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: navy,
+              foregroundColor: white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            const SizedBox(width: 8),
-            // Cancel / Modify Button
-            Expanded(
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ruby,
-                  side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
-                  backgroundColor: rubyBg.withAlpha(40),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.cancel_outlined, size: 16, color: ruby),
-                label: const Text(
-                  'Cancel Stay',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-                onPressed: () => _showCancelBookingDialog(context, b),
-              ),
+            icon: const Icon(Icons.remove_red_eye_outlined, size: 16, color: gold),
+            label: const Text(
+              'View Details',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
             ),
-          ],
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GuestBookingDetailScreen(booking: b),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Cancel Stay Button
+        Expanded(
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ruby,
+              side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+              backgroundColor: rubyBg.withAlpha(40),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.cancel_outlined, size: 16, color: ruby),
+            label: const Text(
+              'Cancel Stay',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+            onPressed: () => _showCancelBookingDialog(context, b),
+          ),
         ),
       ],
     );
@@ -949,7 +952,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
   Widget _buildCurrentStayActions(BuildContext context, ReservationModel b) {
     return Row(
       children: [
-        // 1. View Stay / Extend
+        // 1. View Stay
         Expanded(
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -962,9 +965,9 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                 side: const BorderSide(color: gold),
               ),
             ),
-            icon: const Icon(Icons.more_time_rounded, size: 16, color: gold),
+            icon: const Icon(Icons.remove_red_eye_outlined, size: 16, color: gold),
             label: const Text(
-              'Extend Stay',
+              'View Stay',
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
             ),
             onPressed: () {
@@ -1118,223 +1121,12 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
   }
 
   // =========================================================================
-  // PRE-CHECK-IN MODAL BOTTOM SHEET
-  // =========================================================================
-  void _showPreCheckInBottomSheet(BuildContext context, ReservationModel booking) {
-    String arrivalTime = '14:00 (Standard)';
-    bool idConfirmed = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 14,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: cardBorder,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Header
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: navy,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.qr_code_2_rounded, color: gold, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Express Pre-Check-in',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: navy,
-                                ),
-                              ),
-                              Text(
-                                'Skip front desk queue upon hotel arrival',
-                                style: TextStyle(fontSize: 12, color: muted),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Stay Info Card
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: background,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: cardBorder),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildModalInfoRow('Hotel:', booking.propertyName),
-                          const Divider(height: 14, color: cardBorder),
-                          _buildModalInfoRow('Room:', 'Room ${booking.roomNumber.isNotEmpty ? booking.roomNumber : "Assigned on arrival"} (${booking.roomType})'),
-                          const Divider(height: 14, color: cardBorder),
-                          _buildModalInfoRow('Scheduled Check-in:', Formatters.checkInDateTime(booking.checkIn)),
-                          const Divider(height: 14, color: cardBorder),
-                          _buildModalInfoRow('Primary Guest:', booking.guestName),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Arrival Time Selector
-                    const Text(
-                      'Estimated Time of Arrival',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: navy),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        '12:00 PM (Early)',
-                        '02:00 PM (Standard)',
-                        '05:00 PM (Evening)',
-                        '09:00 PM (Late Night)',
-                      ].map((t) {
-                        final isSel = arrivalTime == t;
-                        return ChoiceChip(
-                          label: Text(t),
-                          selected: isSel,
-                          selectedColor: navy,
-                          labelStyle: TextStyle(
-                            color: isSel ? white : const Color(0xFF334155),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                          onSelected: (val) {
-                            if (val) setSheetState(() => arrivalTime = t);
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ID Verification Status Check
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: emeraldBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: emerald.withAlpha(60)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.verified_user_rounded, color: emerald, size: 22),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Guest ID Document Ready',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF065F46)),
-                                ),
-                                Text(
-                                  'Aadhaar / Government ID linked with phone: ${booking.guestPhone.isNotEmpty ? booking.guestPhone : "Verified on profile"}',
-                                  style: const TextStyle(fontSize: 11, color: Color(0xFF047857)),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: idConfirmed,
-                            activeThumbColor: emerald,
-                            onChanged: (val) => setSheetState(() => idConfirmed = val),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Confirm Pre-Check-in Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: navy,
-                          foregroundColor: white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: gold, width: 1.2),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Pre-Check-in confirmed! Your digital key is ready for priority check-in upon arrival.'),
-                              backgroundColor: emerald,
-                              duration: Duration(seconds: 4),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'Confirm Pre-Check-in & Fast Pass',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: white),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-
-
-  // =========================================================================
   // CANCELLATION MODAL DIALOG
   // =========================================================================
   Future<void> _showCancelBookingDialog(BuildContext context, ReservationModel currentBooking) async {
     final reasonController = TextEditingController();
     final remarksController = TextEditingController();
+    String? reasonError;
     bool isSubmitting = false;
 
     await showDialog(
@@ -1371,13 +1163,32 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                     TextField(
                       controller: reasonController,
                       style: const TextStyle(fontSize: 13),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          reasonError = val.trim().isEmpty ? 'Cancellation reason is required' : null;
+                        });
+                      },
                       decoration: InputDecoration(
                         hintText: 'e.g. Change in travel plans, Personal emergency',
                         hintStyle: const TextStyle(fontSize: 12, color: muted),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: reasonError != null ? InputValidators.errorRed : cardBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: reasonError != null ? InputValidators.errorRed : cardBorder)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: reasonError != null ? InputValidators.errorRed : purple, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                     ),
+                    if (reasonError != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(reasonError!, style: InputValidators.errorTextStyle),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     const Text(
                       'Additional Remarks (Optional)',
@@ -1412,13 +1223,9 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                   onPressed: isSubmitting
                       ? null
                       : () async {
-                          if (reasonController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a cancellation reason'),
-                                backgroundColor: ruby,
-                              ),
-                            );
+                          final rErr = reasonController.text.trim().isEmpty ? 'Cancellation reason is required' : null;
+                          if (rErr != null) {
+                            setDialogState(() => reasonError = rErr);
                             return;
                           }
                           setDialogState(() => isSubmitting = true);
@@ -1471,6 +1278,10 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
     final ifscController = TextEditingController();
     final bankNameController = TextEditingController();
     final remarksController = TextEditingController();
+    String? upiError;
+    String? holderError;
+    String? accountNumError;
+    String? ifscError;
 
     String refundMethod = 'UPI';
     bool isSubmitting = false;
@@ -1662,25 +1473,63 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                       TextField(
                         controller: upiController,
                         style: const TextStyle(fontSize: 13),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            upiError = InputValidators.validateUpi(val, required: true);
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'e.g. mobile@okaxis or user@upi',
                           hintStyle: const TextStyle(fontSize: 12, color: muted),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: upiError != null ? InputValidators.errorRed : cardBorder)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: upiError != null ? InputValidators.errorRed : cardBorder)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: upiError != null ? InputValidators.errorRed : purple, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                      if (upiError != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(upiError!, style: InputValidators.errorTextStyle),
+                            ),
+                          ],
+                        ),
+                      ],
                     ] else ...[
                       const Text('Account Holder Name *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: navy)),
                       const SizedBox(height: 4),
                       TextField(
                         controller: holderController,
                         style: const TextStyle(fontSize: 13),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            holderError = InputValidators.validateName(val, fieldName: 'Account holder name', required: true);
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'Name as per bank records',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: holderError != null ? InputValidators.errorRed : cardBorder)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: holderError != null ? InputValidators.errorRed : cardBorder)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: holderError != null ? InputValidators.errorRed : purple, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                      if (holderError != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(holderError!, style: InputValidators.errorTextStyle),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       const Text('Bank Account Number *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: navy)),
                       const SizedBox(height: 4),
@@ -1688,12 +1537,31 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                         controller: accountNumController,
                         keyboardType: TextInputType.number,
                         style: const TextStyle(fontSize: 13),
+                        onChanged: (val) {
+                          setSheetState(() {
+                            accountNumError = InputValidators.validateAccountNumber(val, required: true);
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'e.g. 01234567890123',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: accountNumError != null ? InputValidators.errorRed : cardBorder)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: accountNumError != null ? InputValidators.errorRed : cardBorder)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: accountNumError != null ? InputValidators.errorRed : purple, width: 1.5)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                       ),
+                      if (accountNumError != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: InputValidators.errorRed, size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(accountNumError!, style: InputValidators.errorTextStyle),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -1707,12 +1575,30 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                                   controller: ifscController,
                                   textCapitalization: TextCapitalization.characters,
                                   style: const TextStyle(fontSize: 13),
+                                  onChanged: (val) {
+                                    setSheetState(() {
+                                      final trimmed = val.trim();
+                                      if (trimmed.isEmpty) {
+                                        ifscError = 'IFSC code is required';
+                                      } else if (trimmed.length < 8 || trimmed.length > 11) {
+                                        ifscError = 'IFSC must be 8-11 characters';
+                                      } else {
+                                        ifscError = null;
+                                      }
+                                    });
+                                  },
                                   decoration: InputDecoration(
                                     hintText: 'e.g. HDFC0001234',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ifscError != null ? InputValidators.errorRed : cardBorder)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ifscError != null ? InputValidators.errorRed : cardBorder)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ifscError != null ? InputValidators.errorRed : purple, width: 1.5)),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                   ),
                                 ),
+                                if (ifscError != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(ifscError!, style: InputValidators.errorTextStyle),
+                                ],
                               ],
                             ),
                           ),
@@ -1773,18 +1659,28 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                         onPressed: isSubmitting
                             ? null
                             : () async {
-                                if (refundMethod == 'UPI' && upiController.text.trim().isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter a valid UPI ID'), backgroundColor: ruby),
-                                  );
-                                  return;
-                                }
-                                if (refundMethod == 'Bank Transfer' &&
-                                    (accountNumController.text.trim().isEmpty || ifscController.text.trim().isEmpty)) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please enter Account Number and IFSC Code'), backgroundColor: ruby),
-                                  );
-                                  return;
+                                if (refundMethod == 'UPI') {
+                                  final uErr = InputValidators.validateUpi(upiController.text, required: true);
+                                  if (uErr != null) {
+                                    setSheetState(() => upiError = uErr);
+                                    return;
+                                  }
+                                } else {
+                                  final hErr = InputValidators.validateName(holderController.text, fieldName: 'Account holder name', required: true);
+                                  final aErr = InputValidators.validateAccountNumber(accountNumController.text, required: true);
+                                  final ifscTrim = ifscController.text.trim();
+                                  final iErr = ifscTrim.isEmpty
+                                      ? 'IFSC code is required'
+                                      : (ifscTrim.length < 8 || ifscTrim.length > 11 ? 'IFSC must be 8-11 characters' : null);
+
+                                  if (hErr != null || aErr != null || iErr != null) {
+                                    setSheetState(() {
+                                      holderError = hErr;
+                                      accountNumError = aErr;
+                                      ifscError = iErr;
+                                    });
+                                    return;
+                                  }
                                 }
 
                                 setSheetState(() => isSubmitting = true);

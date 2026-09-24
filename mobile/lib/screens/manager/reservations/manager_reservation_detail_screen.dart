@@ -33,8 +33,21 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
     final provider = context.read<ReservationProvider>();
     final messenger = ScaffoldMessenger.of(context);
 
-    // If website booking check-in and ID proof not verified, prompt verification
+    // Strict Check-in Time Enforcement: only allowed from 12:00 PM on booking date
     if (newStatus == 'Checked-in' || newStatus == 'checked_in') {
+      if (!Formatters.isCheckInAllowed(_reservation.checkIn)) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Early check-in locked: Check-in is only permitted starting at 12:00 PM on ${Formatters.date(_reservation.checkIn)}.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      // If website booking check-in and ID proof not verified, prompt verification
       final isWebsiteBooking = _reservation.source.isNotEmpty &&
           !_reservation.source.toLowerCase().contains('walk-in');
       if (isWebsiteBooking && _reservation.idVerification != 'Verified') {
@@ -788,11 +801,19 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
     final isVerified = _reservation.idVerification == 'Verified';
     final stLower = _reservation.status.toLowerCase();
     final isCancelled = stLower == 'cancelled' || stLower == 'canceled';
-    final isCheckedOut = stLower == 'checked-out' || stLower == 'checked_out' || stLower == 'completed';
-    final isCheckedIn = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'active' || stLower == 'staying';
+    final isExplicitCheckedOut = stLower == 'checked-out' || stLower == 'checked_out' || stLower == 'completed';
+    final isExplicitCheckedIn = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'active' || stLower == 'staying';
     final isConfirmed = stLower == 'confirmed';
     final payLower = _reservation.paymentStatus.toLowerCase();
     final isPaid = payLower == 'paid' || payLower == 'settled' || payLower == 'completed' || _reservation.balance <= 0;
+
+    final now = DateTime.now();
+    final canCheckInNow = Formatters.isCheckInAllowed(_reservation.checkIn, null, now);
+    final isCheckOutTimePassed = isExplicitCheckedIn && Formatters.isCheckOutDue(_reservation.checkOut, null, now);
+
+    final isCheckedOut = isExplicitCheckedOut || isCheckOutTimePassed;
+    final isCheckedIn = isExplicitCheckedIn && !isCheckOutTimePassed;
+    final displayStatus = isCheckOutTimePassed ? 'Checked-out' : _reservation.status;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -884,7 +905,7 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                             ),
                         ],
                       ),
-                      StatusBadge(status: _reservation.status, fontSize: 13),
+                      StatusBadge(status: displayStatus, fontSize: 13),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1104,18 +1125,31 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.success.withAlpha(50)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.check_circle_outline, color: AppColors.success, size: 20),
-                    SizedBox(width: 10),
+                    const Icon(Icons.check_circle_outline, color: AppColors.success, size: 20),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        'This guest has checked out. Stay is completed.',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'This guest has checked out. Stay is completed.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.success,
+                            ),
+                          ),
+                          if (isCheckOutTimePassed)
+                            Text(
+                              'Auto-checkout completed at scheduled checkout time (${Formatters.checkOutDateTime(_reservation.checkOut)}).',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -1191,16 +1225,54 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 12),
+              if (!canCheckInNow) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock_clock_rounded, size: 18, color: Color(0xFFD97706)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          Formatters.getCheckInTimeRemaining(_reservation.checkIn),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (!isPaid)
                 Row(
                   children: [
                     Expanded(
                       child: CustomButton(
-                        text: 'Check-In Guest',
-                        backgroundColor: const Color(0xFF10B981),
+                        text: canCheckInNow ? 'Check-In Guest' : 'Check-In Locked',
+                        backgroundColor: canCheckInNow ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
                         textColor: Colors.white,
-                        icon: Icons.meeting_room_rounded,
-                        onPressed: () => _updateStatus('Checked-in'),
+                        icon: canCheckInNow ? Icons.meeting_room_rounded : Icons.lock_clock_rounded,
+                        onPressed: canCheckInNow
+                            ? () => _updateStatus('Checked-in')
+                            : () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Early check-in locked: Check-in opens strictly at 12:00 PM on ${Formatters.date(_reservation.checkIn)}.',
+                                    ),
+                                    backgroundColor: const Color(0xFFD97706),
+                                  ),
+                                );
+                              },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1217,11 +1289,22 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
                 )
               else
                 CustomButton(
-                  text: 'Check-In Guest',
-                  backgroundColor: const Color(0xFF10B981),
+                  text: canCheckInNow ? 'Check-In Guest' : 'Check-In Locked (Opens at 12:00 PM)',
+                  backgroundColor: canCheckInNow ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
                   textColor: Colors.white,
-                  icon: Icons.meeting_room_rounded,
-                  onPressed: () => _updateStatus('Checked-in'),
+                  icon: canCheckInNow ? Icons.meeting_room_rounded : Icons.lock_clock_rounded,
+                  onPressed: canCheckInNow
+                      ? () => _updateStatus('Checked-in')
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Early check-in locked: Check-in opens strictly at 12:00 PM on ${Formatters.date(_reservation.checkIn)}.',
+                              ),
+                              backgroundColor: const Color(0xFFD97706),
+                            ),
+                          );
+                        },
                 ),
               const SizedBox(height: 10),
               CustomButton(

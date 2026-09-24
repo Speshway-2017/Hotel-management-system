@@ -15,6 +15,8 @@ import { extractRoomNumber } from '../utils/roomHelper.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { findPropertySafely } from '../utils/propertyCache.js';
 import { processAutoCheckouts } from '../services/autoCheckout.service.js';
+import { clearUserCache } from '../middleware/auth.middleware.js';
+import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 
 const router = express.Router();
 
@@ -431,17 +433,8 @@ router.post('/feedback', async (req, res) => {
     let guestPhone = req.user?.mobile || '';
 
     if (effectiveBookingId) {
-      const cleanId = String(effectiveBookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
-      const bQuery = [
-        { bookingId: effectiveBookingId },
-        { id: effectiveBookingId },
-        { bookingId: cleanId },
-        { id: cleanId }
-      ];
-      if (mongoose.Types.ObjectId.isValid(cleanId)) {
-        bQuery.unshift({ _id: cleanId });
-      }
-      const b = await Booking.findOne({ $or: bQuery });
+      const bQuery = buildBookingLookupQuery(effectiveBookingId);
+      const b = await Booking.findOne(bQuery);
       if (b) {
         propertyId = b.propertyId || 'HS-9HQ8P';
         room = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
@@ -549,16 +542,35 @@ router.put('/feedback/:id', async (req, res) => {
 // GET /api/v1/guest/profile
 router.get('/profile', async (req, res) => {
   try {
-    const user = req.user;
+    const userId = req.user?._id || req.user?.id;
+    let user = null;
+    try {
+      user = await User.findOne({
+        $or: [{ _id: String(userId) }, { id: String(userId) }, { email: req.user?.email }]
+      });
+    } catch (_) {}
+    if (!user) user = req.user;
+
     return sendSuccess(res, 200, {
+      id: user.id || user._id,
+      _id: user.id || user._id,
       name: user.name || 'Guest User',
       email: user.email || '',
-      mobile: user.mobile || '',
-      city: user.city || 'Hyderabad',
-      address: user.address || '',
+      mobile: user.mobile || user.phone || '',
+      phone: user.mobile || user.phone || '',
+      city: user.city || '',
+      address: user.address || user.city || '',
+      state: user.state || '',
+      country: user.country || 'India',
+      avatar: user.avatar || null,
+      role: user.role || 'guest',
+      status: user.status || 'Active',
+      createdAt: user.createdAt || new Date().toISOString(),
+      loyaltyPoints: user.loyaltyPoints || 0,
+      preferences: user.preferences || '',
       language: user.language || 'English (IN)',
       currency: user.currency || 'INR (₹)',
-      notifications: user.notificationPrefs || {
+      notifications: user.notificationSettings || user.notificationPrefs || {
         emailConfirmations: true,
         smsAlerts: true,
         promotionalOffers: false,
@@ -573,37 +585,109 @@ router.get('/profile', async (req, res) => {
 // PUT /api/v1/guest/profile
 router.put('/profile', async (req, res) => {
   try {
-    const { name, email, mobile, city, address, language, currency } = req.body;
+    const { name, email, mobile, phone, city, address, state, country, avatar, preferences, language, currency, notifications } = req.body;
     
     let user = null;
-    if (req.user && req.user._id) {
-      user = await User.findById(req.user._id);
-    }
-    
-    if (!user && req.user?.email) {
-      user = await User.findOne({ email: req.user.email });
-    }
-
-    if (user) {
-      if (name) user.name = name;
-      if (email) user.email = email;
-      if (mobile) user.mobile = mobile;
-      if (city) user.city = city;
-      if (address) user.address = address;
-      if (language) user.language = language;
-      if (currency) user.currency = currency;
-      await user.save();
+    const userId = req.user?._id || req.user?.id;
+    const query = [{ _id: String(userId) }, { id: String(userId) }];
+    if (req.user?.email) query.push({ email: req.user.email });
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
     }
 
+    const effectiveMobile = mobile !== undefined ? mobile : phone;
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (effectiveMobile !== undefined) updateData.mobile = effectiveMobile;
+    if (city !== undefined) updateData.city = city;
+    if (address !== undefined) updateData.address = address;
+    if (state !== undefined) updateData.state = state;
+    if (country !== undefined) updateData.country = country;
+    if (avatar !== undefined) updateData.avatar = avatar;
+    if (preferences !== undefined) updateData.preferences = preferences;
+    if (language !== undefined) updateData.language = language;
+    if (currency !== undefined) updateData.currency = currency;
+    if (notifications !== undefined) updateData.notificationSettings = notifications;
+
+    user = await User.findOneAndUpdate({ $or: query }, updateData, { new: true });
+    if (!user) {
+      user = await User.findOne({ $or: query });
+      if (user) {
+        Object.assign(user, updateData);
+        await user.save();
+      }
+    }
+
+    // Clear user cache so future auth lookups get latest user
+    clearUserCache();
+
+    // Synchronize all associated bookings for this guest
+    try {
+      const userIdentities = [
+        { guestId: String(userId) },
+        { guestId: user?.id || user?._id },
+        { email: req.user.email },
+        ...(user?.email ? [{ email: user.email }] : []),
+        ...(req.user.mobile ? [{ phone: req.user.mobile }] : []),
+        ...(effectiveMobile ? [{ phone: effectiveMobile }] : [])
+      ];
+
+      const bookingSyncFields = {};
+      if (name) {
+        bookingSyncFields.guest = name;
+        bookingSyncFields.guestName = name;
+      }
+      if (effectiveMobile) {
+        bookingSyncFields.phone = effectiveMobile;
+        bookingSyncFields.mobile = effectiveMobile;
+      }
+      if (city) bookingSyncFields.city = city;
+      if (address) bookingSyncFields.address = address;
+
+      if (Object.keys(bookingSyncFields).length > 0) {
+        await Booking.updateMany({ $or: userIdentities }, { $set: bookingSyncFields });
+      }
+    } catch (syncErr) {
+      console.warn('Booking sync warning on guest profile update:', syncErr.message);
+    }
+
+    const io = req.app.get('socketio');
+    if (io && user) {
+      try {
+        if (typeof emitRealtimeSync === 'function') {
+          emitRealtimeSync(io, 'all', 'user_updated', user);
+          emitRealtimeSync(io, 'all', 'guest_updated', { ...user, guestId: userId });
+          emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'profile_updated', id: userId, user });
+          emitRealtimeSync(io, 'all', 'booking_updated', { guest: user.name, phone: user.mobile });
+        }
+        io.emit('user_updated', user);
+        io.emit('guest_updated', user);
+        io.emit('dashboard_sync', { action: 'profile_updated', id: userId, user });
+        io.emit('booking_updated', { guest: user.name, phone: user.mobile });
+      } catch (socketErr) {
+        console.warn('Socket broadcast warning on profile update:', socketErr.message);
+      }
+    }
+
+    const finalUser = user || req.user;
     return sendSuccess(res, 200, {
-      name: name || req.user.name,
-      email: email || req.user.email,
-      mobile: mobile || req.user.mobile,
-      city: city || req.user.city || 'Hyderabad',
-      address: address || req.user.address || '',
-      language: language || 'English (IN)',
-      currency: currency || 'INR (₹)'
-    }, 'Profile information updated successfully in MongoDB');
+      id: finalUser.id || finalUser._id,
+      _id: finalUser.id || finalUser._id,
+      name: finalUser.name,
+      email: finalUser.email,
+      mobile: finalUser.mobile || finalUser.phone || '',
+      phone: finalUser.mobile || finalUser.phone || '',
+      city: finalUser.city || '',
+      address: finalUser.address || finalUser.city || '',
+      state: finalUser.state || '',
+      country: finalUser.country || 'India',
+      avatar: finalUser.avatar || null,
+      role: finalUser.role || 'guest',
+      status: finalUser.status || 'Active',
+      language: finalUser.language || 'English (IN)',
+      currency: finalUser.currency || 'INR (₹)'
+    }, 'Profile information updated successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to update profile');
   }
@@ -1076,12 +1160,9 @@ const handleGuestExtendStay = async (req, res) => {
       paidNow = false
     } = req.body;
 
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
+    const bookingQuery = buildBookingLookupQuery(id);
 
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const booking = await Booking.findOne(bookingQuery);
     if (!booking) {
       return sendError(res, 404, 'Stay booking record not found.');
     }
@@ -1144,7 +1225,7 @@ const handleGuestExtendStay = async (req, res) => {
     }
 
     const updated = await Booking.findOneAndUpdate(
-      { $or: bookingQuery },
+      bookingQuery,
       {
         checkOut: finalNewCheckOut,
         nights: currentNights + (finalAdditionalNights || 0),
@@ -1220,17 +1301,7 @@ const handleGuestRefundRequest = async (req, res) => {
 
     let booking = null;
     if (bookingId) {
-      const cleanId = String(bookingId).replace(/^FOL-/, '');
-      const bookingQuery = [
-        { bookingId: cleanId },
-        { id: cleanId },
-        { bookingId: bookingId },
-        { id: bookingId }
-      ];
-      if (mongoose.Types.ObjectId.isValid(cleanId)) {
-        bookingQuery.unshift({ _id: cleanId });
-      }
-      booking = await Booking.findOne({ $or: bookingQuery });
+      booking = await Booking.findOne(buildBookingLookupQuery(bookingId));
     }
 
     if (!booking) {
@@ -1406,20 +1477,8 @@ const handleGetGuestRefundRequests = async (req, res) => {
 const handleGetSingleBooking = async (req, res) => {
   try {
     const bookingId = req.params.id;
-    const cleanId = String(bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
-    const bookingQuery = [
-      { bookingId: bookingId },
-      { id: bookingId },
-      { bookingId: cleanId },
-      { id: cleanId }
-    ];
-    if (mongoose.Types.ObjectId.isValid(cleanId)) {
-      bookingQuery.unshift({ _id: cleanId });
-    }
-    if (mongoose.Types.ObjectId.isValid(bookingId)) {
-      bookingQuery.unshift({ _id: bookingId });
-    }
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const bookingQuery = buildBookingLookupQuery(bookingId);
+    const booking = await Booking.findOne(bookingQuery);
     if (!booking) {
       return sendError(res, 404, 'Booking not found');
     }
@@ -1492,20 +1551,7 @@ const handleGuestCancelBooking = async (req, res) => {
 
     let booking = null;
     if (bookingId) {
-      const cleanId = String(bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
-      const bookingQuery = [
-        { bookingId: bookingId },
-        { id: bookingId },
-        { bookingId: cleanId },
-        { id: cleanId }
-      ];
-      if (mongoose.Types.ObjectId.isValid(cleanId)) {
-        bookingQuery.unshift({ _id: cleanId });
-      }
-      if (mongoose.Types.ObjectId.isValid(bookingId)) {
-        bookingQuery.unshift({ _id: bookingId });
-      }
-      booking = await Booking.findOne({ $or: bookingQuery });
+      booking = await Booking.findOne(buildBookingLookupQuery(bookingId));
     }
 
     if (!booking) {
@@ -1884,28 +1930,48 @@ router.get('/payments', async (req, res) => {
 // POST /api/v1/guest/payments/pay-balance
 router.post('/payments/pay-balance', async (req, res) => {
   try {
-    const { bookingId, amount, paymentMethod = 'UPI' } = req.body;
-    if (!bookingId || amount === undefined || Number(amount) <= 0) {
+    const { bookingId, id, paymentId, amount, paymentMethod = 'UPI' } = req.body;
+    const rawRef = bookingId || id || paymentId;
+    if (!rawRef || amount === undefined || Number(amount) <= 0) {
       return sendError(res, 400, 'Booking ID and valid amount are required.');
     }
 
-    const cleanId = String(bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
-    const bookingQuery = [
-      { bookingId: bookingId },
-      { id: bookingId },
-      { bookingId: cleanId },
-      { id: cleanId }
-    ];
-    if (mongoose.Types.ObjectId.isValid(cleanId)) {
-      bookingQuery.unshift({ _id: cleanId });
-    }
-    if (mongoose.Types.ObjectId.isValid(bookingId)) {
-      bookingQuery.unshift({ _id: bookingId });
+    let booking = await Booking.findOne(buildBookingLookupQuery(rawRef));
+
+    if (!booking) {
+      // Check if rawRef matches a Payment record
+      const paymentQuery = [
+        { id: rawRef },
+        { paymentId: rawRef },
+        { bookingId: rawRef }
+      ];
+      if (mongoose.Types.ObjectId.isValid(rawRef)) {
+        paymentQuery.unshift({ _id: rawRef });
+      }
+      const paymentDoc = await Payment.findOne({ $or: paymentQuery });
+      if (paymentDoc && paymentDoc.bookingId) {
+        booking = await Booking.findOne(buildBookingLookupQuery(paymentDoc.bookingId));
+      }
     }
 
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    // Fallback: If still not found and req.user exists, search for any pending balance booking for this guest
+    if (!booking && req.user) {
+      const userQueries = [];
+      if (req.user._id) userQueries.push({ guestId: req.user._id });
+      if (req.user.id) userQueries.push({ guestId: req.user.id });
+      if (req.user.email) userQueries.push({ guestEmail: req.user.email });
+      if (req.user.mobile) userQueries.push({ guestPhone: req.user.mobile });
+      if (req.user.phone) userQueries.push({ guestPhone: req.user.phone });
+      if (userQueries.length > 0) {
+        booking = await Booking.findOne({
+          $or: userQueries,
+          balance: { $gt: 0 }
+        }).sort({ createdAt: -1 });
+      }
+    }
+
     if (!booking) {
-      return sendError(res, 404, 'Booking record not found.');
+      return sendError(res, 404, 'Booking record not found for reference: ' + rawRef);
     }
 
     const payAmount = Number(amount);
@@ -1923,7 +1989,7 @@ router.post('/payments/pay-balance', async (req, res) => {
     await booking.save();
 
     const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
-    const guestName = booking.guest || req.user.name || 'Valued Guest';
+    const guestName = booking.guest || req.user?.name || 'Valued Guest';
     const refId = booking.bookingId || booking._id || booking.id;
 
     const newPayment = await Payment.create({
@@ -1936,44 +2002,54 @@ router.post('/payments/pay-balance', async (req, res) => {
       propertyId: propId
     });
 
-    // Notify Manager
-    await triggerNotification({
-      req,
-      role: 'manager',
-      propertyId: propId,
-      title: 'Payment Received',
-      message: `Guest ${guestName} paid ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} for booking ${refId}. Balance: ₹${newBalance}.`,
-      category: 'Payments',
-      data: { bookingId: booking._id, amount: payAmount, paymentMethod }
-    });
+    try {
+      // Notify Manager
+      await triggerNotification({
+        req,
+        role: 'manager',
+        propertyId: propId,
+        title: 'Payment Received',
+        message: `Guest ${guestName} paid ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} for booking ${refId}. Balance: ₹${newBalance}.`,
+        category: 'Payments',
+        data: { bookingId: booking._id, amount: payAmount, paymentMethod }
+      });
 
-    // Notify Receptionist
-    await triggerNotification({
-      req,
-      role: 'receptionist',
-      propertyId: propId,
-      title: 'Payment Logged',
-      message: `Folio balance payment ₹${payAmount.toLocaleString('en-IN')} received for Room ${booking.room || 'N/A'}.`,
-      category: 'Payments',
-      data: { bookingId: booking._id, amount: payAmount }
-    });
+      // Notify Receptionist
+      await triggerNotification({
+        req,
+        role: 'receptionist',
+        propertyId: propId,
+        title: 'Payment Logged',
+        message: `Folio balance payment ₹${payAmount.toLocaleString('en-IN')} received for Room ${booking.room || 'N/A'}.`,
+        category: 'Payments',
+        data: { bookingId: booking._id, amount: payAmount }
+      });
 
-    // Confirm to Guest
-    await triggerNotification({
-      req,
-      userId: req.user._id || req.user.id,
-      role: 'guest',
-      title: 'Payment Successful',
-      message: `Your payment of ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} (Ref: ${refId}) has been processed successfully.`,
-      category: 'Payment Update'
-    });
+      // Confirm to Guest
+      if (req.user) {
+        await triggerNotification({
+          req,
+          userId: req.user._id || req.user.id,
+          role: 'guest',
+          title: 'Payment Successful',
+          message: `Your payment of ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} (Ref: ${refId}) has been processed successfully.`,
+          category: 'Payment Update'
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Payment notification warning:', notifErr.message);
+    }
 
     const io = req.app.get('socketio');
     if (io) {
-      emitRealtimeSync(io, propId, 'payment_logged', { payment: newPayment, bookingId: booking._id });
-      emitRealtimeSync(io, propId, 'payment_updated', { bookingId: booking._id, balance: newBalance });
-      emitRealtimeSync(io, propId, 'booking_updated', { booking: booking, action: 'payment' });
-      emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_settled' });
+      try {
+        emitRealtimeSync(io, propId, 'payment_logged', { payment: newPayment, bookingId: booking._id });
+        emitRealtimeSync(io, propId, 'payment_updated', { bookingId: booking._id, balance: newBalance });
+        emitRealtimeSync(io, propId, 'booking_updated', { booking: booking, action: 'payment' });
+        emitRealtimeSync(io, propId, 'dashboard_sync', { propertyId: propId, action: 'payment_settled' });
+      } catch (sockErr) {
+        console.warn('Socket broadcast warning:', sockErr.message);
+      }
     }
 
     return sendSuccess(res, 200, {
@@ -1982,6 +2058,7 @@ router.post('/payments/pay-balance', async (req, res) => {
       newBalance: newBalance
     }, 'Payment processed successfully and balance updated.');
   } catch (error) {
+    console.error('pay-balance error:', error);
     return sendError(res, 500, error.message || 'Failed to process payment');
   }
 });

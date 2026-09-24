@@ -327,6 +327,7 @@ function SuperAdminProfile() {
                     <Label htmlFor="edit-name" className="text-navy font-semibold text-xs">Full Name</Label>
                     <Input
                       id="edit-name"
+                      nameOnly
                       value={profileData.name}
                       onChange={(e) => {
                         setProfileData({ ...profileData, name: e.target.value });
@@ -342,6 +343,7 @@ function SuperAdminProfile() {
                     <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
                     <Input
                       id="edit-phone"
+                      type="tel"
                       value={profileData.phone}
                       onChange={(e) => {
                         setProfileData({ ...profileData, phone: e.target.value });

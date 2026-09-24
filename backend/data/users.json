@@ -25,7 +25,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-09-04T06:47:43.696Z",
-    "updatedAt": "2026-09-22T07:11:16.809Z"
+    "updatedAt": "2026-09-24T06:14:14.724Z"
   },
   {
     "id": "6a99315b257a3b6f61660170",
@@ -640,7 +640,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:40:50.570Z",
-    "updatedAt": "2026-09-23T12:06:21.973Z"
+    "updatedAt": "2026-09-24T11:58:05.123Z"
   },
   {
     "id": "lfir6yhyu3b",
@@ -649,7 +649,7 @@
     "email": "meghana@hourstay.com",
     "password": "$2a$10$fEQ67uOeMLAtgiA8WqSAoOZhnvE/K2iIRTnV0n952s1wJq.P0Xi3K",
     "role": "manager",
-    "mobile": "9888888866",
+    "mobile": "9888888868",
     "propertyId": "HS-9HQ8P",
     "status": "Active",
     "dept": "Front Desk",
@@ -668,7 +668,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-09-23T11:09:47.263Z"
+    "updatedAt": "2026-09-24T12:02:45.593Z"
   },
   {
     "_id": "2y1ilu5fn41",
@@ -779,7 +779,7 @@
     "_id": "83emngc4opx",
     "name": "Poojitha",
     "email": "poojitha@hourstay.com",
-    "password": "$2a$10$peagazuTpFqOBCHMY8g9hup6KFPWRJ6w.9H4E2GaJZyBGFs/.V7/y",
+    "password": "$2a$10$fEQ67uOeMLAtgiA8WqSAoOZhnvE/K2iIRTnV0n952s1wJq.P0Xi3K",
     "role": "receptionist",
     "mobile": "9888888888",
     "propertyId": "HS-9HQ8P",
@@ -800,7 +800,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-24T11:47:56.630Z",
-    "updatedAt": "2026-09-22T11:09:42.443Z"
+    "updatedAt": "2026-09-24T09:48:14.969Z"
   },
   {
     "id": "nhb9td45vas",
@@ -809,29 +809,26 @@
     "email": "sunny@gmail.com",
     "password": "$2a$10$peagazuTpFqOBCHMY8g9hup6KFPWRJ6w.9H4E2GaJZyBGFs/.V7/y",
     "role": "guest",
-    "mobile": "4563536437",
+    "mobile": "+91 5882568452",
     "propertyId": "HS-JAI",
     "status": "Active",
     "dept": "Front Desk",
     "shift": "Morning (06:00 - 14:00)",
-    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1789548534/hourstay_hms_assets/o18ntwmdfcduy75ke3r3.jpg",
-    "city": "",
+    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790226720/hourstay_hms_assets/hqdudn70aqshbuuuicqt.jpg",
+    "city": "Hyderabad",
     "state": "",
     "country": "India",
-    "address": "",
+    "address": "Hyderabad",
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
     "idDocNumber": "6353 7576 4646",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
+    "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-23T10:10:03.415Z",
-    "verifiedAadhaar": "6353 7576 4646",
-    "verifiedAadhaarLast4": "4646",
-    "isAadhaarVerified": true
+    "updatedAt": "2026-09-24T09:09:37.228Z"
   },
   {
     "id": "omk6dktv7lj",
@@ -887,7 +884,7 @@
       "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
     ],
     "createdAt": "2026-09-07T05:58:33.215Z",
-    "updatedAt": "2026-09-23T11:10:58.211Z"
+    "updatedAt": "2026-09-24T12:02:55.445Z"
   },
   {
     "id": "yl9oyu10cs",
@@ -1360,5 +1357,61 @@
     "fcmTokens": [],
     "createdAt": "2026-09-23T09:45:19.710Z",
     "updatedAt": "2026-09-23T09:45:19.838Z"
+  },
+  {
+    "id": "s18bqsufjjq",
+    "_id": "s18bqsufjjq",
+    "name": "Janu",
+    "email": "janu@gmail.com",
+    "password": "$2a$10$Q5eMe6fq0cHmVNs9O311L.BSZqwGW0WPm.SGAHyTgF2RUnrjN8Elq",
+    "role": "guest",
+    "mobile": "8855885757",
+    "propertyId": null,
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "6544 4664 6446",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-09-24T06:07:41.133Z",
+    "updatedAt": "2026-09-24T06:07:41.312Z"
+  },
+  {
+    "id": "nhb9td45vas",
+    "_id": "nhb9td45vas",
+    "name": "Sunny",
+    "email": "sunny@gmail.com",
+    "password": "$2a$10$peagazuTpFqOBCHMY8g9hup6KFPWRJ6w.9H4E2GaJZyBGFs/.V7/y",
+    "role": "guest",
+    "mobile": "+91 98765 43210",
+    "propertyId": "HS-JAI",
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "Hyderabad",
+    "state": "Telangana",
+    "country": "India",
+    "address": "Banjara Hills, Hyderabad",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "1234 5678 9012",
+    "loyaltyPoints": 50,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-09-22T06:00:00.000Z",
+    "updatedAt": "2026-09-24T06:00:00.000Z"
   }
 ]

@@ -463,23 +463,28 @@ const MockBooking = {
     writeBookings(list);
     return new BookingInstance(removed);
   },
-  updateMany: async (query, update) => {
+  updateMany: async (query = {}, update = {}) => {
     const list = readBookings();
     let modifiedCount = 0;
-    const updateData = update.$set ? { ...update, ...update.$set } : update;
+    const updateData = update.$set ? { ...update, ...update.$set } : { ...update };
     delete updateData.$set;
 
     list.forEach((b, idx) => {
-      let match = true;
-      if (query.propertyId && b.propertyId !== query.propertyId) match = false;
-      if (query.status && b.status !== query.status) match = false;
-      if (match) {
+      let matches = false;
+      if (query.$or && Array.isArray(query.$or)) {
+        matches = query.$or.some(q => matchBookingQuery(b, q));
+      } else {
+        matches = matchBookingQuery(b, query);
+      }
+      if (matches) {
         list[idx] = { ...b, ...updateData, updatedAt: new Date().toISOString() };
         modifiedCount++;
       }
     });
-    writeBookings(list);
-    return { modifiedCount, matchedCount: modifiedCount };
+    if (modifiedCount > 0) {
+      writeBookings(list);
+    }
+    return { acknowledged: true, modifiedCount, matchedCount: modifiedCount };
   },
   deleteMany: async (query = {}) => {
     let list = readBookings();
@@ -593,13 +598,15 @@ const Booking = {
   },
   findById: (id) => {
     return new QueryWrapper((isMongoose) => {
+      const cleanId = String(id || '').trim();
+      const isOid = mongoose.Types.ObjectId.isValid(cleanId) && /^[0-9a-fA-F]{24}$/.test(cleanId);
       if (isMongoose) {
-        if (mongoose.Types.ObjectId.isValid(id)) {
-          return MongooseBooking.findById(id);
+        if (isOid) {
+          return MongooseBooking.findOne({ $or: [{ _id: new mongoose.Types.ObjectId(cleanId) }, { bookingId: cleanId }] });
         }
-        return MongooseBooking.findOne({ $or: [{ bookingId: id }, { id: id }] });
+        return MongooseBooking.findOne({ bookingId: cleanId });
       }
-      return MockBooking.findById(id);
+      return MockBooking.findById(cleanId);
     });
   },
   findOneAndUpdate: (query, update, options) => {
@@ -648,31 +655,29 @@ const Booking = {
     }
     return await MockBooking.create(cleanData);
   },
-  findByIdAndUpdate: async (id, update, options) => {
+  findByIdAndUpdate: async (id, update, options = {}) => {
+    const cleanId = String(id || '').trim();
+    const isOid = mongoose.Types.ObjectId.isValid(cleanId) && /^[0-9a-fA-F]{24}$/.test(cleanId);
     if (mongoose.connection.readyState === 1) {
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        const found = await MongooseBooking.findByIdAndUpdate(id, update, { new: true, ...options });
-        if (found) return found;
-      }
-      return await MongooseBooking.findOneAndUpdate(
-        { $or: [{ id }, { bookingId: id }, { _id: mongoose.Types.ObjectId.isValid(id) ? id : undefined }].filter(Boolean) },
-        update,
-        { new: true, ...options }
-      );
+      const query = isOid
+        ? { $or: [{ _id: new mongoose.Types.ObjectId(cleanId) }, { bookingId: cleanId }] }
+        : { bookingId: cleanId };
+      const found = await MongooseBooking.findOneAndUpdate(query, update, { new: true, ...options });
+      if (found) return found;
     }
-    return await MockBooking.findByIdAndUpdate(id, update, options);
+    return await MockBooking.findByIdAndUpdate(cleanId, update, options);
   },
   findByIdAndDelete: async (id) => {
+    const cleanId = String(id || '').trim();
+    const isOid = mongoose.Types.ObjectId.isValid(cleanId) && /^[0-9a-fA-F]{24}$/.test(cleanId);
     if (mongoose.connection.readyState === 1) {
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        const found = await MongooseBooking.findByIdAndDelete(id);
-        if (found) return found;
-      }
-      return await MongooseBooking.findOneAndDelete({
-        $or: [{ id }, { bookingId: id }]
-      });
+      const query = isOid
+        ? { $or: [{ _id: new mongoose.Types.ObjectId(cleanId) }, { bookingId: cleanId }] }
+        : { bookingId: cleanId };
+      const found = await MongooseBooking.findOneAndDelete(query);
+      if (found) return found;
     }
-    return await MockBooking.findByIdAndDelete(id);
+    return await MockBooking.findByIdAndDelete(cleanId);
   },
   updateMany: async (query, update, options) => {
     if (mongoose.connection.readyState === 1) {

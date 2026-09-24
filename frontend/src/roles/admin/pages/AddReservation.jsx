@@ -204,6 +204,11 @@ function AddReservation() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!room || !String(room).trim()) {
+      toast.error("Please select room");
+      return;
+    }
+
     const val = validateWithZod(walkInBookingSchema, {
       guest,
       phone,
@@ -283,6 +288,7 @@ function AddReservation() {
                 <Input
                   id="guest"
                   type="text"
+                  nameOnly
                   required
                   value={guest}
                   onChange={(e) => {
@@ -296,7 +302,7 @@ function AddReservation() {
               <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
-                  type="text"
+                  type="tel"
                   required
                   value={phone}
                   onChange={(e) => {
@@ -366,9 +372,10 @@ function AddReservation() {
                 )}
               </FormField>
 
-              <FormField label="Room Designation" id="room">
+              <FormField label="Room Designation" required id="room">
                 <Select
                   id="room"
+                  required
                   value={room}
                   onChange={(e) => setRoom(e.target.value)}
                 >

@@ -344,6 +344,7 @@ function Contact() {
                     <Label htmlFor="name" className="text-xs font-bold text-navy ml-2">Full Name</Label>
                     <Input 
                       id="name" 
+                      nameOnly
                       placeholder="Ritu Sharma" 
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -357,6 +358,7 @@ function Contact() {
                     <Label htmlFor="phone" className="text-xs font-bold text-navy ml-2">Mobile Number</Label>
                     <Input 
                       id="phone" 
+                      type="tel"
                       placeholder="+91 98290 11223" 
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}

@@ -180,6 +180,8 @@ function AddRoomTypePage() {
                 <Input
                   id="baseRate"
                   type="number"
+                  min="0"
+                  step="0.01"
                   required
                   value={baseRate}
                   onChange={(e) => {

@@ -283,7 +283,7 @@ export const syncVerifiedAadhaarToGuestProfile = async ({ booking, idDocType, id
     idVerifiedBy: verifiedBy || 'Staff'
   };
 
-  const bookingId = booking._id || booking.id;
+  const bookingId = booking._id || booking.id || booking.bookingId;
   const updatedBooking = await Booking.findByIdAndUpdate(bookingId, verificationPayload, { new: true });
 
   // Sync or link to User collection

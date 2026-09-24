@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../providers/manager/payment_provider.dart';
 import 'package:hour_stay_mobile/colours.dart';
+import '../../../core/utils/input_validators.dart';
 
 class ManagerRecordPaymentScreen extends StatefulWidget {
   const ManagerRecordPaymentScreen({super.key});
@@ -298,14 +299,19 @@ class _ManagerRecordPaymentScreenState
           TextFormField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w900,
               color: navy,
               letterSpacing: -0.5,
             ),
+            validator: (v) => InputValidators.validateAmount(v, fieldName: 'Payment Amount', required: true, allowZero: false),
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
+              errorStyle: InputValidators.errorTextStyle,
+              errorBorder: InputValidators.errorOutlineBorder(radius: 12),
+              focusedErrorBorder: InputValidators.errorOutlineBorder(radius: 12, width: 2.0),
               prefixIcon: const Padding(
                 padding: EdgeInsets.fromLTRB(14, 12, 8, 12),
                 child: Text(
@@ -339,16 +345,6 @@ class _ManagerRecordPaymentScreenState
                 borderSide: const BorderSide(color: purple, width: 1.5),
               ),
             ),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) {
-                return 'Please enter payment amount';
-              }
-              final n = double.tryParse(v.trim());
-              if (n == null || n <= 0) {
-                return 'Amount must be greater than 0';
-              }
-              return null;
-            },
           ),
           const SizedBox(height: 12),
 
@@ -432,13 +428,13 @@ class _ManagerRecordPaymentScreenState
           _buildInputLabel('Guest Name *'),
           TextFormField(
             controller: _guestNameController,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: navy),
             decoration: _buildInputDecoration(
               hint: 'e.g. Rahul Sharma',
               icon: Icons.person_rounded,
             ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Please enter guest name' : null,
+            validator: (v) => InputValidators.validateName(v, fieldName: 'Guest Name', required: true),
           ),
           const SizedBox(height: 12),
 
@@ -754,6 +750,9 @@ class _ManagerRecordPaymentScreenState
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: purple, width: 1.5),
       ),
+      errorStyle: InputValidators.errorTextStyle,
+      errorBorder: InputValidators.errorOutlineBorder(radius: 10),
+      focusedErrorBorder: InputValidators.errorOutlineBorder(radius: 10, width: 2.0),
     );
   }
 }

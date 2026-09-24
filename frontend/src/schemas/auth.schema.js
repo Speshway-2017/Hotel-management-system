@@ -3,7 +3,7 @@ import {
   emailSchema,
   phoneSchema,
   passwordSchema,
-  textSchema
+  nameSchema
 } from "./primitives.js";
 
 export const loginSchema = z.object({
@@ -12,7 +12,7 @@ export const loginSchema = z.object({
 });
 
 export const registerSchema = z.object({
-  name: textSchema(2, "Full name is required (minimum 2 characters)"),
+  name: nameSchema(2, "Full name is required (minimum 2 characters)"),
   email: emailSchema,
   password: passwordSchema,
   mobile: phoneSchema,
@@ -37,7 +37,7 @@ export const otpSchema = z.object({
   otp: z
     .string()
     .trim()
-    .regex(/^\d{6}$/, "Verification code must be exactly 6 digits")
+    .regex(/^\d{6}$/, "Verification code must be exactly 6 digits (numbers only)")
 });
 
 export const changePasswordSchema = z

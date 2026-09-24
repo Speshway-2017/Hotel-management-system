@@ -166,6 +166,7 @@ function AddCoupon() {
                   <Input
                     id="discountValue"
                     type="number"
+                    step="0.01"
                     min="1"
                     max={formData.discountType === "percentage" ? "100" : "100000"}
                     required
@@ -186,6 +187,7 @@ function AddCoupon() {
                     <Input
                       id="maxDiscount"
                       type="number"
+                      step="0.01"
                       min="0"
                       value={formData.maxDiscount}
                       onChange={(e) => handleChange("maxDiscount", e.target.value)}
@@ -213,6 +215,7 @@ function AddCoupon() {
                   <Input
                     id="minBookingAmount"
                     type="number"
+                    step="0.01"
                     min="0"
                     value={formData.minBookingAmount}
                     onChange={(e) => handleChange("minBookingAmount", e.target.value)}

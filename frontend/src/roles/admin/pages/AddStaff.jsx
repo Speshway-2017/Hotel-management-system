@@ -90,6 +90,7 @@ function AddStaff() {
               <Input
                 id="name"
                 type="text"
+                nameOnly
                 required
                 value={name}
                 onChange={(e) => {
@@ -143,7 +144,7 @@ function AddStaff() {
               <FormField label="Phone Number" required id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                 <Input
                   id="phone"
-                  type="text"
+                  type="tel"
                   required
                   value={phone}
                   onChange={(e) => {

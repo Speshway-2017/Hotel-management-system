@@ -81,6 +81,7 @@ function ManagerAddStaff() {
               <Input
                 id="name"
                 type="text"
+                nameOnly
                 required
                 value={name}
                 onChange={(e) => {
@@ -136,7 +137,7 @@ function ManagerAddStaff() {
               <FormField label="Contact Number" id="phone">
                 <Input
                   id="phone"
-                  type="text"
+                  type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 99999 88888"

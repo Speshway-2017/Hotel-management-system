@@ -6,6 +6,7 @@ import Booking from '../models/booking.model.js';
 import { ManagerNotification } from '../models/managerData.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
+import { getAdminManagedPropertyIds, isAllowedForSuperAdminNotification } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
@@ -29,8 +30,10 @@ const seedNotificationsIfNeeded = async (user) => {
     if (count === 0) {
       const propertyId = user.propertyId || 'HS-9HQ8P';
       if (user.role === 'super-admin') {
+        const seedPropId = user.propertyId || 'HS-9HQ8P';
         await Notification.create({
           role: 'super-admin',
+          propertyId: seedPropId,
           title: 'OTA Parity Sync Issue',
           message: 'Booking.com connection returned timeout error during room availability sync for Suite rooms.',
           category: 'OTA Sync',
@@ -38,17 +41,43 @@ const seedNotificationsIfNeeded = async (user) => {
         });
         await Notification.create({
           role: 'super-admin',
+          propertyId: seedPropId,
           title: 'New Property Onboarded',
-          message: "Onboarded 'Backwater Retreat' in Alleppey, Kerala. Default inventory mapping initialized.",
-          category: 'Property Audit',
+          message: "Onboarded 'Speshway Luxury Hotel' in Hyderabad, Telangana. Default inventory mapping initialized.",
+          category: 'Property Setup',
           isRead: false
         });
         await Notification.create({
           role: 'super-admin',
+          propertyId: seedPropId,
           title: 'Security Alert: Unauthorized Login',
-          message: 'Multiple failed login attempts detected on Rambagh Residency admin console from IP 192.168.1.105.',
+          message: 'Multiple failed login attempts detected on Speshway Luxury Hotel admin console from IP 192.168.1.105.',
           category: 'Security Warning',
           isRead: true
+        });
+        await Notification.create({
+          role: 'super-admin',
+          propertyId: seedPropId,
+          title: 'Staff Roster Updated',
+          message: 'New front desk staff member added to Speshway Luxury Hotel by Admin Vikram Rathore.',
+          category: 'Staff',
+          isRead: false
+        });
+        await Notification.create({
+          role: 'super-admin',
+          propertyId: seedPropId,
+          title: 'Property Configuration Updated',
+          message: 'Tax rules and check-in policy configuration updated for Speshway Luxury Hotel.',
+          category: 'Configuration',
+          isRead: false
+        });
+        await Notification.create({
+          role: 'super-admin',
+          propertyId: seedPropId,
+          title: 'Property Maintenance Alert',
+          message: 'HVAC unit maintenance scheduled for 2nd Floor Executive Suite at Speshway Luxury Hotel.',
+          category: 'Property Issue',
+          isRead: false
         });
       } else if (user.role === 'manager' || user.role === 'admin' || user.role === 'receptionist') {
         await Notification.create({
@@ -94,7 +123,7 @@ const syncAllRoleBookingNotifications = async () => {
       Notification.find({}, { role: 1, message: 1, title: 1 }).lean()
     ]);
 
-    const rolesToNotify = ['super-admin', 'admin', 'manager', 'receptionist'];
+    const rolesToNotify = ['admin', 'manager', 'receptionist'];
     const existingRefMap = new Map();
     for (const r of rolesToNotify) {
       existingRefMap.set(r, new Set());
@@ -160,11 +189,22 @@ router.get('/', protect, async (req, res) => {
     const propId = req.user.propertyId;
 
     let query;
-    if (userRole === 'super-admin' || userRole === 'admin') {
+    let adminPropIds = null;
+    if (userRole === 'super-admin') {
+      adminPropIds = await getAdminManagedPropertyIds();
       query = {
         $or: [
           { userId },
-          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null, 'all'] } }
+          { role: 'super-admin' },
+          { role: 'all' },
+          { role: null }
+        ]
+      };
+    } else if (userRole === 'admin') {
+      query = {
+        $or: [
+          { userId },
+          { role: { $in: ['admin', 'manager', 'receptionist', null, 'all'] } }
         ]
       };
     } else if (userRole === 'manager') {
@@ -247,7 +287,19 @@ router.get('/', protect, async (req, res) => {
       };
     }
 
-    const list = await Notification.find(query).sort({ createdAt: -1 }).lean().limit(100);
+    let list = await Notification.find(query).sort({ createdAt: -1 }).lean().limit(100);
+
+    // For Super Admin: strictly isolate to property-related alerts for Admin-managed properties
+    if (userRole === 'super-admin') {
+      if (!adminPropIds) adminPropIds = await getAdminManagedPropertyIds();
+      const saFiltered = [];
+      for (const item of list) {
+        if (await isAllowedForSuperAdminNotification(item, adminPropIds)) {
+          saFiltered.push(item);
+        }
+      }
+      list = saFiltered;
+    }
 
     // Deduplicate items by title and message with strict guest isolation
     const dedupMap = new Map();
@@ -308,11 +360,22 @@ router.get('/unread-count', protect, async (req, res) => {
 
     let query;
     let myBookingIds = null;
-    if (userRole === 'super-admin' || userRole === 'admin') {
+    let adminPropIds = null;
+    if (userRole === 'super-admin') {
+      adminPropIds = await getAdminManagedPropertyIds();
       query = {
         $or: [
           { userId },
-          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null, 'all'] } }
+          { role: 'super-admin' },
+          { role: 'all' },
+          { role: null }
+        ]
+      };
+    } else if (userRole === 'admin') {
+      query = {
+        $or: [
+          { userId },
+          { role: { $in: ['admin', 'manager', 'receptionist', null, 'all'] } }
         ]
       };
     } else if (userRole === 'manager') {
@@ -395,7 +458,20 @@ router.get('/unread-count', protect, async (req, res) => {
       };
     }
 
-    const list = await Notification.find(query).sort({ createdAt: -1 }).lean().limit(100);
+    let list = await Notification.find(query).sort({ createdAt: -1 }).lean().limit(100);
+
+    // For Super Admin: strictly isolate to property-related alerts for Admin-managed properties
+    if (userRole === 'super-admin') {
+      if (!adminPropIds) adminPropIds = await getAdminManagedPropertyIds();
+      const saFiltered = [];
+      for (const item of list) {
+        if (await isAllowedForSuperAdminNotification(item, adminPropIds)) {
+          saFiltered.push(item);
+        }
+      }
+      list = saFiltered;
+    }
+
     const dedupMap = new Map();
     for (const item of list) {
       if (userRole === 'guest') {
@@ -523,11 +599,44 @@ const handleMarkAllNotificationsRead = async (req, res) => {
     const propId = req.user.propertyId;
 
     let roleQuery;
-    if (userRole === 'super-admin' || userRole === 'admin') {
+    if (userRole === 'super-admin') {
+      const adminPropIds = await getAdminManagedPropertyIds();
+      const unreadCandidates = await Notification.find({
+        isRead: false,
+        $or: [
+          { userId },
+          { role: 'super-admin' },
+          { role: 'all' },
+          { role: null }
+        ]
+      }).lean();
+
+      const idsToMark = [];
+      for (const item of unreadCandidates) {
+        if (await isAllowedForSuperAdminNotification(item, adminPropIds)) {
+          idsToMark.push(item._id || item.id);
+        }
+      }
+
+      if (idsToMark.length > 0) {
+        await Notification.updateMany(
+          { $or: idsToMark.map(id => ({ _id: id })) },
+          { isRead: true }
+        );
+      }
+
+      const io = req.app.get('socketio');
+      if (io) {
+        emitRealtimeSync(io, 'global', 'unread_notifications_count_updated', { userId });
+        emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'all_notifications_read' });
+      }
+
+      return res.status(200).json({ success: true, message: 'All notifications marked as read' });
+    } else if (userRole === 'admin') {
       roleQuery = {
         $or: [
           { userId },
-          { role: { $in: ['admin', 'super-admin', 'manager', 'receptionist', null] } },
+          { role: { $in: ['admin', 'manager', 'receptionist', null] } },
           { role: { $exists: false } }
         ]
       };

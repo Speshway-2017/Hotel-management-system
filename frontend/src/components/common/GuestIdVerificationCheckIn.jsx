@@ -601,7 +601,9 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-navy block mb-1.5">ID Document Type *</label>
+                  <label className="text-xs font-bold text-navy block mb-1.5">
+                    ID Document Type <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   <select
                     value={idDocType}
                     onChange={handleDocTypeChange}
@@ -618,7 +620,9 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-navy block">ID Document Number *</label>
+                    <label className="text-xs font-bold text-navy block">
+                      ID Document Number <span className="text-red-600 font-bold ml-1">*</span>
+                    </label>
                     {isAadhaarDoc && aadhaarStatus?.hasExistingAadhaar && (
                       <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
                         On File: {aadhaarStatus.maskedAadhaar}

@@ -4,7 +4,7 @@ import {
   User, Lock, Bell, Globe, Save, RefreshCw, AlertCircle, 
   CheckCircle2, Shield, Eye, EyeOff, KeyRound, Sparkles, Mail, Phone, MapPin 
 } from "lucide-react";
-import { validateWithZod, guestProfileSchema, changePasswordSchema } from "@/schemas";
+import { validateWithZod, validateFieldValue, guestProfileSchema, changePasswordSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/settings")({
   head: () => ({
@@ -328,7 +328,15 @@ function GuestSettingsPage() {
                   <input
                     type="text"
                     value={profile.name}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                    onChange={(e) => {
+                      setProfile({ ...profile, name: e.target.value });
+                      const err = validateFieldValue("name", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, name: err }));
+                    }}
+                    onBlur={(e) => {
+                      const err = validateFieldValue("name", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, name: err }));
+                    }}
                     required
                     placeholder="Guest Full Name"
                     className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
@@ -348,7 +356,17 @@ function GuestSettingsPage() {
                   <input
                     type="email"
                     value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    onChange={(e) => {
+                      setProfile({ ...profile, email: e.target.value });
+                      if (profileErrors.email) {
+                        const err = validateFieldValue("email", e.target.value, { required: true });
+                        setProfileErrors(prev => ({ ...prev, email: err }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const err = validateFieldValue("email", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, email: err }));
+                    }}
                     required
                     placeholder="guest@example.com"
                     className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
@@ -366,11 +384,19 @@ function GuestSettingsPage() {
                 <div className="relative">
                   <Phone className="size-4 text-navy/40 absolute left-3.5 top-3" />
                   <input
-                    type="text"
+                    type="tel"
                     value={profile.mobile}
-                    onChange={(e) => setProfile({ ...profile, mobile: e.target.value })}
+                    onChange={(e) => {
+                      setProfile({ ...profile, mobile: e.target.value });
+                      const err = validateFieldValue("tel", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, mobile: err, phone: err }));
+                    }}
+                    onBlur={(e) => {
+                      const err = validateFieldValue("tel", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, mobile: err, phone: err }));
+                    }}
                     required
-                    placeholder="+91 98765 43210"
+                    placeholder="9876543210"
                     className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
                       profileErrors.mobile || profileErrors.phone ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"
                     }`}
@@ -388,7 +414,15 @@ function GuestSettingsPage() {
                   <input
                     type="text"
                     value={profile.city}
-                    onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                    onChange={(e) => {
+                      setProfile({ ...profile, city: e.target.value });
+                      const err = validateFieldValue("city", e.target.value, { required: false });
+                      setProfileErrors(prev => ({ ...prev, city: err }));
+                    }}
+                    onBlur={(e) => {
+                      const err = validateFieldValue("city", e.target.value, { required: false });
+                      setProfileErrors(prev => ({ ...prev, city: err }));
+                    }}
                     placeholder="Hyderabad"
                     className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${
                       profileErrors.city ? "border-rose-500 ring-1 ring-rose-500" : "border-navy/15"

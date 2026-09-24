@@ -109,7 +109,24 @@ class AuthProvider with ChangeNotifier {
     _isLoading = false;
 
     if (res.success && res.data != null) {
-      _user = res.data;
+      UserModel updated = res.data!;
+      if (data['address'] != null && data['address'].toString().trim().isNotEmpty) {
+        updated = updated.copyWith(address: data['address'].toString().trim());
+      }
+      if (data['city'] != null && data['city'].toString().trim().isNotEmpty) {
+        updated = updated.copyWith(city: data['city'].toString().trim());
+      }
+      if (data['name'] != null && data['name'].toString().trim().isNotEmpty) {
+        updated = updated.copyWith(name: data['name'].toString().trim());
+      }
+      if (data['mobile'] != null && data['mobile'].toString().trim().isNotEmpty) {
+        updated = updated.copyWith(mobile: data['mobile'].toString().trim());
+      }
+      if (data['avatar'] != null && data['avatar'].toString().trim().isNotEmpty) {
+        updated = updated.copyWith(avatar: data['avatar'].toString().trim());
+      }
+      _user = updated;
+      await StorageService.saveUser(_user!);
       notifyListeners();
       return true;
     } else {
@@ -120,10 +137,14 @@ class AuthProvider with ChangeNotifier {
           final updatedName = data['name']?.toString() ?? _user!.name;
           final updatedMobile = data['mobile']?.toString() ?? _user!.mobile;
           final updatedAvatar = data['avatar']?.toString() ?? _user!.avatar;
+          final updatedAddress = data['address']?.toString() ?? _user!.address;
+          final updatedCity = data['city']?.toString() ?? _user!.city;
           _user = _user!.copyWith(
             name: updatedName,
             mobile: updatedMobile,
             avatar: updatedAvatar,
+            address: updatedAddress,
+            city: updatedCity,
           );
           await StorageService.saveUser(_user!);
         }

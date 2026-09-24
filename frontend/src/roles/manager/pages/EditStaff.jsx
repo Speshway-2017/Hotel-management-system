@@ -259,6 +259,7 @@ function ManagerEditStaff() {
                 <Input
                   id="name"
                   type="text"
+                  nameOnly
                   required
                   value={name}
                   onChange={(e) => {
@@ -285,7 +286,7 @@ function ManagerEditStaff() {
                 <FormField label="Contact Number" id="phone" status={fieldErrors.phone ? "error" : undefined} errorMsg={fieldErrors.phone}>
                   <Input
                     id="phone"
-                    type="text"
+                    type="tel"
                     value={phone}
                     onChange={(e) => {
                       setPhone(e.target.value);

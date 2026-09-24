@@ -173,13 +173,28 @@ function ManagerAddReservation() {
 
   const handleRoomTypeChange = (category) => {
     const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, category);
+    
+    // Check if current room matches new category
+    const matchingRooms = rooms.filter(r => {
+      const rType = String(r.category || r.roomType || '').trim().toLowerCase();
+      const cType = String(category || '').trim().toLowerCase();
+      return rType === cType || rType.includes(cType) || cType.includes(rType);
+    });
+    const isCurrentRoomValid = form.roomNumber && matchingRooms.some(r => String(r.roomNumber || r.room) === String(form.roomNumber));
+    const nextRoomNum = isCurrentRoomValid ? form.roomNumber : "";
+
     setForm(prev => ({
       ...prev,
       roomType: category,
+      roomNumber: nextRoomNum,
       nights: nights !== "" ? nights : prev.nights,
       amount: amount !== "" ? amount : prev.amount,
       balance: prev.balance !== "" ? prev.balance : 0
     }));
+
+    if (fieldErrors.roomNumber && nextRoomNum) {
+      setFieldErrors(prev => ({ ...prev, roomNumber: null }));
+    }
   };
 
   const handleNightsChange = (val) => {
@@ -203,6 +218,14 @@ function ManagerAddReservation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!form.roomNumber || !String(form.roomNumber).trim()) {
+      const msg = "Please select room";
+      setFieldErrors(prev => ({ ...prev, roomNumber: msg }));
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
 
     const val = validateWithZod(walkInBookingSchema, {
       guest: form.guest,
@@ -295,8 +318,27 @@ function ManagerAddReservation() {
     }
   };
 
+  // Filter rooms in dropdown based on selected room category
+  const filteredRooms = form.roomType
+    ? rooms.filter(r => {
+        const rType = String(r.category || r.roomType || '').trim().toLowerCase();
+        const fType = String(form.roomType || '').trim().toLowerCase();
+        return rType === fType || rType.includes(fType) || fType.includes(rType);
+      })
+    : rooms;
+
+  const displayRooms = form.roomType ? filteredRooms : rooms;
+
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">
+      <Crumbs
+        items={[
+          { label: "Manager Dashboard", to: "/manager" },
+          { label: "Reservations", to: "/manager/reservations" },
+          { label: "New Reservation" }
+        ]}
+      />
+
       {error && <Notice tone="error" title="Reservation Blocked">{error}</Notice>}
 
       {loading ? (
@@ -306,18 +348,20 @@ function ManagerAddReservation() {
           {/* Guest Profile & Mandatory ID Proof Details */}
           <Panel title="Guest Identification & Mandatory ID Proof" description="Primary guest profile and government ID verification">
             <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <FormField label="Guest Full Name *" required>
+              <FormField label="Guest Full Name" required>
                 <Input
                   required
+                  nameOnly
                   placeholder="Enter guest full name"
                   value={form.guest}
                   onChange={(e) => setForm({ ...form, guest: e.target.value })}
                 />
               </FormField>
 
-              <FormField label="Contact Phone Number *" required>
+              <FormField label="Contact Phone Number" required>
                 <Input
                   required
+                  type="tel"
                   placeholder="Enter contact number (+91 98765 43210)"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -334,7 +378,7 @@ function ManagerAddReservation() {
               </FormField>
 
               {/* Mandatory ID Proof Fields */}
-              <FormField label="ID Proof Type *" required>
+              <FormField label="ID Proof Type" required>
                 <Select
                   required
                   value={form.idProofType}
@@ -358,7 +402,9 @@ function ManagerAddReservation() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-navy block">ID Proof Document Number *</label>
+                  <label className="text-xs font-bold text-navy block">
+                    ID Proof Document Number <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   {isAadhaarType && existingGuestAadhaar?.hasExistingAadhaar && (
                     <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
                       On Record: {existingGuestAadhaar.maskedAadhaar}
@@ -426,7 +472,7 @@ function ManagerAddReservation() {
           {/* Stay & Room Configuration */}
           <Panel title="Stay Itinerary & Room Allocation" description="Schedule dates, category tier, and room assignment">
             <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <FormField label="Check-In Date *" required>
+              <FormField label="Check-In Date" required>
                 <Input
                   type="date"
                   required
@@ -436,7 +482,7 @@ function ManagerAddReservation() {
                 />
               </FormField>
 
-              <FormField label="Check-Out Date *" required>
+              <FormField label="Check-Out Date" required>
                 <Input
                   type="date"
                   required
@@ -456,7 +502,7 @@ function ManagerAddReservation() {
                 />
               </FormField>
 
-              <FormField label="Room Category *" required>
+              <FormField label="Room Category" required>
                 <Select
                   required
                   value={form.roomType}
@@ -469,30 +515,34 @@ function ManagerAddReservation() {
                 </Select>
               </FormField>
 
-              <FormField label="Assign Room #">
+              <FormField 
+                label="Room Allotment (Available Only)" 
+                required 
+                status={fieldErrors.roomNumber ? "error" : undefined} 
+                errorMsg={fieldErrors.roomNumber}
+              >
                 <Select
+                  required
                   value={form.roomNumber}
-                  onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm({ ...form, roomNumber: val });
+                    if (fieldErrors.roomNumber) {
+                      setFieldErrors(p => ({ ...p, roomNumber: null }));
+                    }
+                  }}
                 >
-                  <option value="">Select Room Number</option>
-                  {rooms.length > 0 ? (
-                    rooms.map(rm => (
+                  <option value="">Select Available Room</option>
+                  {displayRooms.length > 0 ? (
+                    displayRooms.map(rm => (
                       <option key={rm.roomNumber || rm.room} value={rm.roomNumber || rm.room}>
                         Room {rm.roomNumber || rm.room} ({rm.category || 'Standard'}) - {rm.status}
                       </option>
                     ))
                   ) : (
-                    <>
-                      <option value="101">Room 101 (Standard Room)</option>
-                      <option value="102">Room 102 (Standard Room)</option>
-                      <option value="103">Room 103 (Standard Room)</option>
-                      <option value="201">Room 201 (Deluxe Room)</option>
-                      <option value="202">Room 202 (Deluxe Room)</option>
-                      <option value="203">Room 203 (Deluxe Room)</option>
-                      <option value="301">Room 301 (Executive Suite)</option>
-                      <option value="302">Room 302 (Executive Suite)</option>
-                      <option value="303">Room 303 (Executive Suite)</option>
-                    </>
+                    <option value="" disabled>
+                      {form.roomType ? `No rooms available for ${form.roomType}` : "No rooms available"}
+                    </option>
                   )}
                 </Select>
               </FormField>
@@ -522,6 +572,7 @@ function ManagerAddReservation() {
               <FormField label="Total Tariff Amount (₹) [Auto-Calculated]">
                 <Input
                   type="number"
+                  step="0.01"
                   placeholder="Auto-calculated tariff (₹)"
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: Number(e.target.value) || 0 })}
@@ -531,6 +582,7 @@ function ManagerAddReservation() {
               <FormField label="Outstanding Balance (₹)">
                 <Input
                   type="number"
+                  step="0.01"
                   placeholder="Enter balance (₹)"
                   value={form.balance}
                   onChange={(e) => setForm({ ...form, balance: Number(e.target.value) || 0 })}

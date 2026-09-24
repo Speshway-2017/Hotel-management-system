@@ -14,11 +14,29 @@ import { subscribeRealtimeSync } from "@/services/socket";
 
 function getToneForType(type) {
   const t = (type || "").toLowerCase();
-  if (t.includes("reserv") || t.includes("book") || t.includes("audit")) return "success";
-  if (t.includes("sync") || t.includes("payment") || t.includes("approval") || t.includes("check")) return "warning";
-  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("warning")) return "error";
+  if (t.includes("setup") || t.includes("onboard") || t.includes("property update") || t.includes("audit")) return "success";
+  if (t.includes("staff") || t.includes("roster")) return "brand";
+  if (t.includes("config") || t.includes("setting") || t.includes("subscription")) return "purple";
+  if (t.includes("sync") || t.includes("ota") || t.includes("warning")) return "warning";
+  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("issue") || t.includes("maintenance")) return "error";
   return "brand";
 }
+
+const isDisallowedForSuperAdminClient = (n) => {
+  const t = (n.title || '').toLowerCase();
+  const m = (n.message || '').toLowerCase();
+  const c = (n.type || n.category || '').toLowerCase();
+  const isAllowedCategory = c.includes('property') || c.includes('staff') || c.includes('config') || c.includes('system') || c.includes('ota') || c.includes('security') || c.includes('maintenance') || c.includes('issue');
+
+  const isOtaOrSystem = c.includes('ota') || c.includes('channel') || c.includes('security') || t.includes('ota') || t.includes('parity');
+  if (isOtaOrSystem) return false;
+  if (c.includes('reserv') || c.includes('book') || t.includes('reservation') || t.includes('online reservation') || t.includes('new booking') || m.includes('booked ') || (m.includes('reservation') && !isAllowedCategory) || m.includes('[ref: #')) return true;
+  if (t.includes('guest check-in') || t.includes('guest check-out') || t.includes('check-in confirmed') || t.includes('check-out completed') || m.includes('checked into') || m.includes('checked out from') || (m.includes('check-in') && !isAllowedCategory) || (m.includes('check-out') && !isAllowedCategory)) return true;
+  if (c.includes('guest') || c.includes('feedback') || c.includes('review') || t.includes('feedback') || t.includes('review') || m.includes('star review') || m.includes('submitted a review') || (m.includes('guest ') && !isAllowedCategory)) return true;
+  if (c.includes('payment') || c.includes('refund') || c.includes('finance') || c.includes('billing') || t.includes('payment') || t.includes('refund')) return true;
+  if (c.includes('service') || c.includes('housekeeping') || c.includes('room service') || t.includes('room service') || t.includes('guest service')) return true;
+  return false;
+};
 
 function SuperAdminNotifications() {
   const [notifications, setNotifications] = useState([]);
@@ -34,19 +52,22 @@ function SuperAdminNotifications() {
 
       const propertiesList = propRes?.success && propRes?.data ? propRes.data : [];
       if (res?.success && Array.isArray(res.data)) {
-        const compiled = res.data.map(n => {
-          const matched = propertiesList.find(p => p._id === n.propertyId || p.id === n.propertyId);
-          return {
-            id: n._id || n.id,
-            title: n.title,
-            message: n.message,
-            type: n.category || 'General',
-            propertyName: matched ? matched.name : (n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel'),
-            timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
-            read: n.isRead,
-            body: n.message
-          };
-        });
+        const compiled = res.data
+          .filter(n => !isDisallowedForSuperAdminClient(n))
+          .map(n => {
+            const matched = propertiesList.find(p => p._id === n.propertyId || p.id === n.propertyId);
+            return {
+              id: n._id || n.id,
+              title: n.title,
+              message: n.message,
+              type: n.category || 'General',
+              propertyId: n.propertyId,
+              propertyName: matched ? matched.name : (n.propertyId === 'All' || !n.propertyId ? 'Global System' : 'Assigned Hotel'),
+              timestamp: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "Today",
+              read: n.isRead,
+              body: n.message
+            };
+          });
         setNotifications(compiled);
       }
     } catch (err) {
@@ -59,13 +80,13 @@ function SuperAdminNotifications() {
   useEffect(() => {
     fetchAlerts(false);
 
-    const handleFocus = () => fetchAlerts(true);
+    const handleFocus = () => fetchAlerts(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchAlerts(true);
     });
 
-    return () => {
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -99,22 +120,28 @@ function SuperAdminNotifications() {
     }
   };
 
-  // Filtered dataset
+  // Filtered dataset for Super Admin
   const filteredNotifications = notifications.filter((n) => {
-    let matchesType = true;
     if (filterType === "Unread") {
-      matchesType = !n.read;
-    } else if (filterType === "Reservations") {
-      const t = (n.type || "").toLowerCase();
-      const title = (n.title || "").toLowerCase();
-      const msg = (n.message || "").toLowerCase();
-      matchesType = t.includes("reserv") || t.includes("book") || title.includes("reserv") || title.includes("booking") || msg.includes("booking");
-    } else if (filterType === "System") {
-      matchesType = n.propertyId === "All" || n.type === "Security Warning" || n.type === "Payment Alert";
-    } else if (filterType === "Property") {
-      matchesType = n.type === "Property Audit";
+      return !n.read;
     }
-    return matchesType;
+    const t = (n.type || "").toLowerCase();
+    const title = (n.title || "").toLowerCase();
+    const msg = (n.message || "").toLowerCase();
+    const combined = `${t} ${title} ${msg}`;
+
+    if (filterType === "Property") {
+      return t.includes("property") || combined.includes("onboard") || combined.includes("property update") || combined.includes("admin assign");
+    } else if (filterType === "Staff") {
+      return t.includes("staff") || combined.includes("staff member") || combined.includes("roster") || combined.includes("employee");
+    } else if (filterType === "Configuration") {
+      return t.includes("config") || t.includes("setting") || t.includes("subscription") || combined.includes("configuration") || combined.includes("settings");
+    } else if (filterType === "System") {
+      return t.includes("system") || t.includes("security") || t.includes("ota") || t.includes("sync") || combined.includes("unauthorized") || combined.includes("parity");
+    } else if (filterType === "Issues") {
+      return t.includes("issue") || t.includes("maintenance") || combined.includes("out of order") || combined.includes("facility");
+    }
+    return true;
   });
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -122,21 +149,23 @@ function SuperAdminNotifications() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="System Alerts Console"
-        subtitle="Monitor real-time system alerts, check channel sync parities, and audit property onboard events."
+        title="Property Alerts Console"
+        subtitle="Monitor property setup/updates, staff changes, configuration adjustments, system health, and property-level issues across Admin-managed properties."
       />
 
       {/* Advanced Filter Toolbar */}
       <div className="flex flex-col gap-3 bg-white border border-muted p-4 rounded-2xl shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Type Filter Pills */}
-          <div className="flex gap-1 bg-muted/30 p-1 rounded-full border border-muted/50">
+          <div className="flex gap-1 bg-muted/30 p-1 rounded-full border border-muted/50 overflow-x-auto max-w-full">
             {[
               { label: "All Alerts", key: "All" },
               { label: `Unread (${unreadCount})`, key: "Unread" },
-              { label: "Reservations", key: "Reservations" },
-              { label: "System Alerts", key: "System" },
-              { label: "Property Audits", key: "Property" }
+              { label: "Property Setup & Updates", key: "Property" },
+              { label: "Staff", key: "Staff" },
+              { label: "Configuration", key: "Configuration" },
+              { label: "System & Security", key: "System" },
+              { label: "Property Issues", key: "Issues" }
             ].map((tab) => (
               <button
                 key={tab.key}

@@ -277,6 +277,8 @@ function AddRoomPage() {
                     <Input
                       id="newTypeRate"
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="e.g. 18500"
                       value={newTypeRate}
                       onChange={(e) => setNewTypeRate(e.target.value)}
@@ -322,6 +324,8 @@ function AddRoomPage() {
                 <Input
                   id="baseRate"
                   type="number"
+                  min="0"
+                  step="0.01"
                   required
                   placeholder="e.g. 12000"
                   value={baseRate}

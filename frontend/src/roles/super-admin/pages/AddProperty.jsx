@@ -165,6 +165,7 @@ function AddProperty() {
                 <Input
                   id="prop-city"
                   required
+                  textOnly
                   value={propertyForm.city}
                   onChange={(e) => {
                     setPropertyForm({ ...propertyForm, city: e.target.value });
@@ -265,6 +266,7 @@ function AddProperty() {
                     <Input
                       id="admin-name"
                       required={adminMode === "create"}
+                      nameOnly
                       value={propertyForm.adminName}
                       onChange={(e) => {
                         setPropertyForm({ ...propertyForm, adminName: e.target.value });
@@ -330,6 +332,7 @@ function AddProperty() {
                   >
                     <Input
                       id="admin-mobile"
+                      type="tel"
                       value={propertyForm.adminMobile}
                       onChange={(e) => {
                         setPropertyForm({ ...propertyForm, adminMobile: e.target.value });

@@ -1,6 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { protect, authorize, checkPropertyStatus, checkPropertyAccess } from '../middleware/auth.middleware.js';
+import { protect, authorize, checkPropertyStatus, checkPropertyAccess, clearUserCache } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import Booking from '../models/booking.model.js';
@@ -27,6 +27,7 @@ import {
   findExistingVerifiedAadhaar,
   formatAadhaar
 } from '../utils/aadhaarValidator.js';
+import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 
 const router = express.Router();
 
@@ -256,9 +257,10 @@ router.post('/properties', authorize('super-admin'), async (req, res) => {
     // Trigger notification
     await triggerNotification({
       role: 'super-admin',
+      propertyId: property.id || property._id,
       title: 'New Property Onboarded',
       message: `Onboarded '${name}' in ${city}. Default inventory mapping initialized.`,
-      category: 'Property Audit'
+      category: 'Property Setup'
     });
 
     invalidatePropertyCache(property.id || property._id);
@@ -283,6 +285,15 @@ router.put('/properties/:id', authorize('super-admin'), async (req, res) => {
 
     invalidatePropertyCache(id);
     await logAction(req.user, 'Updated Property', `${updated.name}`, req);
+
+    await triggerNotification({
+      role: 'super-admin',
+      propertyId: id,
+      title: 'Property Updated',
+      message: `Property details updated for '${updated.name}' (${updated.city}).`,
+      category: 'Property Update'
+    });
+
     return sendSuccess(res, 200, updated, 'Property updated successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to update property');
@@ -305,6 +316,15 @@ router.put('/properties/:propertyId/assign-admin', authorize('super-admin'), asy
 
     invalidatePropertyCache(propertyId);
     await logAction(req.user, 'Assigned Admin to Property', `${updated.name}`, req);
+
+    await triggerNotification({
+      role: 'super-admin',
+      propertyId,
+      title: 'Admin Assigned to Property',
+      message: `Admin assigned to property '${updated.name}'.`,
+      category: 'Property Setup'
+    });
+
     return sendSuccess(res, 200, updated, 'Admin assigned to property successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to assign admin');
@@ -319,6 +339,15 @@ router.delete('/properties/:id', authorize('super-admin'), async (req, res) => {
 
     invalidatePropertyCache(id);
     await logAction(req.user, 'Deleted Property', `${deleted.name}`, req);
+
+    await triggerNotification({
+      role: 'super-admin',
+      propertyId: id,
+      title: 'Property Removed',
+      message: `Property '${deleted.name}' was removed from the system.`,
+      category: 'Property Update'
+    });
+
     return sendSuccess(res, 200, deleted, 'Property deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete property');
@@ -350,7 +379,8 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
       propertyId: u.propertyId || null,
       dept: u.dept || 'Front Desk',
       shift: u.shift || 'Morning (06:00 - 14:00)',
-      lastLogin: u.lastLogin || '—',
+      avatar: u.avatar || null,
+      phone: u.mobile || u.phone || '',
       city: u.city || '',
       state: u.state || '',
       country: u.country || 'India',
@@ -477,6 +507,7 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
     const updated = await User.findOneAndUpdate({ $or: userQuery }, updateFields, { new: true });
     if (!updated) return sendError(res, 404, 'Staff not found');
 
+    clearUserCache();
     await logAction(req.user, 'Updated User', `${updated.name}`, req);
 
     const io = req.app.get('socketio');
@@ -518,6 +549,7 @@ router.delete('/users/:id', checkPropertyStatus, async (req, res) => {
     }
 
     const deleted = await User.findOneAndDelete({ $or: userQuery });
+    clearUserCache();
     await logAction(req.user, 'Deleted User', `${deleted?.name || id}`, req);
     return sendSuccess(res, 200, deleted, 'User deleted successfully');
   } catch (error) {
@@ -583,10 +615,7 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
 
     if (updated.category === 'Refund' || updated.bookingId) {
       try {
-        const cleanBkId = String(updated.bookingId).replace(/^BK-/, '').replace(/^FOL-/, '');
-        const bkQuery = [{ bookingId: updated.bookingId }, { id: updated.bookingId }, { bookingId: cleanBkId }, { id: cleanBkId }];
-        if (mongoose.Types.ObjectId.isValid(cleanBkId)) bkQuery.unshift({ _id: cleanBkId });
-        if (mongoose.Types.ObjectId.isValid(updated.bookingId)) bkQuery.unshift({ _id: updated.bookingId });
+        const bkQuery = buildBookingLookupQuery(updated.bookingId);
 
         const updateSet = {
           'refundRequest.status': finalAction,
@@ -605,7 +634,7 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
         }
 
         const linkedBk = await Booking.findOneAndUpdate(
-          { $or: bkQuery },
+          bkQuery,
           { $set: updateSet },
           { new: true }
         );
@@ -784,12 +813,7 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
 router.get('/reservations/:id/guest-aadhaar-status', async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
-
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const booking = await Booking.findOne(buildBookingLookupQuery(id));
     if (!booking) return sendError(res, 404, 'Reservation not found');
 
     const existingRecord = await findExistingVerifiedAadhaar({
@@ -840,12 +864,7 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
       return sendError(res, 400, 'ID Document Number is required for verification.');
     }
 
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
-
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const booking = await Booking.findOne(buildBookingLookupQuery(id));
     if (!booking) return sendError(res, 404, 'Reservation not found');
 
     const effectiveDocType = idDocType || booking.idDocType || 'Aadhaar Card';
@@ -885,12 +904,9 @@ router.post('/reservations/:id/verify-id', async (req, res) => {
 router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
+    const bookingQuery = buildBookingLookupQuery(id);
 
-    const existingBooking = await Booking.findOne({ $or: bookingQuery });
+    const existingBooking = await Booking.findOne(bookingQuery);
     if (!existingBooking) return sendError(res, 404, 'Booking not found');
 
     const isWebsiteBooking = existingBooking.source && existingBooking.source !== 'Walk-in' && !existingBooking.source.toLowerCase().includes('walk-in');
@@ -959,7 +975,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       });
     }
 
-    const booking = await Booking.findOneAndUpdate({ $or: bookingQuery }, updatePayload, { new: true });
+    const booking = await Booking.findOneAndUpdate(bookingQuery, updatePayload, { new: true });
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Updated Booking', `${booking.guest}`, req);
 
@@ -1011,12 +1027,9 @@ router.put('/reservations/:id/extend', checkPropertyStatus, async (req, res) => 
     }
 
     const { id } = req.params;
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
+    const bookingQuery = buildBookingLookupQuery(id);
 
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const booking = await Booking.findOne(bookingQuery);
     if (!booking) {
       return sendError(res, 404, 'Booking reservation record not found.');
     }
@@ -1028,7 +1041,7 @@ router.put('/reservations/:id/extend', checkPropertyStatus, async (req, res) => 
 
     const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
-      { $or: bookingQuery },
+      bookingQuery,
       {
         checkOut: newCheckOut,
         nights: Number(booking.nights || 1) + Number(additionalNights),
@@ -1065,12 +1078,9 @@ router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) =>
     }
 
     const { id } = req.params;
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
+    const bookingQuery = buildBookingLookupQuery(id);
 
-    const booking = await Booking.findOne({ $or: bookingQuery });
+    const booking = await Booking.findOne(bookingQuery);
     if (!booking) {
       return sendError(res, 404, 'Booking reservation record not found.');
     }
@@ -1083,7 +1093,7 @@ router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) =>
 
     const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
-      { $or: bookingQuery },
+      bookingQuery,
       {
         checkOut: newCheckOut,
         nights: Number(booking.nights || 1) + Number(additionalNights),
@@ -1115,11 +1125,8 @@ router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) =>
 router.delete('/reservations/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingQuery = [{ id }, { bookingId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      bookingQuery.unshift({ _id: id });
-    }
-    const booking = await Booking.findOneAndDelete({ $or: bookingQuery });
+    const bookingQuery = buildBookingLookupQuery(id);
+    const booking = await Booking.findOneAndDelete(bookingQuery);
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Deleted Booking', `${booking.guest}`, req);
 

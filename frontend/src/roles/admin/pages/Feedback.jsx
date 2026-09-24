@@ -5,6 +5,7 @@ import { adminService } from "@/services/admin";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { ActionGroup, ViewActionButton } from "@/components/hs/ActionButtons";
 import {
   MessageSquare,
   Search,
@@ -334,8 +335,8 @@ function AdminFeedbackPage() {
                   <th className="py-3.5 px-4 whitespace-nowrap">Rating</th>
                   <th className="py-3.5 px-4 whitespace-nowrap">Sentiment</th>
                   <th className="py-3.5 px-4">Review Comment</th>
-                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Status</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
+                  <th className="py-3.5 px-4 text-left whitespace-nowrap">Status</th>
+                  <th className="py-3.5 px-4 text-left min-w-[100px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-navy/5 text-navy font-medium">
@@ -411,21 +412,18 @@ function AdminFeedbackPage() {
                       </td>
 
                       {/* Status */}
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap">
                         <StatusBadge status={f.status || (f.response ? "Resolved" : "Published")} />
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end">
-                          <button
+                      <td className="py-3.5 px-4 text-left align-middle min-w-[100px] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <ActionGroup align="left">
+                          <ViewActionButton
                             onClick={() => navigate(`/admin/feedback/view/${fid}`)}
-                            className="size-8 rounded-lg bg-navy/5 hover:bg-purple hover:text-white text-navy flex items-center justify-center transition-colors cursor-pointer border-none"
                             title="View Feedback Details"
-                          >
-                            <Eye className="size-4" />
-                          </button>
-                        </div>
+                          />
+                        </ActionGroup>
                       </td>
                     </tr>
                   );
