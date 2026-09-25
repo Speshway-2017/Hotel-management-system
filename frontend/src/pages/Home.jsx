@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { inr, searchResults, blogPosts } from "@/data/hs-data";
 import { InsightsStackedCarousel } from "@/components/hs/InsightsStackedCarousel";
 import { CategoryLayeredCards } from "@/components/hs/CategoryLayeredCards";
+import { SoilCircularCards } from "@/components/hs/SoilCircularCards";
 
 // Import Slider Images
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -248,14 +249,13 @@ function Home() {
         </div>
 
         <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-10 px-4 sm:px-6">
-          <div>
+          <div className="max-w-3xl text-left">
             <h1 className="font-display text-4xl leading-[1.1] font-bold text-cream sm:text-6xl">
               {homeData.title}
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-cream/80 sm:text-xl font-ui">
+            <p className="mt-6 max-w-2xl text-base leading-relaxed text-gray-300 sm:text-xl font-ui">
               {homeData.description}
             </p>
-           
           </div>
 
           {/* Quick Search Card embedded directly inside the hero flow */}
@@ -265,12 +265,12 @@ function Home() {
                 <div className="text-center py-4 text-navy font-semibold flex flex-col items-center gap-1.5 font-ui">
                   <ShieldAlert className="size-8 text-gold" />
                   <p className="text-sm">Online direct bookings are temporarily disabled by the administrator.</p>
-                  <p className="text-xs text-muted-foreground font-medium">Please contact our reservation desk or front office directly to book a room.</p>
+                  <p className="text-xs text-gray-500 font-medium">Please contact our reservation desk or front office directly to book a room.</p>
                 </div>
               ) : (
                 <form onSubmit={handleHeroSearchSubmit} className="grid gap-4 sm:grid-cols-4">
                   <label className="block text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Destination</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 font-ui">Destination</span>
                     <span className="relative mt-1.5 block">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
                       <Input 
@@ -282,7 +282,7 @@ function Home() {
                     </span>
                   </label>
                   <label className="block text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-in Date</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 font-ui">Check-in Date</span>
                     <span className="relative mt-1.5 block">
                       <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
                       <Input 
@@ -294,7 +294,7 @@ function Home() {
                     </span>
                   </label>
                   <label className="block text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-navy/70 font-ui">Check-out Date</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 font-ui">Check-out Date</span>
                     <span className="relative mt-1.5 block">
                       <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
                       <Input 
@@ -307,7 +307,7 @@ function Home() {
                   </label>
                   <div className="flex items-end">
                     <Button 
-                      type="submit"
+                      type="submit" 
                       className="h-12 w-full rounded-md bg-navy text-cream hover:bg-navy/90 font-bold gap-2 shadow-soft cursor-pointer text-xs border-none"
                     >
                       <SearchIcon className="size-4" /> Search Rooms
@@ -326,7 +326,7 @@ function Home() {
                 <div className="text-right text-xs sm:text-sm">
                   <span className="text-gold font-semibold tracking-wider uppercase">{activeSlide.tagline || "Luxury Stays"}</span>
                   <span className="mx-2 text-cream/35">|</span>
-                  <span className="text-cream/70 font-ui">{activeSlide.title || "Hour Stay"}, {activeSlide.location || "India"}</span>
+                  <span className="text-gray-300 font-ui">{activeSlide.title || "Hour Stay"}, {activeSlide.location || "India"}</span>
                 </div>
               );
             })()}
@@ -337,119 +337,8 @@ function Home() {
       {/* Property Types / Categories Section */}
       <CategoryLayeredCards />
 
-      {/* Why Hour Stay (Built for India) Section */}
-      <section className="bg-white border-y border-navy/5 py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
-            <div className="lg:col-span-5">
-              <span className="text-xs font-bold uppercase tracking-widest text-purple">Built for the Soil</span>
-              <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
-                Connected hotel operations engineered for India
-              </h2>
-              <p className="mt-4 text-base text-[#4A4F58] leading-relaxed font-ui">
-                Hospitality platforms built in the West often fail to match the real-world operational challenges of Indian properties. Hour Stay bridges the gap with a hyper-localized feature set.
-              </p>
-
-              <div className="mt-8 space-y-6">
-                {[
-                  {
-                    title: "UPI-First Settlement Pipeline",
-                    desc: "Skip card commissions. Generate instant dynamic UPI QR codes on front-desk tablets or send payment request links directly to guest WhatsApp."
-                  },
-                  {
-                    title: "India-First GST engine",
-                    desc: "Automated billing that correctly maps tax slabs (12% and 18% tiers) and itemizes SAC/HSN codes across split rooms and POS dining folios."
-                  },
-                  {
-                    title: "Offline Local Cache Resilience",
-                    desc: "Power cuts and internet drops won't freeze your lobby. Front-desk operations run seamlessly offline, syncing data back to the cloud the moment connectivity returns."
-                  },
-                  {
-                    title: "Multi-lingual Staff Training Mode",
-                    desc: "Simplify employee onboarding with clean interfaces and dual-language terminology, catering to staff with varying levels of technical familiarity."
-                  }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
-                      <Check className="size-3.5 stroke-[3]" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-navy">{item.title}</h4>
-                      <p className="mt-1 text-sm text-[#4A4F58] font-ui leading-relaxed">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="lg:col-span-7">
-              {/* Illustrated Visual Cards */}
-              <div className="relative rounded-2xl bg-cream p-8 shadow-soft border border-navy/5 overflow-hidden">
-                <div className="absolute -right-10 -top-10 size-40 rounded-full bg-gold/10 blur-2xl" />
-                <div className="absolute -bottom-10 -left-10 size-40 rounded-full bg-purple/10 blur-2xl" />
-                
-                <div className="grid gap-6 sm:grid-cols-2 relative z-10">
-                  <div className="rounded-xl border border-navy/5 bg-white p-6 shadow-soft">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-[#2E7D32]/10 p-2.5 text-[#2E7D32]">
-                        <QrCode className="size-6" />
-                      </div>
-                      <span className="text-xs font-bold text-navy uppercase tracking-wider">UPI Settlement</span>
-                    </div>
-                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Incorporate instant UPI QR codes at checkout. Reduce gateway commissions by up to 82%.</p>
-                    <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">Reconciliation</span>
-                      <span className="inline-flex items-center gap-1 rounded bg-[#2E7D32]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#2E7D32]">Real-Time</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-navy/5 bg-white p-6 shadow-soft">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-[#5B21B6]/10 p-2.5 text-[#5B21B6]">
-                        <Landmark className="size-6" />
-                      </div>
-                      <span className="text-xs font-bold text-navy uppercase tracking-wider">GST Compliance</span>
-                    </div>
-                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Automatically handles CGST, SGST, IGST with zero manual tax computations.</p>
-                    <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">Tax Slab</span>
-                      <span className="inline-flex items-center gap-1 rounded bg-[#5B21B6]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#5B21B6]">12% / 18% Auto</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-navy/5 bg-white p-6 shadow-soft">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-[#C77700]/10 p-2.5 text-[#C77700]">
-                        <Zap className="size-6" />
-                      </div>
-                      <span className="text-xs font-bold text-navy uppercase tracking-wider">Offline State</span>
-                    </div>
-                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Local storage cache keeps front desk check-ins active even when broadband fails.</p>
-                    <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">Sync State</span>
-                      <span className="inline-flex items-center gap-1 rounded bg-[#C77700]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#C77700]">Auto-Resilient</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-navy/5 bg-white p-6 shadow-soft">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-navy/10 p-2.5 text-navy">
-                        <Users className="size-6" />
-                      </div>
-                      <span className="text-xs font-bold text-navy uppercase tracking-wider">Guest Profiles</span>
-                    </div>
-                    <p className="mt-4 text-xs text-[#4A4F58] font-ui leading-relaxed">Build profiles with preferences, special requests, occasion notes, and personalized greetings.</p>
-                    <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <span className="text-[10px] text-[#4A4F58] uppercase font-bold">CRM Database</span>
-                      <span className="inline-flex items-center gap-1 rounded bg-navy/10 px-1.5 py-0.5 text-[9px] font-bold text-navy">VIP Segment</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Why Hour Stay (Built for the Soil) Section */}
+      <SoilCircularCards />
 
 
 
@@ -462,10 +351,10 @@ function Home() {
               <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
                 Dynamic inventory sync with major OTAs
               </h2>
-              <p className="mt-4 text-base text-[#4A4F58] leading-relaxed font-ui">
+              <p className="mt-4 text-base text-gray-600 leading-relaxed font-ui">
                 Hour Stay’s lightning-fast synchronization engine links your central inventory pool with MakeMyTrip, Goibibo, Booking.com, and Agoda. 
               </p>
-              <p className="mt-3 text-base text-[#4A4F58] leading-relaxed font-ui">
+              <p className="mt-3 text-base text-gray-600 leading-relaxed font-ui">
                 When a guest books directly or on an OTA, availability updates instantly globally. Zero overbookings, zero manual rate conflicts.
               </p>
 
@@ -495,7 +384,7 @@ function Home() {
                     Direct Web Booking
                   </button>
                 </div>
-                <p className="mt-3 text-[11px] text-[#4A4F58] italic font-ui">Click a channel to watch inventory sync happen across the dashboard and all networks in real-time.</p>
+                <p className="mt-3 text-[11px] text-gray-500 italic font-ui">Click a channel to watch inventory sync happen across the dashboard and all networks in real-time.</p>
               </div>
             </div>
 
@@ -525,7 +414,7 @@ function Home() {
                           <span className={`mt-1.5 inline-block size-2 rounded-full ${
                             isActive ? "bg-red-500 animate-ping" : (otaState === "synced" ? "bg-[#2E7D32]" : "bg-[#2E7D32]/40")
                           }`} />
-                          <span className="text-[9px] text-[#4A4F58] block mt-1 font-ui">
+                          <span className="text-[9px] text-gray-500 block mt-1 font-ui">
                             {isActive ? "Booked! -1" : (otaState === "synced" ? "Synced (12 Available)" : "13 Rooms Avail")}
                           </span>
                         </div>
@@ -569,7 +458,7 @@ function Home() {
                       <span className={`mt-1.5 inline-block size-2 rounded-full ${
                         otaState === "syncing_pms" ? "bg-amber-500 animate-pulse" : "bg-[#2E7D32]"
                       }`} />
-                      <span className="text-[10px] text-[#4A4F58] block mt-1 font-ui">
+                      <span className="text-[10px] text-gray-500 block mt-1 font-ui">
                         {otaState === "syncing_pms" ? "Updating allocation..." : "Allocation Grid Synced"}
                       </span>
                     </div>
@@ -602,7 +491,7 @@ function Home() {
             <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               From reservation checkout to dynamic check-out
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-gray-600 leading-relaxed font-ui">
               A frictionless digital ecosystem built to increase guest satisfaction scores and take operational pressure off your lobby.
             </p>
           </div>
@@ -686,7 +575,7 @@ function Home() {
                     <div>
                       {/* Step Label & Top Accent Indicator */}
                       <div className="flex items-center justify-between mb-4">
-                        <span className="font-sans text-[11px] font-bold tracking-widest uppercase text-navy/60">
+                        <span className="font-sans text-[11px] font-bold tracking-widest uppercase text-gray-500">
                           {t.label}
                         </span>
                         <span
@@ -701,14 +590,14 @@ function Home() {
                       </h3>
 
                       {/* Short Description in Inter */}
-                      <p className="font-sans text-xs sm:text-sm text-[#4A4F58] leading-relaxed">
+                      <p className="font-sans text-xs sm:text-sm text-gray-600 leading-relaxed">
                         {t.desc}
                       </p>
                     </div>
 
                     {/* Subtle aesthetic card footer */}
                     <div className="pt-4 mt-6 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-sans font-semibold tracking-wider text-slate-400">
+                      <span className="text-[10px] uppercase font-sans font-semibold tracking-wider text-gray-400">
                         Phase 0{idx + 1}
                       </span>
                       <div
@@ -731,7 +620,7 @@ function Home() {
             <div>
               <span className="text-xs font-bold uppercase tracking-widest text-purple">Stay Options</span>
               <h2 className="mt-2 font-display text-3xl sm:text-4xl font-bold text-navy">Signature collection properties</h2>
-              <p className="mt-2 max-w-lg text-sm sm:text-base text-[#4A4F58] font-ui leading-relaxed">
+              <p className="mt-2 max-w-lg text-sm sm:text-base text-gray-600 font-ui leading-relaxed">
                 Sample properties running Hour Stay, available for booking in the interactive demo.
               </p>
             </div>
@@ -771,19 +660,19 @@ function Home() {
                   </div>
 
                   <div className="p-5">
-                    <p className="flex items-center gap-1 text-xs text-[#4A4F58] font-ui">
+                    <p className="flex items-center gap-1 text-xs text-gray-600 font-ui">
                       <MapPin className="size-3.5 text-purple" /> {h.city}
                     </p>
                     <h3 className="mt-1.5 font-display text-base font-bold text-navy group-hover:text-purple transition-colors line-clamp-1">
                       {h.name}
                     </h3>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-[#4A4F58] font-ui">
+                    <p className="mt-2 flex items-center gap-1 text-xs text-gray-600 font-ui">
                       <Star className="size-4 fill-gold text-gold" /> {h.rating} · {h.reviews} verified reviews
                     </p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
                       <p className="text-sm font-bold text-navy font-ui">
                         {inr(h.price)}
-                        <span className="text-[10px] font-normal text-[#4A4F58]"> / night</span>
+                        <span className="text-[10px] font-normal text-gray-500"> / night</span>
                       </p>
                       <Button asChild size="sm" variant="ghost" className="h-8 px-3 rounded text-purple font-semibold hover:bg-purple/5">
                         <Link to="/rooms/$roomId" params={{ roomId: h.id }}>
@@ -807,7 +696,7 @@ function Home() {
             <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Insights from the hospitality frontline
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-gray-600 leading-relaxed font-ui">
               Read practical guides on GST slabs, peak wedding season pricing, and modern operational strategies.
             </p>
           </div>
@@ -824,7 +713,7 @@ function Home() {
             <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               Trusted by leading Indian hoteliers
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-gray-600 leading-relaxed font-ui">
               Hear from owners and general managers who replaced legacy systems with Hour Stay's calm hospitality suite.
             </p>
           </div>
@@ -866,7 +755,7 @@ function Home() {
                       <Star key={i} className="size-4.5 fill-gold text-gold" />
                     ))}
                   </div>
-                  <p className="text-xs sm:text-[13px] leading-relaxed italic font-ui font-normal">
+                  <p className={`text-xs sm:text-[13px] leading-relaxed italic font-ui font-normal ${idx === 0 ? "text-gray-300" : "text-gray-600"}`}>
                     "{t.quote}"
                   </p>
                 </div>
@@ -876,7 +765,7 @@ function Home() {
                   </div>
                   <div>
                     <h4 className="text-sm font-bold">{t.name}</h4>
-                    <p className="text-[11px] opacity-75">{t.role} · {t.city}</p>
+                    <p className={`text-[11px] ${idx === 0 ? "text-gray-400" : "text-gray-500"}`}>{t.role} · {t.city}</p>
                   </div>
                 </div>
               </div>

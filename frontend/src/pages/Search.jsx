@@ -174,14 +174,13 @@ export function SearchPage() {
           <div className="bg-white rounded-3xl border-[5px] border-white p-6 sm:p-10 shadow-[rgba(13,27,42,0.06)_0px_20px_25px_-5px] mb-10 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-[6px] bg-gradient-to-r from-purple via-coral to-gold" />
             
-            <div className="max-w-3xl mb-6">
-              <span className="text-xs font-bold text-purple uppercase tracking-wider block mb-1">
+            <div className="max-w-3xl mb-6">              <span className="text-xs font-bold text-purple uppercase tracking-wider block mb-1">
                 Luxury Stays & Heritage Havelis
               </span>
               <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">
                 Book a Stay Across Active Properties
               </h1>
-              <p className="text-xs sm:text-base text-[#4A4F58] mt-1 font-ui">
+              <p className="text-xs sm:text-base text-gray-600 mt-1 font-ui">
                 Explore real-time property availability, ratings, and luxury room suites from MongoDB.
               </p>
             </div>
@@ -246,7 +245,7 @@ export function SearchPage() {
 
                 {/* Location Filter */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-navy/55 uppercase tracking-wider block">City / Location</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">City / Location</label>
                   <select 
                     value={selectedCity}
                     onChange={(e) => setSelectedCity(e.target.value)}
@@ -261,7 +260,7 @@ export function SearchPage() {
 
                 {/* Hotel Classification */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-navy/55 uppercase tracking-wider block">Classification</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Classification</label>
                   <select 
                     value={selectedClassification}
                     onChange={(e) => setSelectedClassification(e.target.value)}
@@ -279,7 +278,7 @@ export function SearchPage() {
                 {/* Price Range Slider */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-navy/55 uppercase tracking-wider">Max Price / Night</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Max Price / Night</label>
                     <span className="text-xs font-bold text-purple">{inr(maxPrice)}</span>
                   </div>
                   <input 
@@ -291,7 +290,7 @@ export function SearchPage() {
                     onChange={(e) => setMaxPrice(parseInt(e.target.value))}
                     className="w-full accent-purple h-1 bg-cream rounded-lg cursor-pointer"
                   />
-                  <div className="flex justify-between text-[9px] text-navy/40 font-bold">
+                  <div className="flex justify-between text-[9px] text-gray-400 font-bold">
                     <span>₹1,500</span>
                     <span>₹30,000</span>
                   </div>
@@ -299,7 +298,7 @@ export function SearchPage() {
 
                 {/* Minimum Rating */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-navy/55 uppercase tracking-wider block">Min Guest Rating</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Min Guest Rating</label>
                   <div className="flex gap-2">
                     {[0, 4.0, 4.5, 4.8].map((r) => (
                       <button
@@ -309,7 +308,7 @@ export function SearchPage() {
                         className={`flex-1 py-1.5 rounded-lg text-xs font-bold border cursor-pointer ${
                           minRating === r 
                             ? "bg-purple text-cream border-purple" 
-                            : "border-navy/10 text-navy/70 hover:bg-navy/5"
+                            : "border-navy/10 text-gray-600 hover:bg-navy/5"
                         }`}
                       >
                         {r === 0 ? "Any" : `${r}+ ★`}
@@ -320,10 +319,10 @@ export function SearchPage() {
 
                 {/* Key Amenities Checkboxes */}
                 <div className="space-y-2 pt-2 border-t border-navy/5">
-                  <label className="text-[10px] font-bold text-navy/55 uppercase tracking-wider block">Popular Amenities</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Popular Amenities</label>
                   <div className="flex flex-col gap-2">
                     {["WiFi", "Swimming Pool", "Spa", "Room Service", "Gym", "Restaurant"].map((a) => (
-                      <label key={a} className="flex items-center gap-2.5 text-xs text-navy/80 cursor-pointer">
+                      <label key={a} className="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer">
                         <input 
                           type="checkbox" 
                           checked={selectedAmenities.includes(a)}
@@ -344,7 +343,7 @@ export function SearchPage() {
               {loading ? (
                 <div className="bg-white rounded-2xl p-16 border border-navy/5 text-center space-y-4">
                   <div className="mx-auto size-10 rounded-full border-4 border-purple border-t-transparent animate-spin" />
-                  <p className="text-sm font-semibold text-navy/60">Fetching active properties from MongoDB...</p>
+                  <p className="text-sm font-semibold text-gray-500">Fetching active properties from MongoDB...</p>
                 </div>
               ) : error ? (
                 <div className="bg-white rounded-2xl p-12 border border-rose-200 text-center space-y-3">
@@ -355,7 +354,7 @@ export function SearchPage() {
                 <div className="bg-white rounded-2xl p-16 border border-navy/5 text-center space-y-4 shadow-soft">
                   <Hotel className="size-12 text-navy/20 mx-auto" />
                   <h3 className="font-display text-xl font-bold text-navy">No hotels available in this location</h3>
-                  <p className="text-xs text-navy/60 max-w-md mx-auto">
+                  <p className="text-xs text-gray-500 max-w-md mx-auto">
                     {searchTerm 
                       ? `We currently do not have active hotels listed in "${searchTerm}". Try searching another location like Hyderabad, Jaipur, or Goa.`
                       : "No active properties match your search criteria. Try modifying your search term or clearing active filters."}
@@ -369,7 +368,7 @@ export function SearchPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center text-xs font-semibold text-navy/60 px-1">
+                  <div className="flex justify-between items-center text-xs font-semibold text-gray-500 px-1">
                     <span>Showing <strong>{filteredHotels.length}</strong> active hotel properties</span>
                     <span>Sorted by: <strong>Featured Stays</strong></span>
                   </div>
@@ -413,7 +412,7 @@ export function SearchPage() {
                               <div className="flex justify-between items-start gap-4">
                                 <div>
                                   <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">{hotelName}</h2>
-                                  <p className="text-xs text-[#4A4F58] flex items-center gap-1 mt-1">
+                                  <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
                                     <MapPin className="size-3.5 text-purple shrink-0" />
                                     <span>{address}</span>
                                   </p>
@@ -425,7 +424,7 @@ export function SearchPage() {
                                 </div>
                               </div>
 
-                              <p className="text-xs sm:text-sm text-[#4A4F58] leading-relaxed line-clamp-2 pt-1 font-ui">
+                              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed line-clamp-2 pt-1 font-ui">
                                 {description}
                               </p>
 
@@ -443,10 +442,10 @@ export function SearchPage() {
                             {/* Footer & Actions */}
                             <div className="flex justify-between items-end pt-4 border-t border-navy/5">
                               <div>
-                                <span className="text-[10px] font-bold text-navy/40 uppercase tracking-wider block">Starting From</span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Starting From</span>
                                 <div className="flex items-baseline gap-1">
                                   <span className="font-display text-2xl font-bold text-navy">{inr(startingPrice)}</span>
-                                  <span className="text-[10px] text-[#4A4F58] font-semibold">/ night + GST</span>
+                                  <span className="text-[10px] text-gray-500 font-semibold">/ night + GST</span>
                                 </div>
                               </div>
 

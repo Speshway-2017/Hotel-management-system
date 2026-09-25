@@ -203,7 +203,7 @@ export function SiteFooter() {
   }, []);
 
   return (
-    <footer className="bg-navy text-[#FFF7E6]/75 border-t-2 border-purple/30 pt-16 pb-8 font-ui relative overflow-hidden">
+    <footer className="bg-navy text-gray-300 border-t-2 border-purple/30 pt-16 pb-8 font-ui relative overflow-hidden">
       
       {/* Subtle Purple Accent Radial Glows */}
       <div className="absolute inset-0 pointer-events-none z-0">
@@ -216,7 +216,7 @@ export function SiteFooter() {
         {/* Column 1 - Brand */}
         <div className="space-y-6">
           <Logo tone="light" />
-          <p className="text-xs sm:text-sm leading-relaxed text-[#FFF7E6]/70">
+          <p className="text-xs sm:text-sm leading-relaxed text-gray-300">
             {property?.settings?.description || "A calm, premium property management suite built for Indian hospitality."}
           </p>
           <div className="flex gap-4 pt-2">
@@ -233,7 +233,7 @@ export function SiteFooter() {
                   href={soc.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[#FFF7E6]/50 hover:text-gold hover:scale-110 transition-all duration-200"
+                  className="text-gray-400 hover:text-gold hover:scale-110 transition-all duration-200"
                   aria-label={soc.label}
                   title={soc.label}
                 >
@@ -247,7 +247,7 @@ export function SiteFooter() {
         {/* Column 2 - Product */}
         <div className="space-y-4">
           <p className="font-display text-base font-bold text-cream tracking-wide">Product</p>
-          <ul className="space-y-2.5 text-xs sm:text-sm">
+          <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
             {[
               { label: "Features", to: "/features" },
               { label: "Front Desk", to: "/reception" },
@@ -268,7 +268,7 @@ export function SiteFooter() {
         {/* Column 3 - Company */}
         <div className="space-y-4">
           <p className="font-display text-base font-bold text-cream tracking-wide">Company</p>
-          <ul className="space-y-2.5 text-xs sm:text-sm">
+          <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
             {[
               { label: "About Us", to: "/about" },
               { label: "Blog", to: "/blog" },
@@ -289,7 +289,7 @@ export function SiteFooter() {
         {/* Column 4 - Contact */}
         <div className="space-y-5">
           <p className="font-display text-base font-bold text-cream tracking-wide">Contact</p>
-          <ul className="space-y-3 text-xs sm:text-sm text-[#FFF7E6]/70">
+          <ul className="space-y-3 text-xs sm:text-sm text-gray-300">
             <li className="flex items-center gap-2.5">
               <Phone className="size-4 text-gold shrink-0" />
               <span>{property?.settings?.phone || "+91 141 4055 900"}</span>
@@ -323,8 +323,8 @@ export function SiteFooter() {
       </div>
 
       {/* Divider & Bottom Bar */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 mt-16 pt-6 border-t border-[#FFF7E6]/10 relative z-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-[#FFF7E6]/50">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 mt-16 pt-6 border-t border-white/10 relative z-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-gray-400">
           <p>© 2026 {brandName}. All rights reserved.</p>
           <div className="flex justify-center gap-4">
             <Link to="/" className="hover:text-gold transition-colors">Privacy Policy</Link>
@@ -372,7 +372,7 @@ export function SiteLayout({ children }) {
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream text-foreground">
+    <div className="flex min-h-screen flex-col bg-cream text-foreground overflow-x-clip">
       <SiteHeader />
       <main className="flex-1 animate-fade-in">{children}</main>
       <SiteFooter />

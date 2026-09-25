@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { publicService } from "@/services/public";
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -29,134 +29,149 @@ export const Route = createFileRoute("/features")({
 
 const FEATURE_CARD_PALETTES = [
   {
-    // Royal Purple
-    backBg: "bg-[#7C3AED]/12",
-    backBorder: "border-[#7C3AED]/25",
-    accentGlow: "rgba(124, 58, 237, 0.18)",
-    iconBg: "bg-[#7C3AED]/10 text-[#7C3AED]",
-    badgeBg: "bg-[#7C3AED]/10 text-[#7C3AED] border-[#7C3AED]/25",
+    // 01. Lavender Purple
+    backBg: "bg-[#DDD6FE]",
+    backBorder: "border-[#C4B5FD]",
+    iconBg: "bg-[#EDE9FE] text-[#6D28D9] border-[#DDD6FE]",
+    badgeBg: "bg-[#EDE9FE] text-[#6D28D9] border-[#C4B5FD]",
     bullet: "#7C3AED",
-    hoverTitle: "group-hover:text-[#7C3AED]",
+    hoverTitle: "group-hover:text-[#6D28D9]",
   },
   {
-    // Ocean Sky Blue
-    backBg: "bg-[#0284C7]/12",
-    backBorder: "border-[#0284C7]/25",
-    accentGlow: "rgba(2, 132, 199, 0.18)",
-    iconBg: "bg-[#0284C7]/10 text-[#0284C7]",
-    badgeBg: "bg-[#0284C7]/10 text-[#0284C7] border-[#0284C7]/25",
+    // 02. Ocean Sky Blue
+    backBg: "bg-[#BAE6FD]",
+    backBorder: "border-[#7DD3FC]",
+    iconBg: "bg-[#E0F2FE] text-[#0369A1] border-[#BAE6FD]",
+    badgeBg: "bg-[#E0F2FE] text-[#0369A1] border-[#7DD3FC]",
     bullet: "#0284C7",
     hoverTitle: "group-hover:text-[#0284C7]",
   },
   {
-    // Warm Amber / Gold
-    backBg: "bg-[#D97706]/12",
-    backBorder: "border-[#D97706]/25",
-    accentGlow: "rgba(217, 119, 6, 0.18)",
-    iconBg: "bg-[#D97706]/10 text-[#D97706]",
-    badgeBg: "bg-[#D97706]/10 text-[#D97706] border-[#D97706]/25",
+    // 03. Warm Amber Gold
+    backBg: "bg-[#FDE68A]",
+    backBorder: "border-[#FCD34D]",
+    iconBg: "bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]",
+    badgeBg: "bg-[#FEF3C7] text-[#B45309] border-[#FCD34D]",
     bullet: "#D97706",
     hoverTitle: "group-hover:text-[#D97706]",
   },
   {
-    // Emerald Green
-    backBg: "bg-[#059669]/12",
-    backBorder: "border-[#059669]/25",
-    accentGlow: "rgba(5, 150, 105, 0.18)",
-    iconBg: "bg-[#059669]/10 text-[#059669]",
-    badgeBg: "bg-[#059669]/10 text-[#059669] border-[#059669]/25",
+    // 04. Mint Emerald Green
+    backBg: "bg-[#A7F3D0]",
+    backBorder: "border-[#6EE7B7]",
+    iconBg: "bg-[#D1FAE5] text-[#047857] border-[#A7F3D0]",
+    badgeBg: "bg-[#D1FAE5] text-[#047857] border-[#6EE7B7]",
     bullet: "#059669",
     hoverTitle: "group-hover:text-[#059669]",
   },
   {
-    // Coral Rose
-    backBg: "bg-[#E11D48]/12",
-    backBorder: "border-[#E11D48]/25",
-    accentGlow: "rgba(225, 29, 72, 0.18)",
-    iconBg: "bg-[#E11D48]/10 text-[#E11D48]",
-    badgeBg: "bg-[#E11D48]/10 text-[#E11D48] border-[#E11D48]/25",
+    // 05. Rose Coral Pink
+    backBg: "bg-[#FECDD3]",
+    backBorder: "border-[#FDA4AF]",
+    iconBg: "bg-[#FFE4E6] text-[#BE123C] border-[#FECDD3]",
+    badgeBg: "bg-[#FFE4E6] text-[#BE123C] border-[#FDA4AF]",
     bullet: "#E11D48",
     hoverTitle: "group-hover:text-[#E11D48]",
   },
   {
-    // Periwinkle Indigo
-    backBg: "bg-[#4F46E5]/12",
-    backBorder: "border-[#4F46E5]/25",
-    accentGlow: "rgba(79, 70, 229, 0.18)",
-    iconBg: "bg-[#4F46E5]/10 text-[#4F46E5]",
-    badgeBg: "bg-[#4F46E5]/10 text-[#4F46E5] border-[#4F46E5]/25",
+    // 06. Periwinkle Indigo
+    backBg: "bg-[#C7D2FE]",
+    backBorder: "border-[#A5B4FC]",
+    iconBg: "bg-[#E0E7FF] text-[#4338CA] border-[#C7D2FE]",
+    badgeBg: "bg-[#E0E7FF] text-[#4338CA] border-[#A5B4FC]",
     bullet: "#4F46E5",
     hoverTitle: "group-hover:text-[#4F46E5]",
   },
   {
-    // Aqua Teal
-    backBg: "bg-[#0D9488]/12",
-    backBorder: "border-[#0D9488]/25",
-    accentGlow: "rgba(13, 148, 136, 0.18)",
-    iconBg: "bg-[#0D9488]/10 text-[#0D9488]",
-    badgeBg: "bg-[#0D9488]/10 text-[#0D9488] border-[#0D9488]/25",
+    // 07. Aqua Teal
+    backBg: "bg-[#99F6E4]",
+    backBorder: "border-[#5EEAD4]",
+    iconBg: "bg-[#CCFBF1] text-[#0F766E] border-[#99F6E4]",
+    badgeBg: "bg-[#CCFBF1] text-[#0F766E] border-[#5EEAD4]",
     bullet: "#0D9488",
     hoverTitle: "group-hover:text-[#0D9488]",
   },
   {
-    // Sunset Orange
-    backBg: "bg-[#EA580C]/12",
-    backBorder: "border-[#EA580C]/25",
-    accentGlow: "rgba(234, 88, 12, 0.18)",
-    iconBg: "bg-[#EA580C]/10 text-[#EA580C]",
-    badgeBg: "bg-[#EA580C]/10 text-[#EA580C] border-[#EA580C]/25",
+    // 08. Apricot Sunset Orange
+    backBg: "bg-[#FED7AA]",
+    backBorder: "border-[#FDBA74]",
+    iconBg: "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]",
+    badgeBg: "bg-[#FFEDD5] text-[#C2410C] border-[#FDBA74]",
     bullet: "#EA580C",
     hoverTitle: "group-hover:text-[#EA580C]",
   },
   {
-    // Berry Orchid
-    backBg: "bg-[#C026D3]/12",
-    backBorder: "border-[#C026D3]/25",
-    accentGlow: "rgba(192, 38, 211, 0.18)",
-    iconBg: "bg-[#C026D3]/10 text-[#C026D3]",
-    badgeBg: "bg-[#C026D3]/10 text-[#C026D3] border-[#C026D3]/25",
+    // 09. Berry Orchid
+    backBg: "bg-[#FBCFE8]",
+    backBorder: "border-[#F472B6]",
+    iconBg: "bg-[#FCE7F3] text-[#A21CAF] border-[#FBCFE8]",
+    badgeBg: "bg-[#FCE7F3] text-[#A21CAF] border-[#F472B6]",
     bullet: "#C026D3",
     hoverTitle: "group-hover:text-[#C026D3]",
   },
   {
-    // Cobalt Blue
-    backBg: "bg-[#2563EB]/12",
-    backBorder: "border-[#2563EB]/25",
-    accentGlow: "rgba(37, 99, 235, 0.18)",
-    iconBg: "bg-[#2563EB]/10 text-[#2563EB]",
-    badgeBg: "bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/25",
+    // 10. Soft Cobalt Blue
+    backBg: "bg-[#BFDBFE]",
+    backBorder: "border-[#93C5FD]",
+    iconBg: "bg-[#DBEAFE] text-[#1D4ED8] border-[#BFDBFE]",
+    badgeBg: "bg-[#DBEAFE] text-[#1D4ED8] border-[#93C5FD]",
     bullet: "#2563EB",
     hoverTitle: "group-hover:text-[#2563EB]",
   },
   {
-    // Sage Lime
-    backBg: "bg-[#65A30D]/12",
-    backBorder: "border-[#65A30D]/25",
-    accentGlow: "rgba(101, 163, 13, 0.18)",
-    iconBg: "bg-[#65A30D]/10 text-[#65A30D]",
-    badgeBg: "bg-[#65A30D]/10 text-[#65A30D] border-[#65A30D]/25",
+    // 11. Sage Lime Green
+    backBg: "bg-[#D9F99D]",
+    backBorder: "border-[#BEF264]",
+    iconBg: "bg-[#ECFCCB] text-[#4D7C0F] border-[#D9F99D]",
+    badgeBg: "bg-[#ECFCCB] text-[#4D7C0F] border-[#BEF264]",
     bullet: "#65A30D",
     hoverTitle: "group-hover:text-[#65A30D]",
   },
   {
-    // Midnight Slate / Navy
-    backBg: "bg-[#0D1B2A]/10",
-    backBorder: "border-[#0D1B2A]/20",
-    accentGlow: "rgba(13, 27, 42, 0.15)",
-    iconBg: "bg-[#0D1B2A]/10 text-[#0D1B2A]",
-    badgeBg: "bg-[#0D1B2A]/10 text-[#0D1B2A] border-[#0D1B2A]/20",
-    bullet: "#0D1B2A",
-    hoverTitle: "group-hover:text-[#5B21B6]",
+    // 12. Coral Watermelon
+    backBg: "bg-[#FECDD3]",
+    backBorder: "border-[#FDA4AF]",
+    iconBg: "bg-[#FFF1F2] text-[#E11D48] border-[#FECDD3]",
+    badgeBg: "bg-[#FFF1F2] text-[#E11D48] border-[#FDA4AF]",
+    bullet: "#F43F5E",
+    hoverTitle: "group-hover:text-[#F43F5E]",
   },
-];
-
-const TILT_CONFIGS = [
-  { initial: "rotate-[2.2deg]", hover: "group-hover:rotate-[3.8deg] group-hover:scale-[1.01]" },
-  { initial: "-rotate-[2deg]", hover: "group-hover:-rotate-[3.6deg] group-hover:scale-[1.01]" },
-  { initial: "rotate-[1.8deg]", hover: "group-hover:rotate-[3.2deg] group-hover:scale-[1.01]" },
-  { initial: "-rotate-[2.2deg]", hover: "group-hover:-rotate-[3.8deg] group-hover:scale-[1.01]" },
-  { initial: "rotate-[2deg]", hover: "group-hover:rotate-[3.5deg] group-hover:scale-[1.01]" },
-  { initial: "-rotate-[1.8deg]", hover: "group-hover:-rotate-[3.2deg] group-hover:scale-[1.01]" },
+  {
+    // 13. Lilac Violet
+    backBg: "bg-[#E9D5FF]",
+    backBorder: "border-[#D8B4FE]",
+    iconBg: "bg-[#F3E8FF] text-[#7E22CE] border-[#E9D5FF]",
+    badgeBg: "bg-[#F3E8FF] text-[#7E22CE] border-[#D8B4FE]",
+    bullet: "#9333EA",
+    hoverTitle: "group-hover:text-[#9333EA]",
+  },
+  {
+    // 14. Ocean Cyan
+    backBg: "bg-[#A5F3FC]",
+    backBorder: "border-[#67E8F9]",
+    iconBg: "bg-[#CFFAFE] text-[#0E7490] border-[#A5F3FC]",
+    badgeBg: "bg-[#CFFAFE] text-[#0E7490] border-[#67E8F9]",
+    bullet: "#0891B2",
+    hoverTitle: "group-hover:text-[#0891B2]",
+  },
+  {
+    // 15. Soft Peach Coral
+    backBg: "bg-[#FECACA]",
+    backBorder: "border-[#FCA5A5]",
+    iconBg: "bg-[#FEE2E2] text-[#DC2626] border-[#FECACA]",
+    badgeBg: "bg-[#FEE2E2] text-[#DC2626] border-[#FCA5A5]",
+    bullet: "#EF4444",
+    hoverTitle: "group-hover:text-[#EF4444]",
+  },
+  {
+    // 16. Slate Pearl / Navy Tint
+    backBg: "bg-[#CBD5E1]",
+    backBorder: "border-[#94A3B8]",
+    iconBg: "bg-[#E2E8F0] text-[#1E293B] border-[#CBD5E1]",
+    badgeBg: "bg-[#E2E8F0] text-[#1E293B] border-[#CBD5E1]",
+    bullet: "#334155",
+    hoverTitle: "group-hover:text-[#0D1B2A]",
+  },
 ];
 
 const FEATURE_ICONS = [
@@ -203,6 +218,112 @@ function getFeatureIcon(idx, title = "") {
   if (t.includes("security") || t.includes("audit")) return ShieldCheck;
   if (t.includes("local") || t.includes("language")) return Languages;
   return FEATURE_ICONS[idx % FEATURE_ICONS.length] || Layers;
+}function LayeredFeatureCard({ mod, idx }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -30px 0px" }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const palette = FEATURE_CARD_PALETTES[idx % FEATURE_CARD_PALETTES.length];
+  const IconComponent = getFeatureIcon(idx, mod.title);
+  const rotationAngle = idx % 2 === 0 ? "rotate-[2.3deg]" : "rotate-[2.7deg]";
+  const hoverRotation = idx % 2 === 0 ? "group-hover:rotate-[3.4deg]" : "group-hover:rotate-[3.8deg]";
+
+  // Extract badge number and clean Playfair title
+  const badgeMatch = mod.title.match(/^(\d+)/);
+  const badgeNumber = badgeMatch ? badgeMatch[1].padStart(2, "0") : String(idx + 1).padStart(2, "0");
+  const cleanTitle = mod.title.replace(/^\d+[\.\s\-]+\s*/, "") || mod.title;
+
+  const staggerDelay = `${(idx % 4) * 80 + Math.min(Math.floor(idx / 4) * 60, 240)}ms`;
+
+  return (
+    <div 
+      ref={cardRef}
+      style={{
+        transitionDelay: staggerDelay,
+      }}
+      className={`group relative flex flex-col justify-stretch cursor-default pr-2.5 pb-2.5 transition-all duration-700 ease-out ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-7 pointer-events-none"
+      }`}
+    >
+      {/* Thicker Solid Pastel Colored Back Card (Positioned behind, extending strictly from right & bottom edges, rotated 2-3°) */}
+      <div
+        className={`absolute top-2.5 left-2.5 w-full h-full rounded-2xl ${palette.backBg} border-2 ${palette.backBorder} ${rotationAngle} origin-top-left transition-all duration-300 ease-out group-hover:translate-x-1.5 group-hover:translate-y-1.5 ${hoverRotation} shadow-xs pointer-events-none`}
+        aria-hidden="true"
+      />
+
+      {/* Smaller White Front Card (Clearly in front, straight, crisp borders) */}
+      <div className="relative z-10 flex flex-col justify-between h-full bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-5.5 shadow-[0_4px_16px_-2px_rgba(13,27,42,0.06),0_1px_4px_-1px_rgba(13,27,42,0.04)] transition-all duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_36px_-6px_rgba(13,27,42,0.12),0_4px_12px_-2px_rgba(13,27,42,0.06)] group-hover:border-slate-300">
+        <div>
+          {/* Top Row: Small Pastel Icon Box & Numbered Circular Badge */}
+          <div className="flex items-center justify-between mb-3.5">
+            {/* Small Icon in pastel container with hover rotation */}
+            <div 
+              className={`size-9 rounded-xl flex items-center justify-center transition-all duration-300 ease-out group-hover:scale-110 group-hover:rotate-[-6deg] border ${palette.backBorder} ${palette.iconBg}`}
+            >
+              <IconComponent className="size-4.5" strokeWidth={1.9} />
+            </div>
+
+            {/* Small Circular Numbered Badge with hover scale */}
+            <span 
+              className={`font-mono text-[11px] font-bold size-7 rounded-full border flex items-center justify-center transition-all duration-300 ease-out group-hover:scale-110 group-hover:shadow-xs ${palette.badgeBg}`}
+            >
+              {badgeNumber}
+            </span>
+          </div>
+
+          {/* Playfair Display Title */}
+          <h3 
+            className={`font-display text-[16.5px] sm:text-[17px] font-bold text-navy leading-snug tracking-tight mb-2 ${palette.hoverTitle} transition-colors duration-200`}
+            style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
+          >
+            {cleanTitle}
+          </h3>
+
+          {/* Short Inter Description */}
+          <p className="text-xs text-gray-600 leading-relaxed mb-4 font-ui">
+            {mod.desc}
+          </p>
+        </div>
+
+        {/* Feature Points / Tags */}
+        {mod.points && mod.points.length > 0 && (
+          <ul className="space-y-1.5 pt-3 border-t border-slate-100 font-ui mt-auto">
+            {mod.points.map((pt, pIdx) => (
+              <li key={pIdx} className="flex items-center gap-2 text-[11px] font-medium text-slate-700">
+                <span 
+                  className="size-1.5 rounded-full shrink-0 shadow-xs transition-transform duration-200 group-hover:scale-125" 
+                  style={{ backgroundColor: palette.bullet }}
+                />
+                <span className="truncate">{pt}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Features() {
@@ -240,13 +361,13 @@ function Features() {
 
     loadPlans(false);
 
-    const handleFocus = () => loadPlans(true);
+    const handleFocus = () => loadPlans(true);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadPlans(true);
     });
 
-    return () => {
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -331,21 +452,6 @@ function Features() {
       title: "16. Post-Stay Feedback",
       desc: "Automated WhatsApp feedback request logs, guest review dashboard, and review responses templates.",
       points: ["Google Business hooks", "Sentiment trend reports", "Issue resolution alerts"]
-    },
-    {
-      title: "17. Travel Agent Portal",
-      desc: "Partner logins, contract rate pricing bookings, credit invoice registers, and agent commissions records.",
-      points: ["Agent performance matrix", "Direct credit settlement", "Commission tracking logs"]
-    },
-    {
-      title: "18. Security & Audit Logs",
-      desc: "Role-based access controls, two-factor logins (2FA), encrypted PII storage, and full database audit trails.",
-      points: ["Discount audit logs", "Session timeout guards", "Data export alerts"]
-    },
-    {
-      title: "19. Localizations",
-      desc: "Regional Indian languages localization (Hindi, etc.), multi-currency converters, and language parameters per guest.",
-      points: ["Dynamic exchange rates", "Invoice regional text", "Staff dashboard translations"]
     }
   ];
 
@@ -372,7 +478,7 @@ function Features() {
           <h1 className="mt-6 font-display text-4xl leading-[1.15] font-bold text-cream sm:text-6xl max-w-4xl mx-auto">
             Everything you need to run your hotel, <span className="text-[#F5C06A]">in one place</span>.
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-cream/70 sm:text-xl font-ui">
+          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-gray-300 sm:text-xl font-ui">
             Hour Stay unifies your operations, syncs your channels, and manages your billing in an intuitive, calm operating system designed specifically for Indian hospitality.
           </p>
         </div>
@@ -385,7 +491,7 @@ function Features() {
           <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
             Choose the right plan for your property
           </h2>
-          <p className="mt-4 mx-auto max-w-2xl text-base text-[#4A4F58] leading-relaxed font-ui">
+          <p className="mt-4 mx-auto max-w-2xl text-base text-gray-600 leading-relaxed font-ui">
             All plans include GST compliance, unlimited staff accounts, and dedicated onboarding support.
           </p>
 
@@ -417,7 +523,7 @@ function Features() {
           {/* Plans Grid */}
           <div className="mt-14">
             {plansLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-3 text-[#4A4F58]">
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-gray-500">
                 <RefreshCw className="size-6 animate-spin text-purple" />
                 <p className="text-xs">Loading live subscription plans...</p>
               </div>
@@ -427,7 +533,7 @@ function Features() {
                 <span>{plansError}</span>
               </div>
             ) : plans.length === 0 ? (
-              <div className="py-12 text-center text-[#4A4F58] text-xs">
+              <div className="py-12 text-center text-gray-500 text-xs">
                 No active subscription plans found at this time.
               </div>
             ) : (
@@ -458,7 +564,7 @@ function Features() {
                             {plan.name}
                           </h3>
                         </div>
-                        <p className={`text-xs min-h-[32px] leading-relaxed mb-6 font-ui ${isPopular ? "text-cream/70" : "text-[#4A4F58]"}`}>
+                        <p className={`text-xs min-h-[32px] leading-relaxed mb-6 font-ui ${isPopular ? "text-gray-300" : "text-gray-600"}`}>
                           {plan.description || "Complete operations suite for Indian hotels."}
                         </p>
 
@@ -469,7 +575,7 @@ function Features() {
                             <span className={`text-4xl font-extrabold tracking-tight ${isPopular ? "text-[#F5C06A]" : "text-navy"}`}>
                               {price?.toLocaleString("en-IN")}
                             </span>
-                            <span className={`text-xs ${isPopular ? "text-cream/60" : "text-[#4A4F58]"}`}>
+                            <span className={`text-xs ${isPopular ? "text-gray-400" : "text-gray-500"}`}>
                               {period}
                             </span>
                           </div>
@@ -485,11 +591,11 @@ function Features() {
                           isPopular ? "bg-white/5 border border-white/10" : "bg-cream/40 border border-navy/5"
                         }`}>
                           <div className="flex justify-between">
-                            <span className={isPopular ? "text-cream/70" : "text-[#4A4F58]"}>Property Capacity:</span>
+                            <span className={isPopular ? "text-gray-300" : "text-gray-600"}>Property Capacity:</span>
                             <span className="font-bold">{plan.propertyLimit} {plan.propertyLimit === 1 ? "Property" : "Properties"}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className={isPopular ? "text-cream/70" : "text-[#4A4F58]"}>Room Keys Limit:</span>
+                            <span className={isPopular ? "text-gray-300" : "text-gray-600"}>Room Keys Limit:</span>
                             <span className="font-bold">Up to {plan.roomLimit} Rooms</span>
                           </div>
                         </div>
@@ -535,95 +641,22 @@ function Features() {
       </section>
 
       {/* Complete Product Feature Directory Section */}
-      <section className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80 animate-fade-up">
+      <section className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>
             <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
               All Platform Modules & Features
             </h2>
-            <p className="mt-4 mx-auto max-w-2xl text-base text-[#4A4F58] font-ui leading-relaxed">
+            <p className="mt-4 mx-auto max-w-2xl text-base text-gray-600 font-ui leading-relaxed">
               Explore the exhaustive list of modules built to handle every dimension of modern hospitality operations.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-7 text-left font-ui">
-            {featuresToRender.map((mod, idx) => {
-              const palette = FEATURE_CARD_PALETTES[idx % FEATURE_CARD_PALETTES.length];
-              const tilt = TILT_CONFIGS[idx % TILT_CONFIGS.length];
-              const IconComponent = getFeatureIcon(idx, mod.title);
-
-              // Extract badge number and clean Playfair title
-              const badgeMatch = mod.title.match(/^(\d+)/);
-              const badgeNumber = badgeMatch ? badgeMatch[1].padStart(2, "0") : String(idx + 1).padStart(2, "0");
-              const cleanTitle = mod.title.replace(/^\d+[\.\s\-]+\s*/, "") || mod.title;
-
-              return (
-                <div 
-                  key={idx} 
-                  className="group relative pt-2 pb-3.5 px-1.5 flex flex-col justify-stretch cursor-default"
-                >
-                  {/* Slanted / Tilted Colored Back Layer (Clean 3D Layered Effect) */}
-                  <div
-                    className={`absolute inset-x-1.5 inset-y-2 rounded-2xl border ${palette.backBg} ${palette.backBorder} ${tilt.initial} ${tilt.hover} transition-all duration-300 ease-out origin-center pointer-events-none`}
-                    style={{
-                      boxShadow: `0 10px 24px -8px ${palette.accentGlow}`
-                    }}
-                    aria-hidden="true"
-                  />
-
-                  {/* Front White Rounded Card */}
-                  <div className="relative z-10 flex flex-col justify-between h-full bg-white rounded-2xl border border-[#0D1B2A]/8 p-5 sm:p-5.5 shadow-[0_8px_20px_-6px_rgba(13,27,42,0.06),0_2px_6px_-1px_rgba(13,27,42,0.03)] transition-all duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_32px_-8px_rgba(13,27,42,0.12)] group-hover:border-[#0D1B2A]/15">
-                    <div>
-                      {/* Top Row: Small Icon & Feature Number Badge */}
-                      <div className="flex items-center justify-between mb-3.5">
-                        {/* Small Icon in accent-tinted container */}
-                        <div 
-                          className={`size-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-xs ${palette.iconBg}`}
-                        >
-                          <IconComponent className="size-4.5" strokeWidth={1.8} />
-                        </div>
-
-                        {/* Feature Number Badge */}
-                        <span 
-                          className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-transform duration-300 group-hover:scale-105 shadow-xs ${palette.badgeBg}`}
-                        >
-                          #{badgeNumber}
-                        </span>
-                      </div>
-
-                      {/* Bold Playfair Heading */}
-                      <h3 
-                        className={`font-display text-[16.5px] sm:text-[17.5px] font-bold text-navy leading-snug tracking-tight mb-2 ${palette.hoverTitle} transition-colors duration-200`}
-                        style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
-                      >
-                        {cleanTitle}
-                      </h3>
-
-                      {/* Short Muted Description */}
-                      <p className="text-xs text-[#525F70] leading-relaxed mb-4 font-ui">
-                        {mod.desc}
-                      </p>
-                    </div>
-
-                    {/* Feature Points / Tags */}
-                    {mod.points && mod.points.length > 0 && (
-                      <ul className="space-y-1.5 pt-3 border-t border-slate-100 font-ui mt-auto">
-                        {mod.points.map((pt, pIdx) => (
-                          <li key={pIdx} className="flex items-center gap-2 text-[11px] font-medium text-slate-700">
-                            <span 
-                              className="size-1.5 rounded-full shrink-0 shadow-xs" 
-                              style={{ backgroundColor: palette.bullet }}
-                            />
-                            <span className="truncate">{pt}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-6 lg:gap-7 text-left font-ui">
+            {featuresToRender.map((mod, idx) => (
+              <LayeredFeatureCard key={idx} mod={mod} idx={idx} />
+            ))}
           </div>
         </div>
       </section>

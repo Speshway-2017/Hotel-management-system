@@ -15,9 +15,9 @@ export const Route = createFileRoute("/guest/current-stay")({
       title="Current Stay"
       subtitle="Details of your current room stay, services, and amenities."
       stats={[
-        { label: "Hotel", value: "Hour Stay Rambagh Residency" },
-        { label: "Room", value: "312 (Premier Haveli Room)" },
-        { label: "Wi-Fi Password", value: "RambaghGuest312" },
+        { label: "Hotel", value: "Hour Stay Luxury Hotel" },
+        { label: "Room", value: "312 (Premier Suite)" },
+        { label: "Wi-Fi Password", value: "HourStayGuest312" },
         { label: "Check-out Time", value: "Tomorrow, 11:00 AM" }
       ]}
       dataset="services"

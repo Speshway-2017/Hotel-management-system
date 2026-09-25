@@ -41,16 +41,47 @@ const upload = multer({
   fileFilter
 });
 
-// Upload local file to Cloudinary with local storage fallback
-const uploadImageToCloudinary = async (filePath) => {
+// Upload local file or buffer to Cloudinary with local storage fallback
+const uploadImageToCloudinary = async (fileOrPath, folder = 'hourstay_hms_assets') => {
+  let targetPath = null;
+  let isTempCreated = false;
+
+  if (typeof fileOrPath === 'string') {
+    targetPath = fileOrPath;
+  } else if (fileOrPath && typeof fileOrPath === 'object') {
+    if (Buffer.isBuffer(fileOrPath)) {
+      const uniqueName = `buf-${Date.now()}-${Math.round(Math.random() * 1e9)}.png`;
+      targetPath = path.join(UPLOADS_DIR, uniqueName);
+      fs.writeFileSync(targetPath, fileOrPath);
+      isTempCreated = true;
+    } else if (fileOrPath.path) {
+      targetPath = fileOrPath.path;
+    } else if (fileOrPath.tempFilePath) {
+      targetPath = fileOrPath.tempFilePath;
+    } else if (fileOrPath.buffer && Buffer.isBuffer(fileOrPath.buffer)) {
+      const ext = fileOrPath.originalname ? path.extname(fileOrPath.originalname) : '.png';
+      const uniqueName = `upload-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      targetPath = path.join(UPLOADS_DIR, uniqueName);
+      fs.writeFileSync(targetPath, fileOrPath.buffer);
+      isTempCreated = true;
+    }
+  }
+
+  if (!targetPath || typeof targetPath !== 'string') {
+    throw new Error('Invalid file path or buffer provided for image upload.');
+  }
+
+  const filename = path.basename(targetPath);
+  const backendBase = process.env.BACKEND_URL || process.env.API_BASE_URL || 'http://localhost:5000';
+
   if (isConfigured) {
     try {
-      const result = await cloudinary.uploader.upload(filePath, {
-        folder: 'hourstay_hms_assets'
+      const result = await cloudinary.uploader.upload(targetPath, {
+        folder: folder || 'hourstay_hms_assets'
       });
       // Delete local temporary file
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      if (fs.existsSync(targetPath)) {
+        fs.unlinkSync(targetPath);
       }
       return {
         url: result.secure_url,
@@ -58,17 +89,15 @@ const uploadImageToCloudinary = async (filePath) => {
       };
     } catch (error) {
       console.warn('Cloudinary upload failure, falling back to local static URL:', error.message);
-      const filename = path.basename(filePath);
       return {
-        url: `http://localhost:5000/uploads/${filename}`,
+        url: `${backendBase}/uploads/${filename}`,
         publicId: `local_${filename}`
       };
     }
   } else {
-    // Local fallback: Return URL path
-    const filename = path.basename(filePath);
+    // Local fallback: Return local static URL path
     return {
-      url: `http://localhost:5000/uploads/${filename}`,
+      url: `${backendBase}/uploads/${filename}`,
       publicId: `local_${filename}`
     };
   }
@@ -78,7 +107,7 @@ const uploadImageToCloudinary = async (filePath) => {
 const deleteImageFromCloudinary = async (publicId) => {
   if (!publicId) return;
 
-  if (publicId.startsWith('local_')) {
+  if (typeof publicId === 'string' && publicId.startsWith('local_')) {
     const filename = publicId.replace('local_', '');
     const localPath = path.join(UPLOADS_DIR, filename);
     if (fs.existsSync(localPath)) {

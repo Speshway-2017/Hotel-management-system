@@ -83,9 +83,13 @@ export const getBookingEffectiveAmounts = (b) => {
       originalAmount = totalAmount + discountAmount;
     }
   } else {
-    if (originalAmount <= 0) {
+    if (originalAmount <= 0 || originalAmount < totalAmount) {
       originalAmount = totalAmount;
     }
+  }
+
+  if (originalAmount < totalAmount + discountAmount) {
+    originalAmount = totalAmount + discountAmount;
   }
 
   return { totalAmount, originalAmount, discountAmount, couponCode: b.couponCode || null };
@@ -322,6 +326,7 @@ router.get('/folio', async (req, res) => {
       const gstNo = prop?.settings?.gstin || '36AABCS1429B1Z5';
 
       const { totalAmount, originalAmount, discountAmount } = getBookingEffectiveAmounts(b);
+      const balance = Number(b.balance || 0);
       const baseAmount = totalAmount;
       const discount = discountAmount || Number(b.discount || 0);
       const originalGross = originalAmount > 0 ? originalAmount : (baseAmount + discount);
@@ -334,9 +339,19 @@ router.get('/folio', async (req, res) => {
       
       const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
       const totalCharges = (originalGross - discount) + serviceTotal;
-      const paidAmount = b.paymentStatus === 'Paid' || b.status === 'Confirmed' ? (b.paidAmount !== undefined ? Number(b.paidAmount) : totalCharges) : Number(b.paidAmount || 0);
-      const balance = Math.max(0, totalCharges - paidAmount);
-      const paymentStatus = balance === 0 ? 'Settled' : (paidAmount > 0 ? 'Pending Balance' : 'Unpaid');
+      const isPaid = (b.paymentStatus === 'Paid' || b.status === 'Confirmed' || b.status === 'Checked-in' || b.status === 'Checked-out' || balance === 0);
+      const paidAmount = Number(b.paidAmount !== undefined && b.paidAmount !== null ? b.paidAmount : (isPaid ? Math.max(0, totalAmount - balance) : Math.max(0, totalAmount - balance)));
+      const isCancelled = (b.status || '').toLowerCase() === 'cancelled' || (b.status || '').toLowerCase() === 'canceled';
+      const refundStatus = b.refundStatus || b.refundRequest?.status || '';
+      const isRefunded = 
+        (refundStatus || '').toLowerCase() === 'refunded' || 
+        (refundStatus || '').toLowerCase() === 'approved' || 
+        (b.paymentStatus || '').toLowerCase() === 'refunded' ||
+        (isCancelled && ((b.paymentStatus || '').toLowerCase() === 'paid' || (b.paymentStatus || '').toLowerCase() === 'settled' || Number(b.paidAmount || 0) > 0));
+
+      const paymentStatus = isRefunded
+        ? 'Refunded'
+        : (balance === 0 ? 'Settled' : (paidAmount > 0 ? 'Pending Balance' : 'Unpaid'));
 
       return {
         folioId: `FOL-${b.bookingId || b._id || '1001'}`,
@@ -354,7 +369,11 @@ router.get('/folio', async (req, res) => {
         checkIn: b.checkIn || '2026-09-01',
         checkOut: b.checkOut || '2026-09-03',
         dates: `${b.checkIn || '2026-09-01'} → ${b.checkOut || '2026-09-03'}`,
-        status: b.status || 'Confirmed',
+        nights: calculateStayNights(b.checkIn, b.checkOut) || Number(b.nights) || 1,
+        status: isRefunded ? 'Refunded' : (b.status || 'Confirmed'),
+        bookingStatus: b.status || 'Confirmed',
+        refundStatus: isRefunded ? 'Refunded' : (b.refundStatus || b.refundRequest?.status || null),
+        refundRequest: b.refundRequest || null,
         roomCharges,
         gstTax,
         services,
@@ -1715,9 +1734,18 @@ router.get('/payments', async (req, res) => {
     const loggedPayments = await Payment.find({ $or: paymentQuery }).sort({ createdAt: -1 });
 
     const paymentList = [];
-    const seenTxnIds = new Set();
+    const seenBookingIds = new Set();
 
     for (const b of guestBookings) {
+      const bId = b.bookingId || b._id || b.id;
+      const cleanBId = String(bId);
+
+      // Enforce strictly ONE payment card per booking reservation
+      if (seenBookingIds.has(cleanBId)) {
+        continue;
+      }
+      seenBookingIds.add(cleanBId);
+
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
       const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
@@ -1726,20 +1754,26 @@ router.get('/payments', async (req, res) => {
 
       const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
       const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
-      const bId = b.bookingId || b._id || b.id;
 
       const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
       const balance = Number(b.balance || 0);
       const isBookingRefunded = b.paymentStatus === 'Refunded' || b.refundStatus === 'Refunded' || b.refundRequest?.status === 'Refunded';
       const isPartiallyRefunded = b.paymentStatus === 'Partially Refunded' || b.refundStatus === 'Partially Refunded' || b.refundRequest?.status === 'Partially Refunded';
 
-      const matchedPayments = loggedPayments.filter(p =>
-        (p.bookingId && (p.bookingId === b.bookingId || p.bookingId === String(b._id) || p.bookingId === b.id)) ||
-        (p.guestName && p.guestName === (b.guest || req.user.name) && p.roomNumber === (b.roomNumber || extractRoomNumber(b.room)))
-      );
+      const isPaid = (b.paymentStatus === 'Paid' || b.status === 'Confirmed' || b.status === 'Checked-in' || b.status === 'Checked-out' || balance === 0);
+      const paidAmount = Number(b.paidAmount !== undefined && b.paidAmount !== null ? b.paidAmount : (isPaid ? Math.max(0, totalAmount - balance) : Math.max(0, totalAmount - balance)));
+      const effectiveDisplayAmount = isBookingRefunded ? totalAmount : (paidAmount > 0 ? paidAmount : (isPaid ? totalAmount : (totalAmount - balance > 0 ? totalAmount - balance : totalAmount)));
 
-      const roomCharges = Math.round(totalAmount * 0.82);
-      const gstTax = Math.round(totalAmount * 0.18);
+      // Find any logged payments matching this specific booking
+      const matchedPayments = loggedPayments.filter(p =>
+        p.bookingId && (p.bookingId === b.bookingId || p.bookingId === String(b._id) || (b.id && p.bookingId === String(b.id)))
+      );
+      const latestPayment = matchedPayments.length > 0 ? matchedPayments[0] : null;
+      const paymentMethod = latestPayment?.paymentMethod || b.paymentMethod || 'UPI';
+
+      const originalGross = originalAmount > 0 ? originalAmount : (totalAmount + (discountAmount || 0));
+      const roomCharges = Math.round(originalGross / 1.18);
+      const gstTax = originalGross - roomCharges;
       const services = Array.isArray(b.services) ? b.services : [];
       const serviceTotal = services.reduce((acc, s) => acc + Number(s.amount || 0), 0);
       const discount = discountAmount || Number(b.discount || 0);
@@ -1762,146 +1796,74 @@ router.get('/payments', async (req, res) => {
         };
       }
 
-      if (matchedPayments.length > 0) {
-        for (const p of matchedPayments) {
-          const pStatusRaw = (p.status || '').toLowerCase();
-          let finalStatus = 'Successful';
-          if (isBookingRefunded || pStatusRaw === 'refunded') {
-            finalStatus = 'Refunded';
-          } else if (isPartiallyRefunded || pStatusRaw === 'partially refunded') {
-            finalStatus = 'Partially Refunded';
-          } else if (pStatusRaw === 'pending' || b.paymentStatus === 'Pending') {
-            finalStatus = 'Pending';
-          } else if (pStatusRaw === 'processing') {
-            finalStatus = 'Processing';
-          } else if (pStatusRaw === 'failed') {
-            finalStatus = 'Failed';
-          } else if (pStatusRaw === 'settled' || pStatusRaw === 'paid' || b.paymentStatus === 'Paid') {
-            finalStatus = 'Successful';
-          }
-
-          // Ensure payment amount reflects actual discounted amount if a promo was used
-          let effectivePayAmount = Number(p.amount || totalAmount);
-          if (discountAmount > 0) {
-            if (originalAmount > 0 && effectivePayAmount === originalAmount && effectivePayAmount > totalAmount) {
-              effectivePayAmount = totalAmount;
-            } else if (effectivePayAmount > totalAmount) {
-              effectivePayAmount = totalAmount;
-            }
-          }
-
-          const txnId = p._id ? String(p._id) : `PAY-${bId}`;
-          if (!seenTxnIds.has(txnId)) {
-            seenTxnIds.add(txnId);
-            paymentList.push({
-              id: txnId,
-              paymentId: `PAY-${bId}`,
-              bookingId: bId,
-              guestName: b.guest || req.user.name,
-              hotel: propName,
-              city: city,
-              address: address,
-              gstNo: gstNo,
-              propertyId: b.propertyId || prop?._id || 'HS-9HQ8P',
-              room: b.room || b.roomType || 'Standard Room',
-              roomNumber: b.roomNumber || p.roomNumber || extractRoomNumber(b.room) || '101',
-              amount: effectivePayAmount,
-              totalAmount: totalAmount,
-              originalAmount: originalAmount,
-              discountAmount: discountAmount,
-              couponCode: couponCode,
-              paidAmount: totalAmount - balance,
-              balance: balance,
-              paymentMethod: p.paymentMethod || b.paymentMethod || 'UPI',
-              status: finalStatus,
-              checkIn: checkIn,
-              checkOut: checkOut,
-              dates: `${checkIn} → ${checkOut}`,
-              nights: Number(b.nights) || 1,
-              createdAt: p.createdAt || b.createdAt || new Date(),
-              folio: {
-                folioId: `FOL-${bId}`,
-                roomCharges,
-                gstTax,
-                services,
-                serviceTotal,
-                discount,
-                totalCharges: totalAmount + serviceTotal
-              },
-              refundInfo: refundObj
-            });
-          }
-        }
+      let finalStatus = 'Successful';
+      if (isBookingRefunded) {
+        finalStatus = 'Refunded';
+      } else if (isPartiallyRefunded) {
+        finalStatus = 'Partially Refunded';
+      } else if (b.status === 'Cancelled' && b.paymentStatus === 'Failed') {
+        finalStatus = 'Failed';
+      } else if (b.paymentStatus === 'Pending' || (!isPaid && balance >= totalAmount)) {
+        finalStatus = 'Pending';
+      } else if (balance > 0 && paidAmount === 0) {
+        finalStatus = 'Pending';
       } else {
-        const isPaid = b.paymentStatus === 'Paid' || b.status === 'Confirmed' || b.status === 'Checked-in' || b.status === 'Checked-out';
-        let status = 'Successful';
-        if (isBookingRefunded) {
-          status = 'Refunded';
-        } else if (isPartiallyRefunded) {
-          status = 'Partially Refunded';
-        } else if (b.status === 'Cancelled' && b.paymentStatus === 'Failed') {
-          status = 'Failed';
-        } else if (b.paymentStatus === 'Pending' || (!isPaid && balance >= totalAmount)) {
-          status = 'Pending';
-        } else if (balance > 0 && balance < totalAmount) {
-          status = 'Successful';
-        }
-
-        const txnId = `PAY-${bId}`;
-        if (!seenTxnIds.has(txnId)) {
-          seenTxnIds.add(txnId);
-          paymentList.push({
-            id: txnId,
-            paymentId: txnId,
-            bookingId: bId,
-            guestName: b.guest || req.user.name,
-            hotel: propName,
-            city: city,
-            address: address,
-            gstNo: gstNo,
-            propertyId: b.propertyId || prop?._id || 'HS-9HQ8P',
-            room: b.room || b.roomType || 'Standard Room',
-            roomNumber: b.roomNumber || extractRoomNumber(b.room) || '101',
-            amount: isPaid ? (totalAmount - balance || totalAmount) : totalAmount,
-            totalAmount: totalAmount,
-            paidAmount: isPaid ? (totalAmount - balance || totalAmount) : 0,
-            balance: balance,
-            paymentMethod: b.paymentMethod || 'UPI',
-            status: status,
-            checkIn: checkIn,
-            checkOut: checkOut,
-            dates: `${checkIn} → ${checkOut}`,
-            nights: Number(b.nights) || 1,
-            createdAt: b.createdAt || new Date(),
-            folio: {
-              folioId: `FOL-${bId}`,
-              roomCharges,
-              gstTax,
-              services,
-              serviceTotal,
-              discount,
-              totalCharges: totalAmount + serviceTotal - discount
-            },
-            refundInfo: refundObj
-          });
-        }
+        finalStatus = 'Successful';
       }
+
+      paymentList.push({
+        id: latestPayment?._id ? String(latestPayment._id) : `PAY-${cleanBId}`,
+        paymentId: `PAY-${cleanBId}`,
+        bookingId: cleanBId,
+        guestName: b.guest || req.user.name,
+        hotel: propName,
+        city: city,
+        address: address,
+        gstNo: gstNo,
+        propertyId: b.propertyId || prop?._id || 'HS-9HQ8P',
+        room: b.room || b.roomType || 'Standard Room',
+        roomNumber: b.roomNumber || latestPayment?.roomNumber || extractRoomNumber(b.room) || '101',
+        amount: effectiveDisplayAmount,
+        totalAmount: totalAmount,
+        originalAmount: originalAmount,
+        discountAmount: discountAmount,
+        couponCode: couponCode,
+        paidAmount: paidAmount,
+        balance: balance,
+        paymentMethod: paymentMethod,
+        status: finalStatus,
+        checkIn: checkIn,
+        checkOut: checkOut,
+        dates: `${checkIn} → ${checkOut}`,
+        nights: calculateStayNights(checkIn, checkOut) || Number(b.nights) || 1,
+        createdAt: latestPayment?.createdAt || b.createdAt || new Date(),
+        folio: {
+          folioId: `FOL-${cleanBId}`,
+          roomCharges,
+          gstTax,
+          services,
+          serviceTotal,
+          discount,
+          totalCharges: totalAmount + serviceTotal
+        },
+        refundInfo: refundObj
+      });
     }
 
     // Sort payments newest first
     paymentList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-    // Calculate Summary Stats
+    // Calculate Summary Stats without double counting
     const totalPaid = paymentList.reduce((acc, p) => {
       if (p.status === 'Successful' || p.status === 'Settled' || p.status === 'Paid') {
-        return acc + Number(p.amount || 0);
+        return acc + Number(p.paidAmount || p.amount || 0);
       }
       return acc;
     }, 0);
 
     const pendingAmount = guestBookings.reduce((acc, b) => {
       if (b.status !== 'Cancelled' && b.status !== 'Checked-out') {
-        return acc + Number(b.balance || (b.paymentStatus === 'Pending' ? b.totalAmount || b.amount : 0));
+        return acc + Number(b.balance || 0);
       }
       return acc;
     }, 0);

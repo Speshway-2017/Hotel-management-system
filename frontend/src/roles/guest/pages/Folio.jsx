@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { 
   FileText, Download, Printer, ShieldCheck, Hotel, MapPin, 
   CreditCard, Calendar, Bed, RefreshCw, AlertCircle, Sparkles, 
-  CheckCircle2, Eye, ArrowLeft 
+  CheckCircle2, Eye, ArrowLeft, RotateCcw 
 } from "lucide-react";
 import { inr } from "@/data/hs-data";
-import { ActionGroup, ViewActionIcon } from "@/components/hs/kit";
+import { ActionGroup, ViewActionIcon, RefundActionIcon } from "@/components/hs/kit";
 import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/guest/folio")({
@@ -19,6 +19,66 @@ export const Route = createFileRoute("/guest/folio")({
   }),
   component: GuestFolioPage
 });
+
+function getFolioStatuses(f) {
+  if (!f) {
+    return {
+      isRefunded: false,
+      isCancelled: false,
+      showRefundAction: false,
+      paymentStatusBadgeText: "Settled",
+      paymentBadgeClass: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+      displayFolioStatus: "Confirmed"
+    };
+  }
+
+  const statusLower = (f.status || f.bookingStatus || "").toLowerCase();
+  const refundStatusLower = (f.refundStatus || f.refundRequest?.status || "").toLowerCase();
+  const paymentStatusLower = (f.paymentStatus || "").toLowerCase();
+
+  const isCancelled = (statusLower === "cancelled" || statusLower === "canceled");
+
+  // A folio payment is considered Refunded if:
+  // 1. paymentStatus is explicitly 'refunded'
+  // 2. refundStatus is 'refunded' or 'approved'
+  // 3. status is 'refunded'
+  // 4. The booking is cancelled and was paid/settled
+  const isRefunded = 
+    paymentStatusLower === "refunded" || 
+    refundStatusLower === "refunded" || 
+    refundStatusLower === "approved" || 
+    statusLower === "refunded" ||
+    (isCancelled && (paymentStatusLower === "settled" || paymentStatusLower === "paid" || Number(f.paidAmount || 0) > 0));
+
+  let paymentStatusBadgeText = "Settled";
+  let paymentBadgeClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+
+  if (isRefunded) {
+    paymentStatusBadgeText = "Refunded";
+    paymentBadgeClass = "bg-purple/10 text-purple border border-purple/20";
+  } else if (isCancelled) {
+    paymentStatusBadgeText = "Unpaid";
+    paymentBadgeClass = "bg-amber-50 text-amber-700 border border-amber-200";
+  } else if (paymentStatusLower === "settled" || paymentStatusLower === "paid" || Number(f.balance || 0) === 0) {
+    paymentStatusBadgeText = "Settled";
+    paymentBadgeClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+  } else {
+    paymentStatusBadgeText = f.paymentStatus || "Pending Balance";
+    paymentBadgeClass = "bg-amber-50 text-amber-700 border border-amber-200";
+  }
+
+  // Hide refund button if refunded!
+  const showRefundAction = isCancelled && !isRefunded;
+
+  return {
+    isRefunded,
+    isCancelled,
+    showRefundAction,
+    paymentStatusBadgeText,
+    paymentBadgeClass,
+    displayFolioStatus: isRefunded ? "Refunded" : isCancelled ? "Cancelled" : (f.status || "Confirmed")
+  };
+}
 
 function GuestFolioPage() {
   const navigate = useNavigate();
@@ -70,13 +130,11 @@ function GuestFolioPage() {
   useEffect(() => {
     fetchFolioData(false);
 
-    const handleFocus = () => fetchFolioData(true);
-
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchFolioData(true);
     });
 
-    return () => {
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -108,7 +166,7 @@ function GuestFolioPage() {
         <h3 className="font-display text-lg font-bold text-navy">Unable to Load Digital Folios</h3>
         <p className="text-xs text-rose-600 font-semibold max-w-md mx-auto">{error}</p>
         <button
-          onClick={fetchFolioData}
+          onClick={() => fetchFolioData(false)}
           className="px-5 py-2 bg-navy text-cream rounded-xl text-xs font-bold hover:bg-navy/90 transition-colors shadow-soft cursor-pointer inline-flex items-center gap-2 border-none"
         >
           <RefreshCw className="size-3.5" /> Try Again
@@ -120,6 +178,8 @@ function GuestFolioPage() {
   // Dedicated Folio Details Page View when an item is selected
   if (selectedFolio) {
     const f = selectedFolio;
+    const { isRefunded, isCancelled, showRefundAction, displayFolioStatus } = getFolioStatuses(f);
+
     return (
       <div className="space-y-6 text-left font-ui">
         
@@ -127,6 +187,13 @@ function GuestFolioPage() {
         <div className="bg-white rounded-2xl border border-navy/10 p-6 shadow-soft flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleSelectFolio(null)}
+                className="text-xs font-bold text-purple hover:underline inline-flex items-center gap-1 cursor-pointer border-none bg-transparent p-0 mr-1"
+              >
+                <ArrowLeft className="size-3.5" /> Back to Folios
+              </button>
+              <span className="text-navy/20">•</span>
               <span className="text-xs font-semibold text-navy/60">Booking Ref: {f.bookingId}</span>
             </div>
             <h2 className="font-display text-xl font-bold text-navy mt-1">{f.hotel}</h2>
@@ -136,6 +203,19 @@ function GuestFolioPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {showRefundAction && (
+              <button
+                onClick={() => navigate(`/guest/refund?bookingId=${f.bookingId || f.id || f.folioId}`)}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-soft inline-flex items-center gap-2 cursor-pointer border-none"
+              >
+                <RotateCcw className="size-3.5" /> Request Stay Refund
+              </button>
+            )}
+            {isRefunded && (
+              <span className="px-3 py-2 bg-purple/10 text-purple border border-purple/20 rounded-xl text-xs font-bold inline-flex items-center gap-1.5">
+                <CheckCircle2 className="size-3.5 text-purple" /> Refunded
+              </span>
+            )}
             {f.invoiceAvailable && (
               <button
                 onClick={() => window.print()}
@@ -171,7 +251,11 @@ function GuestFolioPage() {
               <p className="font-bold text-sm">{f.hotel}</p>
               <p className="text-navy/70">GSTIN: <strong className="font-mono text-navy">{f.gstNo}</strong></p>
               <p className="text-navy/70">Dates: {f.dates}</p>
-              <p className="text-navy/70">Folio Status: <strong className="text-emerald-600">{f.status}</strong></p>
+              <p className="text-navy/70">
+                Folio Status: <strong className={isRefunded ? "text-purple" : isCancelled ? "text-rose-600" : "text-emerald-600"}>
+                  {displayFolioStatus}
+                </strong>
+              </p>
             </div>
           </div>
 
@@ -180,53 +264,53 @@ function GuestFolioPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] uppercase font-bold text-muted-foreground">
-                  <th className="py-3 px-4 whitespace-nowrap">Date</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Description / Charge Type</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Amount</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Date</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Description / Charge Type</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
                 {/* Room Tariff Line Item */}
                 <tr className="hover:bg-muted/10 transition-colors">
-                  <td className="py-3.5 px-4 font-mono text-muted-foreground whitespace-nowrap">{f.checkIn}</td>
-                  <td className="py-3.5 px-4 whitespace-nowrap">
+                  <td className="py-3.5 px-4 text-left font-mono text-muted-foreground whitespace-nowrap">{f.checkIn}</td>
+                  <td className="py-3.5 px-4 text-left whitespace-nowrap">
                     <span className="font-bold text-navy block">Room Tariff Charges ({f.room})</span>
                     <span className="text-[11px] text-muted-foreground">Base accommodation tariff</span>
                   </td>
-                  <td className="py-3.5 px-4 text-right font-bold text-navy whitespace-nowrap">{inr(f.roomCharges)}</td>
+                  <td className="py-3.5 px-4 text-left font-bold text-navy whitespace-nowrap">{inr(f.roomCharges)}</td>
                 </tr>
 
                 {/* GST Tax Line Item */}
                 <tr className="hover:bg-muted/10 transition-colors">
-                  <td className="py-3.5 px-4 font-mono text-muted-foreground whitespace-nowrap">{f.checkIn}</td>
-                  <td className="py-3.5 px-4 whitespace-nowrap">
+                  <td className="py-3.5 px-4 text-left font-mono text-muted-foreground whitespace-nowrap">{f.checkIn}</td>
+                  <td className="py-3.5 px-4 text-left whitespace-nowrap">
                     <span className="font-bold text-navy block">Taxes & GST (18%)</span>
                     <span className="text-[11px] text-muted-foreground">Statutory GST liability on room tariff</span>
                   </td>
-                  <td className="py-3.5 px-4 text-right font-bold text-navy whitespace-nowrap">{inr(f.gstTax)}</td>
+                  <td className="py-3.5 px-4 text-left font-bold text-navy whitespace-nowrap">{inr(f.gstTax)}</td>
                 </tr>
 
                 {/* Dynamic Services / Add-ons Line Items */}
                 {f.services && f.services.map((srv, idx) => (
                   <tr key={idx} className="hover:bg-muted/10 transition-colors">
-                    <td className="py-3.5 px-4 font-mono text-muted-foreground whitespace-nowrap">{srv.date || f.checkIn}</td>
-                    <td className="py-3.5 px-4 whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-left font-mono text-muted-foreground whitespace-nowrap">{srv.date || f.checkIn}</td>
+                    <td className="py-3.5 px-4 text-left whitespace-nowrap">
                       <span className="font-bold text-navy block">{srv.name}</span>
                       <span className="text-[11px] text-purple font-semibold">Service / Incidentals</span>
                     </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-navy whitespace-nowrap">{inr(srv.amount)}</td>
+                    <td className="py-3.5 px-4 text-left font-bold text-navy whitespace-nowrap">{inr(srv.amount)}</td>
                   </tr>
                 ))}
 
                 {/* Discount line item if applicable */}
                 {f.discount > 0 && (
                   <tr className="hover:bg-muted/10 transition-colors bg-emerald-50/50">
-                    <td className="py-3.5 px-4 font-mono text-emerald-700 whitespace-nowrap">{f.checkIn}</td>
-                    <td className="py-3.5 px-4 whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-left font-mono text-emerald-700 whitespace-nowrap">{f.checkIn}</td>
+                    <td className="py-3.5 px-4 text-left whitespace-nowrap">
                       <span className="font-bold text-emerald-700 block">Promotional / Corporate Discount</span>
                       <span className="text-[11px] text-emerald-600">Promotional credit applied</span>
                     </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-emerald-700 whitespace-nowrap">-{inr(f.discount)}</td>
+                    <td className="py-3.5 px-4 text-left font-bold text-emerald-700 whitespace-nowrap">-{inr(f.discount)}</td>
                   </tr>
                 )}
               </tbody>
@@ -248,13 +332,13 @@ function GuestFolioPage() {
                 <span>{inr(f.totalCharges)}</span>
               </div>
               <div className="flex justify-between text-emerald-600">
-                <span>Paid Online:</span>
-                <span>-{inr(f.paidAmount)}</span>
+                <span>{isRefunded ? "Amount Refunded:" : "Paid Online:"}</span>
+                <span>{isRefunded ? inr(f.paidAmount || f.totalCharges) : `-${inr(f.paidAmount)}`}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-navy/10 font-bold text-sm">
                 <span className="text-navy">Net Balance:</span>
-                <span className={f.balance > 0 ? "text-amber-600" : "text-emerald-600"}>
-                  {inr(f.balance)}
+                <span className={isRefunded ? "text-purple" : f.balance > 0 ? "text-amber-600" : "text-emerald-600"}>
+                  {isRefunded ? "₹0 (Refund Settled)" : inr(f.balance)}
                 </span>
               </div>
             </div>
@@ -294,68 +378,82 @@ function GuestFolioPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] uppercase font-bold text-muted-foreground">
-                  <th className="py-3 px-4 whitespace-nowrap">Folio ID</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Hotel Property</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Room Type</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Stay Dates</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Total Charges</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Paid Amount</th>
-                  <th className="py-3 px-4 text-right whitespace-nowrap">Balance</th>
-                  <th className="py-3 px-4 text-center whitespace-nowrap">Payment Status</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Folio ID</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Hotel Property</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Room Type</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Stay Dates</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Total Charges</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Paid Amount</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Balance</th>
+                  <th className="py-3 px-4 text-left whitespace-nowrap">Payment Status</th>
                   <th className="py-3 px-4 text-left whitespace-nowrap min-w-[80px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted font-medium text-navy">
-                {folios.map((f) => (
-                  <tr 
-                    key={f.id || f.folioId} 
-                    onClick={() => handleSelectFolio(f)}
-                    className="hover:bg-purple/5 transition-colors cursor-pointer"
-                  >
-                    <td className="py-3.5 px-4 font-mono font-bold text-purple whitespace-nowrap">
-                      {f.folioId}
-                    </td>
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="font-bold text-navy block">{f.hotel}</span>
-                      <span className="text-[11px] text-muted-foreground">{f.city}</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
-                      {f.room}
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-navy whitespace-nowrap">
-                      {f.dates}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-navy whitespace-nowrap">
-                      {inr(f.totalCharges)}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-emerald-600 whitespace-nowrap">
-                      {inr(f.paidAmount)}
-                    </td>
-                    <td className={`py-3.5 px-4 text-right font-bold whitespace-nowrap ${f.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                      {inr(f.balance)}
-                    </td>
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        f.paymentStatus === 'Settled'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {f.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[80px]" onClick={(e) => e.stopPropagation()}>
-                      <ActionGroup align="left">
-                        <ViewActionIcon
-                          title="View Folio Details"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectFolio(f);
-                          }}
-                        />
-                      </ActionGroup>
-                    </td>
-                  </tr>
-                ))}
+                {folios.map((f) => {
+                  const {
+                    isRefunded,
+                    showRefundAction,
+                    paymentStatusBadgeText,
+                    paymentBadgeClass
+                  } = getFolioStatuses(f);
+
+                  return (
+                    <tr 
+                      key={f.id || f.folioId} 
+                      onClick={() => handleSelectFolio(f)}
+                      className="hover:bg-purple/5 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4 text-left font-mono font-bold text-purple whitespace-nowrap">
+                        {f.folioId}
+                      </td>
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
+                        <span className="font-bold text-navy block">{f.hotel}</span>
+                        <span className="text-[11px] text-muted-foreground">{f.city}</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-left text-muted-foreground whitespace-nowrap">
+                        {f.room}
+                      </td>
+                      <td className="py-3.5 px-4 text-left font-medium text-navy whitespace-nowrap">
+                        {f.dates}
+                      </td>
+                      <td className="py-3.5 px-4 text-left font-bold text-navy whitespace-nowrap">
+                        {inr(f.totalCharges)}
+                      </td>
+                      <td className="py-3.5 px-4 text-left font-bold text-emerald-600 whitespace-nowrap">
+                        {inr(f.paidAmount)}
+                      </td>
+                      <td className={`py-3.5 px-4 text-left font-bold whitespace-nowrap ${isRefunded ? "text-purple" : f.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                        {isRefunded ? "₹0" : inr(f.balance)}
+                      </td>
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${paymentBadgeClass}`}>
+                          {paymentStatusBadgeText}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-left whitespace-nowrap min-w-[80px]" onClick={(e) => e.stopPropagation()}>
+                        <ActionGroup align="left">
+                          <ViewActionIcon
+                            title="View Folio Details"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectFolio(f);
+                            }}
+                          />
+                          {showRefundAction && (
+                            <RefundActionIcon
+                              title="Request Stay Refund"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/guest/refund?bookingId=${f.bookingId || f.id || f.folioId}`);
+                              }}
+                            />
+                          )}
+                        </ActionGroup>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -366,4 +464,4 @@ function GuestFolioPage() {
   );
 }
 
-export default GuestFolioPage;
+export default GuestFolioPage;

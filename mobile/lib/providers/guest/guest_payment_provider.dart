@@ -20,11 +20,11 @@ class GuestPaymentProvider with ChangeNotifier {
 
   double get totalPaid => _summary.totalPaid > 0
       ? _summary.totalPaid
-      : _payments.fold(0.0, (acc, p) => p.isSuccessful ? acc + p.amount : acc);
+      : _payments.fold(0.0, (acc, p) => p.isSuccessful ? acc + (p.paidAmount > 0 ? p.paidAmount : p.amount) : acc);
 
   double get pendingAmount => _summary.pendingAmount > 0
       ? _summary.pendingAmount
-      : _payments.fold(0.0, (acc, p) => p.isPending ? acc + p.balance : acc);
+      : _payments.fold(0.0, (acc, p) => (p.isPending || p.hasPendingBalance) ? acc + p.balance : acc);
 
   double get refundedAmount => _summary.refundedAmount > 0
       ? _summary.refundedAmount
@@ -64,11 +64,13 @@ class GuestPaymentProvider with ChangeNotifier {
           }
           if (map.containsKey('payments') && map['payments'] is List) {
             final list = map['payments'] as List<dynamic>;
-            _payments = list.map((e) => GuestPaymentModel.fromJson(e as Map<String, dynamic>)).toList();
+            final rawPayments = list.map((e) => GuestPaymentModel.fromJson(e as Map<String, dynamic>)).toList();
+            _payments = _consolidatePayments(rawPayments);
           }
         } else if (response.data is List<dynamic>) {
           final list = response.data as List<dynamic>;
-          _payments = list.map((e) => GuestPaymentModel.fromJson(e as Map<String, dynamic>)).toList();
+          final rawPayments = list.map((e) => GuestPaymentModel.fromJson(e as Map<String, dynamic>)).toList();
+          _payments = _consolidatePayments(rawPayments);
           _calculateSummaryLocally();
         }
       }
@@ -99,6 +101,49 @@ class GuestPaymentProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  List<GuestPaymentModel> _consolidatePayments(List<GuestPaymentModel> list) {
+    final Map<String, GuestPaymentModel> map = {};
+    for (final p in list) {
+      final key = p.bookingId.trim().isNotEmpty ? p.bookingId.trim() : p.id.trim();
+      if (!map.containsKey(key)) {
+        map[key] = p;
+      } else {
+        final existing = map[key]!;
+        final bestTotal = p.totalAmount > existing.totalAmount ? p.totalAmount : existing.totalAmount;
+        final bestPaid = p.paidAmount > existing.paidAmount ? p.paidAmount : existing.paidAmount;
+        final bestAmount = p.amount > existing.amount ? p.amount : existing.amount;
+
+        map[key] = GuestPaymentModel(
+          id: existing.id.isNotEmpty ? existing.id : p.id,
+          paymentId: existing.paymentId.isNotEmpty ? existing.paymentId : p.paymentId,
+          bookingId: key,
+          guestName: p.guestName.isNotEmpty ? p.guestName : existing.guestName,
+          hotel: p.hotel.isNotEmpty ? p.hotel : existing.hotel,
+          city: p.city.isNotEmpty ? p.city : existing.city,
+          address: p.address.isNotEmpty ? p.address : existing.address,
+          gstNo: p.gstNo.isNotEmpty ? p.gstNo : existing.gstNo,
+          propertyId: p.propertyId.isNotEmpty ? p.propertyId : existing.propertyId,
+          room: p.room.isNotEmpty ? p.room : existing.room,
+          roomNumber: p.roomNumber.isNotEmpty ? p.roomNumber : existing.roomNumber,
+          amount: bestAmount > 0 ? bestAmount : (bestPaid > 0 ? bestPaid : bestTotal),
+          totalAmount: bestTotal,
+          paidAmount: bestPaid,
+          balance: p.balance < existing.balance ? p.balance : existing.balance,
+          paymentMethod: p.paymentMethod.isNotEmpty ? p.paymentMethod : existing.paymentMethod,
+          status: (p.isRefunded || existing.isRefunded) ? 'Refunded' : (p.isSuccessful || existing.isSuccessful ? 'Successful' : p.status),
+          checkIn: p.checkIn.isNotEmpty ? p.checkIn : existing.checkIn,
+          checkOut: p.checkOut.isNotEmpty ? p.checkOut : existing.checkOut,
+          dates: p.dates.isNotEmpty ? p.dates : existing.dates,
+          nights: p.nights > existing.nights ? p.nights : existing.nights,
+          createdAt: p.createdAt.isNotEmpty ? p.createdAt : existing.createdAt,
+          folio: p.folio ?? existing.folio,
+          refundInfo: p.refundInfo ?? existing.refundInfo,
+        );
+      }
+    }
+    return map.values.toList();
   }
 
   Future<void> _fetchFallbackFromBookings() async {
@@ -140,13 +185,13 @@ class GuestPaymentProvider with ChangeNotifier {
         }
       }
       if (fallbackList.isNotEmpty) {
-        _payments = fallbackList;
+        _payments = _consolidatePayments(fallbackList);
       }
     }
   }
 
   void _calculateSummaryLocally() {
-    final paid = _payments.fold(0.0, (acc, p) => p.isSuccessful ? acc + p.amount : acc);
+    final paid = _payments.fold(0.0, (acc, p) => p.isSuccessful ? acc + (p.paidAmount > 0 ? p.paidAmount : p.amount) : acc);
     final pending = _payments.fold(0.0, (acc, p) => p.hasPendingBalance ? acc + p.balance : acc);
     final refunded = _payments.fold(0.0, (acc, p) => p.isRefunded || p.isPartiallyRefunded ? acc + (p.refundInfo?.approvedAmount ?? p.amount) : acc);
 

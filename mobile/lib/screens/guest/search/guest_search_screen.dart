@@ -83,7 +83,14 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       final propRes = await ApiService.get(ApiEndpoints.publicProperties);
       List<Map<String, dynamic>> fetchedProps = [];
       if (propRes.success && propRes.data is List) {
-        fetchedProps = (propRes.data as List).map((e) => e as Map<String, dynamic>).toList();
+        fetchedProps = (propRes.data as List)
+            .map((e) => e as Map<String, dynamic>)
+            .where((p) {
+              final name = (p['name'] ?? p['settings']?['hotelName'] ?? '').toString().toLowerCase();
+              final status = (p['status'] ?? '').toString().toLowerCase();
+              return !name.contains('test') && !name.contains('rambagh') && status != 'suspended';
+            })
+            .toList();
       }
 
       // 2. Format query params for date availability
@@ -91,7 +98,14 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       final outStr = DateFormat('yyyy-MM-dd').format(_checkOutDate);
 
       // 3. Fetch rooms from public endpoint or manager room service
-      final targetProp = _selectedPropertyId != 'all' ? _selectedPropertyId : (fetchedProps.isNotEmpty ? (fetchedProps[0]['_id'] ?? fetchedProps[0]['id'] ?? 'HS-9HQ8P') : 'HS-9HQ8P');
+      final targetProp = _selectedPropertyId != 'all'
+          ? _selectedPropertyId
+          : (fetchedProps.isNotEmpty
+              ? (fetchedProps.firstWhere(
+                    (p) => (p['_id'] ?? p['id'] ?? '') == 'HS-9HQ8P',
+                    orElse: () => fetchedProps[0],
+                  )['_id'] ?? fetchedProps[0]['_id'] ?? fetchedProps[0]['id'] ?? 'HS-9HQ8P')
+              : 'HS-9HQ8P');
       final roomRes = await ApiService.get('${ApiEndpoints.publicProperties}/$targetProp/rooms?checkIn=$inStr&checkOut=$outStr');
 
       List<RoomModel> loadedRooms = [];
@@ -106,13 +120,18 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
           );
           final pSettings = propMatch['settings'] as Map<String, dynamic>? ?? {};
           final pName = pSettings['hotelName'] ?? pSettings['name'] ?? propMatch['name'] ?? 'Hour Stay Luxury Hotel';
-          final pCity = pSettings['city'] ?? propMatch['city'] ?? 'India';
+          final pCity = pSettings['city'] ?? propMatch['city'] ?? 'Hyderabad';
           final pPolicy = pSettings['cancellationPolicy'] ?? 'Free cancellation up to 24 hours prior to check-in';
 
           map['propertyName'] = pName;
           map['city'] = pCity;
           map['cancellationPolicy'] = pPolicy;
           return RoomModel.fromJson(map);
+        }).where((rm) {
+          final num = rm.roomNumber.toLowerCase();
+          final cat = rm.category.toLowerCase();
+          final prop = (rm.propertyName ?? '').toLowerCase();
+          return !num.contains('test') && !cat.contains('test') && !prop.contains('rambagh') && !prop.contains('test');
         }).toList();
       }
 
@@ -120,7 +139,12 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       if (loadedRooms.isEmpty && mounted) {
         final roomProv = context.read<RoomProvider>();
         await roomProv.fetchAll(silent: true);
-        loadedRooms = roomProv.rooms;
+        loadedRooms = roomProv.rooms.where((rm) {
+          final num = rm.roomNumber.toLowerCase();
+          final cat = rm.category.toLowerCase();
+          final prop = (rm.propertyName ?? '').toLowerCase();
+          return !num.contains('test') && !cat.contains('test') && !prop.contains('rambagh') && !prop.contains('test');
+        }).toList();
       }
 
       if (mounted) {
@@ -154,6 +178,17 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // Filtered rooms
   List<RoomModel> get _filteredRooms {
     var list = _rooms.where((room) {
+      // Exclude test rooms and dummy test properties permanently
+      final roomNumLower = room.roomNumber.toLowerCase();
+      final roomCatLower = room.category.toLowerCase();
+      final roomPropLower = (room.propertyName ?? '').toLowerCase();
+      if (roomNumLower.contains('test') ||
+          roomCatLower.contains('test') ||
+          roomPropLower.contains('rambagh') ||
+          roomPropLower.contains('test')) {
+        return false;
+      }
+
       // 1. Status Navigation Tab Filter (all, available, occupied, reserved)
       if (_selectedStatus != 'all') {
         final st = room.status.toLowerCase().trim();

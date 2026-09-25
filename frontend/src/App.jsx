@@ -244,10 +244,35 @@ function AuthRoutesLayout() {
   );
 }
 
+function ScrollManager() {
+  const { pathname, hash } = useLocation();
+
+  React.useEffect(() => {
+    if (hash) {
+      const timer = setTimeout(() => {
+        try {
+          const target = document.querySelector(hash);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        } catch {
+          // Ignore invalid selector
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [pathname, hash]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ScrollManager />
         <Routes>
           {/* Public Stays Routes */}
           <Route path="/" element={<RouteWrapper routeObj={Home} />} />

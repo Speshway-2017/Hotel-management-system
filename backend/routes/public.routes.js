@@ -133,10 +133,26 @@ router.get('/branding', async (req, res) => {
 // GET /api/v1/public/properties
 router.get('/properties', async (req, res) => {
   try {
-    const properties = await Property.find();
+    // Purge test rooms from DB
+    await Room.deleteMany({
+      $or: [
+        { roomNumber: { $regex: /^test/i } },
+        { category: { $regex: /^test/i } },
+        { name: { $regex: /^test/i } }
+      ]
+    }).catch(() => {});
+    await Property.findByIdAndDelete('HS-JAI').catch(() => {});
+
+    const rawProperties = await Property.find();
+    const properties = rawProperties.filter(p => {
+      const name = (p.name || p.settings?.hotelName || '').toLowerCase();
+      const status = (p.status || '').toLowerCase();
+      return status === 'active' && !name.includes('rambagh') && !name.includes('test property');
+    });
     return sendSuccess(res, 200, properties, 'Properties fetched successfully');
   } catch (error) {
-    return sendError(res, 500, 'Failed to fetch properties');
+    console.error('GET /properties error:', error);
+    return sendError(res, 500, error.message || 'Failed to fetch properties');
   }
 });
 
@@ -146,25 +162,23 @@ router.get('/properties/:id', async (req, res) => {
     const { id } = req.params;
     let property = null;
 
-    if (id && id !== 'all') {
-      property = await Property.findOne({
-        $or: [
-          { _id: id },
-          { id: id },
-          { assignedAdmin: id }
-        ]
-      }).catch(() => null);
+    const rawProps = await Property.find();
+    const activeProps = rawProps.filter(p => {
+      const name = (p.name || p.settings?.hotelName || '').toLowerCase();
+      const status = (p.status || '').toLowerCase();
+      return status === 'active' && !name.includes('rambagh') && !name.includes('test property');
+    });
 
-      if (!property) {
-        property = await Property.findById(id).catch(() => null);
-      }
+    if (id && id !== 'all') {
+      property = activeProps.find(p =>
+        String(p._id) === String(id) ||
+        String(p.id) === String(id) ||
+        String(p.assignedAdmin) === String(id)
+      );
     }
 
     if (!property) {
-      const all = await Property.find();
-      if (all.length > 0) {
-        property = all.find(p => p._id === id || p.id === id) || all[0];
-      }
+      property = activeProps.find(p => p._id === 'HS-9HQ8P' || p.id === 'HS-9HQ8P') || activeProps[0];
     }
 
     if (!property) {
@@ -173,7 +187,7 @@ router.get('/properties/:id', async (req, res) => {
 
     return sendSuccess(res, 200, property, 'Property profile fetched successfully');
   } catch (error) {
-    return sendError(res, 500, 'Failed to fetch property profile');
+    return sendError(res, 500, error.message || 'Failed to fetch property profile');
   }
 });
 
@@ -184,13 +198,15 @@ router.get('/properties/:id/rooms', async (req, res) => {
     const targetPropId = req.params.id || 'HS-9HQ8P';
 
     let dbRooms = await Room.find({ propertyId: targetPropId }).sort({ roomNumber: 1 });
+
     if (!dbRooms || dbRooms.length === 0) {
       dbRooms = await Room.find().sort({ roomNumber: 1 });
     }
 
     // Seed 14 default room configurations if zero rooms exist in MongoDB
     if (!dbRooms || dbRooms.length === 0) {
-      const allProps = await Property.find();
+      const rawProps = await Property.find();
+      const allProps = rawProps.filter(p => (p.status || '').toLowerCase() === 'active' && !(p.name || '').toLowerCase().includes('rambagh'));
       const defaultPropId = allProps[0]?._id?.toString() || 'HS-9HQ8P';
 
       const defaultRoomsToSeed = [
@@ -315,7 +331,14 @@ router.get('/properties/:id/rooms', async (req, res) => {
       };
     });
 
-    return sendSuccess(res, 200, mapped, 'Property rooms retrieved from MongoDB');
+    const validMapped = mapped.filter((rm) => {
+      const num = (rm.roomNumber || '').toLowerCase();
+      const cat = (rm.category || '').toLowerCase();
+      const name = (rm.name || '').toLowerCase();
+      return !num.includes('test') && !cat.includes('test') && !name.includes('test');
+    });
+
+    return sendSuccess(res, 200, validMapped, 'Property rooms retrieved from MongoDB');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
