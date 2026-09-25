@@ -55,8 +55,8 @@ export const roomStatusMeta =
 
 export const properties = [
 {
-  id: "HS-JAI",
-  name: "Hour Stay Rambagh Residency",
+  id: "HS-9HQ8P",
+  name: "Speshway Luxury Hotel",
   city: "Madhapur,Hyderabad",
   rooms: 128,
   occupancy: 84,
@@ -462,19 +462,19 @@ export const blogPosts = [
 
 
 export const searchResults = [
-{ id: "HS-JAI", name: "Hour Stay Rambagh Residency", city: "Jaipur", rating: 4.8, reviews: 1284, price: 8900, tags: ["Heritage haveli", "Courtyard pool", "High-speed WiFi"] },
+{ id: "HS-9HQ8P", name: "Speshway Luxury Hotel", city: "Madhapur, Hyderabad", rating: 4.9, reviews: 1284, price: 8900, tags: ["Hitech City", "Infinity pool", "High-speed WiFi"] },
 { id: "HS-UDA", name: "Hour Stay Lake Palace View", city: "Udaipur", rating: 4.9, reviews: 962, price: 14200, tags: ["Lake view", "Rooftop dining", "Spa"] },
 { id: "HS-GOA", name: "Hour Stay Candolim Beach Resort", city: "Goa", rating: 4.6, reviews: 2140, price: 11400, tags: ["Beachfront", "Kids club", "Sunset bar"] },
 { id: "HS-KER", name: "Hour Stay Backwater Retreat", city: "Alleppey", rating: 4.7, reviews: 738, price: 7600, tags: ["Backwaters", "Ayurveda", "Houseboat tour"] }];
 
 
 export const myBookings = [
-{ id: "BK-20101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "101 · Standard Room", dates: "22–24 Sep 2026", status: "Active", amount: 9500 },
-{ id: "BK-10101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "102 · Standard Room", dates: "22–24 Sep 2026", status: "Active", amount: 11400 },
-{ id: "BK-10301", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "103 · Standard Room", dates: "01–02 Sep 2026", status: "Completed", amount: 8500 },
-{ id: "BK-20202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "202 · Deluxe Room", dates: "02–05 Sep 2026", status: "Completed", amount: 14500 },
-{ id: "BK-10202", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "102 · Standard Room", dates: "25–27 Sep 2026", status: "Upcoming", amount: 7000 },
-{ id: "BK-30101", hotel: "Hour Stay Rambagh Residency", city: "Hyderabad", room: "301 · Executive Suite", dates: "26–28 Sep 2026", status: "Upcoming", amount: 21000 }];
+{ id: "BK-20101", hotel: "Speshway Luxury Hotel", city: "Hyderabad", room: "101 · Standard Room", dates: "22–24 Sep 2026", status: "Active", amount: 9500 },
+{ id: "BK-10101", hotel: "Speshway Luxury Hotel", city: "Hyderabad", room: "102 · Standard Room", dates: "22–24 Sep 2026", status: "Active", amount: 11400 },
+{ id: "BK-10301", hotel: "Speshway Luxury Hotel", city: "Hyderabad", room: "103 · Standard Room", dates: "01–02 Sep 2026", status: "Completed", amount: 8500 },
+{ id: "BK-20202", hotel: "Speshway Luxury Hotel", city: "Hyderabad", room: "202 · Deluxe Room", dates: "02–05 Sep 2026", status: "Completed", amount: 14500 },
+{ id: "BK-10202", hotel: "Speshway Luxury Hotel", city: "Hyderabad", room: "102 · Standard Room", dates: "25–27 Sep 2026", status: "Upcoming", amount: 7000 },
+{ id: "BK-30101", hotel: "Speshway Luxury Hotel", city: "Hyderabad", room: "301 · Executive Suite", dates: "26–28 Sep 2026", status: "Upcoming", amount: 21000 }];
 
 
 export const serviceRequests = [

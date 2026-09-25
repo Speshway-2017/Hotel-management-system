@@ -205,7 +205,7 @@ export function RoomDetailsPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
 
           {/* 1. Breadcrumb */}
-          <nav className="flex items-center gap-2 text-xs text-navy/60 mb-4 font-medium">
+          <nav className="flex items-center gap-2 text-xs text-gray-500 mb-4 font-medium">
             <Link to="/search" className="hover:text-purple">Stays</Link>
             <ChevronRight className="size-3" />
             <Link to={`/hotels/${property?._id || property?.id || targetPropId}`} className="hover:text-purple">{hotelName}</Link>
@@ -227,7 +227,7 @@ export function RoomDetailsPage() {
                   </div>
                 </div>
                 <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">{hotelName}</h1>
-                <p className="text-xs sm:text-sm text-[#4A4F58] flex items-center gap-1.5 mt-2 font-medium font-ui">
+                <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-1.5 mt-2 font-medium font-ui">
                   <MapPin className="size-4 text-purple shrink-0" />
                   <span>{roomType} {roomNumber ? `(${roomNumber})` : ""} — {location}</span>
                 </p>
@@ -268,12 +268,12 @@ export function RoomDetailsPage() {
               {/* 4. Room Overview */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-5">
                 <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Room Overview</h2>
-                <p className="text-xs sm:text-sm text-[#4A4F58] leading-relaxed font-ui">{roomDescription}</p>
+                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-ui">{roomDescription}</p>
 
                 {/* Key Spec Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Bed Type</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Bed Type</span>
                     <strong className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Bed className="size-3.5 text-purple shrink-0" />
                       <span>{bedType}</span>
@@ -281,7 +281,7 @@ export function RoomDetailsPage() {
                   </div>
 
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Capacity</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Capacity</span>
                     <strong className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Users className="size-3.5 text-purple shrink-0" />
                       <span>{capacity}</span>
@@ -289,7 +289,7 @@ export function RoomDetailsPage() {
                   </div>
 
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Floor</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Floor</span>
                     <strong className="text-xs font-bold text-navy flex items-center gap-1.5">
                       <Sparkles className="size-3.5 text-purple shrink-0" />
                       <span>{roomFloor}</span>
@@ -297,7 +297,7 @@ export function RoomDetailsPage() {
                   </div>
 
                   <div className="p-3 rounded-xl bg-cream/50 border border-navy/5">
-                    <span className="text-[10px] text-[#4A4F58] font-bold uppercase block mb-0.5">Rate Plan</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Rate Plan</span>
                     <strong className="text-xs font-bold text-purple truncate block">
                       {ratePlan}
                     </strong>
@@ -326,14 +326,14 @@ export function RoomDetailsPage() {
                     <span className="text-[10px] text-purple font-bold uppercase tracking-wider block">Base Nightly Tariff</span>
                     <div className="flex items-baseline gap-2">
                       <span className="font-display text-2xl font-bold text-navy">{inr(nightlyTariff)}</span>
-                      <span className="text-navy/50 text-[10px] font-bold">/ night</span>
+                      <span className="text-gray-500 text-[10px] font-bold">/ night</span>
                     </div>
                   </div>
 
                   <div className="p-4 rounded-xl bg-cream/50 border border-navy/5 space-y-1">
-                    <span className="text-[10px] text-navy/50 font-bold uppercase tracking-wider block">Applicable Taxes</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Applicable Taxes</span>
                     <span className="font-bold text-navy text-sm block">18% GST (CGST 9% + SGST 9%)</span>
-                    <span className="text-[10px] text-navy/60 block">Included at booking confirmation</span>
+                    <span className="text-[10px] text-gray-500 block">Included at booking confirmation</span>
                   </div>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export function RoomDetailsPage() {
                   <div className="flex justify-between items-center border-b border-navy/5 pb-3">
                     <div>
                       <h2 className="font-display text-xl font-bold text-navy">Select Room Configuration</h2>
-                      <p className="text-xs text-navy/60">Choose your specific room number for this stay</p>
+                      <p className="text-xs text-gray-500">Choose your specific room number for this stay</p>
                     </div>
                   </div>
 
@@ -367,7 +367,7 @@ export function RoomDetailsPage() {
                         >
                           <div>
                             <span className="font-mono text-sm block font-bold">Room {rm.roomNumber}</span>
-                            <span className="text-[10px] opacity-80 block">{rm.floor || 'Floor 1'} · {rm.capacity || '2 Adults'}</span>
+                            <span className="text-[10px] text-gray-500 block">{rm.floor || 'Floor 1'} · {rm.capacity || '2 Adults'}</span>
                           </div>
 
                           <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
@@ -397,7 +397,7 @@ export function RoomDetailsPage() {
                 {/* Hotel & Room Selection Card */}
                 <div className="p-3.5 bg-cream/40 rounded-xl border border-navy/5 space-y-1 text-xs">
                   <strong className="font-bold text-navy block text-sm">{hotelName}</strong>
-                  <span className="text-navy/70 block">{roomType} {roomNumber ? `(${roomNumber})` : ""}</span>
+                  <span className="text-gray-500 block">{roomType} {roomNumber ? `(${roomNumber})` : ""}</span>
                   <span className="text-purple font-mono font-bold block mt-1">{inr(nightlyTariff)} / night</span>
                 </div>
 
@@ -435,11 +435,11 @@ export function RoomDetailsPage() {
                 {/* Price Breakdown */}
                 <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
                   <div className="flex justify-between">
-                    <dt className="text-navy/60">Room Tariff ({nightsCount} {nightsCount === 1 ? 'night' : 'nights'})</dt>
+                    <dt className="text-gray-500">Room Tariff ({nightsCount} {nightsCount === 1 ? 'night' : 'nights'})</dt>
                     <dd className="tabular-nums font-bold text-navy">{inr(baseTariffTotal)}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-navy/60">GST 18%</dt>
+                    <dt className="text-gray-500">GST 18%</dt>
                     <dd className="tabular-nums font-bold text-navy">{inr(gstTax)}</dd>
                   </div>
                   <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy">
@@ -459,7 +459,7 @@ export function RoomDetailsPage() {
                   {isAvailable ? "Book Now — Instant Confirmation" : "Room Unavailable"}
                 </Button>
 
-                <div className="p-3 bg-purple/5 rounded-xl border border-purple/10 text-[10px] text-navy/70 space-y-1">
+                <div className="p-3 bg-purple/5 rounded-xl border border-purple/10 text-[10px] text-gray-500 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-purple">
                     <ShieldCheck className="size-3.5 shrink-0" />
                     <span>Best Price Guarantee</span>

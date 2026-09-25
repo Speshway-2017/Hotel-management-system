@@ -126,7 +126,7 @@ function BlogList() {
           <h1 className="mt-5 font-display text-4xl leading-[1.1] font-bold text-cream sm:text-5xl lg:text-6xl">
             Insights for <span className="text-[#F5C06A]">smarter hotel</span> management
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm sm:text-base leading-relaxed text-cream/70 font-ui">
+          <p className="mx-auto mt-4 max-w-2xl text-sm sm:text-base leading-relaxed text-gray-300 font-ui">
             Operational advice, regulatory GST updates, and revenue management strategies written by hoteliers, for Indian properties.
           </p>
         </div>
@@ -143,7 +143,7 @@ function BlogList() {
                 className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-300 border cursor-pointer ${
                   selectedCategory === cat
                     ? "bg-navy text-cream border-navy shadow-lift"
-                    : "bg-white text-navy/70 border-navy/5 hover:border-gold/30 hover:bg-gold/5"
+                    : "bg-white text-gray-600 border-navy/5 hover:border-gold/30 hover:bg-gold/5"
                 }`}
               >
                 {cat}
@@ -178,14 +178,14 @@ function BlogList() {
                         {featuredArticle.title}
                       </Link>
                     </h2>
-                    <p className="mt-2 text-xs sm:text-sm text-[#4A4F58] font-ui leading-relaxed line-clamp-3">
+                    <p className="mt-2 text-xs sm:text-sm text-gray-600 font-ui leading-relaxed line-clamp-3">
                       {featuredArticle.excerpt}
                     </p>
                   </div>
                   <div className="pt-4 border-t border-navy/5 flex items-center justify-between">
                     <div className="text-[11px] font-ui">
                       <p className="font-bold text-navy">{featuredArticle.author}</p>
-                      <p className="text-[#4A4F58] mt-0.5">{featuredArticle.date} · {featuredArticle.readTime}</p>
+                      <p className="text-gray-500 mt-0.5">{featuredArticle.date} · {featuredArticle.readTime}</p>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="text-purple font-semibold hover:bg-purple/5 h-8 px-3 text-xs">
                       <Link to="/blog/$slug" params={{ slug: featuredArticle.slug }}>
@@ -234,12 +234,12 @@ function BlogList() {
                               {post.title}
                             </Link>
                           </h4>
-                          <p className="text-xs text-[#4A4F58] font-ui leading-relaxed line-clamp-3 mt-3 flex-grow">
+                          <p className="text-xs text-gray-600 font-ui leading-relaxed line-clamp-3 mt-3 flex-grow">
                             {post.excerpt}
                           </p>
                         </div>
                       </div>
-                      <div className="p-5 pt-0 border-t border-navy/5 mt-4 flex items-center justify-between text-[11px] text-[#4A4F58] font-ui shrink-0">
+                      <div className="p-5 pt-0 border-t border-navy/5 mt-4 flex items-center justify-between text-[11px] text-gray-500 font-ui shrink-0">
                         <span>{post.date} · {post.readTime}</span>
                         <Link to="/blog/$slug" params={{ slug: post.slug }} className="text-purple font-semibold hover:underline flex items-center gap-1">
                           Read More <ArrowRight className="size-3" />
@@ -250,7 +250,7 @@ function BlogList() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-navy/15 p-12 text-center">
-                  <p className="text-[#4A4F58] text-sm font-ui">No articles found in this category.</p>
+                  <p className="text-gray-500 text-sm font-ui">No articles found in this category.</p>
                 </div>
               )}
             </div>
@@ -267,7 +267,7 @@ function BlogList() {
                   {popularTopics.map((topic) => (
                     <span 
                       key={topic}
-                      className="px-2.5 py-1 rounded bg-cream/60 border border-gold/10 text-[11px] font-semibold text-navy/80 hover:text-purple cursor-pointer transition-colors font-ui capitalize"
+                      className="px-2.5 py-1 rounded bg-cream/60 border border-gold/10 text-[11px] font-semibold text-gray-600 hover:text-purple cursor-pointer transition-colors font-ui capitalize"
                     >
                       {topic}
                     </span>
@@ -280,7 +280,7 @@ function BlogList() {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(245,192,106,0.06),transparent_50%)]" />
                 <div className="relative z-10 space-y-4">
                   <h4 className="font-display text-base font-bold">Get hospitality insights</h4>
-                  <p className="text-xs text-cream/70 font-ui leading-relaxed">
+                  <p className="text-xs text-gray-300 font-ui leading-relaxed">
                     Subscribe to receive practical guides on GST slabs, seasonal revenue pricing, and front-desk checklists monthly.
                   </p>
                   
@@ -325,7 +325,7 @@ function BlogList() {
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
             Build a smarter hotel with Hour Stay.
           </h2>
-          <p className="mx-auto mt-4 max-w-lg text-base text-[#4A4F58] font-ui leading-relaxed">
+          <p className="mx-auto mt-4 max-w-lg text-base text-gray-600 font-ui leading-relaxed">
             Explore the calm operating system engineered to save hours and sync reservations.
           </p>
           <div className="mt-8 flex justify-center">

@@ -166,13 +166,13 @@
     "nights": 2,
     "pax": "1 Adult",
     "source": "Hour Stay App",
-    "status": "Checked-in",
+    "status": "Checked-out",
     "amount": 9500,
     "totalAmount": 9500,
     "balance": 0,
     "paymentStatus": "Paid",
     "propertyId": "HS-9HQ8P",
-    "updatedAt": "2026-09-22T16:49:20.000Z",
+    "updatedAt": "2026-09-25T08:10:38.094Z",
     "id": "BK-20101",
     "guestName": "Sunny",
     "name": "Sunny",
@@ -186,7 +186,11 @@
     "idVerification": "Verified",
     "idDocType": "Aadhaar Card",
     "idDocNumber": "6353 7576 4646",
-    "createdAt": "2026-09-22T08:30:00.000Z"
+    "createdAt": "2026-09-22T08:30:00.000Z",
+    "checkedOutAt": "2026-09-25T08:10:38.088Z",
+    "autoCheckedOut": true,
+    "autoCheckedOutAt": "2026-09-25T08:10:38.088Z",
+    "folioStatus": "Closed"
   },
   {
     "bookingId": "BK-10201",

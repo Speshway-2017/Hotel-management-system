@@ -104,15 +104,15 @@ function BlogPost() {
   return (
     <SiteLayout>
       <article className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-navy/60 mb-6 font-ui">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500 mb-6 font-ui">
           <Link to="/" className="hover:text-purple">Home</Link>
-          <ChevronRight className="size-3 text-navy/40" />
+          <ChevronRight className="size-3 text-gray-400" />
           <Link to="/blog" className="hover:text-purple">Journal</Link>
-          <ChevronRight className="size-3 text-navy/40" />
+          <ChevronRight className="size-3 text-gray-400" />
           <span className="text-navy font-bold truncate max-w-xs">{post.title}</span>
         </nav>
         <h1 className="mt-4 font-display text-3xl sm:text-4xl lg:text-5xl leading-tight font-bold text-navy">{post.title}</h1>
-        <p className="mt-4 text-xs sm:text-sm text-[#4A4F58] font-ui">
+        <p className="mt-4 text-xs sm:text-sm text-gray-500 font-ui">
           {post.author} · {post.role} · {post.date} · {post.readTime}
         </p>
         
@@ -126,7 +126,7 @@ function BlogPost() {
           <div className="absolute inset-0 bg-black/5" />
         </div>
 
-        <div className="mt-10 space-y-5 text-sm sm:text-base leading-relaxed text-[#4A4F58] text-left font-ui">
+        <div className="mt-10 space-y-5 text-sm sm:text-base leading-relaxed text-gray-600 text-left font-ui">
           <p className="text-base sm:text-lg text-navy font-bold">{post.excerpt}</p>
           {post.content ? (
             post.content.split("\n\n").map((para, i) => (
@@ -151,7 +151,7 @@ function BlogPost() {
                 everything, twice.”
               </blockquote>
               <h2 className="pt-4 font-display text-2xl font-bold text-navy text-left">What to change this week</h2>
-              <ul className="list-disc space-y-2 pl-5 text-left text-[#4A4F58]">
+              <ul className="list-disc space-y-2 pl-5 text-left text-gray-600">
                 <li>Pre-assign rooms for all arrivals with a confirmed ETA before 11:00.</li>
                 <li>Move ID capture to pre check-in so the desk only verifies, never types.</li>
                 <li>Set rate-parity alerts on your top two OTAs and review them at the morning brief.</li>

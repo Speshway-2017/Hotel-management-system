@@ -180,7 +180,7 @@ export function InsightsStackedCarousel() {
                   >
                     {post.tag}
                   </span>
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-[#8A8F98] font-sans">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 font-sans">
                     <Clock className="size-3.5 text-[#5B21B6]" /> {post.readTime}
                   </span>
                 </div>
@@ -199,7 +199,7 @@ export function InsightsStackedCarousel() {
 
                 {/* Body excerpt in Inter */}
                 <p
-                  className="mt-2.5 text-xs lg:text-[12.5px] leading-relaxed text-[#4A4F58] font-sans line-clamp-3"
+                  className="mt-2.5 text-xs lg:text-[12.5px] leading-relaxed text-gray-600 font-sans line-clamp-3"
                   style={{ fontFamily: '"Inter", sans-serif' }}
                 >
                   {post.excerpt}
@@ -217,7 +217,7 @@ export function InsightsStackedCarousel() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-[#0D1B2A] leading-tight font-sans">{post.author}</p>
-                    <p className="text-[10px] text-[#8A8F98] font-sans">{post.role || post.date}</p>
+                    <p className="text-[10px] text-gray-500 font-sans">{post.role || post.date}</p>
                   </div>
                 </div>
 
@@ -257,7 +257,7 @@ export function InsightsStackedCarousel() {
                     >
                       {currentPost.tag}
                     </span>
-                    <span className="flex items-center gap-1 text-xs font-medium text-[#8A8F98] font-sans">
+                    <span className="flex items-center gap-1 text-xs font-medium text-gray-500 font-sans">
                       <Clock className="size-3 text-[#5B21B6]" /> {currentPost.readTime}
                     </span>
                   </div>
@@ -272,7 +272,7 @@ export function InsightsStackedCarousel() {
                   </h3>
 
                   <p
-                    className="mt-2.5 text-xs leading-relaxed text-[#4A4F58] font-sans line-clamp-3"
+                    className="mt-2.5 text-xs leading-relaxed text-gray-600 font-sans line-clamp-3"
                     style={{ fontFamily: '"Inter", sans-serif' }}
                   >
                     {currentPost.excerpt}
@@ -289,7 +289,7 @@ export function InsightsStackedCarousel() {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-[#0D1B2A] leading-tight font-sans">{currentPost.author}</p>
-                      <p className="text-[10px] text-[#8A8F98] font-sans">{currentPost.date}</p>
+                      <p className="text-[10px] text-gray-500 font-sans">{currentPost.date}</p>
                     </div>
                   </div>
 

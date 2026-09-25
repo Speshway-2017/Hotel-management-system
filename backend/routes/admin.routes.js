@@ -207,7 +207,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     if (!req.file) {
       return sendError(res, 400, 'No image file uploaded');
     }
-    const result = await uploadImageToCloudinary(req.file.buffer, 'hms_property_assets');
+    const result = await uploadImageToCloudinary(req.file.path || req.file, 'hms_property_assets');
     return sendSuccess(res, 200, result, 'Image uploaded successfully');
   } catch (error) {
     return sendError(res, 500, error.message);

@@ -1,77 +1,5 @@
 [
   {
-    "id": "HS-JAI",
-    "_id": "HS-JAI",
-    "name": "Rambagh Residency",
-    "city": "Madhapur,Hyderabad",
-    "rooms": 50,
-    "occupancy": 76,
-    "adr": 8500,
-    "revpar": 6460,
-    "status": "Active",
-    "gm": "Vikramaditya Singh",
-    "assignedAdmin": null,
-    "subscriptionTier": "Enterprise",
-    "subscriptionStatus": "Active",
-    "commissionRate": 12,
-    "settings": {
-      "logo": "",
-      "address": "",
-      "city": "",
-      "state": "",
-      "country": "India",
-      "pincode": "",
-      "phone": "",
-      "email": "",
-      "website": "",
-      "gstin": "",
-      "classification": "3-Star",
-      "description": "",
-      "amenities": [],
-      "highlights": [],
-      "propertyPolicies": "",
-      "locationMap": "",
-      "facebook": "",
-      "instagram": "",
-      "twitter": "",
-      "linkedin": "",
-      "gstEnabled": true,
-      "cgst": 9,
-      "sgst": 9,
-      "igst": 18,
-      "hsnSac": "996311",
-      "taxInclusive": true,
-      "checkInTime": "12:00",
-      "checkOutTime": "11:00",
-      "earlyCheckInCharge": 0,
-      "lateCheckOutCharge": 0,
-      "cancellationPolicy": "Free cancellation up to 24 hours prior to check-in. Cancellation within 24 hours will attract a 1-night tariff penalty.",
-      "noShowPolicy": "No-show will attract 100% room charge penalty.",
-      "refundPolicy": "Refunds are processed within 5-7 business days.",
-      "paymentMethods": [
-        "UPI",
-        "Card",
-        "Cash"
-      ],
-      "advancePaymentPercent": 100,
-      "securityDeposit": 0,
-      "bookingRules": "Guests must produce valid identity documentation on arrival.",
-      "reservationSettings": "Auto-release unconfirmed rooms after 2 hours.",
-      "paymentConfig": "Razorpay Checkout API Integration",
-      "notifyOnBooking": true,
-      "notifyOnPayment": true,
-      "notifyOnCancellation": true,
-      "notifyOnCheckInOut": true,
-      "notifyOnGuestService": true,
-      "channelEmail": true,
-      "channelSms": false,
-      "channelWhatsApp": true,
-      "channelPush": false
-    },
-    "createdAt": "2026-09-01T04:34:46.075Z",
-    "updatedAt": "2026-09-01T04:34:46.081Z"
-  },
-  {
     "id": "HS-UDA",
     "_id": "HS-UDA",
     "name": "Lake Palace View",
@@ -221,10 +149,10 @@
     "name": "Backwater Retreat",
     "city": "Alleppey",
     "rooms": 15,
-    "occupancy": 30,
-    "adr": 12000,
-    "revpar": 3600,
-    "status": "Onboarding",
+    "occupancy": 0,
+    "adr": 0,
+    "revpar": 0,
+    "status": "Active",
     "gm": "Unassigned",
     "assignedAdmin": null,
     "subscriptionTier": "None",
@@ -284,8 +212,8 @@
       "channelWhatsApp": true,
       "channelPush": false
     },
-    "createdAt": "2026-09-01T04:34:46.095Z",
-    "updatedAt": "2026-09-01T04:34:46.099Z"
+    "createdAt": "2026-08-18T06:30:08.895Z",
+    "updatedAt": "2026-09-25T05:23:38.990Z"
   },
   {
     "_id": "HS-505NZ",
@@ -324,174 +252,56 @@
     "subscriptionExpiry": "2027-09-18T06:24:25.308Z",
     "commissionRate": 12,
     "settings": {
-      "logo": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788155962/hourstay_hms_assets/k9uc3exlyql4tcrqemnm.jpg",
-      "address": "Plot No. 45, Hitech City Road, Madhapur",
-      "phone": "1800 266 4687",
-      "email": "reservations@speshwayluxuryhotel.com",
-      "gstin": "36AAAAA1111A1Z1",
-      "classification": "3-Star",
-      "description": "Experience a comfortable and premium stay in the heart of Madhapur, Hyderabad, with modern rooms, excellent hospitality, and convenient access to major business and entertainment destinations.",
-      "gstEnabled": true,
-      "cgst": 9,
-      "sgst": 9,
-      "igst": 18,
-      "hsnSac": "996311",
-      "taxInclusive": true,
-      "checkInTime": "12:00",
-      "checkOutTime": "11:00",
-      "earlyCheckInCharge": 0,
-      "lateCheckOutCharge": 0,
-      "cancellationPolicy": "Free cancellation up to 24 hours prior to check-in. Cancellation within 24 hours will attract a 1-night tariff penalty.",
-      "noShowPolicy": "No-show will attract 100% room charge penalty.",
-      "refundPolicy": "Refunds are processed within 5-7 business days.",
-      "paymentMethods": [
-        "UPI",
-        "Card",
-        "Cash"
-      ],
-      "advancePaymentPercent": 100,
-      "securityDeposit": 0,
-      "bookingRules": "Guests must produce valid identity documentation on arrival.",
-      "reservationSettings": "Auto-release unconfirmed rooms after 2 hours.",
-      "paymentConfig": "Razorpay Checkout API Integration",
-      "notifyOnBooking": true,
-      "notifyOnPayment": true,
-      "notifyOnCancellation": true,
-      "notifyOnCheckInOut": true,
-      "notifyOnGuestService": true,
-      "channelEmail": true,
-      "channelSms": false,
-      "channelWhatsApp": true,
-      "channelPush": false,
-      "name": "Speshway Luxury Hotel",
+      "hotelName": "Speshway Luxury Hotel",
       "city": "Madhapur, Hyderabad",
-      "photos": [
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152549/hourstay_hms_assets/t1wutasu8gu727qtekyj.jpg",
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152563/hourstay_hms_assets/g42hkvukxkpcx4yzrmlh.jpg",
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152576/hourstay_hms_assets/gyya0cmjdn90upu2ivir.jpg",
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152859/hourstay_hms_assets/lwlxmgzzdc1nvfllbywl.jpg"
+      "address": "Plot 42, Hitech City Main Rd, Madhapur, Hyderabad, Telangana 500081",
+      "phone": "+91 40 4567 8900",
+      "email": "reservations@speshway.com",
+      "reservationEmail": "reservations@speshway.com",
+      "gstin": "36AABCS1429B1Z5",
+      "cancellationPolicy": "Free cancellation up to 24 hours prior to check-in.",
+      "name": "Speshway Luxury Hotel",
+      "description": "",
+      "logo": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314941/hms_property_assets/gxcutfjwtplrvkwuvlpq.jpg",
+      "gallery": [
+        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314607/hms_property_assets/rojkvtj9w3vroqy4rlum.jpg",
+        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314954/hms_property_assets/qxbpgv6p7v5gnshrrlcx.jpg",
+        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314965/hms_property_assets/emctarkhgdsy13m94vzv.jpg"
       ],
+      "photos": [
+        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314607/hms_property_assets/rojkvtj9w3vroqy4rlum.jpg",
+        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314954/hms_property_assets/qxbpgv6p7v5gnshrrlcx.jpg",
+        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790314965/hms_property_assets/emctarkhgdsy13m94vzv.jpg"
+      ],
+      "contactNumber": "+91 40 4567 8900",
       "state": "Telangana",
       "country": "India",
       "pincode": "500081",
-      "website": "booknstay.speshway.site",
-      "amenities": [
-        "Premium rooms",
-        "high-speed Wi-Fi",
-        "24/7 front desk",
-        "business-friendly facilities",
-        "convenient city access"
-      ],
+      "website": "",
+      "classification": "3-Star",
+      "amenities": [],
       "highlights": [],
-      "propertyPolicies": "Free cancellation up to 24 hours before check-in. Cancellations within 24 hours may be subject to a cancellation charge.",
-      "locationMap": "Madhapur, Hyderabad, Telangana",
+      "checkInTime": "12:00",
+      "checkOutTime": "11:00",
+      "cancelPolicy": "Free cancellation up to 24 hours prior to check-in.",
+      "policies": "",
+      "propertyPolicies": "",
+      "locationMap": "",
       "facebook": "",
       "instagram": "",
       "twitter": "",
       "linkedin": "",
-      "cancelPolicy": "Free cancellation up to 24 hours prior to check-in. Cancellation within 24 hours will attract a 1-night tariff penalty.",
+      "cgst": 9,
+      "sgst": 9,
       "autoAssign": true,
       "waitlistLimit": 5,
       "paymentProvider": "Razorpay",
       "emailAlerts": true,
       "smsAlerts": false,
-      "parityAlerts": true,
-      "hotelName": "Speshway Luxury Hotel",
-      "gallery": [
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152549/hourstay_hms_assets/t1wutasu8gu727qtekyj.jpg",
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152563/hourstay_hms_assets/g42hkvukxkpcx4yzrmlh.jpg",
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152576/hourstay_hms_assets/gyya0cmjdn90upu2ivir.jpg",
-        "https://res.cloudinary.com/dg9sqvxen/image/upload/v1788152859/hourstay_hms_assets/lwlxmgzzdc1nvfllbywl.jpg"
-      ],
-      "reservationEmail": "reservations@speshwayluxuryhotel.com",
-      "contactNumber": "1800 266 4687",
-      "policies": "Free cancellation up to 24 hours before check-in. Cancellations within 24 hours may be subject to a cancellation charge.",
-      "roomTypes": [
-        {
-          "_id": "RT-01",
-          "category": "Standard Room",
-          "rooms": [
-            "101",
-            "102",
-            "103"
-          ],
-          "roomsCount": 3,
-          "occupancy": "2 Adults",
-          "baseRate": 3000,
-          "activePlans": 1,
-          "amenities": [
-            "Air Conditioning",
-            "High-speed Wi-Fi",
-            "Flat Screen TV"
-          ],
-          "status": "Active"
-        },
-        {
-          "_id": "RT-02",
-          "category": "Deluxe Room",
-          "rooms": [
-            "201",
-            "202",
-            "203",
-            "401",
-            "402",
-            "403"
-          ],
-          "roomsCount": 6,
-          "occupancy": "2 Adults + 1 Child",
-          "baseRate": 4500,
-          "activePlans": 2,
-          "amenities": [
-            "Balcony View",
-            "Smart TV",
-            "Room Service",
-            "Mini Bar"
-          ],
-          "status": "Active"
-        },
-        {
-          "_id": "RT-03",
-          "category": "Executive Suite",
-          "rooms": [
-            "301",
-            "302",
-            "303"
-          ],
-          "roomsCount": 3,
-          "occupancy": "4 Adults",
-          "baseRate": 6500,
-          "activePlans": 2,
-          "amenities": [
-            "Jacuzzi Bath",
-            "Living Room",
-            "Espresso Machine",
-            "Airport Transfer"
-          ],
-          "status": "Active"
-        },
-        {
-          "_id": "RT-1788329427394",
-          "category": "Penthouse Suite",
-          "baseRate": 5500,
-          "occupancy": "2 Adults",
-          "rooms": [
-            "501",
-            "502"
-          ],
-          "roomsCount": 2,
-          "activePlans": 1,
-          "amenities": [
-            "Air Conditioning",
-            "High-speed Wi-Fi",
-            "Flat Screen TV"
-          ],
-          "status": "Active"
-        }
-      ]
+      "parityAlerts": true
     },
     "createdAt": "2026-08-18T06:50:34.910Z",
-    "updatedAt": "2026-09-18T06:16:23.977Z",
-    "subscriptionPlanName": "Starter Tier"
+    "updatedAt": "2026-09-25T05:42:53.638Z"
   },
   {
     "_id": "HS-0L43K",
@@ -806,7 +616,7 @@
     "occupancy": 78,
     "adr": 11400,
     "revpar": 8892,
-    "status": "Active",
+    "status": "Suspended",
     "gm": "Dileep",
     "assignedAdmin": null,
     "subscriptionTier": "None",
@@ -867,6 +677,6 @@
       "channelPush": false
     },
     "createdAt": "2026-09-23T09:43:47.129Z",
-    "updatedAt": "2026-09-23T09:43:47.165Z"
+    "updatedAt": "2026-09-25T05:23:49.680Z"
   }
 ]
