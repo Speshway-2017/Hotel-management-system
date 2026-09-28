@@ -325,8 +325,8 @@ export function RoomDetailsPage() {
                   <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 space-y-1">
                     <span className="text-[10px] text-purple font-bold uppercase tracking-wider block">Base Nightly Tariff</span>
                     <div className="flex items-baseline gap-2">
-                      <span className="font-display text-2xl font-bold text-navy">{inr(nightlyTariff)}</span>
-                      <span className="text-gray-500 text-[10px] font-bold">/ night</span>
+                      <span className="font-price text-xl font-bold text-navy tracking-tight">{inr(nightlyTariff)}</span>
+                      <span className="text-gray-500 text-[10px] font-medium">/ night</span>
                     </div>
                   </div>
 
@@ -398,7 +398,7 @@ export function RoomDetailsPage() {
                 <div className="p-3.5 bg-cream/40 rounded-xl border border-navy/5 space-y-1 text-xs">
                   <strong className="font-bold text-navy block text-sm">{hotelName}</strong>
                   <span className="text-gray-500 block">{roomType} {roomNumber ? `(${roomNumber})` : ""}</span>
-                  <span className="text-purple font-mono font-bold block mt-1">{inr(nightlyTariff)} / night</span>
+                  <span className="text-purple font-price font-bold block mt-1">{inr(nightlyTariff)} / night</span>
                 </div>
 
                 {/* Date Selectors */}
@@ -436,15 +436,15 @@ export function RoomDetailsPage() {
                 <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
                   <div className="flex justify-between">
                     <dt className="text-gray-500">Room Tariff ({nightsCount} {nightsCount === 1 ? 'night' : 'nights'})</dt>
-                    <dd className="tabular-nums font-bold text-navy">{inr(baseTariffTotal)}</dd>
+                    <dd className="font-price font-semibold text-navy">{inr(baseTariffTotal)}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-gray-500">GST 18%</dt>
-                    <dd className="tabular-nums font-bold text-navy">{inr(gstTax)}</dd>
+                    <dd className="font-price font-semibold text-navy">{inr(gstTax)}</dd>
                   </div>
-                  <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy">
+                  <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy items-baseline">
                     <dt>Total Amount</dt>
-                    <dd className="tabular-nums font-bold text-purple">{inr(totalPayable)}</dd>
+                    <dd className="font-price text-sm font-bold text-purple">{inr(totalPayable)}</dd>
                   </div>
                 </dl>
 

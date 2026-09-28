@@ -249,6 +249,25 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> deleteAccount({String reason = 'Guest requested permanent account deletion'}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    final res = await AuthService.deleteAccount(reason: reason);
+    _isLoading = false;
+
+    if (res.success) {
+      _user = null;
+      notifyListeners();
+      return true;
+    } else {
+      _errorMessage = res.message ?? 'Failed to delete account';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await AuthService.logout();
     _user = null;

@@ -309,13 +309,15 @@ function ViewGuestPage() {
           title="Guest Details"
         />
         <div className="flex gap-2 select-none self-start sm:self-center">
-          <Button
-            variant="outline"
-            className="h-9 px-4 text-xs font-bold border-muted text-navy rounded-full"
-            onClick={() => navigate({ to: `/admin/guests/edit/${guest._id || guest.id}` })}
-          >
-            Edit Profile
-          </Button>
+          {guest.status !== "Inactive" && (
+            <Button
+              variant="outline"
+              className="h-9 px-4 text-xs font-bold border-muted text-navy rounded-full"
+              onClick={() => navigate({ to: `/admin/guests/edit/${guest._id || guest.id}` })}
+            >
+              Edit Profile
+            </Button>
+          )}
           <Button
             className="bg-navy hover:bg-navy-deep text-white h-9 px-4 text-xs font-bold rounded-full shadow-soft"
             onClick={() => navigate({ to: `/admin/reservations/add` })}

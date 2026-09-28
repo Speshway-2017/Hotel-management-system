@@ -402,10 +402,21 @@ class GuestSettingsProvider with ChangeNotifier {
     }
   }
 
+  Future<ApiResponse<dynamic>> deleteAccount({String reason = 'Guest requested permanent deletion'}) async {
+    try {
+      return await ApiService.delete(
+        ApiEndpoints.deleteAccount,
+        {'reason': reason},
+      );
+    } catch (e) {
+      return ApiResponse(success: false, statusCode: 500, message: e.toString());
+    }
+  }
+
   Future<ApiResponse<dynamic>> requestAccountDeletion({String reason = 'Guest requested deletion'}) async {
     try {
-      return await ApiService.post(
-        ApiEndpoints.guestDeleteAccount,
+      return await ApiService.delete(
+        ApiEndpoints.deleteAccount,
         {'reason': reason},
       );
     } catch (e) {

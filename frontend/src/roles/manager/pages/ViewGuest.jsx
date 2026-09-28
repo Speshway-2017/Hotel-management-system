@@ -292,7 +292,7 @@ function ManagerViewGuest() {
                   <span className="font-semibold block mt-0.5">
                     {formatISTDateTime(latestStay.checkIn)} → {formatISTDateTime(latestStay.checkOut)}
                   </span>
-                  {latestStay.status === "Checked-in" && (
+                  {latestStay.status === "Checked-in" && guestProfile.status !== "Inactive" && (
                     <button
                       onClick={() => navigate({ to: `/manager/reservations/extend/${latestStay.bookingId || latestStay._id || latestStay.id}` })}
                       className="text-[10px] text-brand hover:underline font-bold inline-flex items-center gap-0.5 mt-1 cursor-pointer"

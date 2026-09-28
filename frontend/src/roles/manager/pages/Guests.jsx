@@ -388,7 +388,7 @@ function ManagerGuestsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-left align-middle">
                         <div className="font-semibold text-navy text-[11.5px] whitespace-nowrap">{formatISTDateTime(b.checkOut)}</div>
-                        {b.status === "Checked-in" && (
+                        {b.status === "Checked-in" && b.status !== "Inactive" && g.status !== "Inactive" && g.accountStatus !== "Inactive" && (
                           <button
                             onClick={() => navigate({ to: `/manager/reservations/extend/${b.bookingId || b._id || b.id}` })}
                             className="text-[10px] text-brand hover:underline font-bold inline-flex items-center gap-0.5 mt-0.5 cursor-pointer whitespace-nowrap"
@@ -399,11 +399,12 @@ function ManagerGuestsPage() {
                       </td>
                       <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap">
                         <Tag tone={
+                          (b.status === "Inactive" || g.status === "Inactive" || g.accountStatus === "Inactive") ? "error" :
                           b.status === "Confirmed" ? "brand" :
                           b.status === "Checked-in" ? "success" :
                           b.status === "Checked-out" ? "neutral" : "error"
                         }>
-                          {b.status}
+                          {(b.status === "Inactive" || g.status === "Inactive" || g.accountStatus === "Inactive") ? "Inactive" : b.status}
                         </Tag>
                       </td>
                       <td className="py-3.5 px-4 text-left align-middle">

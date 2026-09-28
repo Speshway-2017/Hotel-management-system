@@ -90,6 +90,10 @@ class ManagerNotificationProvider with ChangeNotifier {
     SocketService.on('booking_created', (_) => _debouncedFetchNotifications());
     SocketService.on('booking_updated', (_) => _debouncedFetchNotifications());
     SocketService.on('reservation_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('user_deleted', (_) => _debouncedFetchNotifications());
+    SocketService.on('guest_deleted', (_) => _debouncedFetchNotifications());
+    SocketService.on('guest_status_changed', (_) => _debouncedFetchNotifications());
+    SocketService.on('guest_updated', (_) => _debouncedFetchNotifications());
   }
 
   void _registerFcmListeners() {

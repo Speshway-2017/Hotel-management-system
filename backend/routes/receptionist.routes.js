@@ -414,6 +414,7 @@ router.get('/guests', async (req, res) => {
       const guestName = userMatch?.name || b.guest || b.guestName || 'Guest';
       const dedupKey = `${(userMatch?.email || guestName).trim().toLowerCase()}_${rmNum}`;
 
+      const isGuestInactive = userMatch?.status === 'Inactive' || userMatch?.isDeleted;
       if (!seenGuests.has(dedupKey)) {
         seenGuests.add(dedupKey);
         guestList.push({
@@ -437,11 +438,12 @@ router.get('/guests', async (req, res) => {
           balance: b.balance !== undefined ? Number(b.balance) : 0,
           amount: Number(b.amount || b.totalAmount || 0),
           paymentStatus: Number(b.balance || 0) === 0 || b.paymentStatus === 'Paid' ? 'Paid' : 'Pending',
-          status: b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : (b.status || 'Staying'),
+          status: isGuestInactive ? 'Inactive' : (b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : (b.status || 'Staying')),
+          accountStatus: isGuestInactive ? 'Inactive' : (userMatch?.status || 'Active'),
           vipTier: 'Gold Elite',
           specialRequests: b.specialRequests || b.notes || 'None',
           timeline: [
-            { time: b.checkIn || 'Recent', action: `Guest in-house active stay in Room ${rmNum}.` }
+            { time: b.checkIn || 'Recent', action: isGuestInactive ? 'Guest account deleted/inactive.' : `Guest in-house active stay in Room ${rmNum}.` }
           ]
         });
       }

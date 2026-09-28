@@ -23,6 +23,9 @@ import { Route as ResetPassword } from "./pages/ResetPassword";
 import { Route as VerifyOtp } from "./pages/VerifyOtp";
 import { Route as BookingIndex } from "./pages/BookingIndex";
 import { Route as BookingConfirmation } from "./pages/BookingConfirmation";
+import { Route as PrivacyPolicy } from "./pages/PrivacyPolicy";
+import { Route as Terms } from "./pages/Terms";
+import { Route as DeleteAccount } from "./pages/DeleteAccount";
 
 // Import Admin Workspace Pages
 import { Route as AdminLayout } from "./roles/admin/pages/AdminLayout";
@@ -285,6 +288,12 @@ export default function App() {
           <Route path="/rooms/:roomId" element={<RouteWrapper routeObj={RoomDetails} />} />
           <Route path="/blog" element={<RouteWrapper routeObj={BlogIndex} />} />
           <Route path="/blog/:slug" element={<RouteWrapper routeObj={BlogPost} />} />
+          <Route path="/privacy" element={<RouteWrapper routeObj={PrivacyPolicy} />} />
+          <Route path="/privacy-policy" element={<RouteWrapper routeObj={PrivacyPolicy} />} />
+          <Route path="/terms" element={<RouteWrapper routeObj={Terms} />} />
+          <Route path="/terms-and-conditions" element={<RouteWrapper routeObj={Terms} />} />
+          <Route path="/account-deletion" element={<RouteWrapper routeObj={DeleteAccount} />} />
+          <Route path="/delete-account" element={<RouteWrapper routeObj={DeleteAccount} />} />
           
           {/* Shared Auth Layout Routes */}
           <Route element={<AuthRoutesLayout />}>

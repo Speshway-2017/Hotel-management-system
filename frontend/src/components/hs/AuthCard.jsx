@@ -347,25 +347,24 @@ export function AuthCard({
           )}
           
           {mode === "register" && (
-            <div>
-              <Label htmlFor="mobile" className="sr-only">Mobile</Label>
-              <Input 
-                id="mobile" 
-                className="w-full bg-white border-none px-5 py-3 rounded-full shadow-[0_10px_10px_-5px_#E7E9EE] border-x-2 border-y-0 border-x-transparent focus:outline-none focus:border-x-[#12B1D1] focus-visible:ring-0 focus-visible:ring-offset-0 text-xs text-navy h-12 transition-all" 
-                placeholder="Mobile Number" 
-                value={mobile}
-                onChange={(e) => {
-                  setMobile(e.target.value);
-                  if (fieldErrors.mobile) setFieldErrors(prev => ({ ...prev, mobile: null }));
-                }}
-                autoComplete="off"
-              />
-              {fieldErrors.mobile && (
-                <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in">{fieldErrors.mobile}</p>
-              )}
-            </div>
+            <p className="text-[11.5px] text-center text-muted-foreground leading-relaxed px-2 mt-2">
+              By continuing, you agree to our{" "}
+              <Link 
+                to="/terms" 
+                className="font-semibold text-purple hover:underline hover:text-navy transition-colors inline"
+              >
+                Terms &amp; Conditions
+              </Link>{" "}
+              and{" "}
+              <Link 
+                to="/privacy" 
+                className="font-semibold text-purple hover:underline hover:text-navy transition-colors inline"
+              >
+                Privacy Policy
+              </Link>.
+            </p>
           )}
-          
+
           <button 
             type="submit" 
             className="w-full font-bold bg-navy hover:bg-[#081420] text-cream py-3 rounded-full shadow-[rgba(13,27,42,0.25)_0px_20px_10px_-15px] cursor-pointer border-none transition-all duration-200 ease-in-out hover:scale-[1.03] hover:shadow-[rgba(13,27,42,0.25)_0px_23px_10px_-20px] active:scale-[0.95] active:shadow-[rgba(13,27,42,0.25)_0px_15px_10px_-10px] text-xs uppercase tracking-wide h-12 mt-4"
@@ -382,8 +381,26 @@ export function AuthCard({
 
         {children}
 
-
         {footer && <p className="mt-5 text-center text-xs text-muted-foreground">{footer}</p>}
+
+        {/* Legal Links Footer for Login */}
+        {mode === "login" && (
+          <div className="mt-5 pt-3.5 border-t border-navy/10 flex items-center justify-center gap-2 text-[11px] text-muted-foreground font-ui">
+            <Link
+              to="/privacy"
+              className="hover:text-purple hover:underline transition-colors focus:outline-none"
+            >
+              Privacy Policy
+            </Link>
+            <span className="text-navy/30 text-[10px] select-none">|</span>
+            <Link
+              to="/terms"
+              className="hover:text-purple hover:underline transition-colors focus:outline-none"
+            >
+              Terms &amp; Conditions
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   );

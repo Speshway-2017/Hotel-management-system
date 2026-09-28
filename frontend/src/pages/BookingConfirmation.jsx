@@ -76,10 +76,11 @@ function Confirmation() {
 }
 
 function Row({ k, v }) {
+  const isAmount = k.toLowerCase().includes("paid") || k.toLowerCase().includes("amount") || k.toLowerCase().includes("total");
   return (
-    <div className="flex flex-wrap justify-between gap-2">
+    <div className="flex flex-wrap justify-between gap-2 items-baseline">
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className="font-medium">{v}</dd>
+      <dd className={`font-medium ${isAmount ? "font-price font-bold text-navy text-sm" : ""}`}>{v}</dd>
     </div>
   );
 }

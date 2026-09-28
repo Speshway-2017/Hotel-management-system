@@ -836,14 +836,63 @@ class _AuthCardState extends State<AuthCard> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Mobile Field (Register Mode)
                     if (widget.mode == AuthMode.register) ...[
-                      _buildWebStyledInputField(
-                        controller: _mobileController,
-                        placeholder: 'Mobile Number',
-                        keyboardType: TextInputType.phone,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'By continuing, you agree to our ',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF667085),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => _showLegalModal(context, 'Terms & Conditions', _termsText),
+                              child: Text(
+                                'Terms & Conditions',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF5B21B6),
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              ' and ',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF667085),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => _showLegalModal(context, 'Privacy Policy', _privacyPolicyText),
+                              child: Text(
+                                'Privacy Policy',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF5B21B6),
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '.',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF667085),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 6),
                     ],
 
                     const SizedBox(height: 4),
@@ -902,10 +951,165 @@ class _AuthCardState extends State<AuthCard> {
                 textAlign: TextAlign.center,
                 child: widget.footer ?? _buildDefaultFooter(),
               ),
+
+              // Legal Links Footer Bar for Login
+              if (widget.mode == AuthMode.login) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.only(top: 14),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Color(0x1A0D1B2A), width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => _showLegalModal(context, 'Privacy Policy', _privacyPolicyText),
+                        child: Text(
+                          'Privacy Policy',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF667085),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          '|',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color(0x400D1B2A),
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _showLegalModal(context, 'Terms & Conditions', _termsText),
+                        child: Text(
+                          'Terms & Conditions',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF667085),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  void _showLegalModal(BuildContext context, String title, String content) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Color(0xFFFFFDF8),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0x260D1B2A),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0D1B2A),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  icon: const Icon(Icons.close, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  content,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    height: 1.6,
+                    color: const Color(0xFF344054),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const String _privacyPolicyText = '''
+Hour Stay Data & Privacy Policy
+
+1. Commitment to Privacy
+Hour Stay respects your personal information and safeguards guest and host confidentiality. All communications, reservation metadata, and credentials are handled under modern data protection guidelines.
+
+2. Information We Collect
+• Contact & Identity Information: Name, email address, phone number for reservations and identity verification.
+• Booking & Transaction History: Reservation dates, room selections, billing amounts, and confirmation records.
+• Device & Usage Diagnostics: Approximate location for local property discovery and security logs.
+
+3. How Your Information is Used
+• Processing hotel reservations, check-ins, hourly extensions, and guest service requests.
+• Generating secure receipts and booking confirmations.
+• Customer support and fraud prevention.
+
+4. Your Rights
+Under Digital Data Protection regulations, you have full rights to inspect your data, update your details, or permanently delete your account at any time directly through the app settings or support desk.
+''';
+
+  static const String _termsText = '''
+Hour Stay Terms & Conditions
+
+1. Account Usage & User Eligibility
+Users must be at least 18 years old to create an account or complete hotel reservations through Hour Stay. You agree to provide accurate and truthful identity details.
+
+2. Reservations & Check-in Policies
+• Hourly and daily room bookings are held according to each partner property's check-in schedule.
+• Valid government-issued photo ID is required upon check-in.
+• Early arrivals and extensions are subject to room availability and property confirmation.
+
+3. Payments & Billing
+• Charges are billed in accordance with the selected slot duration and rate cards.
+• Additional amenities or extensions requested during your stay will be added to your folio.
+
+4. Code of Conduct & Property Rules
+Guests must respect property guidelines, check-out times, and staff instructions. Any disruption or violation may result in booking termination without refund.
+''';
 }

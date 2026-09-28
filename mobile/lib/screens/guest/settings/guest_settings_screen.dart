@@ -88,6 +88,10 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
                   _buildSignOutSection(authProvider),
                   const SizedBox(height: 20),
 
+                  // 6. Delete Account Section (Danger Zone)
+                  _buildDeleteAccountSection(authProvider),
+                  const SizedBox(height: 24),
+
                   // Footer Status
                   _buildFooter(),
                 ],
@@ -528,6 +532,87 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: ruby,
+                foregroundColor: white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // 6. DELETE ACCOUNT SECTION
+  // ==========================================
+  Widget _buildDeleteAccountSection(AuthProvider authProvider) {
+    return Container(
+      decoration: BoxDecoration(
+        color: blush.withAlpha(18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: blush.withAlpha(80)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: blush.withAlpha(30),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person_remove_rounded, color: blush, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Delete Account',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: blush,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Permanently remove your profile, data, and access',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _showDeleteAccountDialog(authProvider),
+              icon: const Icon(Icons.delete_forever_rounded, size: 18, color: white),
+              label: const Text(
+                'Delete Account',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: blush,
                 foregroundColor: white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1340,6 +1425,8 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
             onPressed: () async {
               Navigator.of(ctx).pop();
               await authProvider.logout();
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: ruby,
@@ -1348,6 +1435,203 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Yes, Logout', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Delete Account Confirmation Dialog
+  void _showDeleteAccountDialog(AuthProvider authProvider) {
+    bool isDeleting = false;
+    bool confirmed = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: blush.withAlpha(25),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.warning_amber_rounded, color: blush, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Delete Account',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: navy,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to permanently delete your Hour Stay account? This action cannot be undone.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: navyLight,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: blush.withAlpha(16),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: blush.withAlpha(60)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'What happens when you delete your account:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: blush,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _buildBulletPoint('Your account status is deactivated in all hotel portals.'),
+                    _buildBulletPoint('Active sessions & device login tokens are immediately revoked.'),
+                    _buildBulletPoint('Financial invoice copies are archived for legal compliance.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: isDeleting
+                    ? null
+                    : () => setDialogState(() => confirmed = !confirmed),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: confirmed,
+                          activeColor: blush,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          onChanged: isDeleting
+                              ? null
+                              : (val) => setDialogState(() => confirmed = val ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'I understand this action is permanent.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: navy,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isDeleting ? null : () => Navigator.of(dialogCtx).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: muted,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: (!confirmed || isDeleting)
+                  ? null
+                  : () async {
+                      setDialogState(() => isDeleting = true);
+                      final ok = await authProvider.deleteAccount(
+                        reason: 'Permanently deleted by guest from mobile app settings',
+                      );
+                      setDialogState(() => isDeleting = false);
+
+                      if (!mounted || !dialogCtx.mounted) return;
+                      Navigator.of(dialogCtx).pop();
+
+                      if (ok) {
+                        _showToast('Your account has been deleted successfully.');
+                        Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
+                      } else {
+                        _showToast(
+                          authProvider.errorMessage ?? 'Failed to delete account. Please try again.',
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: blush,
+                disabledBackgroundColor: blush.withAlpha(100),
+                foregroundColor: white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: isDeleting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Permanently Delete',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: white,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBulletPoint(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(color: blush, fontSize: 13, fontWeight: FontWeight.w800)),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 11.5, color: slate700, height: 1.3),
+            ),
           ),
         ],
       ),
