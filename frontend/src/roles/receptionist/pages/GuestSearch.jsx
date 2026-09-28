@@ -363,8 +363,12 @@ function InHouseGuestsPage() {
                       </Tag>
                     </td>
                     <td className="py-3.5 px-4">
-                      <Tag tone={g.status === "Staying" ? "success" : g.status === "Extended Stay" ? "brand" : "warning"}>
-                        {g.status}
+                      <Tag tone={
+                        (g.status === "Inactive" || g.accountStatus === "Inactive") ? "error" :
+                        g.status === "Staying" ? "success" : 
+                        g.status === "Extended Stay" ? "brand" : "warning"
+                      }>
+                        {(g.status === "Inactive" || g.accountStatus === "Inactive") ? "Inactive" : g.status}
                       </Tag>
                     </td>
                     <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[200px]">
@@ -374,10 +378,12 @@ function InHouseGuestsPage() {
                           title="View Reservation Details"
                         />
 
-                        <ExtendActionButton
-                          onClick={() => navigate(`/reception/reservations/extend/${g.id || g._id || g.bookingId}`)}
-                          title="Extend Stay Duration"
-                        />
+                        {g.status !== "Inactive" && g.accountStatus !== "Inactive" && (
+                          <ExtendActionButton
+                            onClick={() => navigate(`/reception/reservations/extend/${g.id || g._id || g.bookingId}`)}
+                            title="Extend Stay Duration"
+                          />
+                        )}
                       </ActionGroup>
                     </td>
                   </tr>

@@ -1,6 +1,6 @@
 import Notification from '../models/notification.model.js';
 import Property from '../models/property.model.js';
-import { ManagerNotification } from '../models/managerData.model.js';
+import { ManagerNotification, ReceptionistNotification } from '../models/managerData.model.js';
 import User from '../models/user.model.js';
 import { emitRealtimeSync } from './socketEmitter.js';
 
@@ -253,7 +253,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       isRead: false
     });
 
-    // Only persist to ManagerNotification for manager scoped notifications
+    // Persist to ManagerNotification for manager scoped notifications
     if (role === 'manager') {
       try {
         let existingMn = null;
@@ -268,6 +268,31 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
 
         if (!existingMn) {
           await ManagerNotification.create({
+            title: cleanTitle,
+            message: cleanMsg,
+            category: category || 'General',
+            isRead: false,
+            propertyId: targetPropId || 'HS-9HQ8P'
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Persist to ReceptionistNotification for receptionist scoped notifications
+    if (role === 'receptionist') {
+      try {
+        let existingRn = null;
+        try {
+          existingRn = await ReceptionistNotification.findOne({
+            title: cleanTitle,
+            message: cleanMsg,
+            propertyId: targetPropId || 'HS-9HQ8P',
+            createdAt: { $gte: sixtySecondsAgo }
+          });
+        } catch (_) {}
+
+        if (!existingRn) {
+          await ReceptionistNotification.create({
             title: cleanTitle,
             message: cleanMsg,
             category: category || 'General',
@@ -554,3 +579,178 @@ export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = '
     console.error("❌ Failed to broadcast feedback notification:", err.message);
   }
 };
+
+/**
+ * Handles notification distribution across Admin, Manager, Receptionist, and Guest when an account is deleted.
+ */
+export const notifyAccountDeletionEvent = async ({ req, io, user }) => {
+  try {
+    if (!user) return;
+    const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
+    const userName = user.name || 'Guest User';
+    const userEmail = (user.email || 'guest@hourstay.com').toLowerCase().trim();
+    const userId = String(user._id || user.id || '');
+    const propId = user.propertyId || 'HS-9HQ8P';
+
+    const adminTitle = `Guest Account Deleted: ${userName}`;
+    const adminMsg = `Guest ${userName} (${userEmail}) permanently deleted their account. Status has been updated to Inactive.`;
+
+    const guestTitle = `Your Hour Stay Account Has Been Deleted`;
+    const guestMsg = `Your account (${userEmail}) and profile credentials have been permanently deleted and marked Inactive.`;
+
+    // 1. Notify Admin Portal
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'admin',
+      propertyId: null,
+      title: adminTitle,
+      message: adminMsg,
+      category: 'System',
+      data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+    });
+
+    // 2. Notify Manager Portal
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'manager',
+      propertyId: propId,
+      title: adminTitle,
+      message: adminMsg,
+      category: 'System',
+      data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+    });
+
+    // Also ensure default property has ManagerNotification
+    if (propId !== 'HS-9HQ8P') {
+      await triggerNotification({
+        req,
+        io: socketIo,
+        role: 'manager',
+        propertyId: 'HS-9HQ8P',
+        title: adminTitle,
+        message: adminMsg,
+        category: 'System',
+        data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+      });
+    }
+
+    // 3. Notify Receptionist Portal
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'receptionist',
+      propertyId: propId,
+      title: adminTitle,
+      message: adminMsg,
+      category: 'System',
+      data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+    });
+
+    if (propId !== 'HS-9HQ8P') {
+      await triggerNotification({
+        req,
+        io: socketIo,
+        role: 'receptionist',
+        propertyId: 'HS-9HQ8P',
+        title: adminTitle,
+        message: adminMsg,
+        category: 'System',
+        data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+      });
+    }
+
+    // 4. Universal / All-role feed
+    await triggerNotification({
+      req,
+      io: socketIo,
+      role: 'all',
+      propertyId: propId,
+      title: adminTitle,
+      message: adminMsg,
+      category: 'System',
+      data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+    });
+
+    // 5. Notify Guest (Logs confirmation in their activity / push history)
+    if (userId) {
+      await triggerNotification({
+        req,
+        io: socketIo,
+        userId: userId,
+        role: 'guest',
+        title: guestTitle,
+        message: guestMsg,
+        category: 'System',
+        data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
+      });
+    }
+
+    // 6. Direct fallback write into dedicated role tables
+    try {
+      await Promise.all([
+        ManagerNotification.create({
+          title: adminTitle,
+          message: adminMsg,
+          category: 'System',
+          isRead: false,
+          propertyId: propId
+        }).catch(() => null),
+        ReceptionistNotification.create({
+          title: adminTitle,
+          message: adminMsg,
+          category: 'System',
+          isRead: false,
+          propertyId: propId
+        }).catch(() => null)
+      ]);
+    } catch (_) {}
+
+    // 7. Real-time broadcast sync across all connected clients & rooms
+    if (socketIo) {
+      const payload = {
+        id: userId,
+        userId: userId,
+        email: userEmail,
+        name: userName,
+        role: user.role || 'guest',
+        status: 'Inactive',
+        isDeleted: true
+      };
+      const notifPayload = {
+        title: adminTitle,
+        message: adminMsg,
+        category: 'System',
+        role: 'all',
+        propertyId: propId,
+        data: { userId, email: userEmail, status: 'Inactive' },
+        createdAt: new Date().toISOString()
+      };
+
+      emitRealtimeSync(socketIo, 'all', 'user_deleted', payload);
+      emitRealtimeSync(socketIo, 'all', 'user_updated', payload);
+      emitRealtimeSync(socketIo, 'all', 'guest_updated', payload);
+      emitRealtimeSync(socketIo, 'all', 'guest_deleted', payload);
+      emitRealtimeSync(socketIo, 'all', 'guest_status_changed', payload);
+      emitRealtimeSync(socketIo, 'all', 'notification_created', notifPayload);
+      emitRealtimeSync(socketIo, 'all', 'notification_received', notifPayload);
+      emitRealtimeSync(socketIo, 'all', 'new_notification', notifPayload);
+      emitRealtimeSync(socketIo, 'all', 'manager_notification', notifPayload);
+      emitRealtimeSync(socketIo, 'all', 'unread_notifications_count_updated', { role: 'all', propertyId: propId });
+      emitRealtimeSync(socketIo, 'all', 'dashboard_sync', { propertyId: propId, action: 'guest_account_deleted', userId });
+
+      // Direct socket emit
+      socketIo.emit('notification_created', notifPayload);
+      socketIo.emit('notification_received', notifPayload);
+      socketIo.emit('new_notification', notifPayload);
+      socketIo.emit('guest_updated', payload);
+      socketIo.emit('user_updated', payload);
+      socketIo.emit('guest_status_changed', payload);
+      socketIo.emit('dashboard_sync', { propertyId: propId, action: 'guest_account_deleted', userId });
+    }
+  } catch (err) {
+    console.error("❌ Failed to broadcast account deletion notification:", err.message);
+  }
+};
+

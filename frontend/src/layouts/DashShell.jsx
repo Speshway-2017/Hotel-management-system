@@ -178,23 +178,69 @@ export function DashShell({ role, children }) {
       lastEventTimestamp = now;
 
       // Realtime notification raise based on event
-      if (eventName === 'notification_created' && data?.notification) {
-        const notif = data.notification;
-        const currentRole = role;
+      if ((eventName === 'notification_created' || eventName === 'notification_received' || eventName === 'new_notification') && (data?.notification || data?.title)) {
+        const notif = data.notification || data;
         const currentUserId = currentUser?._id || currentUser?.id;
-        const isTargeted = !notif.role || notif.role === currentRole || 
-                           (notif.userId && String(notif.userId) === String(currentUserId)) ||
-                           currentRole === 'super-admin' || currentRole === 'admin';
+        const notifRole = (notif.role || '').toLowerCase().trim();
+        const myRole = (role || '').toLowerCase().trim();
 
-        if (isTargeted) {
-          toast(notif.title || 'System Alert', {
-            description: notif.message,
-            icon: '🔔',
-            duration: 5000,
+        const roleMatches = !notifRole || 
+                            notifRole === 'all' || 
+                            notifRole === myRole || 
+                            (myRole === 'reception' && (notifRole === 'receptionist' || notifRole === 'reception')) ||
+                            (myRole === 'receptionist' && (notifRole === 'receptionist' || notifRole === 'reception')) ||
+                            myRole === 'super-admin' || 
+                            myRole === 'admin';
+
+        const isUserTargeted = notif.userId && String(notif.userId) === String(currentUserId);
+
+        if (roleMatches || isUserTargeted) {
+          const title = notif.title || 'System Alert';
+          const description = notif.message || '';
+          const isDeletedNotif = title.toLowerCase().includes('delete') || description.toLowerCase().includes('delete');
+
+          toast(title, {
+            description,
+            icon: isDeletedNotif ? '🗑️' : '🔔',
+            duration: 6000,
             action: {
               label: 'View Alerts',
-              onClick: () => navigate({ to: `/${role}/notifications` })
+              onClick: () => {
+                const targetRoute = myRole === 'reception' ? '/reception/guest-search' : `/${role}/notifications`;
+                navigate({ to: targetRoute });
+              }
             }
+          });
+
+          // Trigger native Windows OS Desktop notification for Receptionist desktop
+          if (window.electronAPI?.showNotification) {
+            window.electronAPI.showNotification({
+              title,
+              body: description
+            });
+          }
+        }
+      } else if (eventName === 'guest_deleted' || eventName === 'user_deleted') {
+        const title = `Guest Account Deleted: ${data?.name || 'Guest'}`;
+        const description = `Guest ${data?.name || 'Guest'} (${data?.email || ''}) permanently deleted their account. Status has been updated to Inactive.`;
+
+        toast.error(title, {
+          description,
+          icon: '🗑️',
+          duration: 6000,
+          action: {
+            label: 'View Guests',
+            onClick: () => {
+              const targetRoute = (role === 'reception' || role === 'receptionist') ? '/reception/guest-search' : `/${role}/guests`;
+              navigate({ to: targetRoute });
+            }
+          }
+        });
+
+        if (window.electronAPI?.showNotification) {
+          window.electronAPI.showNotification({
+            title,
+            body: description
           });
         }
       } else if (eventName === 'booking_created') {

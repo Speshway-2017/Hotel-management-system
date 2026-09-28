@@ -670,9 +670,9 @@ function Home() {
                       <Star className="size-4 fill-gold text-gold" /> {h.rating} · {h.reviews} verified reviews
                     </p>
                     <div className="mt-4 flex items-center justify-between border-t border-navy/5 pt-3">
-                      <p className="text-sm font-bold text-navy font-ui">
+                      <p className="text-sm font-bold text-navy font-price">
                         {inr(h.price)}
-                        <span className="text-[10px] font-normal text-gray-500"> / night</span>
+                        <span className="text-[10px] font-medium text-gray-500 font-ui"> / night</span>
                       </p>
                       <Button asChild size="sm" variant="ghost" className="h-8 px-3 rounded text-purple font-semibold hover:bg-purple/5">
                         <Link to="/rooms/$roomId" params={{ roomId: h.id }}>

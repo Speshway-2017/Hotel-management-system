@@ -1048,6 +1048,7 @@ router.get('/guests', async (req, res) => {
       const statusStr = b.status || 'Confirmed';
       const isCheckedIn = (statusStr.toLowerCase().includes('in') && statusStr.toLowerCase().includes('check')) || statusStr.toLowerCase() === 'staying';
       
+      const isGuestInactive = userMatch?.status === 'Inactive' || userMatch?.isDeleted;
       const guestData = {
         id: b._id || b.id || b.bookingId,
         _id: b._id || b.id || b.bookingId,
@@ -1062,7 +1063,8 @@ router.get('/guests', async (req, res) => {
         roomNumber: rmNum,
         checkIn: b.checkIn || b.checkInDate || '',
         checkOut: b.checkOut || b.checkOutDate || '',
-        status: statusStr,
+        status: isGuestInactive ? 'Inactive' : statusStr,
+        accountStatus: isGuestInactive ? 'Inactive' : (userMatch?.status || 'Active'),
         paymentStatus: (b.balance === 0 || b.paymentStatus === 'Paid') ? 'Paid' : 'Pending',
         bookingId: b.bookingId || b._id || b.id,
         loyaltyPoints: userMatch?.loyaltyPoints || 0
@@ -1070,7 +1072,7 @@ router.get('/guests', async (req, res) => {
 
       if (!guestsMap[key]) {
         guestsMap[key] = guestData;
-      } else if (isCheckedIn) {
+      } else if (isCheckedIn && !isGuestInactive) {
         // Active staying guest profile takes priority
         guestsMap[key] = {
           ...guestData,
@@ -1085,6 +1087,7 @@ router.get('/guests', async (req, res) => {
     guestUsers.forEach(u => {
       const key = (u.email || u.name || '').trim().toLowerCase();
       if (key && !guestsMap[key]) {
+        const isUserInactive = u.status === 'Inactive' || u.isDeleted;
         guestsMap[key] = {
           id: u.id || u._id,
           _id: u.id || u._id,
@@ -1099,7 +1102,8 @@ router.get('/guests', async (req, res) => {
           roomNumber: '--',
           checkIn: '',
           checkOut: '',
-          status: 'Registered',
+          status: isUserInactive ? 'Inactive' : (u.status || 'Registered'),
+          accountStatus: isUserInactive ? 'Inactive' : (u.status || 'Active'),
           paymentStatus: 'Paid',
           bookingId: u.id || u._id,
           loyaltyPoints: u.loyaltyPoints || 0
@@ -2332,5 +2336,120 @@ const handleExtendReservation = async (req, res) => {
 
 router.put('/reservations/:id/extend', handleExtendReservation);
 router.post('/reservations/:id/extend', handleExtendReservation);
+
+// ==========================================
+// MANAGER NOTIFICATIONS
+// ==========================================
+router.get('/notifications', async (req, res) => {
+  try {
+    const propertyId = req.user?.propertyId || 'HS-9HQ8P';
+    const propQuery = [
+      { role: 'manager' },
+      { role: 'all' },
+      { role: null },
+      { userId: req.user.id || req.user._id },
+      { propertyId },
+      { propertyId: 'HS-9HQ8P' }
+    ];
+
+    const [standardList, managerList] = await Promise.all([
+      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(100),
+      ManagerNotification.find().sort({ createdAt: -1 }).lean().limit(100)
+    ]);
+
+    const itemsMap = new Map();
+    const normalize = (it) => {
+      const id = it._id ? String(it._id) : (it.id ? String(it.id) : '');
+      const cleanTitle = (it.title || '').trim().toLowerCase();
+      const cleanMsg = (it.message || '').trim().toLowerCase();
+      const key = `${cleanTitle}_${cleanMsg}`;
+      return {
+        id,
+        _id: id,
+        title: it.title,
+        message: it.message,
+        category: it.category || 'General',
+        isRead: Boolean(it.isRead),
+        propertyId: it.propertyId || propertyId,
+        createdAt: it.createdAt || new Date().toISOString(),
+        updatedAt: it.updatedAt || new Date().toISOString(),
+        _dedupKey: key
+      };
+    };
+
+    for (const it of standardList || []) {
+      const norm = normalize(it);
+      itemsMap.set(norm._dedupKey || norm.id, norm);
+    }
+    for (const it of managerList || []) {
+      const norm = normalize(it);
+      const key = norm._dedupKey || norm.id;
+      if (itemsMap.has(key)) {
+        const existing = itemsMap.get(key);
+        if (norm.isRead || existing.isRead) {
+          existing.isRead = true;
+        }
+      } else {
+        itemsMap.set(key, norm);
+      }
+    }
+
+    const mergedList = Array.from(itemsMap.values()).sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return sendSuccess(res, 200, mergedList, 'Manager notifications feed retrieved.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/notifications/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
+
+    await Promise.all([
+      ManagerNotification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true }).catch(() => null),
+      Notification.findOneAndUpdate({ $or: idQuery }, { isRead: true }, { new: true }).catch(() => null)
+    ]);
+
+    return sendSuccess(res, 200, {}, 'Notification marked as read.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.post('/notifications/read-all', async (req, res) => {
+  try {
+    const propertyId = req.user?.propertyId || 'HS-9HQ8P';
+    await Promise.all([
+      ManagerNotification.updateMany({ $or: [{ propertyId }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }] }, { isRead: true }).catch(() => null),
+      Notification.updateMany({ $or: [{ role: 'manager' }, { role: 'all' }, { propertyId }] }, { isRead: true }).catch(() => null)
+    ]);
+
+    return sendSuccess(res, 200, {}, 'All notifications marked as read.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+router.delete('/notifications/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+    const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
+
+    await Promise.all([
+      ManagerNotification.deleteMany({ $or: idQuery }).catch(() => null),
+      Notification.deleteMany({ $or: idQuery }).catch(() => null)
+    ]);
+
+    return sendSuccess(res, 200, {}, 'Notification removed.');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
 
 export default router;

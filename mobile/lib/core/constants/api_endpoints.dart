@@ -101,6 +101,7 @@ class ApiEndpoints {
   static const String verifyOtp = '/auth/verify-otp';
   static const String resetPassword = '/auth/reset-password';
   static const String profile = '/auth/profile';
+  static const String deleteAccount = '/auth/account';
   static const String logout = '/auth/logout';
   static const String fcmToken = '/auth/fcm-token';
 

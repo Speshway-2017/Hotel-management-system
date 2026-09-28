@@ -733,9 +733,11 @@ class _GuestProfileScreenState extends State<GuestProfileScreen> {
               foregroundColor: white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              authProvider.logout();
+              await authProvider.logout();
+              if (!context.mounted) return;
+              Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
             },
             child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w700)),
           ),

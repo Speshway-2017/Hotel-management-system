@@ -178,6 +178,29 @@ class AuthService {
     });
   }
 
+  static Future<ApiResponse<dynamic>> deleteAccount({String reason = 'Guest requested permanent account deletion'}) async {
+    try {
+      final response = await ApiService.delete(
+        ApiEndpoints.deleteAccount,
+        {'reason': reason},
+      );
+      if (response.success) {
+        try {
+          await NotificationService.removeTokenFromBackend();
+        } catch (_) {}
+        SocketService.disconnect();
+        await StorageService.clear();
+      }
+      return response;
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        statusCode: 500,
+        message: e.toString(),
+      );
+    }
+  }
+
   static Future<void> logout() async {
     try {
       await NotificationService.removeTokenFromBackend();

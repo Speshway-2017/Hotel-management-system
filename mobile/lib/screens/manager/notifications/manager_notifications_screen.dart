@@ -1205,7 +1205,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
   // ==========================================
   IconData _getCategoryIcon(String category) {
     final cat = category.toLowerCase();
-    if (cat.contains('reserv') || cat.contains('book')) {
+    if (cat.contains('delete') || cat.contains('account') || cat.contains('system')) {
+      return Icons.person_remove_rounded;
+    } else if (cat.contains('reserv') || cat.contains('book')) {
       return Icons.calendar_month_rounded;
     } else if (cat.contains('approval')) {
       return Icons.verified_user_rounded;
@@ -1225,7 +1227,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
 
   Color _getCategoryAccentColor(String category) {
     final cat = category.toLowerCase();
-    if (cat.contains('reserv') || cat.contains('book')) {
+    if (cat.contains('delete') || cat.contains('account')) {
+      return blush;
+    } else if (cat.contains('reserv') || cat.contains('book')) {
       return const Color(0xFF0284C7); // Sky blue
     } else if (cat.contains('approval')) {
       return purple;
@@ -1243,7 +1247,9 @@ class _ManagerNotificationsScreenState extends State<ManagerNotificationsScreen>
 
   Color _getCategoryBgColor(String category) {
     final cat = category.toLowerCase();
-    if (cat.contains('reserv') || cat.contains('book')) {
+    if (cat.contains('delete') || cat.contains('account')) {
+      return blush.withAlpha(25);
+    } else if (cat.contains('reserv') || cat.contains('book')) {
       return const Color(0xFFE0F2FE);
     } else if (cat.contains('approval')) {
       return const Color(0xFFEDE9FE);

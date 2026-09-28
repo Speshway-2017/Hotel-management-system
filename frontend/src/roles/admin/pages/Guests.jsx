@@ -136,7 +136,8 @@ function GuestsCrmPage() {
           roomDisplay,
           roomType,
           currentStay: latest ? `${roomDisplay} · ${roomType}` : '—',
-          status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
+          status: (u.status === 'Inactive' || u.isDeleted) ? 'Inactive' : (latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive'),
+          accountStatus: (u.status === 'Inactive' || u.isDeleted) ? 'Inactive' : (u.status || 'Active'),
           latestStay: latest
         };
       });
@@ -442,25 +443,37 @@ function GuestsCrmPage() {
                       ₹{Number(g.tariff !== undefined ? g.tariff : (g.spend || g.balance || 0)).toLocaleString("en-IN")}
                     </td>
                     <td className="py-3.5 px-4 text-center align-middle">
-                      <Tag tone={g.status === "Staying-In" ? "success" : g.status === "Expected" ? "warning" : "neutral"}>
-                        {g.status}
+                      <Tag tone={
+                        (g.status === "Inactive" || g.accountStatus === "Inactive") ? "error" :
+                        g.status === "Staying-In" ? "success" : 
+                        g.status === "Expected" ? "warning" : "neutral"
+                      }>
+                        {(g.status === "Inactive" || g.accountStatus === "Inactive") ? "Inactive" : g.status}
                       </Tag>
                     </td>
                     <td className="py-3 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
                       <ActionGroup align="left">
-                        {(g.status === "Staying-In" || g.latestStay?.status === "Checked-in" || g.latestStay?.status === "Staying") && g.latestStay && (
-                          <ExtendActionButton
-                            onClick={() => navigate({ to: `/admin/reservations/extend/${g.latestStay.bookingId || g.latestStay._id || g.latestStay.id}` })}
-                            title="Extend Stay"
+                        {g.status === "Inactive" || g.accountStatus === "Inactive" ? (
+                          <ViewActionButton
+                            onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
                           />
-                        )}
-                        <ViewActionButton
-                          onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
-                        />
-                        {(g.status !== "Checked-out" && g.status !== "Checked Out") && (
-                          <EditActionButton
-                            onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
-                          />
+                        ) : (
+                          <>
+                            {(g.status === "Staying-In" || g.latestStay?.status === "Checked-in" || g.latestStay?.status === "Staying") && g.latestStay && (
+                              <ExtendActionButton
+                                onClick={() => navigate({ to: `/admin/reservations/extend/${g.latestStay.bookingId || g.latestStay._id || g.latestStay.id}` })}
+                                title="Extend Stay"
+                              />
+                            )}
+                            <ViewActionButton
+                              onClick={() => navigate({ to: `/admin/guests/view/${g._id}` })}
+                            />
+                            {(g.status !== "Checked-out" && g.status !== "Checked Out") && (
+                              <EditActionButton
+                                onClick={() => navigate({ to: `/admin/guests/edit/${g._id}` })}
+                              />
+                            )}
+                          </>
                         )}
                       </ActionGroup>
                     </td>

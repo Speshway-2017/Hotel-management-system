@@ -386,10 +386,10 @@ export function HotelDetailsPage() {
                                 </div>
 
                                 <div className="text-right shrink-0">
-                                  <span className="font-display text-xl font-bold text-navy block leading-none">
+                                  <span className="font-price text-xl font-bold text-navy block leading-none tracking-tight">
                                     {inr(type.price)}
                                   </span>
-                                  <span className="text-[10px] text-gray-500 font-bold block mt-0.5">/ night + 18% GST</span>
+                                  <span className="text-[10px] text-gray-500 font-medium block mt-0.5">/ night + 18% GST</span>
                                 </div>
                               </div>
 

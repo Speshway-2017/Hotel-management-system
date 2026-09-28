@@ -570,17 +570,17 @@ function Features() {
 
                         {/* Price */}
                         <div className="mb-6 pb-6 border-b border-white/10">
-                          <div className="flex items-baseline gap-1">
+                          <div className="flex items-baseline gap-1 font-price">
                             <span className="text-sm font-semibold">₹</span>
-                            <span className={`text-4xl font-extrabold tracking-tight ${isPopular ? "text-[#F5C06A]" : "text-navy"}`}>
+                            <span className={`text-3xl font-bold tracking-tight ${isPopular ? "text-[#F5C06A]" : "text-navy"}`}>
                               {price?.toLocaleString("en-IN")}
                             </span>
-                            <span className={`text-xs ${isPopular ? "text-gray-400" : "text-gray-500"}`}>
+                            <span className={`text-xs font-ui ${isPopular ? "text-gray-400" : "text-gray-500"}`}>
                               {period}
                             </span>
                           </div>
                           {billingCycle === "yearly" && (
-                            <p className={`text-[11px] mt-1 font-medium ${isPopular ? "text-gold/90" : "text-purple"}`}>
+                            <p className={`text-[11px] mt-1 font-medium font-price ${isPopular ? "text-gold/90" : "text-purple"}`}>
                               ₹{plan.yearlyPrice?.toLocaleString("en-IN")} billed annually
                             </p>
                           )}
@@ -641,7 +641,7 @@ function Features() {
       </section>
 
       {/* Complete Product Feature Directory Section */}
-      <section className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80">
+      <section id="modules" className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80 scroll-mt-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>

@@ -279,7 +279,7 @@ export function SearchPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Max Price / Night</label>
-                    <span className="text-xs font-bold text-purple">{inr(maxPrice)}</span>
+                    <span className="text-xs font-bold text-purple font-price">{inr(maxPrice)}</span>
                   </div>
                   <input 
                     type="range" 
@@ -290,7 +290,7 @@ export function SearchPage() {
                     onChange={(e) => setMaxPrice(parseInt(e.target.value))}
                     className="w-full accent-purple h-1 bg-cream rounded-lg cursor-pointer"
                   />
-                  <div className="flex justify-between text-[9px] text-gray-400 font-bold">
+                  <div className="flex justify-between text-[10px] text-gray-400 font-semibold font-price">
                     <span>₹1,500</span>
                     <span>₹30,000</span>
                   </div>
@@ -444,8 +444,8 @@ export function SearchPage() {
                               <div>
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Starting From</span>
                                 <div className="flex items-baseline gap-1">
-                                  <span className="font-display text-2xl font-bold text-navy">{inr(startingPrice)}</span>
-                                  <span className="text-[10px] text-gray-500 font-semibold">/ night + GST</span>
+                                  <span className="font-price text-xl font-bold text-navy tracking-tight">{inr(startingPrice)}</span>
+                                  <span className="text-[10px] text-gray-500 font-medium">/ night + GST</span>
                                 </div>
                               </div>
 

@@ -23,6 +23,8 @@ import {
   Award,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
+  Trash2,
   Save,
   X
 } from "lucide-react";
@@ -47,6 +49,13 @@ function GuestProfilePage() {
   const [saving, setSaving] = useState(false);
   const [profileErrors, setProfileErrors] = useState({});
   const [passwordErrors, setPasswordErrors] = useState({});
+
+  // Account deletion dialog state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [understandChecked, setUnderstandChecked] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   
   const currentUser = authService.getCurrentUser() || {};
 
@@ -297,6 +306,36 @@ function GuestProfilePage() {
     window.location.href = "/login";
   };
 
+  const handleConfirmDeleteAccount = async (e) => {
+    if (e) e.preventDefault();
+    if (!understandChecked) {
+      setDeleteError("Please confirm that you understand this action is permanent.");
+      return;
+    }
+    setIsDeletingAccount(true);
+    setDeleteError("");
+    try {
+      const res = await authService.deleteAccount(deletePassword || undefined);
+      if (res && (res.success !== false)) {
+        setIsDeleteDialogOpen(false);
+        setNotification({
+          tone: "success",
+          title: "Account Deleted",
+          body: "Your Hour Stay account has been permanently deleted. Logging out..."
+        });
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1000);
+      } else {
+        setDeleteError(res?.message || "Failed to delete account. Please try again.");
+        setIsDeletingAccount(false);
+      }
+    } catch (err) {
+      setDeleteError(err?.response?.data?.message || err?.message || "An unexpected error occurred while deleting your account.");
+      setIsDeletingAccount(false);
+    }
+  };
+
   const initials = profileData.name
     ? profileData.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
     : "AM";
@@ -374,14 +413,29 @@ function GuestProfilePage() {
               </div>
             </div>
 
-            <Button
-              variant="destructive"
-              onClick={handleLogout}
-              className="w-full h-10 rounded-xl font-bold gap-2 text-xs uppercase tracking-wide cursor-pointer border-none bg-rose-600 hover:bg-rose-700 text-white"
-            >
-              <LogOut className="size-4" />
-              Sign Out
-            </Button>
+            <div className="w-full space-y-2.5">
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
+                className="w-full h-10 rounded-xl font-bold gap-2 text-xs uppercase tracking-wide cursor-pointer border-none bg-navy hover:bg-purple text-cream shadow-soft transition-all"
+              >
+                <LogOut className="size-4" />
+                Sign Out
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setDeleteError("");
+                  setUnderstandChecked(false);
+                  setDeletePassword("");
+                  setIsDeleteDialogOpen(true);
+                }}
+                className="w-full h-10 rounded-xl font-bold gap-2 text-xs uppercase tracking-wide cursor-pointer border-none bg-blush hover:bg-blush/90 text-white shadow-soft transition-all"
+              >
+                <Trash2 className="size-4" />
+                Delete Account
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -689,6 +743,98 @@ function GuestProfilePage() {
 
         </div>
       </div>
+
+      {/* Confirmation Dialog Box Modal */}
+      {isDeleteDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-navy/10 overflow-hidden text-left p-6 sm:p-8 space-y-5">
+            
+            <button
+              type="button"
+              onClick={() => {
+                if (!isDeletingAccount) setIsDeleteDialogOpen(false);
+              }}
+              className="absolute top-5 right-5 text-navy/40 hover:text-navy p-1.5 rounded-xl hover:bg-navy/5 transition-colors cursor-pointer border-none bg-transparent"
+            >
+              <X className="size-5" />
+            </button>
+
+            <div className="flex items-start gap-4">
+              <div className="size-12 rounded-2xl bg-blush/15 text-blush flex items-center justify-center shrink-0 border border-blush/25">
+                <Trash2 className="size-6" />
+              </div>
+              <div className="space-y-1 pr-6">
+                <h3 className="font-display text-lg sm:text-xl font-bold text-navy">
+                  Confirm Account Deletion
+                </h3>
+                <p className="text-xs text-navy/60 font-medium">
+                  Permanent deletion for <span className="font-bold text-blush">{profileData.email || profileData.name}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-[#FAF9F5] rounded-2xl p-4 sm:p-5 border border-navy/10 text-xs text-navy/80 space-y-2 leading-relaxed">
+              <p className="font-bold text-navy">When you delete your Hour Stay account:</p>
+              <ul className="list-disc list-inside space-y-1.5 text-navy/70">
+                <li>Your profile details, credentials, and member preferences will be permanently wiped.</li>
+                <li>Your authenticated access to Hour Stay services will be immediately terminated.</li>
+                <li>Completed stay folios and tax receipts are archived per accounting and statutory laws.</li>
+              </ul>
+            </div>
+
+            {deleteError && (
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0 text-rose-600" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <label className="flex items-start gap-3 p-3.5 rounded-xl bg-[#FAF9F5] border border-navy/15 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={understandChecked}
+                onChange={(e) => setUnderstandChecked(e.target.checked)}
+                className="mt-0.5 size-4 accent-blush rounded cursor-pointer"
+              />
+              <span className="text-xs font-bold text-navy leading-snug">
+                I understand that deleting my account is permanent, irreversible, and immediately logs me out.
+              </span>
+            </label>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isDeletingAccount}
+                onClick={() => setIsDeleteDialogOpen(false)}
+                className="text-xs font-bold text-navy border-navy/20 hover:bg-cream rounded-xl px-5 h-10 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!understandChecked || isDeletingAccount}
+                onClick={handleConfirmDeleteAccount}
+                className="bg-blush hover:bg-blush/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl px-6 h-10 shadow-soft cursor-pointer border-none flex items-center gap-2 transition-all"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <div className="size-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
+                    <span>Deleting Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="size-4" />
+                    <span>Permanently Delete Account</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

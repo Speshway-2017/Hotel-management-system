@@ -9,7 +9,7 @@ import Review from '../models/review.model.js';
 import Notification from '../models/notification.model.js';
 import { Room, Feedback, Payment, Approval } from '../models/managerData.model.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
-import { notifyFeedbackEvent, triggerNotification } from '../utils/notification.helper.js';
+import { notifyFeedbackEvent, triggerNotification, notifyAccountDeletionEvent } from '../utils/notification.helper.js';
 import { calculateStayNights } from '../utils/dateUtils.js';
 import { extractRoomNumber } from '../utils/roomHelper.js';
 import { sendSuccess, sendError } from '../utils/response.js';
@@ -604,7 +604,7 @@ router.get('/profile', async (req, res) => {
 // PUT /api/v1/guest/profile
 router.put('/profile', async (req, res) => {
   try {
-    const { name, email, mobile, phone, city, address, state, country, avatar, preferences, language, currency, notifications } = req.body;
+    const { name, email, mobile, phone, city, address, state, country, avatar, preferences, language, currency, notifications, status, isDeleted } = req.body;
     
     let user = null;
     const userId = req.user?._id || req.user?.id;
@@ -628,6 +628,11 @@ router.put('/profile', async (req, res) => {
     if (language !== undefined) updateData.language = language;
     if (currency !== undefined) updateData.currency = currency;
     if (notifications !== undefined) updateData.notificationSettings = notifications;
+    if (status !== undefined) updateData.status = status;
+    if (isDeleted !== undefined) {
+      updateData.isDeleted = isDeleted;
+      if (isDeleted) updateData.deletedAt = new Date();
+    }
 
     user = await User.findOneAndUpdate({ $or: query }, updateData, { new: true });
     if (!user) {
@@ -672,7 +677,9 @@ router.put('/profile', async (req, res) => {
     }
 
     const io = req.app.get('socketio');
-    if (io && user) {
+    if (status === 'Inactive' || isDeleted === true) {
+      await notifyAccountDeletionEvent({ req, io, user });
+    } else if (io && user) {
       try {
         if (typeof emitRealtimeSync === 'function') {
           emitRealtimeSync(io, 'all', 'user_updated', user);
@@ -2329,6 +2336,48 @@ router.post('/delete-account-request', async (req, res) => {
     return sendSuccess(res, 200, {}, 'Your account deletion request has been submitted to support and will be processed within 48 hours.');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to submit account deletion request');
+  }
+});
+
+// DELETE /api/guest/account & /api/v1/guest/account
+router.delete('/account', async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const query = [{ _id: String(userId) }, { id: String(userId) }, { email: userEmail }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { $or: query },
+      {
+        $set: {
+          status: 'Inactive',
+          isDeleted: true,
+          deletedAt: new Date(),
+          fcmToken: null,
+          fcmTokens: [],
+          otp: null,
+          otpExpires: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return sendError(res, 404, 'User not found or already deleted');
+    }
+
+    clearUserCache();
+
+    // Trigger and broadcast notifications across Admin, Manager, and Guest
+    await notifyAccountDeletionEvent({ req, user: updatedUser });
+
+    return sendSuccess(res, 200, { deletedId: userId, status: 'Inactive' }, 'Account deleted and marked Inactive successfully');
+  } catch (error) {
+    console.error('Guest Delete Account Error:', error);
+    return sendError(res, 500, error.message || 'Failed to delete account');
   }
 });
 

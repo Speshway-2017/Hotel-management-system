@@ -652,11 +652,11 @@ function Booking() {
                 <dl className="space-y-2 border-t border-navy/5 pt-4 text-xs font-medium">
                   <div className="flex justify-between">
                     <dt className="text-navy/60">Room Tariff ({nights} {nights === 1 ? 'night' : 'nights'})</dt>
-                    <dd className="tabular-nums font-bold text-navy">{inr(roomBaseTotal)}</dd>
+                    <dd className="font-price font-semibold text-navy">{inr(roomBaseTotal)}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-navy/60">GST (18%)</dt>
-                    <dd className="tabular-nums font-bold text-navy">{inr(roomGst)}</dd>
+                    <dd className="font-price font-semibold text-navy">{inr(roomGst)}</dd>
                   </div>
 
                   {appliedCoupon && discountAmount > 0 && (
@@ -664,13 +664,13 @@ function Booking() {
                       <dt className="flex items-center gap-1">
                         <Tag className="size-3" /> Coupon ({appliedCoupon.code})
                       </dt>
-                      <dd className="tabular-nums">- {inr(discountAmount)}</dd>
+                      <dd className="font-price font-semibold">- {inr(discountAmount)}</dd>
                     </div>
                   )}
 
-                  <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy">
+                  <div className="flex justify-between border-t border-navy/5 pt-3 text-sm font-bold text-navy items-baseline">
                     <dt>Total Payable</dt>
-                    <dd className="tabular-nums font-bold text-purple">{inr(payableTotal)}</dd>
+                    <dd className="font-price text-sm font-bold text-purple">{inr(payableTotal)}</dd>
                   </div>
                 </dl>
               </div>

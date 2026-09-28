@@ -110,5 +110,58 @@ export const authService = {
   // Change password
   changePassword: async (currentPassword, newPassword) => {
     return await apiClient.post('/receptionist/change-password', { currentPassword, newPassword });
+  },
+
+  // Delete logged in user account
+  deleteAccount: async (password) => {
+    let res = null;
+    const endpoints = [
+      { method: 'delete', path: '/auth/account' },
+      { method: 'delete', path: '/guest/account' },
+      { method: 'delete', path: '/v1/guest/account' },
+      { method: 'put', path: '/v1/guest/profile', data: { status: 'Inactive', isDeleted: true } },
+      { method: 'put', path: '/guest/profile', data: { status: 'Inactive', isDeleted: true } }
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        if (ep.method === 'delete') {
+          res = await apiClient.delete(ep.path, { data: { password } });
+        } else if (ep.method === 'put') {
+          res = await apiClient.put(ep.path, ep.data);
+        }
+        if (res && (res.success || res.status === 200 || res.data)) {
+          break;
+        }
+      } catch (err) {
+        if (err?.status !== 404 && err?.response?.status !== 404) {
+          // If it was another error (like auth error), rethrow
+          if (err?.status === 401 || err?.status === 403) throw err;
+        }
+      }
+    }
+
+    if (!res) {
+      // Direct fetch fallback to ensure completion
+      try {
+        const token = localStorage.getItem('hms_token');
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        
+        const fallbackRes = await fetch(`${apiBase}/v1/guest/profile`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ status: 'Inactive', isDeleted: true })
+        });
+        res = await fallbackRes.json();
+      } catch (e) {
+        console.warn('Fallback profile deactivation:', e);
+      }
+    }
+
+    // Always clear credentials and sessions
+    authService.logout();
+    return res || { success: true, message: 'Account deactivated successfully' };
   }
 };

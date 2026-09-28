@@ -249,12 +249,11 @@ export function SiteFooter() {
           <p className="font-display text-base font-bold text-cream tracking-wide">Product</p>
           <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
             {[
-              { label: "Features", to: "/features" },
-              { label: "Front Desk", to: "/reception" },
-              { label: "Reservations", to: "/search" },
-              { label: "GST Billing", to: "/features" },
-              { label: "Guest Experience", to: "/guest" },
-              { label: "Analytics", to: "/admin" }
+              { label: "Features", to: "/features#modules" },
+              { label: "Front Desk", to: "/features#modules" },
+              { label: "Reservations", to: "/features#modules" },
+              { label: "GST Billing", to: "/features#modules" },
+              { label: "Analytics", to: "/features#modules" }
             ].map((item, idx) => (
               <li key={idx}>
                 <Link to={item.to} className="hover:text-gold hover:translate-x-1 transition-all duration-300 block py-0.5">
@@ -273,9 +272,9 @@ export function SiteFooter() {
               { label: "About Us", to: "/about" },
               { label: "Blog", to: "/blog" },
               { label: "Contact", to: "/contact" },
-              { label: "Careers", to: "/contact" },
-              { label: "Privacy Policy", to: "/" },
-              { label: "Terms & Conditions", to: "/" }
+              { label: "Privacy Policy", to: "/privacy" },
+              { label: "Terms & Conditions", to: "/terms" },
+              { label: "Delete Account", to: "/delete-account" }
             ].map((item, idx) => (
               <li key={idx}>
                 <Link to={item.to} className="hover:text-gold hover:translate-x-1 transition-all duration-300 block py-0.5">
@@ -290,17 +289,41 @@ export function SiteFooter() {
         <div className="space-y-5">
           <p className="font-display text-base font-bold text-cream tracking-wide">Contact</p>
           <ul className="space-y-3 text-xs sm:text-sm text-gray-300">
-            <li className="flex items-center gap-2.5">
-              <Phone className="size-4 text-gold shrink-0" />
-              <span>{property?.settings?.phone || "+91 141 4055 900"}</span>
+            <li>
+              <a
+                href={`tel:${(property?.settings?.phone || "+91 141 4055 900").replace(/[^\d+]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 hover:text-gold transition-colors group cursor-pointer"
+                title="Call us"
+              >
+                <Phone className="size-4 text-gold shrink-0 transition-transform group-hover:scale-110" />
+                <span>{property?.settings?.phone || "+91 141 4055 900"}</span>
+              </a>
             </li>
-            <li className="flex items-center gap-2.5">
-              <Mail className="size-4 text-gold shrink-0" />
-              <span>{property?.settings?.email || "stay@hourstay.in"}</span>
+            <li>
+              <a
+                href={`mailto:${property?.settings?.email || "stay@hourstay.in"}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 hover:text-gold transition-colors group cursor-pointer"
+                title="Email us"
+              >
+                <Mail className="size-4 text-gold shrink-0 transition-transform group-hover:scale-110" />
+                <span>{property?.settings?.email || "stay@hourstay.in"}</span>
+              </a>
             </li>
-            <li className="flex items-start gap-2.5">
-              <MapPin className="size-4 text-gold shrink-0 mt-0.5" />
-              <span>{property ? `${property.settings?.address || ''}${property.settings?.address ? ', ' : ''}${property.city}` : "Amber Fort Road, Jaipur, Rajasthan 302002"}</span>
+            <li>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property ? `${property.settings?.address || ''}${property.settings?.address ? ', ' : ''}${property.city || 'Jaipur, Rajasthan'}` : "Amber Fort Road, Jaipur, Rajasthan 302002")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2.5 hover:text-gold transition-colors group cursor-pointer"
+                title="Open location on Google Maps"
+              >
+                <MapPin className="size-4 text-gold shrink-0 mt-0.5 transition-transform group-hover:scale-110" />
+                <span>{property ? `${property.settings?.address || ''}${property.settings?.address ? ', ' : ''}${property.city}` : "Amber Fort Road, Jaipur, Rajasthan 302002"}</span>
+              </a>
             </li>
           </ul>
 
@@ -327,9 +350,9 @@ export function SiteFooter() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-gray-400">
           <p>© 2026 {brandName}. All rights reserved.</p>
           <div className="flex justify-center gap-4">
-            <Link to="/" className="hover:text-gold transition-colors">Privacy Policy</Link>
+            <Link to="/privacy" className="hover:text-gold transition-colors">Privacy Policy</Link>
             <span>|</span>
-            <Link to="/" className="hover:text-gold transition-colors">Terms</Link>
+            <Link to="/terms" className="hover:text-gold transition-colors">Terms</Link>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { protect, clearUserCache } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
+import { notifyAccountDeletionEvent } from '../utils/notification.helper.js';
 import CMS from '../models/cms.model.js';
 
 const router = express.Router();
@@ -449,6 +450,51 @@ router.get('/cms', async (req, res) => {
     return sendSuccess(res, 200, cmsItems, 'Public CMS items retrieved');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to fetch public CMS');
+  }
+});
+
+// @desc    Delete logged-in user account (sets status to Inactive across all portals)
+// @route   DELETE /api/auth/account
+// @access  Private
+router.delete('/account', protect, async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const query = [{ _id: String(userId) }, { id: String(userId) }, { email: userEmail }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    // Update status to Inactive and mark as deleted while wiping login sessions
+    const updatedUser = await User.findOneAndUpdate(
+      { $or: query },
+      {
+        $set: {
+          status: 'Inactive',
+          isDeleted: true,
+          deletedAt: new Date(),
+          fcmToken: null,
+          fcmTokens: [],
+          otp: null,
+          otpExpires: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return sendError(res, 404, 'User not found or already deleted');
+    }
+
+    clearUserCache();
+
+    // Trigger and broadcast persistent notifications to Admin, Manager, and Guest
+    await notifyAccountDeletionEvent({ req, user: updatedUser });
+
+    return sendSuccess(res, 200, { deletedId: userId, status: 'Inactive' }, 'Account deleted and marked Inactive successfully');
+  } catch (error) {
+    console.error('Delete Account Error:', error);
+    return sendError(res, 500, error.message || 'Failed to delete account');
   }
 });
 
