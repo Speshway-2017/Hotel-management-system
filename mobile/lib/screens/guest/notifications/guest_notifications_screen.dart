@@ -5,6 +5,8 @@ import 'package:hour_stay_mobile/models/notification_model.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_notification_provider.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
+import 'package:hour_stay_mobile/providers/auth_provider.dart';
+import '../../auth/login_screen.dart';
 import '../bookings/guest_bookings_screen.dart';
 import '../bookings/guest_booking_detail_screen.dart';
 import '../feedback/guest_feedback_screen.dart';
@@ -22,6 +24,7 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
 
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  bool _isFilterMenuOpen = false;
 
   @override
   void initState() {
@@ -40,6 +43,8 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final isAuthenticated = authProvider.isAuthenticated;
     final provider = context.watch<GuestNotificationProvider>();
     final allNotifications = provider.notifications;
     final selectedFilter = provider.selectedCategory;
@@ -73,24 +78,26 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
               color: purple,
               backgroundColor: white,
               onRefresh: () => provider.fetchNotifications(),
-              child: isInitialLoading
-                  ? _buildLoadingSkeleton()
-                  : provider.errorMessage != null && allNotifications.isEmpty
-                      ? _buildErrorState(provider)
-                      : filtered.isEmpty
-                          ? _buildEmptyState(provider, selectedFilter)
-                          : ListView.separated(
-                              physics: const AlwaysScrollableScrollPhysics(
-                                parent: BouncingScrollPhysics(),
-                              ),
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 10),
-                              itemBuilder: (context, index) {
-                                final notif = filtered[index];
-                                return _buildNotificationCard(context, notif, provider);
-                              },
-                            ),
+              child: !isAuthenticated
+                  ? _buildGuestModeState(context)
+                  : isInitialLoading
+                      ? _buildLoadingSkeleton()
+                      : provider.errorMessage != null && allNotifications.isEmpty
+                          ? _buildErrorState(provider)
+                          : filtered.isEmpty
+                              ? _buildEmptyState(provider, selectedFilter)
+                              : ListView.separated(
+                                  physics: const AlwaysScrollableScrollPhysics(
+                                    parent: BouncingScrollPhysics(),
+                                  ),
+                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                                  itemCount: filtered.length,
+                                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final notif = filtered[index];
+                                    return _buildNotificationCard(context, notif, provider);
+                                  },
+                                ),
             ),
           ),
         ],
@@ -161,45 +168,11 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
     GuestNotificationProvider provider,
     List<NotificationModel> allNotifications,
   ) {
-    final unreadCount = provider.unreadCount;
-    final readCount = allNotifications.length - unreadCount;
-
-    final categories = ['All', 'Unread', 'Bookings', 'Payments', 'Announcements', 'Read'];
-
-    int getCategoryCount(String cat) {
-      if (cat == 'All') return allNotifications.length;
-      if (cat == 'Unread') return unreadCount;
-      if (cat == 'Read') return readCount;
-      final target = cat.trim().toLowerCase();
-      return allNotifications.where((n) {
-        final c = n.category.trim().toLowerCase();
-        final t = n.type.trim().toLowerCase();
-        final msg = n.message.trim().toLowerCase();
-        final title = n.title.trim().toLowerCase();
-
-        if (target == 'bookings' && (c.contains('book') || c.contains('reserv') || c.contains('stay') || c.contains('check') || c.contains('room') || t.contains('book') || t.contains('check') || t.contains('stay') || title.contains('booking') || title.contains('reservation') || title.contains('check-in') || title.contains('checked in') || title.contains('check-out') || title.contains('checked out') || title.contains('room assigned') || msg.contains('booking') || msg.contains('reservation') || msg.contains('check-in') || msg.contains('checked in') || msg.contains('check-out') || msg.contains('checked out') || msg.contains('room assigned'))) {
-          return true;
-        }
-        if (target == 'payments' &&
-            (c.contains('pay') ||
-                c.contains('bill') ||
-                c.contains('folio') ||
-                c.contains('refund') ||
-                t.contains('pay') ||
-                t.contains('refund') ||
-                msg.contains('paid') ||
-                msg.contains('payment') ||
-                msg.contains('refund') ||
-                title.contains('payment') ||
-                title.contains('refund'))) {
-          return true;
-        }
-        if (target == 'announcements' && (c.contains('announc') || c.contains('alert') || c.contains('promo') || t.contains('announc') || c.contains('general'))) {
-          return true;
-        }
-        return c == target || t == target;
-      }).length;
-    }
+    final List<Map<String, dynamic>> filters = <Map<String, dynamic>>[
+      <String, dynamic>{'key': 'All', 'label': 'All Notifications', 'shortLabel': 'All', 'count': allNotifications.length, 'icon': Icons.notifications_none_rounded},
+      <String, dynamic>{'key': 'Unread', 'label': 'Unread Updates', 'shortLabel': 'Unread', 'count': provider.unreadCount, 'icon': Icons.mark_email_unread_rounded, 'isLive': provider.unreadCount > 0},
+      <String, dynamic>{'key': 'Read', 'label': 'Read History', 'shortLabel': 'Read', 'count': allNotifications.length - provider.unreadCount, 'icon': Icons.done_all_rounded},
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -215,137 +188,253 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
       ),
       child: Column(
         children: [
-          // 1. Search Bar
+          // Search Field & Filter Button in Single Row
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cardBorder),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(fontSize: 13.5, color: navy, fontWeight: FontWeight.w500),
-                decoration: InputDecoration(
-                  hintText: 'Search updates, bookings, folios...',
-                  hintStyle: const TextStyle(fontSize: 13, color: muted),
-                  prefixIcon: const Icon(Icons.search_rounded, color: muted, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 16, color: muted),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val;
-                  });
-                },
-              ),
-            ),
-          ),
-
-          // 2. Category Filter Chips (Horizontal Scroll)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              height: 42,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                clipBehavior: Clip.hardEdge,
-                padding: EdgeInsets.zero,
-                itemCount: categories.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final cat = categories[index];
-                  final count = getCategoryCount(cat);
-                  final isSelected = provider.selectedCategory.toLowerCase() == cat.toLowerCase();
-
-                  return InkWell(
-                    onTap: () => provider.setCategory(cat),
-                    borderRadius: BorderRadius.circular(20),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isSelected ? navy : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected ? navy : cardBorder,
-                          width: 1.2,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: navy.withAlpha(35),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (cat == 'Unread' && count > 0) ...[
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: gold,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            cat,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                              color: isSelected ? cream : navy,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isSelected ? gold : const Color(0xFFE2E8F0),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$count',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected ? navy : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              children: [
+                // 1. Search Bar
+                Expanded(
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cardBorder),
                     ),
-                  );
-                },
-              ),
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(fontSize: 13.5, color: navy, fontWeight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        hintText: 'Search updates, folios...',
+                        hintStyle: const TextStyle(fontSize: 12.5, color: muted),
+                        prefixIcon: const Icon(Icons.search_rounded, color: muted, size: 18),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 16, color: muted),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 2. Filter Button beside Search Bar
+                _buildNotificationsFilterButton(provider, filters),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
+
+          // 3. Inline Expandable Filter Options directly below search bar
+          if (_isFilterMenuOpen) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: filters.map((f) {
+                    final key = f['key'] as String;
+                    final label = f['label'] as String;
+                    final count = f['count'] as int;
+                    final icon = f['icon'] as IconData;
+                    final isLive = (f['isLive'] as bool?) ?? false;
+                    final isSelected = provider.selectedCategory.toLowerCase() == key.toLowerCase();
+
+                    return InkWell(
+                      onTap: () {
+                        provider.setCategory(key);
+                        setState(() => _isFilterMenuOpen = false);
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: isSelected ? navy : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              icon,
+                              size: 16,
+                              color: isSelected ? gold : purple,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  if (isLive) ...[
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      margin: const EdgeInsets.only(right: 6),
+                                      decoration: const BoxDecoration(
+                                        color: gold,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ],
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                      color: isSelected ? cream : navy,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected ? gold : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isSelected ? navy : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                            if (isSelected) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check_rounded, color: gold, size: 16),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+
+  Widget _buildNotificationsFilterButton(
+    GuestNotificationProvider provider,
+    List<Map<String, dynamic>> filters,
+  ) {
+    Map<String, dynamic> currentMatch = filters.first;
+    for (final f in filters) {
+      if (f['key'].toString().toLowerCase() == provider.selectedCategory.toLowerCase()) {
+        currentMatch = f;
+        break;
+      }
+    }
+
+    final selectedLabel = currentMatch['shortLabel'] as String;
+    final selectedCount = currentMatch['count'] as int;
+    final isFiltered = provider.selectedCategory.toLowerCase() != 'all';
+
+    return InkWell(
+      onTap: () {
+        setState(() => _isFilterMenuOpen = !_isFilterMenuOpen);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        decoration: BoxDecoration(
+          color: (_isFilterMenuOpen || isFiltered) ? navy : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (_isFilterMenuOpen || isFiltered) ? gold : cardBorder,
+            width: 1.2,
+          ),
+          boxShadow: (_isFilterMenuOpen || isFiltered)
+              ? [
+                  BoxShadow(
+                    color: navy.withAlpha(30),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 16,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : purple,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isFiltered ? selectedLabel : 'Filter',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: (_isFilterMenuOpen || isFiltered) ? FontWeight.w800 : FontWeight.w600,
+                color: (_isFilterMenuOpen || isFiltered) ? cream : navy,
+              ),
+            ),
+            if (isFiltered) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: gold,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$selectedCount',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: navy,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(width: 3),
+            Icon(
+              _isFilterMenuOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : muted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
 
   // ==========================================
   // NOTIFICATION CARD
@@ -1075,49 +1164,170 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
   }
 
   // ==========================================
-  // ERROR STATE
+  // GUEST MODE & ERROR STATE
   // ==========================================
+  Widget _buildGuestModeState(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: gold.withAlpha(80), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(8),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: navy,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: navy.withAlpha(30),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.notifications_active_rounded, size: 30, color: gold),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Stay Notifications & Updates',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sign in to receive instant check-in notifications, room key readiness alerts, and payment receipts in real time.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: muted,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: navy,
+                    foregroundColor: white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: gold, width: 1.2),
+                    ),
+                  ),
+                  icon: const Icon(Icons.login_rounded, size: 18, color: gold),
+                  label: const Text(
+                    'Sign In / Register',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState(GuestNotificationProvider provider) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFF87171)),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardBorder, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(8),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
-              child: const Icon(Icons.error_outline_rounded, size: 32, color: Color(0xFFE53935)),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Failed to Load Notifications',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: navy),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              provider.errorMessage ?? 'Please check your internet connection and try again.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, color: muted),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: navy,
-                foregroundColor: cream,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: slateBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold.withAlpha(120), width: 1.5),
+                ),
+                child: const Icon(Icons.notifications_off_rounded, size: 28, color: navy),
               ),
-              icon: const Icon(Icons.refresh_rounded, size: 16, color: gold),
-              label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w700)),
-              onPressed: () => provider.fetchNotifications(),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'Unable to Load Notifications',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'We could not refresh your alerts at this time. Tap retry to check again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: muted, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: navy,
+                  foregroundColor: white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: gold, width: 1),
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 18, color: gold),
+                label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                onPressed: () => provider.fetchNotifications(),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/auth_card.dart';
 import '../../widgets/auth_scaffold.dart';
+import '../role_gate.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthMode initialMode;
@@ -49,8 +50,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!success) {
         throw Exception(authProvider.errorMessage ?? 'Invalid email or password');
       }
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const RoleGate()),
+          (route) => false,
+        );
       }
     } else if (_currentMode == AuthMode.register) {
       final success = await authProvider.register(
@@ -62,8 +66,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!success) {
         throw Exception(authProvider.errorMessage ?? 'Registration failed. Please try again.');
       }
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const RoleGate()),
+          (route) => false,
+        );
       }
     } else if (_currentMode == AuthMode.forgot) {
       final success = await authProvider.forgotPassword(email);

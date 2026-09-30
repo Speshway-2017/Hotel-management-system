@@ -19,6 +19,7 @@ validateEnv();
 const PORT = process.env.PORT || 5000;
 
 import { seedUsers } from './scripts/seed.js';
+import { purgeGuestAccountDeletionNotifications } from './utils/notification.helper.js';
 
 import { Server } from 'socket.io';
 import { startAutoCheckoutScheduler } from './services/autoCheckout.service.js';
@@ -31,6 +32,9 @@ const startServer = async () => {
 
   // Seed demo workspace accounts
   await seedUsers();
+
+  // Clean up any legacy account deletion notifications stored under guest/all scope
+  await purgeGuestAccountDeletionNotifications();
 
   // Create HTTP Server & Socket.io instance
   const server = http.createServer(app);

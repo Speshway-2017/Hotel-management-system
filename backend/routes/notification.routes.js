@@ -6,12 +6,158 @@ import Booking from '../models/booking.model.js';
 import { ManagerNotification } from '../models/managerData.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
-import { getAdminManagedPropertyIds, isAllowedForSuperAdminNotification } from '../utils/notification.helper.js';
+import { getAdminManagedPropertyIds, isAllowedForSuperAdminNotification, purgeGuestAccountDeletionNotifications } from '../utils/notification.helper.js';
 
 const router = express.Router();
 
 let lastSyncAllRoleTime = 0;
 let isSeededMap = new Map();
+
+// Helper to build robust, secure guest notification filters
+const buildGuestNotificationQueryBundle = async (user) => {
+  const userId = user.id || user._id;
+  const uIdStr = String(userId || '');
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  const userPhone = (user?.mobile || user?.phone || '').trim();
+  const userName = (user?.name || '').trim();
+
+  const bQuery = [
+    { guestId: userId },
+    { guestId: uIdStr },
+    { userId: userId },
+    { userId: uIdStr }
+  ];
+  if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
+  if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
+  if (userName) bQuery.push({ guest: userName }, { guestName: userName });
+
+  let guestBookings = [];
+  try {
+    guestBookings = await Booking.find({ $or: bQuery }).lean();
+  } catch (_) {}
+
+  const myBookingIds = new Set();
+  for (const b of guestBookings) {
+    if (b.bookingId) myBookingIds.add(String(b.bookingId).trim().toLowerCase());
+    if (b._id) myBookingIds.add(String(b._id).trim().toLowerCase());
+    if (b.id) myBookingIds.add(String(b.id).trim().toLowerCase());
+  }
+
+  const guestQueries = [
+    { userId: uIdStr },
+    { userId: userId },
+    { userId: user.id },
+    { userId: user._id }
+  ];
+  if (userEmail) guestQueries.push({ userId: userEmail });
+  if (userPhone) guestQueries.push({ userId: userPhone });
+
+  for (const b of guestBookings) {
+    const bId = b.bookingId || String(b._id) || b.id;
+    if (bId) {
+      guestQueries.push({ message: { $regex: bId, $options: 'i' } });
+      guestQueries.push({ title: { $regex: bId, $options: 'i' } });
+    }
+  }
+
+  // Broad public announcements exclusively for guests (excluding any operational/staff/account deletion/system alerts)
+  guestQueries.push({
+    role: 'guest',
+    userId: { $in: [null, undefined, '', 'all'] },
+    category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions'] }
+  });
+
+  // Strict exclusion of Account Deletion & staff operational alerts at database level
+  const exclusionFilter = {
+    title: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+    message: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+    category: { $nin: ['Account Deletion', 'AccountClosure', 'AdminAlert', 'Operations', 'Maintenance', 'Staff', 'Staff Roster', 'Property Setup', 'Property Issue', 'OTA Sync', 'Security Warning'] }
+  };
+
+  return {
+    query: {
+      $and: [
+        { $or: guestQueries },
+        exclusionFilter
+      ]
+    },
+    myBookingIds
+  };
+};
+
+const filterAndDeduplicateGuestList = (list, userId, user, myBookingIds) => {
+  const dedupMap = new Map();
+  const userIdStr = String(userId || '').toLowerCase();
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  const userPhone = (user?.mobile || user?.phone || '').trim().toLowerCase();
+
+  for (const item of list) {
+    const title = (item.title || '').trim();
+    const message = (item.message || '').trim();
+    const category = (item.category || '').trim();
+    const combined = `${title} ${message} ${category}`.toLowerCase();
+
+    // 1. Strict elimination of account deletion / deactivation notifications
+    if (
+      combined.includes('account deleted') ||
+      combined.includes('deleted their account') ||
+      combined.includes('account has been deleted') ||
+      combined.includes('credentials have been permanently deleted') ||
+      category.toLowerCase() === 'account deletion'
+    ) {
+      continue;
+    }
+
+    // 2. Determine recipient identity matching
+    const notifUserId = item.userId ? String(item.userId).trim().toLowerCase() : '';
+    const isExplicitlyForMe = notifUserId === userIdStr ||
+                              (userEmail && notifUserId === userEmail) ||
+                              (userPhone && notifUserId === userPhone);
+
+    const isBroadcast = notifUserId === '' ||
+                        notifUserId === 'null' ||
+                        notifUserId === 'undefined' ||
+                        notifUserId === 'all';
+
+    // 3. Extract any booking references
+    const refMatches = combined.match(/Ref:\s*#?([A-Za-z0-9-]+)/gi) || [];
+    const bkMatches = combined.match(/\b(BK-[A-Za-z0-9-]+)\b/gi) || [];
+    const allRefs = [...refMatches, ...bkMatches].map(r => r.replace(/Ref:\s*#?/i, '').replace(/#/g, '').trim().toLowerCase());
+
+    if (allRefs.length > 0) {
+      const matchesMyBooking = allRefs.some(ref => {
+        for (const myId of myBookingIds) {
+          if (myId.includes(ref) || ref.includes(myId)) return true;
+        }
+        return false;
+      });
+      // If references another guest's booking, strictly exclude
+      if (!matchesMyBooking) continue;
+    } else {
+      // If not referencing a booking and not addressed to me, check if it's an allowed guest announcement
+      if (!isExplicitlyForMe) {
+        const allowedCategories = ['general', 'announcement', 'announcements', 'promo', 'promotions'];
+        const nRole = (item.role || '').toLowerCase();
+        if (!isBroadcast || (nRole !== 'guest' && nRole !== 'all') || !allowedCategories.includes(category.toLowerCase())) {
+          continue;
+        }
+      }
+    }
+
+    // 4. Exclude internal management/staff-only alerts
+    const nRole = (item.role || '').toLowerCase();
+    if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isExplicitlyForMe) {
+      continue;
+    }
+
+    const key = `${title.toLowerCase()}:::${message.toLowerCase()}`;
+    if (!dedupMap.has(key)) {
+      dedupMap.set(key, item);
+    }
+  }
+
+  return Array.from(dedupMap.values());
+};
 
 // Helper to seed initial notifications if database is empty for role
 const seedNotificationsIfNeeded = async (user) => {
@@ -99,6 +245,7 @@ const seedNotificationsIfNeeded = async (user) => {
       } else if (user.role === 'guest') {
         await Notification.create({
           userId: user.id || user._id,
+          role: 'guest',
           title: 'Welcome to Hour Stay!',
           message: 'Thank you for registering. Manage your bookings and stay preferences from this console.',
           category: 'General',
@@ -190,6 +337,8 @@ router.get('/', protect, async (req, res) => {
 
     let query;
     let adminPropIds = null;
+    let guestBookingIds = null;
+
     if (userRole === 'super-admin') {
       adminPropIds = await getAdminManagedPropertyIds();
       query = {
@@ -213,7 +362,6 @@ router.get('/', protect, async (req, res) => {
           { userId },
           { role: { $in: ['manager', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -223,61 +371,13 @@ router.get('/', protect, async (req, res) => {
           { userId },
           { role: { $in: ['receptionist', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
     } else if (userRole === 'guest') {
-      const uIdStr = String(userId || '');
-      const userEmail = req.user?.email;
-      const userPhone = req.user?.mobile || req.user?.phone;
-      const userName = req.user?.name;
-
-      const bQuery = [
-        { guestId: userId },
-        { guestId: uIdStr },
-        { userId: userId },
-        { userId: uIdStr }
-      ];
-      if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
-      if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
-      if (userName) bQuery.push({ guest: userName }, { guestName: userName });
-
-      let guestBookings = [];
-      try {
-        guestBookings = await Booking.find({ $or: bQuery }).lean();
-      } catch (_) {}
-
-      var myBookingIds = new Set();
-      for (const b of guestBookings) {
-        if (b.bookingId) myBookingIds.add(String(b.bookingId).trim().toLowerCase());
-        if (b._id) myBookingIds.add(String(b._id).trim().toLowerCase());
-        if (b.id) myBookingIds.add(String(b.id).trim().toLowerCase());
-      }
-
-      const guestQueries = [
-        { userId: uIdStr },
-        { userId: req.user.id },
-        { userId: req.user._id }
-      ];
-      if (userEmail) guestQueries.push({ userId: userEmail });
-      if (userPhone) guestQueries.push({ userId: userPhone });
-
-      for (const b of guestBookings) {
-        const bId = b.bookingId || String(b._id) || b.id;
-        if (bId) {
-          guestQueries.push({ message: { $regex: bId, $options: 'i' } });
-          guestQueries.push({ title: { $regex: bId, $options: 'i' } });
-        }
-      }
-
-      guestQueries.push({
-        role: { $in: ['guest', 'all'] },
-        userId: { $in: [null, undefined, '', 'all'] },
-        category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions', 'System'] }
-      });
-
-      query = { $or: guestQueries };
+      const bundle = await buildGuestNotificationQueryBundle(req.user);
+      query = bundle.query;
+      guestBookingIds = bundle.myBookingIds;
     } else {
       query = {
         $or: [
@@ -301,43 +401,14 @@ router.get('/', protect, async (req, res) => {
       list = saFiltered;
     }
 
-    // Deduplicate items by title and message with strict guest isolation
+    if (userRole === 'guest') {
+      const uniqueList = filterAndDeduplicateGuestList(list, userId, req.user, guestBookingIds || new Set());
+      return res.status(200).json({ success: true, data: uniqueList });
+    }
+
+    // Deduplicate items for staff roles
     const dedupMap = new Map();
     for (const item of list) {
-      if (userRole === 'guest') {
-        const notifUserId = item.userId ? String(item.userId).trim().toLowerCase() : '';
-        const isMyUserId = notifUserId === '' ||
-                           notifUserId === 'null' ||
-                           notifUserId === 'undefined' ||
-                           notifUserId === 'all' ||
-                           notifUserId === String(userId || '').toLowerCase() ||
-                           (req.user?.email && notifUserId === req.user.email.toLowerCase()) ||
-                           (req.user?.phone && notifUserId === req.user.phone.toLowerCase()) ||
-                           (req.user?.mobile && notifUserId === req.user.mobile.toLowerCase());
-
-        const combined = `${item.title || ''} ${item.message || ''}`;
-        const refMatches = combined.match(/Ref:\s*#?([A-Za-z0-9-]+)/gi) || [];
-        const bkMatches = combined.match(/\b(BK-[A-Za-z0-9-]+)\b/gi) || [];
-        const allRefs = [...refMatches, ...bkMatches].map(r => r.replace(/Ref:\s*#?/i, '').replace(/#/g, '').trim().toLowerCase());
-
-        if (allRefs.length > 0) {
-          const matchesMyBooking = allRefs.some(ref => {
-            for (const myId of (myBookingIds || [])) {
-              if (myId.includes(ref) || ref.includes(myId)) return true;
-            }
-            return false;
-          });
-          if (!matchesMyBooking) continue;
-        } else {
-          if (!isMyUserId) continue;
-        }
-
-        const nRole = (item.role || '').toLowerCase();
-        if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isMyUserId) {
-          continue;
-        }
-      }
-
       const key = `${(item.title || '').trim().toLowerCase()}:::${(item.message || '').trim().toLowerCase()}`;
       if (!dedupMap.has(key)) {
         dedupMap.set(key, item);
@@ -359,8 +430,9 @@ router.get('/unread-count', protect, async (req, res) => {
     const propId = req.user.propertyId;
 
     let query;
-    let myBookingIds = null;
     let adminPropIds = null;
+    let guestBookingIds = null;
+
     if (userRole === 'super-admin') {
       adminPropIds = await getAdminManagedPropertyIds();
       query = {
@@ -384,7 +456,6 @@ router.get('/unread-count', protect, async (req, res) => {
           { userId },
           { role: { $in: ['manager', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
@@ -394,61 +465,13 @@ router.get('/unread-count', protect, async (req, res) => {
           { userId },
           { role: { $in: ['receptionist', 'all', null] } },
           { propertyId: propId },
-          { propertyId: 'HS-9HQ8P' },
           { propertyId: 'HS-9HQ8P' }
         ]
       };
     } else if (userRole === 'guest') {
-      const uIdStr = String(userId || '');
-      const userEmail = req.user?.email;
-      const userPhone = req.user?.mobile || req.user?.phone;
-      const userName = req.user?.name;
-
-      const bQuery = [
-        { guestId: userId },
-        { guestId: uIdStr },
-        { userId: userId },
-        { userId: uIdStr }
-      ];
-      if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
-      if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
-      if (userName) bQuery.push({ guest: userName }, { guestName: userName });
-
-      let guestBookings = [];
-      try {
-        guestBookings = await Booking.find({ $or: bQuery });
-      } catch (_) {}
-
-      myBookingIds = new Set();
-      for (const b of guestBookings) {
-        if (b.bookingId) myBookingIds.add(String(b.bookingId).trim().toLowerCase());
-        if (b._id) myBookingIds.add(String(b._id).trim().toLowerCase());
-        if (b.id) myBookingIds.add(String(b.id).trim().toLowerCase());
-      }
-
-      const guestQueries = [
-        { userId: uIdStr },
-        { userId: req.user.id },
-        { userId: req.user._id }
-      ];
-      if (userEmail) guestQueries.push({ userId: userEmail });
-      if (userPhone) guestQueries.push({ userId: userPhone });
-
-      for (const b of guestBookings) {
-        const bId = b.bookingId || String(b._id) || b.id;
-        if (bId) {
-          guestQueries.push({ message: { $regex: bId, $options: 'i' } });
-          guestQueries.push({ title: { $regex: bId, $options: 'i' } });
-        }
-      }
-
-      guestQueries.push({
-        role: { $in: ['guest', 'all'] },
-        userId: { $in: [null, undefined, '', 'all'] },
-        category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions', 'System'] }
-      });
-
-      query = { $or: guestQueries };
+      const bundle = await buildGuestNotificationQueryBundle(req.user);
+      query = bundle.query;
+      guestBookingIds = bundle.myBookingIds;
     } else {
       query = {
         $or: [
@@ -472,42 +495,14 @@ router.get('/unread-count', protect, async (req, res) => {
       list = saFiltered;
     }
 
+    if (userRole === 'guest') {
+      const uniqueList = filterAndDeduplicateGuestList(list, userId, req.user, guestBookingIds || new Set());
+      const unreadCount = uniqueList.filter(n => !n.isRead).length;
+      return res.status(200).json({ success: true, count: unreadCount, unreadCount });
+    }
+
     const dedupMap = new Map();
     for (const item of list) {
-      if (userRole === 'guest') {
-        const notifUserId = item.userId ? String(item.userId).trim().toLowerCase() : '';
-        const isMyUserId = notifUserId === '' ||
-                           notifUserId === 'null' ||
-                           notifUserId === 'undefined' ||
-                           notifUserId === 'all' ||
-                           notifUserId === String(userId || '').toLowerCase() ||
-                           (req.user?.email && notifUserId === req.user.email.toLowerCase()) ||
-                           (req.user?.phone && notifUserId === req.user.phone.toLowerCase()) ||
-                           (req.user?.mobile && notifUserId === req.user.mobile.toLowerCase());
-
-        const combined = `${item.title || ''} ${item.message || ''}`;
-        const refMatches = combined.match(/Ref:\s*#?([A-Za-z0-9-]+)/gi) || [];
-        const bkMatches = combined.match(/\b(BK-[A-Za-z0-9-]+)\b/gi) || [];
-        const allRefs = [...refMatches, ...bkMatches].map(r => r.replace(/Ref:\s*#?/i, '').replace(/#/g, '').trim().toLowerCase());
-
-        if (allRefs.length > 0) {
-          const matchesMyBooking = allRefs.some(ref => {
-            for (const myId of (myBookingIds || [])) {
-              if (myId.includes(ref) || ref.includes(myId)) return true;
-            }
-            return false;
-          });
-          if (!matchesMyBooking) continue;
-        } else {
-          if (!isMyUserId) continue;
-        }
-
-        const nRole = (item.role || '').toLowerCase();
-        if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isMyUserId) {
-          continue;
-        }
-      }
-
       const key = `${(item.title || '').trim().toLowerCase()}:::${(item.message || '').trim().toLowerCase()}`;
       if (!dedupMap.has(key)) {
         dedupMap.set(key, item);
@@ -667,43 +662,8 @@ const handleMarkAllNotificationsRead = async (req, res) => {
         ]
       };
     } else if (userRole === 'guest') {
-      const uIdStr = String(userId || '');
-      const userEmail = req.user?.email;
-      const userPhone = req.user?.mobile || req.user?.phone;
-      const userName = req.user?.name;
-
-      const bQuery = [
-        { guestId: userId },
-        { guestId: uIdStr },
-        { userId: userId },
-        { userId: uIdStr }
-      ];
-      if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
-      if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
-      if (userName) bQuery.push({ guest: userName }, { guestName: userName });
-
-      let guestBookings = [];
-      try {
-        guestBookings = await Booking.find({ $or: bQuery });
-      } catch (_) {}
-
-      const guestQueries = [
-        { userId: uIdStr },
-        { userId: req.user.id },
-        { userId: req.user._id }
-      ];
-      if (userEmail) guestQueries.push({ userId: userEmail });
-      if (userPhone) guestQueries.push({ userId: userPhone });
-
-      for (const b of guestBookings) {
-        const bId = b.bookingId || String(b._id) || b.id;
-        if (bId) {
-          guestQueries.push({ message: { $regex: bId, $options: 'i' } });
-          guestQueries.push({ title: { $regex: bId, $options: 'i' } });
-        }
-      }
-
-      roleQuery = { $or: guestQueries };
+      const bundle = await buildGuestNotificationQueryBundle(req.user);
+      roleQuery = bundle.query;
     } else {
       roleQuery = {
         $or: [

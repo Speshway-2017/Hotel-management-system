@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/guest_payment_model.dart';
 import '../../../providers/guest/guest_payment_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../auth/login_screen.dart';
 import '../folio/guest_folio_screen.dart';
 import '../../../services/pdf_invoice_service.dart';
 import 'package:hour_stay_mobile/colours.dart';
@@ -22,18 +24,7 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
   String _searchQuery = '';
   String _selectedFilter = 'All';
   final TextEditingController _searchController = TextEditingController();
-
-  final List<String> _filters = [
-    'All',
-    'Successful',
-    'Pending',
-    'Refunded',
-    'Partially Refunded',
-    'UPI',
-    'Card',
-    'Net Banking',
-    'Cash',
-  ];
+  bool _isFilterMenuOpen = false;
 
   @override
   void initState() {
@@ -51,6 +42,8 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final isAuthenticated = authProvider.isAuthenticated;
     final paymentProvider = context.watch<GuestPaymentProvider>();
     final allPayments = paymentProvider.payments;
     final summary = paymentProvider.summary;
@@ -61,26 +54,16 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
 
     // Filter payments
     final filtered = allPayments.where((p) {
-      final method = p.paymentMethod.toLowerCase();
-
-      // Status/Method filter
+      // Status filter
       bool matchesFilter = true;
       if (_selectedFilter == 'Successful') {
         matchesFilter = p.isSuccessful;
       } else if (_selectedFilter == 'Pending') {
         matchesFilter = p.isPending || p.hasPendingBalance;
       } else if (_selectedFilter == 'Refunded') {
-        matchesFilter = p.isRefunded;
-      } else if (_selectedFilter == 'Partially Refunded') {
-        matchesFilter = p.isPartiallyRefunded;
-      } else if (_selectedFilter == 'UPI') {
-        matchesFilter = method.contains('upi') || method.contains('gpay') || method.contains('phonepe');
-      } else if (_selectedFilter == 'Card') {
-        matchesFilter = method.contains('card') || method.contains('credit') || method.contains('debit');
-      } else if (_selectedFilter == 'Net Banking') {
-        matchesFilter = method.contains('net') || method.contains('bank');
-      } else if (_selectedFilter == 'Cash') {
-        matchesFilter = method.contains('cash');
+        matchesFilter = p.isRefunded || p.isPartiallyRefunded;
+      } else if (_selectedFilter == 'Failed') {
+        matchesFilter = p.isFailed || p.status.toLowerCase() == 'rejected' || p.status.toLowerCase() == 'cancelled';
       }
 
       // Search query filter
@@ -102,6 +85,30 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
 
     return Scaffold(
       backgroundColor: background,
+      appBar: AppBar(
+        backgroundColor: navy,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+          onPressed: () {
+            if (widget.onNavigateTab != null) {
+              widget.onNavigateTab!(2);
+            } else if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        title: const Text(
+          'Payments & Invoices',
+          style: TextStyle(
+            color: cream,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
       body: RefreshIndicator(
         color: gold,
         backgroundColor: navy,
@@ -125,7 +132,12 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
             ),
 
             // 3. Transactions List / Empty / Error States
-            if (paymentProvider.isLoading && allPayments.isEmpty)
+            if (!isAuthenticated)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildGuestModeState(context),
+              )
+            else if (paymentProvider.isLoading && allPayments.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
@@ -385,161 +397,265 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
   // SEARCH & FILTER BAR
   // ==========================================
   Widget _buildSearchAndFilterSection(List<GuestPaymentModel> allPayments) {
+    final List<Map<String, dynamic>> filters = <Map<String, dynamic>>[
+      <String, dynamic>{'key': 'All', 'label': 'All Transactions', 'shortLabel': 'All', 'count': _getFilterCount('All', allPayments), 'icon': Icons.all_inbox_rounded},
+      <String, dynamic>{'key': 'Successful', 'label': 'Successful / Paid', 'shortLabel': 'Successful', 'count': _getFilterCount('Successful', allPayments), 'icon': Icons.check_circle_rounded},
+      <String, dynamic>{'key': 'Pending', 'label': 'Pending Balance', 'shortLabel': 'Pending', 'count': _getFilterCount('Pending', allPayments), 'icon': Icons.hourglass_top_rounded},
+      <String, dynamic>{'key': 'Refunded', 'label': 'Refunded', 'shortLabel': 'Refunded', 'count': _getFilterCount('Refunded', allPayments), 'icon': Icons.replay_rounded},
+      <String, dynamic>{'key': 'Failed', 'label': 'Failed / Cancelled', 'shortLabel': 'Failed', 'count': _getFilterCount('Failed', allPayments), 'icon': Icons.cancel_outlined},
+    ];
+
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search Field
+          // Search Field & Filter Button in Single Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cardBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(8),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+            child: Row(
+              children: [
+                // 1. Search Bar
+                Expanded(
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cardBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(8),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      style: const TextStyle(fontSize: 13, color: navy, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        hintText: 'Search ID, booking, hotel...',
+                        hintStyle: const TextStyle(fontSize: 12.5, color: muted),
+                        prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 18),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 16, color: muted),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
-                style: const TextStyle(fontSize: 13.5, color: navy, fontWeight: FontWeight.w600),
-                decoration: InputDecoration(
-                  hintText: 'Search by Payment ID, Booking ID, Hotel...',
-                  hintStyle: const TextStyle(fontSize: 12.5, color: muted),
-                  prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18, color: muted),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                const SizedBox(width: 8),
+
+                // 2. Filter Button beside Search Bar
+                _buildPaymentsFilterButton(filters),
+              ],
+            ),
+          ),
+
+          // 3. Inline Expandable Filter Options directly below search bar
+          if (_isFilterMenuOpen) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: filters.map((f) {
+                    final key = f['key'] as String;
+                    final label = f['label'] as String;
+                    final count = f['count'] as int;
+                    final icon = f['icon'] as IconData;
+                    final isSel = _selectedFilter == key;
+
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter = key;
+                          _isFilterMenuOpen = false;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: isSel ? navy : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              icon,
+                              size: 16,
+                              color: isSel ? gold : purple,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                  color: isSel ? cream : navy,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSel ? gold : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isSel ? navy : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                            if (isSel) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check_rounded, color: gold, size: 16),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-
-          // Horizontal Navigation Filter Chips
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              height: 42,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                clipBehavior: Clip.hardEdge,
-                padding: EdgeInsets.zero,
-                itemCount: _filters.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final filter = _filters[index];
-                  final isSelected = _selectedFilter == filter;
-                  final count = _getFilterCount(filter, allPayments);
-
-                  return InkWell(
-                    onTap: () => setState(() => _selectedFilter = filter),
-                    borderRadius: BorderRadius.circular(20),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isSelected ? navy : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected ? navy : cardBorder,
-                          width: 1.2,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: navy.withAlpha(35),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            filter,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                              color: isSelected ? cream : navy,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isSelected ? gold : const Color(0xFFE2E8F0),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$count',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected ? navy : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
+          ],
         ],
       ),
     );
   }
+
+  Widget _buildPaymentsFilterButton(List<Map<String, dynamic>> filters) {
+    Map<String, dynamic> currentMatch = filters.first;
+    for (final f in filters) {
+      if (f['key'] == _selectedFilter) {
+        currentMatch = f;
+        break;
+      }
+    }
+
+    final selectedLabel = currentMatch['shortLabel'] as String;
+    final selectedCount = currentMatch['count'] as int;
+    final isFiltered = _selectedFilter != 'All';
+
+    return InkWell(
+      onTap: () {
+        setState(() => _isFilterMenuOpen = !_isFilterMenuOpen);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        decoration: BoxDecoration(
+          color: (_isFilterMenuOpen || isFiltered) ? navy : white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (_isFilterMenuOpen || isFiltered) ? gold : cardBorder,
+            width: 1.2,
+          ),
+          boxShadow: (_isFilterMenuOpen || isFiltered)
+              ? [
+                  BoxShadow(
+                    color: navy.withAlpha(30),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(6),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 16,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : purple,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isFiltered ? selectedLabel : 'Filter',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: (_isFilterMenuOpen || isFiltered) ? FontWeight.w800 : FontWeight.w600,
+                color: (_isFilterMenuOpen || isFiltered) ? cream : navy,
+              ),
+            ),
+            if (isFiltered) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: gold,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$selectedCount',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: navy,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(width: 3),
+            Icon(
+              _isFilterMenuOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : muted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
 
   int _getFilterCount(String filter, List<GuestPaymentModel> allPayments) {
     if (filter == 'All') return allPayments.length;
     if (filter == 'Successful') return allPayments.where((p) => p.isSuccessful).length;
     if (filter == 'Pending') return allPayments.where((p) => p.isPending || p.hasPendingBalance).length;
     if (filter == 'Refunded') return allPayments.where((p) => p.isRefunded || p.isPartiallyRefunded).length;
-    if (filter == 'Partially Refunded') return allPayments.where((p) => p.isPartiallyRefunded).length;
-    final f = filter.toLowerCase();
-    if (f == 'upi') {
-      return allPayments.where((p) {
-        final m = p.paymentMethod.toLowerCase();
-        return m.contains('upi') || m.contains('gpay') || m.contains('phonepe');
-      }).length;
-    }
-    if (f == 'card') {
-      return allPayments.where((p) {
-        final m = p.paymentMethod.toLowerCase();
-        return m.contains('card') || m.contains('credit') || m.contains('debit');
-      }).length;
-    }
-    if (f == 'net banking') {
-      return allPayments.where((p) {
-        final m = p.paymentMethod.toLowerCase();
-        return m.contains('net') || m.contains('bank');
-      }).length;
-    }
-    if (f == 'cash') {
-      return allPayments.where((p) => p.paymentMethod.toLowerCase().contains('cash')).length;
+    if (filter == 'Failed') {
+      return allPayments.where((p) => p.isFailed || p.status.toLowerCase() == 'rejected' || p.status.toLowerCase() == 'cancelled').length;
     }
     return 0;
   }
@@ -1329,56 +1445,169 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
     );
   }
 
+  Widget _buildGuestModeState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: gold.withAlpha(80), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(8),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: navy,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: navy.withAlpha(30),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.account_balance_wallet_rounded, size: 30, color: gold),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Guest Payments & Invoices',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sign in to view transaction history, download GST invoices, and track security deposits and refunds.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: muted,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: navy,
+                    foregroundColor: white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: gold, width: 1.2),
+                    ),
+                  ),
+                  icon: const Icon(Icons.login_rounded, size: 18, color: gold),
+                  label: const Text(
+                    'Sign In / Register',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState(String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: rubyBg,
-                shape: BoxShape.circle,
-                border: Border.all(color: ruby.withAlpha(100)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardBorder, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(8),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
-              child: const Icon(Icons.error_outline_rounded, size: 30, color: ruby),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Unable to Load Payments',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: navy,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, color: muted),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => context.read<GuestPaymentProvider>().fetchPayments(),
-              icon: const Icon(Icons.refresh_rounded, size: 16, color: white),
-              label: const Text(
-                'Retry Connection',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: navy,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: gold),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: slateBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold.withAlpha(120), width: 1.5),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: const Icon(Icons.receipt_long_rounded, size: 28, color: navy),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'Unable to Load Payments',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'We could not load your payment records right now. Tap retry to reconnect.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: muted, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => context.read<GuestPaymentProvider>().fetchPayments(),
+                icon: const Icon(Icons.refresh_rounded, size: 18, color: gold),
+                label: const Text(
+                  'Retry Connection',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: navy,
+                  foregroundColor: white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: gold, width: 1),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

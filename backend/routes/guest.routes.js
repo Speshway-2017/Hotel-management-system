@@ -866,9 +866,9 @@ router.get('/notifications', async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     const userIdStr = String(userId || '');
-    const userEmail = req.user?.email;
-    const userPhone = req.user?.mobile || req.user?.phone;
-    const userName = req.user?.name;
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const userPhone = (req.user?.mobile || req.user?.phone || '').trim();
+    const userName = (req.user?.name || '').trim();
 
     setImmediate(() => {
       syncGuestBookingNotifications(req.user).catch(() => {});
@@ -887,7 +887,7 @@ router.get('/notifications', async (req, res) => {
 
     let guestBookings = [];
     try {
-      guestBookings = await Booking.find({ $or: bQuery });
+      guestBookings = await Booking.find({ $or: bQuery }).lean();
     } catch (_) {}
 
     const myBookingIds = new Set();
@@ -897,50 +897,73 @@ router.get('/notifications', async (req, res) => {
       if (b.id) myBookingIds.add(String(b.id).trim().toLowerCase());
     }
 
-    // 2. Build targeted notification query
-    const notifQuery = [
+    // 2. Build targeted notification query strictly for this guest
+    const guestQueries = [
       { userId: userId },
       { userId: userIdStr }
     ];
-    if (userEmail) notifQuery.push({ userId: userEmail });
-    if (userPhone) notifQuery.push({ userId: userPhone });
+    if (userEmail) guestQueries.push({ userId: userEmail });
+    if (userPhone) guestQueries.push({ userId: userPhone });
 
     for (const b of guestBookings) {
       const bId = b.bookingId || String(b._id) || b.id;
       if (bId) {
-        notifQuery.push({ message: { $regex: bId, $options: 'i' } });
-        notifQuery.push({ title: { $regex: bId, $options: 'i' } });
+        guestQueries.push({ message: { $regex: bId, $options: 'i' } });
+        guestQueries.push({ title: { $regex: bId, $options: 'i' } });
       }
     }
 
     // General broadcast announcements (broadcast with no specific user ID)
-    notifQuery.push({
-      role: { $in: ['guest', 'all'] },
+    guestQueries.push({
+      role: 'guest',
       userId: { $in: [null, undefined, '', 'all'] },
-      category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions', 'System'] }
+      category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions'] }
     });
 
-    let list = await Notification.find({ $or: notifQuery });
+    // Strict exclusion of Account Deletion & non-guest system alerts at database level
+    const exclusionFilter = {
+      title: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+      message: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+      category: { $nin: ['Account Deletion', 'AccountClosure', 'AdminAlert', 'Operations', 'Maintenance', 'Staff', 'Staff Roster', 'Property Setup', 'Property Issue', 'OTA Sync', 'Security Warning'] }
+    };
 
-    if (Array.isArray(list)) {
-      list = list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    }
+    let list = await Notification.find({
+      $and: [
+        { $or: guestQueries },
+        exclusionFilter
+      ]
+    }).sort({ createdAt: -1 }).lean().limit(100);
 
-    // 3. Strictly filter out any other guest's notifications
-    const seen = new Set();
-    const unique = [];
+    // 3. Strictly filter and deduplicate
+    const dedupMap = new Map();
     for (const n of list || []) {
+      const title = (n.title || '').trim();
+      const message = (n.message || '').trim();
+      const category = (n.category || '').trim();
+      const combined = `${title} ${message} ${category}`.toLowerCase();
+
+      // Skip any account deletion content
+      if (
+        combined.includes('account deleted') ||
+        combined.includes('deleted their account') ||
+        combined.includes('account has been deleted') ||
+        combined.includes('credentials have been permanently deleted') ||
+        category.toLowerCase() === 'account deletion'
+      ) {
+        continue;
+      }
+
       const notifUserId = n.userId ? String(n.userId).trim().toLowerCase() : '';
-      const isMyUserId = notifUserId === '' ||
-                         notifUserId === 'null' ||
-                         notifUserId === 'undefined' ||
-                         notifUserId === 'all' ||
-                         notifUserId === userIdStr.toLowerCase() ||
-                         (userEmail && notifUserId === userEmail.toLowerCase()) ||
-                         (userPhone && notifUserId === userPhone.toLowerCase());
+      const isExplicitlyForMe = notifUserId === userIdStr.toLowerCase() ||
+                                (userEmail && notifUserId === userEmail) ||
+                                (userPhone && notifUserId === userPhone.toLowerCase());
+
+      const isBroadcast = notifUserId === '' ||
+                          notifUserId === 'null' ||
+                          notifUserId === 'undefined' ||
+                          notifUserId === 'all';
 
       // Extract any booking references from title and message
-      const combined = `${n.title || ''} ${n.message || ''}`;
       const refMatches = combined.match(/Ref:\s*#?([A-Za-z0-9-]+)/gi) || [];
       const bkMatches = combined.match(/\b(BK-[A-Za-z0-9-]+)\b/gi) || [];
       const allRefs = [...refMatches, ...bkMatches].map(r => r.replace(/Ref:\s*#?/i, '').replace(/#/g, '').trim().toLowerCase());
@@ -959,28 +982,29 @@ router.get('/notifications', async (req, res) => {
           continue;
         }
       } else {
-        // No booking reference: if targeted to another user, skip
-        if (!isMyUserId) {
-          continue;
+        // No booking reference: if not explicitly for me, must be broadcast guest announcement
+        if (!isExplicitlyForMe) {
+          const allowedCats = ['general', 'announcement', 'announcements', 'promo', 'promotions'];
+          const nRole = (n.role || '').toLowerCase();
+          if (!isBroadcast || (nRole !== 'guest' && nRole !== 'all') || !allowedCats.includes(category.toLowerCase())) {
+            continue;
+          }
         }
       }
 
       // Ensure manager/admin internal operational alerts don't leak
       const nRole = (n.role || '').toLowerCase();
-      if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isMyUserId) {
+      if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isExplicitlyForMe) {
         continue;
       }
 
-      const id = n._id ? String(n._id) : (n.id ? String(n.id) : '');
-      const key = `${(n.title || '').trim().toLowerCase()}__${(n.message || '').trim().toLowerCase()}`;
-      if (!seen.has(id) && !seen.has(key)) {
-        if (id) seen.add(id);
-        seen.add(key);
-        unique.push(n);
+      const key = `${title.toLowerCase()}:::${message.toLowerCase()}`;
+      if (!dedupMap.has(key)) {
+        dedupMap.set(key, n);
       }
     }
 
-    return sendSuccess(res, 200, unique, 'Guest notifications fetched successfully');
+    return sendSuccess(res, 200, Array.from(dedupMap.values()), 'Guest notifications fetched successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to fetch notifications');
   }
@@ -1111,7 +1135,7 @@ const handleMarkAllGuestNotificationsRead = async (req, res) => {
       if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
       if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
       if (userName) bQuery.push({ guest: userName }, { guestName: userName });
-      const guestBookings = await Booking.find({ $or: bQuery });
+      const guestBookings = await Booking.find({ $or: bQuery }).lean();
       for (const b of guestBookings) {
         const bId = b.bookingId || String(b._id) || b.id;
         if (bId) {
@@ -1121,8 +1145,20 @@ const handleMarkAllGuestNotificationsRead = async (req, res) => {
       }
     } catch (_) {}
 
+    const exclusionFilter = {
+      title: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+      message: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+      category: { $nin: ['Account Deletion', 'AccountClosure', 'AdminAlert', 'Operations', 'Maintenance', 'Staff', 'Staff Roster', 'Property Setup', 'Property Issue', 'OTA Sync', 'Security Warning'] }
+    };
+
     await Notification.updateMany(
-      { $or: notifQuery },
+      {
+        $and: [
+          { isRead: false },
+          { $or: notifQuery },
+          exclusionFilter
+        ]
+      },
       { isRead: true }
     );
 
@@ -1144,19 +1180,124 @@ router.put('/notifications/read-all', handleMarkAllGuestNotificationsRead);
 
 router.get('/notifications/unread-count', async (req, res) => {
   try {
-    const userId = req.user?.id || req.user?._id;
-    const uIdStr = String(userId || '');
-    const userEmail = req.user?.email;
+    const userId = req.user?._id || req.user?.id;
+    const userIdStr = String(userId || '');
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const userPhone = (req.user?.mobile || req.user?.phone || '').trim();
+    const userName = (req.user?.name || '').trim();
 
-    const count = await Notification.countDocuments({
-      isRead: false,
-      $or: [
-        { userId: uIdStr },
-        { userId: userEmail },
-        { role: 'guest', userId: { $in: [null, undefined, '', 'all'] } }
-      ]
+    const bQuery = [
+      { guestId: userId },
+      { guestId: userIdStr },
+      { userId: userId },
+      { userId: userIdStr }
+    ];
+    if (userEmail) bQuery.push({ email: userEmail }, { guestEmail: userEmail });
+    if (userPhone) bQuery.push({ phone: userPhone }, { guestPhone: userPhone });
+    if (userName) bQuery.push({ guest: userName }, { guestName: userName });
+
+    let guestBookings = [];
+    try {
+      guestBookings = await Booking.find({ $or: bQuery }).lean();
+    } catch (_) {}
+
+    const myBookingIds = new Set();
+    for (const b of guestBookings) {
+      if (b.bookingId) myBookingIds.add(String(b.bookingId).trim().toLowerCase());
+      if (b._id) myBookingIds.add(String(b._id).trim().toLowerCase());
+      if (b.id) myBookingIds.add(String(b.id).trim().toLowerCase());
+    }
+
+    const guestQueries = [
+      { userId: userId },
+      { userId: userIdStr }
+    ];
+    if (userEmail) guestQueries.push({ userId: userEmail });
+    if (userPhone) guestQueries.push({ userId: userPhone });
+
+    for (const b of guestBookings) {
+      const bId = b.bookingId || String(b._id) || b.id;
+      if (bId) {
+        guestQueries.push({ message: { $regex: bId, $options: 'i' } });
+        guestQueries.push({ title: { $regex: bId, $options: 'i' } });
+      }
+    }
+
+    guestQueries.push({
+      role: 'guest',
+      userId: { $in: [null, undefined, '', 'all'] },
+      category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions'] }
     });
-    return sendSuccess(res, 200, { unreadCount: count }, 'Unread count retrieved');
+
+    const exclusionFilter = {
+      title: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+      message: { $not: /account deleted|account.*deleted|deleted.*account|deleted.*profile/i },
+      category: { $nin: ['Account Deletion', 'AccountClosure', 'AdminAlert', 'Operations', 'Maintenance', 'Staff', 'Staff Roster', 'Property Setup', 'Property Issue', 'OTA Sync', 'Security Warning'] }
+    };
+
+    const unreadList = await Notification.find({
+      $and: [
+        { isRead: false },
+        { $or: guestQueries },
+        exclusionFilter
+      ]
+    }).lean().limit(100);
+
+    const dedupMap = new Map();
+    for (const n of unreadList || []) {
+      const title = (n.title || '').trim();
+      const message = (n.message || '').trim();
+      const category = (n.category || '').trim();
+      const combined = `${title} ${message} ${category}`.toLowerCase();
+
+      if (
+        combined.includes('account deleted') ||
+        combined.includes('deleted their account') ||
+        combined.includes('account has been deleted') ||
+        category.toLowerCase() === 'account deletion'
+      ) {
+        continue;
+      }
+
+      const notifUserId = n.userId ? String(n.userId).trim().toLowerCase() : '';
+      const isExplicitlyForMe = notifUserId === userIdStr.toLowerCase() ||
+                                (userEmail && notifUserId === userEmail) ||
+                                (userPhone && notifUserId === userPhone.toLowerCase());
+
+      const refMatches = combined.match(/Ref:\s*#?([A-Za-z0-9-]+)/gi) || [];
+      const bkMatches = combined.match(/\b(BK-[A-Za-z0-9-]+)\b/gi) || [];
+      const allRefs = [...refMatches, ...bkMatches].map(r => r.replace(/Ref:\s*#?/i, '').replace(/#/g, '').trim().toLowerCase());
+
+      if (allRefs.length > 0) {
+        const matchesMyBooking = allRefs.some(ref => {
+          for (const myId of myBookingIds) {
+            if (myId.includes(ref) || ref.includes(myId)) return true;
+          }
+          return false;
+        });
+        if (!matchesMyBooking) continue;
+      } else {
+        if (!isExplicitlyForMe) {
+          const allowedCats = ['general', 'announcement', 'announcements', 'promo', 'promotions'];
+          const nRole = (n.role || '').toLowerCase();
+          if (!allowedCats.includes(category.toLowerCase()) || (nRole !== 'guest' && nRole !== 'all')) {
+            continue;
+          }
+        }
+      }
+
+      const nRole = (n.role || '').toLowerCase();
+      if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isExplicitlyForMe) {
+        continue;
+      }
+
+      const key = `${title.toLowerCase()}:::${message.toLowerCase()}`;
+      if (!dedupMap.has(key)) {
+        dedupMap.set(key, n);
+      }
+    }
+
+    return sendSuccess(res, 200, { unreadCount: dedupMap.size, count: dedupMap.size }, 'Unread count retrieved');
   } catch (error) {
     return sendError(res, 500, error.message);
   }
@@ -1266,7 +1407,18 @@ const handleGuestExtendStay = async (req, res) => {
 
     const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
 
-    // Single unified alert to Manager & Receptionist
+    // 1. Notify Admin (Global)
+    await triggerNotification({
+      req,
+      role: 'admin',
+      propertyId: propId,
+      title: 'Guest Extended Stay',
+      message: `Guest ${booking.guest || req.user.name} extended stay (+₹${finalAdditionalAmount}). New checkout: ${finalNewCheckOut}.`,
+      category: 'Operations',
+      data: { bookingId: updated._id, additionalAmount: finalAdditionalAmount, newCheckOut: finalNewCheckOut }
+    });
+
+    // 2. Notify Manager
     await triggerNotification({
       req,
       role: 'manager',
@@ -1277,7 +1429,18 @@ const handleGuestExtendStay = async (req, res) => {
       data: { bookingId: updated._id, additionalAmount: finalAdditionalAmount, newCheckOut: finalNewCheckOut }
     });
 
-    // Notify Guest Confirmation
+    // 3. Notify Receptionist
+    await triggerNotification({
+      req,
+      role: 'receptionist',
+      propertyId: propId,
+      title: 'Guest Extended Stay',
+      message: `Guest ${booking.guest || req.user.name} extended stay (+₹${finalAdditionalAmount}). New checkout: ${finalNewCheckOut}.`,
+      category: 'Operations',
+      data: { bookingId: updated._id, additionalAmount: finalAdditionalAmount, newCheckOut: finalNewCheckOut }
+    });
+
+    // 4. Notify Guest Confirmation
     await triggerNotification({
       req,
       userId: req.user._id || req.user.id,
@@ -1643,7 +1806,17 @@ const handleGuestCancelBooking = async (req, res) => {
       );
     }
 
-    // 1. Notify Manager
+    // 1. Notify Admin (Global)
+    await triggerNotification({
+      req,
+      role: 'admin',
+      title: 'Upcoming Booking Cancelled',
+      message: `Guest ${guestName} cancelled Booking ${refId}. Refundable: ₹${refundableAmount.toLocaleString('en-IN')}. Reason: ${reason || 'Before check-in cancellation'}.`,
+      category: 'Alerts',
+      data: { bookingId: updated._id, cancellationFee, refundableAmount }
+    });
+
+    // 2. Notify Manager
     await triggerNotification({
       req,
       role: 'manager',
@@ -1654,7 +1827,7 @@ const handleGuestCancelBooking = async (req, res) => {
       data: { bookingId: updated._id, cancellationFee, refundableAmount }
     });
 
-    // 2. Notify Receptionist
+    // 3. Notify Receptionist
     await triggerNotification({
       req,
       role: 'receptionist',
@@ -1665,7 +1838,7 @@ const handleGuestCancelBooking = async (req, res) => {
       data: { bookingId: updated._id }
     });
 
-    // 3. Confirm to Guest
+    // 4. Confirm to Guest
     await triggerNotification({
       req,
       userId: req.user?._id || req.user?.id,
@@ -1972,6 +2145,17 @@ router.post('/payments/pay-balance', async (req, res) => {
     });
 
     try {
+      // Notify Admin
+      await triggerNotification({
+        req,
+        role: 'admin',
+        propertyId: propId,
+        title: 'Payment Received',
+        message: `Guest ${guestName} paid ₹${payAmount.toLocaleString('en-IN')} via ${paymentMethod} for booking ${refId}. Balance: ₹${newBalance}.`,
+        category: 'Payments',
+        data: { bookingId: booking._id, amount: payAmount, paymentMethod }
+      });
+
       // Notify Manager
       await triggerNotification({
         req,

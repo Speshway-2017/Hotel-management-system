@@ -9,12 +9,16 @@ import 'package:hour_stay_mobile/providers/auth_provider.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/screens/guest/bookings/guest_booking_detail_screen.dart';
+import 'package:hour_stay_mobile/screens/auth/login_screen.dart';
+import 'guest_room_detail_screen.dart';
 import 'package:hour_stay_mobile/services/api_service.dart';
 import 'package:hour_stay_mobile/widgets/empty_state.dart';
 import 'package:hour_stay_mobile/colours.dart';
 
 class GuestSearchScreen extends StatefulWidget {
-  const GuestSearchScreen({super.key});
+  final ValueChanged<int>? onNavigateTab;
+
+  const GuestSearchScreen({super.key, this.onNavigateTab});
 
   @override
   State<GuestSearchScreen> createState() => _GuestSearchScreenState();
@@ -24,10 +28,10 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // Search & Filter Controllers & States
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedStatus = 'all'; // 'all', 'available', 'occupied', 'reserved'
   String _selectedCategory = 'all';
   String _selectedPropertyId = 'all';
   String _sortBy = 'recommended'; // 'recommended', 'price_asc', 'price_desc', 'rating'
+  bool _isFilterMenuOpen = false;
 
   // Booking Dates & Occupancy
   DateTime _checkInDate = DateTime.now();
@@ -42,8 +46,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   bool _onlyBreakfast = false;
   final Set<String> _selectedAmenities = {};
 
-  // Properties & Dynamic Rooms from MongoDB
-  List<Map<String, dynamic>> _properties = [];
+  // Dynamic Rooms from MongoDB
   List<RoomModel> _rooms = [];
   bool _isLoading = false;
   String? _errorMessage;
@@ -149,7 +152,6 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
 
       if (mounted) {
         setState(() {
-          _properties = fetchedProps;
           _rooms = loadedRooms;
           _isLoading = false;
         });
@@ -189,33 +191,17 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         return false;
       }
 
-      // 1. Status Navigation Tab Filter (all, available, occupied, reserved)
-      if (_selectedStatus != 'all') {
-        final st = room.status.toLowerCase().trim();
-        final op = room.operationalStatus.toLowerCase().trim();
-        if (_selectedStatus == 'available') {
-          final isAvail = st == 'available' || (room.isAvailable && st != 'occupied' && st != 'reserved');
-          if (!isAvail) return false;
-        } else if (_selectedStatus == 'occupied') {
-          final isOcc = st == 'occupied' || op == 'occupied' || (room.guest != null && room.guest!.isNotEmpty && !room.isAvailable);
-          if (!isOcc) return false;
-        } else if (_selectedStatus == 'reserved') {
-          final isRes = st == 'reserved' || room.isReserved || op == 'reserved';
-          if (!isRes) return false;
-        }
-      }
-
-      // 2. Availability toggle filter
+      // 1. Availability toggle filter
       if (_onlyAvailable && !room.isAvailable) {
         return false;
       }
 
-      // 3. Property filter
+      // 2. Property filter
       if (_selectedPropertyId != 'all') {
         if (room.propertyId != _selectedPropertyId) return false;
       }
 
-      // 4. Category filter (from category filter bar beside search bar)
+      // 3. Category filter
       if (_selectedCategory != 'all') {
         final cat = room.category.toLowerCase();
         final sel = _selectedCategory.toLowerCase();
@@ -226,17 +212,17 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         if (!isMatch) return false;
       }
 
-      // 5. Max Price filter
+      // 4. Max Price filter
       final price = _calculateRoomPrice(room);
       if (price > _maxPrice) return false;
 
-      // 6. Breakfast filter
+      // 5. Breakfast filter
       if (_onlyBreakfast) {
         final hasBreakfast = room.amenities.any((a) => a.toLowerCase().contains('breakfast') || a.toLowerCase().contains('dining'));
         if (!hasBreakfast) return false;
       }
 
-      // 7. Selected Amenities filter
+      // 6. Selected Amenities filter
       if (_selectedAmenities.isNotEmpty) {
         for (final amenity in _selectedAmenities) {
           final has = room.amenities.any((a) => a.toLowerCase().contains(amenity.toLowerCase()));
@@ -244,7 +230,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         }
       }
 
-      // 8. Search query filter (matches Category, Room Number, City, Property Name, Floor, Amenities)
+      // 7. Search query filter (matches Category, Room Number, City, Property Name, Floor, Amenities)
       if (_searchQuery.trim().isNotEmpty) {
         final q = _searchQuery.toLowerCase().trim();
         final matchesCat = room.category.toLowerCase().contains(q);
@@ -277,7 +263,6 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
     setState(() {
       _searchController.clear();
       _searchQuery = '';
-      _selectedStatus = 'all';
       _selectedCategory = 'all';
       _selectedPropertyId = 'all';
       _sortBy = 'recommended';
@@ -296,11 +281,12 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
 
   String _getCategoryDisplayName(String key) {
     if (key == 'all') return 'All Categories';
-    final match = _categoriesList.firstWhere(
-      (c) => c['key'] == key,
-      orElse: () => {'key': key, 'label': key},
-    );
-    return match['label'] as String;
+    for (final c in _categoriesList) {
+      if (c['key'] == key) {
+        return c['label'] as String;
+      }
+    }
+    return key;
   }
 
   int _getCategoryRoomCount(String categoryKey) {
@@ -315,28 +301,36 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
     }).length;
   }
 
-  int _getStatusRoomCount(String statusKey) {
-    if (statusKey == 'all') return _rooms.length;
-    return _rooms.where((r) {
-      final st = r.status.toLowerCase().trim();
-      final op = r.operationalStatus.toLowerCase().trim();
-      if (statusKey == 'available') {
-        return st == 'available' || (r.isAvailable && st != 'occupied' && st != 'reserved');
-      } else if (statusKey == 'occupied') {
-        return st == 'occupied' || op == 'occupied' || (r.guest != null && r.guest!.isNotEmpty && !r.isAvailable);
-      } else if (statusKey == 'reserved') {
-        return st == 'reserved' || r.isReserved || op == 'reserved';
-      }
-      return false;
-    }).length;
-  }
-
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredRooms;
 
     return Scaffold(
       backgroundColor: background,
+      appBar: AppBar(
+        backgroundColor: navy,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+          onPressed: () {
+            if (widget.onNavigateTab != null) {
+              widget.onNavigateTab!(2);
+            } else if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        title: const Text(
+          'Search & Explore',
+          style: TextStyle(
+            color: cream,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
       body: RefreshIndicator(
         color: purple,
         backgroundColor: white,
@@ -424,7 +418,40 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // ==========================================
   // 1. SEARCH & FILTER HEADER
   // ==========================================
+  int get _activeFiltersCount {
+    int count = 0;
+    if (_selectedCategory != 'all') count++;
+    if (_maxPrice < 25000) count++;
+    if (_selectedAmenities.isNotEmpty) count++;
+    if (_onlyAvailable) count++;
+    return count;
+  }
+
   Widget _buildSearchHeader() {
+    final activeCount = _activeFiltersCount;
+    final availableAmenities = [
+      'WiFi',
+      'Air Conditioning',
+      'Bathtub',
+      'Swimming Pool',
+      'Breakfast Included',
+      'Smart TV',
+      'Free Parking',
+      'Fitness Center / Gym',
+      'Balcony / Terrace',
+      'Mini Bar',
+      'Room Service',
+      'Jacuzzi',
+    ];
+
+    final presets = [
+      {'label': '< ₹3,000', 'value': 3000.0},
+      {'label': '< ₹6,000', 'value': 6000.0},
+      {'label': '< ₹10,000', 'value': 10000.0},
+      {'label': '< ₹15,000', 'value': 15000.0},
+      {'label': '< ₹25,000', 'value': 25000.0},
+    ];
+
     return Container(
       decoration: const BoxDecoration(
         color: white,
@@ -434,15 +461,15 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // A. Search Input + Room Category Filter Bar (Beside Search Bar)
+          // A. Search Input Field & Filter Button in Single Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                // Search Input Field
+                // 1. Search Bar
                 Expanded(
                   child: Container(
-                    height: 44,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
@@ -463,7 +490,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                           fontSize: 12.5,
                           fontWeight: FontWeight.normal,
                         ),
-                        prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 20),
+                        prefixIcon: const Icon(Icons.search_rounded, color: purple, size: 19),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, color: muted, size: 16),
@@ -481,134 +508,377 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                 ),
                 const SizedBox(width: 8),
 
-                // Category Filter Bar Button
-                _buildCategoryFilterBar(),
+                // 2. Filter Button beside Search Bar
+                _buildSearchFilterButton(),
               ],
             ),
           ),
-          const SizedBox(height: 10),
 
-          // B. Dates & Occupancy Selector Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: cream.withAlpha(120),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: gold.withAlpha(90)),
-              ),
-              child: Row(
-                children: [
-                  // Dates Pill
-                  Expanded(
-                    child: InkWell(
-                      onTap: _showDateRangePicker,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_month_rounded, size: 18, color: purple),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'DATES & DURATION',
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: muted,
-                                    letterSpacing: 0.4,
-                                  ),
+          // B. Inline Expandable Filter Panel directly below search bar
+          if (_isFilterMenuOpen) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Panel Header: Title + Reset Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.tune_rounded, size: 16, color: purple),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Filter Options',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: navy,
+                              ),
+                            ),
+                            if (activeCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: gold,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                Text(
-                                  '${DateFormat('dd MMM').format(_checkInDate)} - ${DateFormat('dd MMM').format(_checkOutDate)} ($_nightsCount ${_nightsCount == 1 ? 'Night' : 'Nights'})',
+                                child: Text(
+                                  '$activeCount active',
                                   style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
                                     color: navy,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        InkWell(
+                          onTap: _resetAllFilters,
+                          borderRadius: BorderRadius.circular(6),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Text(
+                              'Reset All',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: purple,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 18, color: cardBorder),
+
+                    // 1. Room Category
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Room Category',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy),
+                        ),
+                        Text(
+                          _getCategoryDisplayName(_selectedCategory),
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: purple),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _categoriesList.map((cat) {
+                        final key = cat['key'] as String;
+                        final label = cat['label'] as String;
+                        final icon = cat['icon'] as IconData;
+                        final count = _getCategoryRoomCount(key);
+                        final isSel = _selectedCategory == key;
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() => _selectedCategory = key);
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSel ? navy : white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSel ? gold : cardBorder,
+                                width: isSel ? 1.2 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, size: 13, color: isSel ? gold : purple),
+                                const SizedBox(width: 5),
+                                Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSel ? cream : navy,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: isSel ? gold : const Color(0xFFE2E8F0),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '$count',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: isSel ? navy : const Color(0xFF64748B),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
+                        );
+                      }).toList(),
                     ),
-                  ),
-                  Container(width: 1, height: 28, color: gold.withAlpha(90)),
-                  const SizedBox(width: 10),
+                    const SizedBox(height: 14),
 
-                  // Occupancy Pill
-                  InkWell(
-                    onTap: _showOccupancySelector,
-                    child: Row(
+                    // 2. Maximum Price
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.people_alt_rounded, size: 18, color: navy),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'GUESTS & ROOMS',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: muted,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                            Text(
-                              '$_adultsCount Adults${_childrenCount > 0 ? ', $_childrenCount Ch' : ''} • $_roomsCount Rm',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: navy,
-                              ),
-                            ),
-                          ],
+                        const Text(
+                          'Maximum Price',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy),
+                        ),
+                        Text(
+                          _maxPrice >= 25000 ? 'Any Price (Up to ₹25k+)' : 'Up to ₹${_maxPrice.toInt()}',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: navy,
+                        inactiveTrackColor: const Color(0xFFE2E8F0),
+                        thumbColor: gold,
+                        overlayColor: gold.withAlpha(40),
+                        trackHeight: 4,
+                      ),
+                      child: Slider(
+                        value: _maxPrice.clamp(1000.0, 25000.0),
+                        min: 1000.0,
+                        max: 25000.0,
+                        divisions: 24,
+                        onChanged: (val) => setState(() => _maxPrice = val),
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: presets.map((p) {
+                        final val = p['value'] as double;
+                        final label = p['label'] as String;
+                        final isSel = (_maxPrice - val).abs() < 100;
+
+                        return InkWell(
+                          onTap: () => setState(() => _maxPrice = val),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isSel ? navy : white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: isSel ? gold : cardBorder),
+                            ),
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                color: isSel ? cream : navy,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 3. Availability Filter
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: cardBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Available Rooms Only',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy),
+                              ),
+                              Text(
+                                'Hide currently occupied rooms',
+                                style: TextStyle(fontSize: 10.5, color: muted),
+                              ),
+                            ],
+                          ),
+                          Switch(
+                            value: _onlyAvailable,
+                            activeTrackColor: navy,
+                            thumbColor: const WidgetStatePropertyAll(gold),
+                            onChanged: (val) => setState(() => _onlyAvailable = val),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 4. Room Amenities
+                    const Text(
+                      'Amenities',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: navy),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: availableAmenities.map((amenity) {
+                        final isSel = _selectedAmenities.contains(amenity);
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              if (isSel) {
+                                _selectedAmenities.remove(amenity);
+                              } else {
+                                _selectedAmenities.add(amenity);
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isSel ? navy : white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSel ? gold : cardBorder,
+                                width: isSel ? 1.2 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isSel ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+                                  size: 13,
+                                  color: isSel ? gold : purple,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  amenity,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSel ? cream : navy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 5. Close / Done Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: navy,
+                          foregroundColor: white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          setState(() => _isFilterMenuOpen = false);
+                        },
+                        child: const Text(
+                          'Done',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-
-          // C. Filter Navigation Tabs (All Rooms, Available, Occupied, Reserved)
-          _buildStatusNavTabs(),
+          ],
         ],
       ),
     );
   }
 
-  // Room Category Filter Button (Beside Search Bar)
-  Widget _buildCategoryFilterBar() {
-    final isFiltered = _selectedCategory != 'all';
-    final selectedLabel = _getCategoryDisplayName(_selectedCategory);
+  Widget _buildSearchFilterButton() {
+    final activeCount = _activeFiltersCount;
+    final isFiltered = activeCount > 0;
 
     return InkWell(
-      onTap: _showCategoryFilterSheet,
+      onTap: () {
+        setState(() => _isFilterMenuOpen = !_isFilterMenuOpen);
+      },
       borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
-          color: isFiltered ? navy : const Color(0xFFF1F5F9),
+          color: (_isFilterMenuOpen || isFiltered) ? navy : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isFiltered ? gold : cardBorder,
+            color: (_isFilterMenuOpen || isFiltered) ? gold : cardBorder,
             width: 1.2,
           ),
-          boxShadow: isFiltered
+          boxShadow: (_isFilterMenuOpen || isFiltered)
               ? [
                   BoxShadow(
-                    color: navy.withAlpha(40),
+                    color: navy.withAlpha(35),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -620,283 +890,25 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
           children: [
             Icon(
               Icons.tune_rounded,
-              size: 17,
-              color: isFiltered ? gold : purple,
+              size: 15,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : purple,
             ),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 100),
-              child: Text(
-                isFiltered ? selectedLabel : 'Category',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isFiltered ? FontWeight.w800 : FontWeight.w700,
-                  color: isFiltered ? cream : navy,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 5),
+            Text(
+              isFiltered ? 'Filters ($activeCount)' : 'Filters',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: (_isFilterMenuOpen || isFiltered) ? FontWeight.w800 : FontWeight.w600,
+                color: (_isFilterMenuOpen || isFiltered) ? cream : navy,
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             Icon(
-              Icons.keyboard_arrow_down_rounded,
+              _isFilterMenuOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
               size: 16,
-              color: isFiltered ? gold : muted,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : muted,
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // Category Filter Bottom Sheet
-  void _showCategoryFilterSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle Bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: cardBorder,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Header: Icon + Title + Close Button
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: purple.withAlpha(25),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: purple.withAlpha(60)),
-                        ),
-                        child: const Icon(Icons.category_rounded, color: purple, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Filter by Room Category',
-                              style: TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w800,
-                                color: navy,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Select a category to refine room results',
-                              style: TextStyle(fontSize: 12, color: muted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 20, color: muted),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Category Options
-                  ..._categoriesList.map((cat) {
-                    final key = cat['key'] as String;
-                    final label = cat['label'] as String;
-                    final icon = cat['icon'] as IconData;
-                    final count = _getCategoryRoomCount(key);
-                    final isSelected = _selectedCategory == key;
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedCategory = key;
-                          });
-                          Navigator.pop(ctx);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: isSelected ? navy : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected ? navy : cardBorder,
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                icon,
-                                size: 20,
-                                color: isSelected ? gold : purple,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSelected ? cream : navy,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? gold : const Color(0xFFE2E8F0),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '$count rooms',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: isSelected ? navy : const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ),
-                              if (isSelected) ...[
-                                const SizedBox(width: 8),
-                                const Icon(Icons.check_circle_rounded, color: gold, size: 18),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // Filter Navigation Tabs (All Rooms, Available, Occupied, Reserved)
-  Widget _buildStatusNavTabs() {
-    const statuses = [
-      {'key': 'all', 'label': 'All Rooms', 'icon': Icons.grid_view_rounded},
-      {'key': 'available', 'label': 'Available', 'icon': Icons.check_circle_outline_rounded},
-      {'key': 'occupied', 'label': 'Occupied', 'icon': Icons.person_rounded},
-      {'key': 'reserved', 'label': 'Reserved', 'icon': Icons.event_seat_rounded},
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        height: 42,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          clipBehavior: Clip.hardEdge,
-          padding: EdgeInsets.zero,
-          itemCount: statuses.length,
-          separatorBuilder: (context, index) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final st = statuses[index];
-            final key = st['key'] as String;
-            final label = st['label'] as String;
-            final icon = st['icon'] as IconData;
-            final count = _getStatusRoomCount(key);
-            final isSelected = _selectedStatus == key;
-
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedStatus = key;
-                });
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-                decoration: BoxDecoration(
-                  color: isSelected ? navy : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? navy : cardBorder,
-                    width: 1.2,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: navy.withAlpha(35),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 15,
-                      color: isSelected ? gold : purple,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? cream : navy,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isSelected ? gold : const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: isSelected ? navy : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
         ),
       ),
     );
@@ -906,34 +918,44 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // 2. RESULTS SUMMARY BAR
   // ==========================================
   Widget _buildResultsSummaryBar(int count) {
-    String statusTitle = 'Rooms';
-    if (_selectedStatus == 'available') {
-      statusTitle = 'Available Rooms';
-    } else if (_selectedStatus == 'occupied') {
-      statusTitle = 'Occupied Rooms';
-    } else if (_selectedStatus == 'reserved') {
-      statusTitle = 'Reserved Rooms';
-    }
-
-    String catTag = '';
-    if (_selectedCategory != 'all') {
-      catTag = ' • ${_getCategoryDisplayName(_selectedCategory)}';
-    }
+    final hasActiveFilters = _selectedCategory != 'all' ||
+        _maxPrice < 25000 ||
+        _selectedAmenities.isNotEmpty ||
+        _onlyAvailable ||
+        _searchQuery.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            '$count $statusTitle$catTag',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: navy,
-            ),
+          Row(
+            children: [
+              Text(
+                '$count ${_onlyAvailable ? "Available " : ""}Rooms',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                ),
+              ),
+              if (_selectedCategory != 'all') ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: purpleBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _getCategoryDisplayName(_selectedCategory),
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: purple),
+                  ),
+                ),
+              ],
+            ],
           ),
-          if (_selectedCategory != 'all' || _selectedStatus != 'all' || _searchQuery.isNotEmpty)
+          if (hasActiveFilters)
             InkWell(
               onTap: _resetAllFilters,
               borderRadius: BorderRadius.circular(12),
@@ -968,13 +990,10 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
     final gstTax = (price * 0.18).roundToDouble();
     final totalPayable = price + gstTax;
 
-    final hotelName = room.propertyName?.isNotEmpty == true ? room.propertyName! : 'Hour Stay Luxury Hotel';
-    final city = room.city?.isNotEmpty == true ? room.city! : 'India';
-
     return Container(
       decoration: BoxDecoration(
         color: white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: cardBorder),
         boxShadow: [
           BoxShadow(
@@ -985,71 +1004,29 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // A. Hero Room Image Banner with Property & Availability Overlays
-          Stack(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openRoomDetails(room),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildRoomHeroImage(room),
-              // Gradient Shade
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withAlpha(120),
-                        Colors.transparent,
-                        Colors.black.withAlpha(160),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Top Badges
-              Positioned(
-                top: 12,
-                left: 12,
-                right: 12,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Property Name Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: navy.withAlpha(220),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: gold.withAlpha(120)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on_rounded, size: 12, color: gold),
-                          const SizedBox(width: 4),
-                          Text(
-                            hotelName,
-                            style: const TextStyle(
-                              color: cream,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Rating Badge
-                    Container(
+              // 1. Room Image with rating overlay
+              Stack(
+                children: [
+                  _buildRoomHeroImage(room),
+                  // Rating Badge
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(180),
+                        color: Colors.black.withAlpha(160),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.star_rounded, size: 13, color: gold),
                           const SizedBox(width: 3),
@@ -1064,18 +1041,18 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              // Bottom Badges (Room Number & Category)
-              Positioned(
-                bottom: 12,
-                left: 12,
-                right: 12,
+
+              // 2. Room Name/Type, Final Amount incl. GST & Book Stay Button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // Room Name and Final Amount
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1083,37 +1060,59 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                           Text(
                             room.category,
                             style: const TextStyle(
-                              color: white,
-                              fontSize: 16,
+                              fontSize: 15.5,
                               fontWeight: FontWeight.w800,
-                              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                              color: navy,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₹${totalPayable.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: navy,
+                              letterSpacing: -0.3,
                             ),
                           ),
-                          Text(
-                            'Room ${room.roomNumber} • ${room.floor} • $city',
+                          const Text(
+                            'Final amount (incl. GST)',
                             style: TextStyle(
-                              color: cream.withAlpha(220),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 10.5,
+                              color: muted,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Availability Status Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: room.isAvailable ? emerald : ruby,
-                        borderRadius: BorderRadius.circular(8),
+                    const SizedBox(width: 12),
+
+                    // Book Stay Button (always active to view details and select dates)
+                    ElevatedButton(
+                      onPressed: () => _openRoomDetails(room),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: navy,
+                        foregroundColor: white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(
+                            color: gold,
+                            width: 1.1,
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        room.isAvailable ? 'AVAILABLE' : 'RESERVED',
-                        style: const TextStyle(
+                      child: const Text(
+                        'Book Stay',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
                           color: white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
@@ -1122,150 +1121,45 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
               ),
             ],
           ),
-
-          // B. Card Body (Specs, Amenities, Pricing, Policies, and Booking Button)
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Bed & Capacity Specs Row
-                Row(
-                  children: [
-                    _buildSpecItem(Icons.bed_rounded, room.bedType),
-                    const SizedBox(width: 14),
-                    _buildSpecItem(Icons.people_alt_outlined, room.capacity),
-                    const SizedBox(width: 14),
-                    _buildSpecItem(Icons.layers_outlined, room.floor),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // 2. Amenities Preview Chips
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: room.amenities.take(4).map((a) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: cardBorder),
-                      ),
-                      child: Text(
-                        a,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: navy,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-
-                // 3. Cancellation Policy Highlight
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: emerald.withAlpha(15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: emerald.withAlpha(40)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.shield_outlined, size: 14, color: emerald),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          room.cancellationPolicy ?? 'Free cancellation up to 24 hours prior to check-in',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF065F46),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 20, color: cardBorder),
-
-                // 4. Price Breakdown & Action Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '₹${price.toStringAsFixed(0)} / $_nightsCount ${_nightsCount == 1 ? 'Night' : 'Nights'}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: navy,
-                          ),
-                        ),
-                        Text(
-                          '+ ₹${gstTax.toStringAsFixed(0)} GST (18%) • Total ₹${totalPayable.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: muted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    ElevatedButton(
-                      onPressed: room.isAvailable ? () => _openRoomBookingFlow(room) : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: room.isAvailable ? navy : muted,
-                        foregroundColor: cream,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(color: room.isAvailable ? gold : Colors.transparent),
-                        ),
-                      ),
-                      child: Text(
-                        room.isAvailable ? 'Book Stay' : 'Reserved',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSpecItem(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: purple),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            color: navy,
-          ),
+  void _openRoomDetails(RoomModel room) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GuestRoomDetailScreen(
+          room: room,
+          checkInDate: null,
+          checkOutDate: null,
+          adultsCount: _adultsCount,
+          childrenCount: _childrenCount,
+          roomsCount: _roomsCount,
+          onBookStay: (
+            r, {
+            DateTime? checkInDate,
+            DateTime? checkOutDate,
+            int? adultsCount,
+            int? childrenCount,
+            int? roomsCount,
+            String? acVariant,
+            double? customPrice,
+          }) {
+            Navigator.of(context).pop();
+            _openRoomBookingFlow(
+              r,
+              checkInDate: checkInDate,
+              checkOutDate: checkOutDate,
+              adultsCount: adultsCount,
+              childrenCount: childrenCount,
+              roomsCount: roomsCount,
+              acVariant: acVariant,
+              customPrice: customPrice,
+            );
+          },
         ),
-      ],
+      ),
     );
   }
 
@@ -1336,166 +1230,37 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   }
 
   // ==========================================
-  // 4. DATE RANGE PICKER MODAL
+  // 4. ROOM DETAILS & INSTANT BOOKING FLOW
   // ==========================================
-  Future<void> _showDateRangePicker() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 180)),
-      initialDateRange: DateTimeRange(
-        start: _checkInDate,
-        end: _checkOutDate,
-      ),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: purple,
-            colorScheme: const ColorScheme.light(
-              primary: purple,
-              onPrimary: white,
-              surface: white,
-              onSurface: navy,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _checkInDate = picked.start;
-        _checkOutDate = picked.end;
-      });
-      _loadPropertiesAndRooms(silent: true);
-    }
-  }
-
-  // ==========================================
-  // 5. OCCUPANCY SELECTOR SHEET
-  // ==========================================
-  void _showOccupancySelector() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: cardBorder,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Select Guests & Rooms',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: navy),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildCounterRow('Adults', 'Ages 13 or above', _adultsCount, 1, 10, (val) {
-                    setSheetState(() => _adultsCount = val);
-                    setState(() => _adultsCount = val);
-                  }),
-                  const Divider(height: 24, color: cardBorder),
-
-                  _buildCounterRow('Children', 'Ages 0 to 12', _childrenCount, 0, 6, (val) {
-                    setSheetState(() => _childrenCount = val);
-                    setState(() => _childrenCount = val);
-                  }),
-                  const Divider(height: 24, color: cardBorder),
-
-                  _buildCounterRow('Rooms', 'Number of rooms required', _roomsCount, 1, 5, (val) {
-                    setSheetState(() => _roomsCount = val);
-                    setState(() => _roomsCount = val);
-                  }),
-                  const SizedBox(height: 20),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: navy,
-                        foregroundColor: cream,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: gold),
-                        ),
-                      ),
-                      child: const Text('Apply Selection', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCounterRow(String title, String subtitle, int count, int min, int max, ValueChanged<int> onChanged) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: navy)),
-            Text(subtitle, style: const TextStyle(fontSize: 11, color: muted)),
-          ],
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.remove_circle_outline, color: muted),
-              onPressed: count > min ? () => onChanged(count - 1) : null,
-            ),
-            SizedBox(
-              width: 24,
-              child: Text(
-                '$count',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: navy),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: purple),
-              onPressed: count < max ? () => onChanged(count + 1) : null,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-
-
-  // ==========================================
-  // 7. ROOM DETAILS & INSTANT BOOKING FLOW
-  // ==========================================
-  void _openRoomBookingFlow(RoomModel room) {
+  void _openRoomBookingFlow(
+    RoomModel room, {
+    DateTime? checkInDate,
+    DateTime? checkOutDate,
+    int? adultsCount,
+    int? childrenCount,
+    int? roomsCount,
+    String? acVariant,
+    double? customPrice,
+  }) {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.user;
 
-    final price = _calculateRoomPrice(room);
+    if (user == null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+
+    final effectiveCheckIn = checkInDate ?? _checkInDate;
+    final effectiveCheckOut = checkOutDate ?? _checkOutDate;
+    final effectiveAdults = adultsCount ?? _adultsCount;
+    final effectiveChildren = childrenCount ?? _childrenCount;
+    final effectiveRooms = roomsCount ?? _roomsCount;
+    final diffDays = effectiveCheckOut.difference(effectiveCheckIn).inDays;
+    final effectiveNights = diffDays > 0 ? diffDays : 1;
+
+    final price = customPrice ?? (_calculateRoomPrice(room) * effectiveNights);
     final gstTax = (price * 0.18).roundToDouble();
     final totalPayable = price + gstTax;
 
@@ -1590,8 +1355,8 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildDetailSpec(Icons.bed_rounded, 'Bed Type', room.bedType),
-                          _buildDetailSpec(Icons.people_rounded, 'Capacity', room.capacity),
-                          _buildDetailSpec(Icons.layers_rounded, 'Floor', room.floor),
+                          _buildDetailSpec(Icons.people_rounded, 'Capacity', '$effectiveAdults Adults'),
+                          _buildDetailSpec(Icons.ac_unit_rounded, 'Variant', acVariant ?? 'AC Room'),
                           _buildDetailSpec(Icons.star_rounded, 'Rating', '${room.rating} ⭐'),
                         ],
                       ),
@@ -1610,16 +1375,20 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                       ),
                       child: Column(
                         children: [
-                          _buildSummaryLine('Check-In Date', DateFormat('EEE, dd MMM yyyy').format(_checkInDate)),
+                          _buildSummaryLine('Check-In Date', DateFormat('EEE, dd MMM yyyy').format(effectiveCheckIn)),
                           const Divider(height: 14, color: cardBorder),
-                          _buildSummaryLine('Check-Out Date', DateFormat('EEE, dd MMM yyyy').format(_checkOutDate)),
+                          _buildSummaryLine('Check-Out Date', DateFormat('EEE, dd MMM yyyy').format(effectiveCheckOut)),
                           const Divider(height: 14, color: cardBorder),
                           _buildSummaryLine(
                             'Duration of Stay',
-                            '$_nightsCount ${_nightsCount == 1 ? 'Night' : 'Nights'}',
+                            '$effectiveNights ${effectiveNights == 1 ? 'Night' : 'Nights'}',
                           ),
                           const Divider(height: 14, color: cardBorder),
-                          _buildSummaryLine('Occupancy', '$_adultsCount Adults, $_childrenCount Children ($_roomsCount Room)'),
+                          _buildSummaryLine('Occupancy', '$effectiveAdults Adults${effectiveChildren > 0 ? ", $effectiveChildren Children" : ""} ($effectiveRooms Room)'),
+                          if (acVariant != null) ...[
+                            const Divider(height: 14, color: cardBorder),
+                            _buildSummaryLine('Selected Variant', acVariant),
+                          ],
                         ],
                       ),
                     ),
@@ -1637,11 +1406,11 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                       ),
                       child: Column(
                         children: [
-                          _buildSummaryLine('Guest Name', user?.name.isNotEmpty == true ? user!.name : 'Valued Guest'),
+                          _buildSummaryLine('Guest Name', user.name.isNotEmpty ? user.name : 'Valued Guest'),
                           const Divider(height: 14, color: cardBorder),
-                          _buildSummaryLine('Email Address', user?.email.isNotEmpty == true ? user!.email : 'guest@hourstay.com'),
+                          _buildSummaryLine('Email Address', user.email.isNotEmpty ? user.email : 'guest@hourstay.com'),
                           const Divider(height: 14, color: cardBorder),
-                          _buildSummaryLine('Mobile / Phone', user?.mobile.isNotEmpty == true ? user!.mobile : 'Verified on File'),
+                          _buildSummaryLine('Mobile / Phone', user.mobile.isNotEmpty ? user.mobile : 'Verified on File'),
                         ],
                       ),
                     ),
@@ -1680,7 +1449,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                       child: Column(
                         children: [
                           _buildSummaryLine(
-                            'Room Tariff ($_nightsCount ${_nightsCount == 1 ? 'Night' : 'Nights'})',
+                            'Room Tariff ($effectiveNights ${effectiveNights == 1 ? 'Night' : 'Nights'})',
                             '₹${price.toStringAsFixed(0)}',
                           ),
                           const Divider(height: 14, color: cardBorder),
@@ -1717,19 +1486,19 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                     'roomNumber': room.roomNumber,
                                     'room': room.category,
                                     'roomType': room.category,
-                                    'guest': user?.name ?? 'Valued Guest',
-                                    'guestName': user?.name ?? 'Valued Guest',
-                                    'email': user?.email ?? 'guest@hourstay.com',
-                                    'phone': user?.mobile ?? '9999999999',
-                                    'checkIn': DateFormat('yyyy-MM-dd').format(_checkInDate),
-                                    'checkInDate': DateFormat('yyyy-MM-dd').format(_checkInDate),
-                                    'checkOut': DateFormat('yyyy-MM-dd').format(_checkOutDate),
-                                    'checkOutDate': DateFormat('yyyy-MM-dd').format(_checkOutDate),
+                                    'guest': user.name,
+                                    'guestName': user.name,
+                                    'email': user.email,
+                                    'phone': user.mobile,
+                                    'checkIn': DateFormat('yyyy-MM-dd').format(effectiveCheckIn),
+                                    'checkInDate': DateFormat('yyyy-MM-dd').format(effectiveCheckIn),
+                                    'checkOut': DateFormat('yyyy-MM-dd').format(effectiveCheckOut),
+                                    'checkOutDate': DateFormat('yyyy-MM-dd').format(effectiveCheckOut),
                                     'stayType': 'overnight',
-                                    'nights': _nightsCount,
-                                    'adults': _adultsCount,
-                                    'children': _childrenCount,
-                                    'roomsCount': _roomsCount,
+                                    'nights': effectiveNights,
+                                    'adults': effectiveAdults,
+                                    'children': effectiveChildren,
+                                    'roomsCount': effectiveRooms,
                                     'amount': totalPayable,
                                     'totalAmount': totalPayable,
                                     'specialRequests': specialRequestsController.text.trim(),
@@ -1755,8 +1524,8 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                     // Fallback to guestBookings
                                     await bookingProv.bookRoom(
                                       roomId: room.id,
-                                      checkIn: DateFormat('yyyy-MM-dd').format(_checkInDate),
-                                      checkOut: DateFormat('yyyy-MM-dd').format(_checkOutDate),
+                                      checkIn: DateFormat('yyyy-MM-dd').format(effectiveCheckIn),
+                                      checkOut: DateFormat('yyyy-MM-dd').format(effectiveCheckOut),
                                       stayType: 'overnight',
                                       totalAmount: totalPayable,
                                     );
@@ -1767,64 +1536,50 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                     createdRes = ReservationModel(
                                       id: autoBookingId,
                                       bookingId: autoBookingId,
-                                      guest: user?.name ?? 'Guest',
-                                      email: user?.email ?? '',
-                                      phone: user?.mobile ?? '',
-                                      room: 'Room ${room.roomNumber} · ${room.category}',
+                                      hotel: hotelName,
+                                      room: room.category,
                                       roomNumber: room.roomNumber,
-                                      roomType: room.category,
-                                      checkIn: DateFormat('yyyy-MM-dd').format(_checkInDate),
-                                      checkOut: DateFormat('yyyy-MM-dd').format(_checkOutDate),
-                                      nights: _nightsCount,
-                                      stayType: 'overnight',
+                                      checkIn: DateFormat('yyyy-MM-dd').format(effectiveCheckIn),
+                                      checkOut: DateFormat('yyyy-MM-dd').format(effectiveCheckOut),
+                                      guest: user.name,
                                       amount: totalPayable,
+                                      balance: 0,
                                       status: 'Confirmed',
                                       paymentStatus: 'Paid',
                                       propertyId: room.propertyId,
-                                      hotel: _findPropertyName(room.propertyId),
                                     );
                                   }
 
-                                  if (!mounted) return;
                                   navigator.pop();
                                   _showBookingSuccessDialog(room, totalPayable, createdRes);
-                                  bookingProv.fetchDashboardData(silent: true);
-                                  _loadPropertiesAndRooms(silent: true);
                                 } catch (e) {
-                                  if (!mounted) return;
-                                  setModalState(() => isSubmitting = false);
                                   messenger.showSnackBar(
                                     SnackBar(
-                                      content: Text('Failed to confirm booking: $e'),
+                                      content: Text('Booking failed: $e'),
                                       backgroundColor: ruby,
                                     ),
                                   );
+                                } finally {
+                                  if (mounted) {
+                                    setModalState(() => isSubmitting = false);
+                                  }
                                 }
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: navy,
-                          foregroundColor: cream,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: gold, width: 1.2),
-                          ),
+                          foregroundColor: white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
                         ),
                         child: isSubmitting
                             ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(color: white, strokeWidth: 2),
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: white),
                               )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.check_circle_outline_rounded, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Confirm & Book Stay • ₹${totalPayable.toStringAsFixed(0)}',
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
-                                  ),
-                                ],
+                            : Text(
+                                'Confirm & Book Stay • ₹${totalPayable.toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: white),
                               ),
                       ),
                     ),
@@ -1836,19 +1591,6 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
         );
       },
     );
-  }
-
-  String _findPropertyName(String propertyId) {
-    try {
-      final match = _properties.firstWhere(
-        (p) => (p['_id'] ?? p['id'] ?? p['propertyId']) == propertyId,
-        orElse: () => <String, dynamic>{},
-      );
-      if (match.isNotEmpty) {
-        return match['name'] ?? match['propertyName'] ?? match['hotelName'] ?? 'Hour Stay Luxury Hotel';
-      }
-    } catch (_) {}
-    return 'Hour Stay Luxury Hotel';
   }
 
   Widget _buildDetailSpec(IconData icon, String label, String value) {

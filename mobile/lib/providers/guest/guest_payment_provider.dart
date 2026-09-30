@@ -94,7 +94,7 @@ class GuestPaymentProvider with ChangeNotifier {
           await _fetchFallbackFromBookings();
           _calculateSummaryLocally();
         } catch (_) {
-          if (!silent) _errorMessage = e.toString();
+          if (!silent) _errorMessage = 'Unable to connect to server. Please check your connection.';
         }
       }
     } finally {

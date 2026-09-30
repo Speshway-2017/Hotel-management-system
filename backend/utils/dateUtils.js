@@ -277,8 +277,12 @@ export const formatISTDateTime = (dateVal, includeTime = true) => {
 export const isCheckInAllowed = (booking, serverNow = new Date()) => {
   if (!booking) return false;
   const statusLower = String(booking.status || '').toLowerCase().trim();
-  // If already checked in or checked out, it is not pending check-in
-  if (['checked-in', 'checked in', 'staying', 'checked-out', 'checked out', 'cancelled'].includes(statusLower)) {
+  // If already checked in or in-house, check-in is complete (not locked)
+  if (['checked-in', 'checked in', 'staying', 'in-house', 'active'].includes(statusLower)) {
+    return true;
+  }
+  // Terminal states where check-in cannot happen
+  if (['checked-out', 'checked out', 'cancelled', 'canceled', 'no-show'].includes(statusLower)) {
     return false;
   }
 

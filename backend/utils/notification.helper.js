@@ -661,33 +661,7 @@ export const notifyAccountDeletionEvent = async ({ req, io, user }) => {
       });
     }
 
-    // 4. Universal / All-role feed
-    await triggerNotification({
-      req,
-      io: socketIo,
-      role: 'all',
-      propertyId: propId,
-      title: adminTitle,
-      message: adminMsg,
-      category: 'System',
-      data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
-    });
-
-    // 5. Notify Guest (Logs confirmation in their activity / push history)
-    if (userId) {
-      await triggerNotification({
-        req,
-        io: socketIo,
-        userId: userId,
-        role: 'guest',
-        title: guestTitle,
-        message: guestMsg,
-        category: 'System',
-        data: { userId, email: userEmail, status: 'Inactive', event: 'account_deleted' }
-      });
-    }
-
-    // 6. Direct fallback write into dedicated role tables
+    // Direct fallback write into dedicated role tables
     try {
       await Promise.all([
         ManagerNotification.create({
@@ -707,7 +681,7 @@ export const notifyAccountDeletionEvent = async ({ req, io, user }) => {
       ]);
     } catch (_) {}
 
-    // 7. Real-time broadcast sync across all connected clients & rooms
+    // Real-time broadcast sync strictly for administrative/management consoles
     if (socketIo) {
       const payload = {
         id: userId,
@@ -722,35 +696,42 @@ export const notifyAccountDeletionEvent = async ({ req, io, user }) => {
         title: adminTitle,
         message: adminMsg,
         category: 'System',
-        role: 'all',
+        role: 'admin',
         propertyId: propId,
         data: { userId, email: userEmail, status: 'Inactive' },
         createdAt: new Date().toISOString()
       };
 
-      emitRealtimeSync(socketIo, 'all', 'user_deleted', payload);
-      emitRealtimeSync(socketIo, 'all', 'user_updated', payload);
-      emitRealtimeSync(socketIo, 'all', 'guest_updated', payload);
-      emitRealtimeSync(socketIo, 'all', 'guest_deleted', payload);
-      emitRealtimeSync(socketIo, 'all', 'guest_status_changed', payload);
-      emitRealtimeSync(socketIo, 'all', 'notification_created', notifPayload);
-      emitRealtimeSync(socketIo, 'all', 'notification_received', notifPayload);
-      emitRealtimeSync(socketIo, 'all', 'new_notification', notifPayload);
-      emitRealtimeSync(socketIo, 'all', 'manager_notification', notifPayload);
-      emitRealtimeSync(socketIo, 'all', 'unread_notifications_count_updated', { role: 'all', propertyId: propId });
-      emitRealtimeSync(socketIo, 'all', 'dashboard_sync', { propertyId: propId, action: 'guest_account_deleted', userId });
-
-      // Direct socket emit
-      socketIo.emit('notification_created', notifPayload);
-      socketIo.emit('notification_received', notifPayload);
-      socketIo.emit('new_notification', notifPayload);
-      socketIo.emit('guest_updated', payload);
-      socketIo.emit('user_updated', payload);
-      socketIo.emit('guest_status_changed', payload);
-      socketIo.emit('dashboard_sync', { propertyId: propId, action: 'guest_account_deleted', userId });
+      emitRealtimeSync(socketIo, propId, 'guest_deleted', payload);
+      emitRealtimeSync(socketIo, propId, 'guest_status_changed', payload);
+      emitRealtimeSync(socketIo, propId, 'user_updated', payload);
+      emitRealtimeSync(socketIo, propId, 'manager_notification', notifPayload);
+      emitRealtimeSync(socketIo, propId, 'unread_notifications_count_updated', { role: 'manager', propertyId: propId });
+      emitRealtimeSync(socketIo, 'global', 'unread_notifications_count_updated', { role: 'admin' });
+      emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: 'guest_account_deleted', userId });
     }
   } catch (err) {
     console.error("❌ Failed to broadcast account deletion notification:", err.message);
   }
 };
+
+/**
+ * Purges any legacy Account Deletion alerts accidentally saved under Guest or All-role scope.
+ */
+export const purgeGuestAccountDeletionNotifications = async () => {
+  try {
+    const deletionFilter = {
+      $or: [
+        { title: { $regex: /account deleted|account has been deleted|deleted account/i } },
+        { message: { $regex: /account deleted|permanently deleted their account|credentials have been permanently deleted/i } },
+        { category: 'Account Deletion' }
+      ],
+      role: { $in: ['guest', 'all', null] }
+    };
+    await Notification.deleteMany(deletionFilter).catch(() => null);
+  } catch (err) {
+    console.warn("Notice: account deletion notifications cleanup:", err.message);
+  }
+};
+
 

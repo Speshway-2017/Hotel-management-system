@@ -1,13 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/app_colors.dart';
+import '../colours.dart';
+import '../screens/guest_mode_screen.dart';
 
 class AuthScaffold extends StatelessWidget {
   final Widget child;
+  final bool showGuestSkip;
+  final VoidCallback? onSkip;
 
   const AuthScaffold({
     super.key,
     required this.child,
+    this.showGuestSkip = true,
+    this.onSkip,
   });
+
+  void _handleSkip(BuildContext context) {
+    if (onSkip != null) {
+      onSkip!();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const GuestModeScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +48,7 @@ class AuthScaffold extends StatelessWidget {
             ),
           ),
 
-          // 2. Subtle Dark Gradient Overlay (matching web from-navy/85 via-navy/55 to-navy/70)
+          // 2. Subtle Dark Gradient Overlay
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -46,21 +65,56 @@ class AuthScaffold extends StatelessWidget {
 
           // 3. Scrollable Main Content
           SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 32,
-                    ),
-                    child: Center(
-                      child: child,
+            child: Column(
+              children: [
+                // Top Header Bar: Skip only
+                if (showGuestSkip)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: TextButton(
+                        onPressed: () => _handleSkip(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          backgroundColor: Colors.black.withAlpha(90),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(color: gold.withAlpha(90), width: 1),
+                          ),
+                        ),
+                        child: Text(
+                          'Skip',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: cream,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                );
-              },
+
+                // Form Content
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Center(
+                            child: child,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         ],
