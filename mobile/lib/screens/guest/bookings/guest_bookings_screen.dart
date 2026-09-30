@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
+import 'package:hour_stay_mobile/providers/auth_provider.dart';
 import 'package:hour_stay_mobile/widgets/empty_state.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
+import '../../auth/login_screen.dart';
 import '../feedback/guest_add_feedback_screen.dart';
 import '../folio/guest_folio_screen.dart';
 import '../search/guest_search_screen.dart';
@@ -28,24 +30,25 @@ class GuestBookingsScreen extends StatefulWidget {
   State<GuestBookingsScreen> createState() => _GuestBookingsScreenState();
 }
 
-class _GuestBookingsScreenState extends State<GuestBookingsScreen>
-    with SingleTickerProviderStateMixin {
-
-  late TabController _tabController;
+class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
+  String _selectedFilter = 'all';
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isFilterMenuOpen = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: 4,
-      vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 3),
-    );
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    if (widget.initialTabIndex == 1) {
+      _selectedFilter = 'upcoming';
+    } else if (widget.initialTabIndex == 2) {
+      _selectedFilter = 'current';
+    } else if (widget.initialTabIndex == 3) {
+      _selectedFilter = 'completed';
+    } else {
+      _selectedFilter = 'all';
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GuestBookingProvider>().fetchMyBookings();
     });
@@ -53,7 +56,6 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -68,12 +70,67 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
     }
   }
 
+  _BookingTabType _getBookingTabType(ReservationModel b) {
+    final s = b.status.toLowerCase();
+    if (s == 'cancelled') return _BookingTabType.cancelled;
+    if (s == 'checked_in' || s == 'checked-in') return _BookingTabType.currentStay;
+    if (s == 'checked_out' || s == 'checked-out' || s == 'completed') return _BookingTabType.completed;
+    return _BookingTabType.upcoming;
+  }
+
+  String get _emptyTitle {
+    switch (_selectedFilter) {
+      case 'upcoming':
+        return 'No Upcoming Stays';
+      case 'current':
+        return 'No Current Stay Active';
+      case 'completed':
+        return 'No Past Stays';
+      case 'cancelled':
+        return 'No Cancelled Bookings';
+      default:
+        return 'No Bookings Found';
+    }
+  }
+
+  String get _emptyMessage {
+    switch (_selectedFilter) {
+      case 'upcoming':
+        return 'When you book a room or hourly stay, your active reservation will appear here.';
+      case 'current':
+        return 'You are not currently checked into any room. Check-in details will appear here.';
+      case 'completed':
+        return 'Your completed stays, digital folios, and invoices will be archived here.';
+      case 'cancelled':
+        return 'Cancelled reservations and refund tracking requests will be listed here.';
+      default:
+        return 'We could not find any bookings matching your criteria. Try adjusting your search query or filters.';
+    }
+  }
+
+  IconData get _emptyIcon {
+    switch (_selectedFilter) {
+      case 'upcoming':
+        return Icons.calendar_today_outlined;
+      case 'current':
+        return Icons.hotel_outlined;
+      case 'completed':
+        return Icons.history_rounded;
+      case 'cancelled':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.search_off_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final isAuthenticated = authProvider.isAuthenticated;
     final bookingProvider = context.watch<GuestBookingProvider>();
     final allBookings = bookingProvider.bookings;
 
-    // Filter into 4 exact business categories from real MongoDB data
+    // Filter into exact business categories from real MongoDB data
     final upcomingBookings = allBookings.where((b) {
       final s = b.status.toLowerCase();
       final isCurrent = s == 'checked_in' || s == 'checked-in';
@@ -111,15 +168,45 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
       }).toList();
     }
 
-    final filteredUpcoming = applySearch(upcomingBookings);
-    final filteredCurrent = applySearch(currentStayBookings);
-    final filteredCompleted = applySearch(completedBookings);
-    final filteredCancelled = applySearch(cancelledBookings);
+    final List<ReservationModel> activeList = _selectedFilter == 'all'
+        ? allBookings
+        : _selectedFilter == 'upcoming'
+            ? upcomingBookings
+            : _selectedFilter == 'current'
+                ? currentStayBookings
+                : _selectedFilter == 'completed'
+                    ? completedBookings
+                    : cancelledBookings;
 
+    final filteredBookings = applySearch(activeList);
     final isInitialLoading = bookingProvider.isLoading && allBookings.isEmpty;
 
     return Scaffold(
       backgroundColor: background,
+      appBar: AppBar(
+        backgroundColor: navy,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: gold, size: 20),
+          onPressed: () {
+            if (widget.onNavigateTab != null) {
+              widget.onNavigateTab!(2);
+            } else if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        title: const Text(
+          'My Bookings',
+          style: TextStyle(
+            color: cream,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 76),
         child: Container(
@@ -162,85 +249,97 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
           ),
         ),
       ),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
+      body: RefreshIndicator(
+        color: purple,
+        backgroundColor: white,
+        onRefresh: () => bookingProvider.fetchMyBookings(),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
             SliverToBoxAdapter(
               child: _buildHeaderSection(
+                allCount: allBookings.length,
                 upcomingCount: upcomingBookings.length,
                 currentCount: currentStayBookings.length,
                 completedCount: completedBookings.length,
                 cancelledCount: cancelledBookings.length,
               ),
             ),
-          ];
-        },
-        body: RefreshIndicator(
-          color: purple,
-          backgroundColor: white,
-          onRefresh: () => bookingProvider.fetchMyBookings(),
-          child: isInitialLoading
-              ? _buildLoadingSkeleton()
-              : bookingProvider.errorMessage != null && allBookings.isEmpty
-                  ? _buildErrorState(bookingProvider)
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        // Tab 1: Current Stay
-                        _buildBookingListView(
-                          context,
-                          bookings: filteredCurrent,
-                          tabType: _BookingTabType.currentStay,
-                          emptyTitle: 'No Current Stay Active',
-                          emptyMessage: 'You are not currently checked into any room. Check-in details will appear here.',
-                          onRefresh: () => bookingProvider.fetchMyBookings(),
-                        ),
-
-                        // Tab 2: Upcoming
-                        _buildBookingListView(
-                          context,
-                          bookings: filteredUpcoming,
-                          tabType: _BookingTabType.upcoming,
-                          emptyTitle: 'No Upcoming Stays',
-                          emptyMessage: 'When you book a room or hourly stay, your active reservation will appear here.',
-                          onRefresh: () => bookingProvider.fetchMyBookings(),
-                        ),
-
-                        // Tab 3: Completed
-                        _buildBookingListView(
-                          context,
-                          bookings: filteredCompleted,
-                          tabType: _BookingTabType.completed,
-                          emptyTitle: 'No Past Stays',
-                          emptyMessage: 'Your completed stays, digital folios, and invoices will be archived here.',
-                          onRefresh: () => bookingProvider.fetchMyBookings(),
-                        ),
-
-                        // Tab 4: Cancelled
-                        _buildBookingListView(
-                          context,
-                          bookings: filteredCancelled,
-                          tabType: _BookingTabType.cancelled,
-                          emptyTitle: 'No Cancelled Bookings',
-                          emptyMessage: 'Cancelled reservations and refund tracking requests will be listed here.',
-                          onRefresh: () => bookingProvider.fetchMyBookings(),
-                        ),
-                      ],
-                    ),
+            if (!isAuthenticated)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildGuestModeState(context),
+              )
+            else if (isInitialLoading)
+              SliverToBoxAdapter(child: _buildLoadingSkeleton())
+            else if (bookingProvider.errorMessage != null && allBookings.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildErrorState(bookingProvider),
+              )
+            else if (filteredBookings.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 120),
+                  child: EmptyState(
+                    icon: _emptyIcon,
+                    title: _emptyTitle,
+                    message: _emptyMessage,
+                    actionText: _selectedFilter == 'upcoming' || _selectedFilter == 'current' || _selectedFilter == 'all'
+                        ? 'Explore Rooms'
+                        : 'Refresh Stays',
+                    onAction: () {
+                      if (_selectedFilter == 'upcoming' || _selectedFilter == 'current' || _selectedFilter == 'all') {
+                        _navigateToSearch(context);
+                      } else {
+                        bookingProvider.fetchMyBookings();
+                      }
+                    },
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final booking = filteredBookings[index];
+                      final tabType = _getBookingTabType(booking);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _buildBookingCard(context, booking, tabType),
+                      );
+                    },
+                    childCount: filteredBookings.length,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 
   // =========================================================================
-  // HEADER SECTION (Title, Search Bar, and Navigation Chips)
+  // HEADER SECTION (Search Bar & Inline Filter Dropdown)
   // =========================================================================
   Widget _buildHeaderSection({
+    required int allCount,
     required int upcomingCount,
     required int currentCount,
     required int completedCount,
     required int cancelledCount,
   }) {
+    final List<Map<String, dynamic>> filters = <Map<String, dynamic>>[
+      <String, dynamic>{'key': 'all', 'label': 'All Bookings', 'shortLabel': 'All', 'count': allCount, 'icon': Icons.all_inbox_rounded},
+      <String, dynamic>{'key': 'upcoming', 'label': 'Upcoming Stays', 'shortLabel': 'Upcoming', 'count': upcomingCount, 'icon': Icons.calendar_today_rounded},
+      <String, dynamic>{'key': 'current', 'label': 'Current Stay (In-House)', 'shortLabel': 'Current', 'count': currentCount, 'icon': Icons.hotel_rounded, 'isLive': currentCount > 0},
+      <String, dynamic>{'key': 'completed', 'label': 'Completed Stays', 'shortLabel': 'Completed', 'count': completedCount, 'icon': Icons.task_alt_rounded},
+      <String, dynamic>{'key': 'cancelled', 'label': 'Cancelled Stays', 'shortLabel': 'Cancelled', 'count': cancelledCount, 'icon': Icons.cancel_outlined},
+    ];
+
     return Container(
       decoration: const BoxDecoration(
         color: white,
@@ -250,253 +349,253 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title Bar
+          // Search Field & Filter Button in Single Row
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: purpleBg,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: purple.withAlpha(40)),
-                  ),
-                  child: const Icon(Icons.bookmark_added_rounded, color: purple, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'My Bookings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: navy,
-                          letterSpacing: -0.3,
-                        ),
+                // 1. Search Bar
+                Expanded(
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cardBorder),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(fontSize: 13, color: navy, fontWeight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        hintText: 'Search by ID, hotel, room...',
+                        hintStyle: const TextStyle(fontSize: 12.5, color: muted),
+                        prefixIcon: const Icon(Icons.search_rounded, color: muted, size: 18),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 16, color: muted),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       ),
-                      Text(
-                        'Manage upcoming trips, current stays & past invoices',
-                        style: TextStyle(fontSize: 11.5, color: muted),
-                      ),
-                    ],
+                      onChanged: (val) {
+                        setState(() => _searchQuery = val);
+                      },
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
+
+                // 2. Filter Dropdown Button beside Search Bar
+                _buildBookingsFilterButton(filters),
               ],
             ),
           ),
 
-          // Search Field
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cardBorder),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(fontSize: 13, color: navy, fontWeight: FontWeight.w500),
-                decoration: InputDecoration(
-                  hintText: 'Search by Booking ID, hotel, room, city...',
-                  hintStyle: const TextStyle(fontSize: 12.5, color: muted),
-                  prefixIcon: const Icon(Icons.search_rounded, color: muted, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 16, color: muted),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          // 3. Inline Expandable Filter Options directly below the search area
+          if (_isFilterMenuOpen) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: cardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                onChanged: (val) {
-                  setState(() => _searchQuery = val);
-                },
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: filters.map((f) {
+                    final key = f['key'] as String;
+                    final label = f['label'] as String;
+                    final count = f['count'] as int;
+                    final icon = f['icon'] as IconData;
+                    final isLive = (f['isLive'] as bool?) ?? false;
+                    final isSel = _selectedFilter == key;
+
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter = key;
+                          _isFilterMenuOpen = false;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: isSel ? navy : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              icon,
+                              size: 16,
+                              color: isSel ? gold : purple,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  if (isLive) ...[
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      margin: const EdgeInsets.only(right: 6),
+                                      decoration: const BoxDecoration(
+                                        color: gold,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ],
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                      color: isSel ? cream : navy,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSel ? gold : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isSel ? navy : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                            if (isSel) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check_rounded, color: gold, size: 16),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
-          ),
-
-          // Horizontal Navigation Tabs (Current Stay, Upcoming, Completed, Cancelled)
-          _buildBookingsNavChips(
-            currentCount: currentCount,
-            upcomingCount: upcomingCount,
-            completedCount: completedCount,
-            cancelledCount: cancelledCount,
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildBookingsNavChips({
-    required int currentCount,
-    required int upcomingCount,
-    required int completedCount,
-    required int cancelledCount,
-  }) {
-    final tabs = [
-      {'index': 0, 'label': 'Current Stay', 'count': currentCount, 'isLive': currentCount > 0},
-      {'index': 1, 'label': 'Upcoming', 'count': upcomingCount, 'isLive': false},
-      {'index': 2, 'label': 'Completed', 'count': completedCount, 'isLive': false},
-      {'index': 3, 'label': 'Cancelled', 'count': cancelledCount, 'isLive': false},
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        height: 42,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.zero,
-          clipBehavior: Clip.hardEdge,
-          itemCount: tabs.length,
-          separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final tab = tabs[index];
-          final tabIndex = tab['index'] as int;
-          final label = tab['label'] as String;
-          final count = tab['count'] as int;
-          final isLive = tab['isLive'] as bool;
-          final isSelected = _tabController.index == tabIndex;
-
-          return InkWell(
-            onTap: () {
-              _tabController.animateTo(tabIndex);
-              setState(() {});
-            },
-            borderRadius: BorderRadius.circular(20),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-              decoration: BoxDecoration(
-                color: isSelected ? navy : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected ? navy : cardBorder,
-                  width: 1.2,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: navy.withAlpha(35),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isLive) ...[
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: emerald,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? cream : navy,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isSelected ? gold : const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: isSelected ? navy : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ),
-  );
-}
-
-  // =========================================================================
-  // BOOKINGS LIST VIEW PER TAB
-  // =========================================================================
-  Widget _buildBookingListView(
-    BuildContext context, {
-    required List<ReservationModel> bookings,
-    required _BookingTabType tabType,
-    required String emptyTitle,
-    required String emptyMessage,
-    required Future<void> Function() onRefresh,
-  }) {
-    if (bookings.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.fromLTRB(16, 32, 16, 120),
-        children: [
-          EmptyState(
-            icon: tabType == _BookingTabType.upcoming
-                ? Icons.calendar_today_outlined
-                : tabType == _BookingTabType.currentStay
-                    ? Icons.hotel_outlined
-                    : tabType == _BookingTabType.completed
-                        ? Icons.history_rounded
-                        : Icons.cancel_outlined,
-            title: emptyTitle,
-            message: emptyMessage,
-            actionText: tabType == _BookingTabType.upcoming || tabType == _BookingTabType.currentStay
-                ? 'Explore Rooms'
-                : 'Refresh Stays',
-            onAction: () {
-              if (tabType == _BookingTabType.upcoming || tabType == _BookingTabType.currentStay) {
-                _navigateToSearch(context);
-              } else {
-                onRefresh();
-              }
-            },
-          ),
-        ],
-      );
+  Widget _buildBookingsFilterButton(List<Map<String, dynamic>> filters) {
+    Map<String, dynamic> currentMatch = filters.first;
+    for (final f in filters) {
+      if (f['key'] == _selectedFilter) {
+        currentMatch = f;
+        break;
+      }
     }
 
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
-      itemCount: bookings.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, index) {
-        final booking = bookings[index];
-        return _buildBookingCard(context, booking, tabType);
+    final selectedLabel = currentMatch['shortLabel'] as String;
+    final selectedCount = currentMatch['count'] as int;
+    final isFiltered = _selectedFilter != 'all';
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _isFilterMenuOpen = !_isFilterMenuOpen;
+        });
       },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        decoration: BoxDecoration(
+          color: (_isFilterMenuOpen || isFiltered) ? navy : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (_isFilterMenuOpen || isFiltered) ? gold : cardBorder,
+            width: 1.2,
+          ),
+          boxShadow: (_isFilterMenuOpen || isFiltered)
+              ? [
+                  BoxShadow(
+                    color: navy.withAlpha(30),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 16,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : purple,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isFiltered ? selectedLabel : 'Filter',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: (_isFilterMenuOpen || isFiltered) ? FontWeight.w800 : FontWeight.w600,
+                color: (_isFilterMenuOpen || isFiltered) ? cream : navy,
+              ),
+            ),
+            if (isFiltered) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: gold,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$selectedCount',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: navy,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(width: 3),
+            Icon(
+              _isFilterMenuOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: (_isFilterMenuOpen || isFiltered) ? gold : muted,
+            ),
+          ],
+        ),
+      ),
     );
   }
+
+
 
   // =========================================================================
   // MAIN BOOKING CARD WIDGET
@@ -532,11 +631,23 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => GuestBookingDetailScreen(booking: b),
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // 1. Top Bar: Booking ID & Status Badges
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -551,47 +662,53 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
               child: Row(
                 children: [
                   // Booking ID with copy icon
-                  InkWell(
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: b.reservationNumber));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Booking ID #${b.reservationNumber} copied!'),
-                          duration: const Duration(seconds: 2),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '#${b.reservationNumber}',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
+                  Flexible(
+                    child: InkWell(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: b.reservationNumber));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Booking ID #${b.reservationNumber} copied!'),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '#${b.reservationNumber}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: tabType == _BookingTabType.currentStay
+                                    ? const Color(0xFF065F46)
+                                    : isCancelled
+                                        ? const Color(0xFF991B1B)
+                                        : navy,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.copy_rounded,
+                            size: 13,
                             color: tabType == _BookingTabType.currentStay
                                 ? const Color(0xFF065F46)
                                 : isCancelled
                                     ? const Color(0xFF991B1B)
-                                    : navy,
+                                    : muted,
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.copy_rounded,
-                          size: 13,
-                          color: tabType == _BookingTabType.currentStay
-                              ? const Color(0xFF065F46)
-                              : isCancelled
-                                  ? const Color(0xFF991B1B)
-                                  : muted,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 6),
                   // Payment Status Pill
                   _buildPaymentPill(b.paymentStatus),
                   const SizedBox(width: 6),
@@ -634,7 +751,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    'Room ${b.roomNumber.isNotEmpty ? b.roomNumber : "Assigned on Check-in"}',
+                                    b.roomNumber.isNotEmpty ? 'Room ${b.roomNumber}' : 'Room Assigned',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
@@ -704,6 +821,8 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                                       fontWeight: FontWeight.w700,
                                       color: navy,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -738,6 +857,8 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                                       fontWeight: FontWeight.w700,
                                       color: navy,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -750,11 +871,15 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                           children: [
                             const Icon(Icons.people_outline_rounded, size: 14, color: muted),
                             const SizedBox(width: 4),
-                            Text(
-                              '${b.adults} Adults${b.children > 0 ? ", ${b.children} Kids" : ""} (${b.roomsCount} Room)',
-                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                            Expanded(
+                              child: Text(
+                                '${b.adults} Adults${b.children > 0 ? ", ${b.children} Kids" : ""} (${b.roomsCount} Room)',
+                                style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
@@ -764,6 +889,8 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                               child: Text(
                                 durationText,
                                 style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -771,57 +898,6 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
                       ],
                     ),
                   ),
-
-                  // 3. Cancelled & Refund Details Notice (if applicable)
-                  if (isCancelled) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: rubyBg.withAlpha(80),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: ruby.withAlpha(50)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.info_outline_rounded, color: ruby, size: 15),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  b.cancellationReason.isNotEmpty
-                                      ? 'Cancelled: ${b.cancellationReason}'
-                                      : 'Stay reservation was cancelled.',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF991B1B),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (b.hasRefundRequest) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Refund Processing:',
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF7F1D1D)),
-                                ),
-                                _buildRefundStatusBadge(b.refundStatus),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
 
                   const SizedBox(height: 12),
 
@@ -874,7 +950,9 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   // =========================================================================
@@ -1021,13 +1099,15 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
               backgroundColor: navy,
               foregroundColor: white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.star_rate_rounded, size: 16, color: gold),
             label: const Text(
               'Feedback',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             onPressed: () {
               Navigator.of(context).push(
@@ -1045,7 +1125,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
             style: OutlinedButton.styleFrom(
               foregroundColor: navy,
               side: const BorderSide(color: cardBorder),
-              padding: const EdgeInsets.symmetric(vertical: 9),
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.receipt_long_outlined, size: 15, color: navy),
@@ -2009,40 +2089,6 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
     );
   }
 
-  Widget _buildRefundStatusBadge(String status) {
-    final s = status.toLowerCase();
-    Color bg;
-    Color fg;
-    if (s == 'refunded') {
-      bg = purpleBg;
-      fg = purple;
-    } else if (s == 'approved') {
-      bg = emeraldBg;
-      fg = emerald;
-    } else if (s == 'processing') {
-      bg = blueBg;
-      fg = blue;
-    } else if (s == 'rejected') {
-      bg = rubyBg;
-      fg = ruby;
-    } else {
-      bg = amberBg;
-      fg = amber;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg),
-      ),
-    );
-  }
-
   // =========================================================================
   // LOADING & ERROR SKELETONS
   // =========================================================================
@@ -2065,38 +2111,166 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen>
     );
   }
 
+  Widget _buildGuestModeState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: gold.withAlpha(80), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(8),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: navy,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: navy.withAlpha(30),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.hotel_rounded, size: 30, color: gold),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Welcome to Hour Stay',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sign in or create an account to view your upcoming stays, active reservations, and digital check-in keys.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: muted,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: navy,
+                    foregroundColor: white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: gold, width: 1.2),
+                    ),
+                  ),
+                  icon: const Icon(Icons.login_rounded, size: 18, color: gold),
+                  label: const Text(
+                    'Sign In / Register',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState(GuestBookingProvider provider) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline_rounded, color: ruby, size: 48),
-            const SizedBox(height: 14),
-            const Text(
-              'Unable to Load Bookings',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: navy),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              provider.errorMessage ?? 'Please check your internet connection and try again.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: muted),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: navy,
-                foregroundColor: white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardBorder, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: navy.withAlpha(8),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold)),
-              onPressed: () => provider.fetchMyBookings(),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: slateBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold.withAlpha(120), width: 1.5),
+                ),
+                child: const Icon(Icons.sync_problem_rounded, size: 28, color: navy),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Unable to Load Reservations',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'We could not refresh your stay details right now. Please verify your connection and tap retry.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: muted, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: navy,
+                  foregroundColor: white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: gold, width: 1),
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 18, color: gold),
+                label: const Text('Refresh Stays', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                onPressed: () => provider.fetchMyBookings(),
+              ),
+            ],
+          ),
         ),
       ),
     );

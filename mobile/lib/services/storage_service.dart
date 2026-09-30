@@ -8,6 +8,17 @@ class StorageService {
   static const String _keyBaseUrl = 'hms_mobile_base_url';
   static const String _keySocketUrl = 'hms_mobile_socket_url';
   static const String _keyLastViewedFeedback = 'hms_last_viewed_feedback';
+  static const String _keyOnboardingCompleted = 'hms_onboarding_completed';
+
+  static Future<void> saveOnboardingCompleted(bool completed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyOnboardingCompleted, completed);
+  }
+
+  static Future<bool> isOnboardingCompleted() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyOnboardingCompleted) ?? false;
+  }
 
   static Future<void> saveLastViewedFeedback(DateTime time) async {
     final prefs = await SharedPreferences.getInstance();

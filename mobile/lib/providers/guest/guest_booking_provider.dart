@@ -91,7 +91,7 @@ class GuestBookingProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-      if (!silent) _errorMessage = e.toString();
+      if (!silent) _errorMessage = 'Unable to connect to server. Please check your connection.';
     } finally {
       if (!silent) {
         _isLoading = false;

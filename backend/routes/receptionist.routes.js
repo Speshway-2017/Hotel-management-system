@@ -1085,12 +1085,16 @@ router.put('/reservations/:id/status', async (req, res) => {
 
     const isWebsiteBooking = booking.source && booking.source !== 'Walk-in' && !booking.source.toLowerCase().includes('walk-in');
 
-    // Strict server-time check-in enforcement
+    // Strict server-time check-in enforcement (applied only to pending/confirmed reservations)
     if (status === 'Checked-in') {
-      const serverNow = new Date();
-      if (!isCheckInAllowed(booking, serverNow)) {
-        const checkInTime = booking.checkInTime || '12:00 PM';
-        return sendError(res, 400, `Check-in is only permitted starting at ${checkInTime} on ${booking.checkIn} (Current server time: ${formatISTDateTime(serverNow)}). Early check-in is locked.`);
+      const currentStatus = String(booking.status || '').toLowerCase().trim();
+      const isPendingOrConfirmed = ['confirmed', 'pending', 'booked', 'reserved', 'pending check-in'].includes(currentStatus);
+      if (isPendingOrConfirmed) {
+        const serverNow = new Date();
+        if (!isCheckInAllowed(booking, serverNow)) {
+          const checkInTime = booking.checkInTime || '12:00 PM';
+          return sendError(res, 400, `Check-in is only permitted starting at ${checkInTime} on ${booking.checkIn} (Current server time: ${formatISTDateTime(serverNow)}). Early check-in is locked.`);
+        }
       }
     }
 

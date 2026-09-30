@@ -17,7 +17,9 @@ import 'providers/manager/payment_provider.dart';
 import 'providers/manager/reservation_provider.dart';
 import 'providers/manager/room_provider.dart';
 import 'providers/manager/staff_provider.dart';
-import 'screens/role_gate.dart';
+import 'screens/splash/splash_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/guest_mode_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -82,8 +84,11 @@ class HourStayApp extends StatelessWidget {
         title: 'Hour Stay',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const RoleGate(),
+        home: const SplashScreen(),
         routes: {
+          '/splash': (context) => const SplashScreen(),
+          '/onboarding': (context) => const OnboardingScreen(),
+          '/guest-mode': (context) => const GuestModeScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/forgot-password': (context) => const ForgotPasswordScreen(),

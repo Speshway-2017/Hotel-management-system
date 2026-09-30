@@ -818,7 +818,7 @@
     "shift": "Morning (06:00 - 14:00)",
     "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1790226720/hourstay_hms_assets/hqdudn70aqshbuuuicqt.jpg",
     "city": "Hyderabad",
-    "state": "",
+    "state": "Telangana",
     "country": "India",
     "address": "Hyderabad",
     "type": "Regular",
@@ -827,10 +827,12 @@
     "idDocNumber": "6353 7576 4646",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": null,
-    "fcmTokens": [],
+    "fcmToken": "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
+    "fcmTokens": [
+      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
+    ],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-09-24T09:09:37.228Z"
+    "updatedAt": "2026-09-30T05:03:01.869Z"
   },
   {
     "id": "omk6dktv7lj",

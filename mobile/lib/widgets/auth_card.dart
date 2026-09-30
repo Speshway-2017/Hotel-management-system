@@ -814,6 +814,60 @@ class _AuthCardState extends State<AuthCard> {
                       const SizedBox(height: 16),
                     ],
 
+                    // Terms & Conditions and Privacy Policy notice for Sign Up (Register Mode)
+                    if (widget.mode == AuthMode.register) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 14),
+                        child: Text.rich(
+                          TextSpan(
+                            text: 'By continuing, you agree to our ',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF667085),
+                              height: 1.45,
+                            ),
+                            children: [
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: GestureDetector(
+                                  onTap: () => _showTermsModal(context),
+                                  child: Text(
+                                    'Terms & Conditions',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF5B21B6),
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const TextSpan(text: ' and '),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: GestureDetector(
+                                  onTap: () => _showPrivacyModal(context),
+                                  child: Text(
+                                    'Privacy Policy',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF5B21B6),
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+
                     // Reset Password Fields (Reset Mode)
                     if (widget.mode == AuthMode.reset) ...[
                       _buildWebStyledInputField(
@@ -834,65 +888,6 @@ class _AuthCardState extends State<AuthCard> {
                         onTogglePressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
                       ),
                       const SizedBox(height: 16),
-                    ],
-
-                    if (widget.mode == AuthMode.register) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              'By continuing, you agree to our ',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                color: const Color(0xFF667085),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => _showLegalModal(context, 'Terms & Conditions', _termsText),
-                              child: Text(
-                                'Terms & Conditions',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF5B21B6),
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              ' and ',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                color: const Color(0xFF667085),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => _showLegalModal(context, 'Privacy Policy', _privacyPolicyText),
-                              child: Text(
-                                'Privacy Policy',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF5B21B6),
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '.',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                color: const Color(0xFF667085),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                     ],
 
                     const SizedBox(height: 4),
@@ -951,58 +946,6 @@ class _AuthCardState extends State<AuthCard> {
                 textAlign: TextAlign.center,
                 child: widget.footer ?? _buildDefaultFooter(),
               ),
-
-              // Legal Links Footer Bar for Login
-              if (widget.mode == AuthMode.login) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.only(top: 14),
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: Color(0x1A0D1B2A), width: 1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      GestureDetector(
-                        onTap: () => _showLegalModal(context, 'Privacy Policy', _privacyPolicyText),
-                        child: Text(
-                          'Privacy Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF667085),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6),
-                        child: Text(
-                          '|',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Color(0x400D1B2A),
-                          ),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => _showLegalModal(context, 'Terms & Conditions', _termsText),
-                        child: Text(
-                          'Terms & Conditions',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF667085),
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -1010,27 +953,27 @@ class _AuthCardState extends State<AuthCard> {
     );
   }
 
-  void _showLegalModal(BuildContext context, String title, String content) {
+  void _showTermsModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.8,
+        height: MediaQuery.of(ctx).size.height * 0.72,
         decoration: const BoxDecoration(
-          color: Color(0xFFFFFDF8),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
               child: Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0x260D1B2A),
+                  color: const Color(0xFFCBD5E1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1039,33 +982,67 @@ class _AuthCardState extends State<AuthCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF0D1B2A),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F3FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.description_outlined, color: Color(0xFF5B21B6), size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Terms & Conditions',
+                      style: GoogleFonts.inter(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0D1B2A),
+                      ),
+                    ),
+                  ],
                 ),
                 IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFF8A8F98)),
                   onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(Icons.close, size: 20),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
-            const Divider(height: 24),
+            const Divider(height: 24, color: Color(0xFFE2E8F0)),
             Expanded(
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Text(
-                  content,
+                  'Welcome to Hour Stay. By creating an account and using our services, you agree to comply with our booking policies, guest conduct guidelines, and reservation terms.\n\n'
+                  '1. Account Registration: You must provide accurate and verifiable personal details (name, email, phone number) when creating an account.\n\n'
+                  '2. Bookings & Cancellations: Reservations are subject to property availability and specific check-in/check-out policies. Cancellation penalties apply as per the booked rate plan.\n\n'
+                  '3. Guest Identity: Valid government-issued photo ID is required during physical check-in at the property.\n\n'
+                  '4. Payments & Invoicing: All applicable room charges, taxes, and service fees must be settled in accordance with the billing folio.\n\n'
+                  '5. Responsible Use: Guests are expected to maintain proper conduct and respect property guidelines and safety measures during their stay.',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     height: 1.6,
-                    color: const Color(0xFF344054),
+                    color: const Color(0xFF334155),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D1B2A),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('I Understand', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -1074,42 +1051,102 @@ class _AuthCardState extends State<AuthCard> {
     );
   }
 
-  static const String _privacyPolicyText = '''
-Hour Stay Data & Privacy Policy
-
-1. Commitment to Privacy
-Hour Stay respects your personal information and safeguards guest and host confidentiality. All communications, reservation metadata, and credentials are handled under modern data protection guidelines.
-
-2. Information We Collect
-• Contact & Identity Information: Name, email address, phone number for reservations and identity verification.
-• Booking & Transaction History: Reservation dates, room selections, billing amounts, and confirmation records.
-• Device & Usage Diagnostics: Approximate location for local property discovery and security logs.
-
-3. How Your Information is Used
-• Processing hotel reservations, check-ins, hourly extensions, and guest service requests.
-• Generating secure receipts and booking confirmations.
-• Customer support and fraud prevention.
-
-4. Your Rights
-Under Digital Data Protection regulations, you have full rights to inspect your data, update your details, or permanently delete your account at any time directly through the app settings or support desk.
-''';
-
-  static const String _termsText = '''
-Hour Stay Terms & Conditions
-
-1. Account Usage & User Eligibility
-Users must be at least 18 years old to create an account or complete hotel reservations through Hour Stay. You agree to provide accurate and truthful identity details.
-
-2. Reservations & Check-in Policies
-• Hourly and daily room bookings are held according to each partner property's check-in schedule.
-• Valid government-issued photo ID is required upon check-in.
-• Early arrivals and extensions are subject to room availability and property confirmation.
-
-3. Payments & Billing
-• Charges are billed in accordance with the selected slot duration and rate cards.
-• Additional amenities or extensions requested during your stay will be added to your folio.
-
-4. Code of Conduct & Property Rules
-Guests must respect property guidelines, check-out times, and staff instructions. Any disruption or violation may result in booking termination without refund.
-''';
+  void _showPrivacyModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.72,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDE9FE),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF5B21B6), size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Privacy Policy',
+                      style: GoogleFonts.inter(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0D1B2A),
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFF8A8F98)),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ],
+            ),
+            const Divider(height: 24, color: Color(0xFFE2E8F0)),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Text(
+                  'At Hour Stay, we prioritize your privacy and data security. This Privacy Policy outlines how your personal information is collected, protected, and used.\n\n'
+                  '1. Information Collected: We collect your name, contact details (email and phone number), booking history, and device information to deliver seamless hospitality experiences.\n\n'
+                  '2. How We Use Data: Your information is used exclusively for processing reservations, sending instant check-in notifications, issuing GST invoices, and account security.\n\n'
+                  '3. Data Protection: All data is encrypted in transit and at rest using industry-standard protocols. We do not sell or rent your personal information to third parties.\n\n'
+                  '4. Notifications: You may receive service alerts (e.g., booking confirmations, room readiness) via SMS, email, or push notifications.\n\n'
+                  '5. Your Rights: You can request profile updates or account deletion anytime from the Profile settings section in the app.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    height: 1.6,
+                    color: const Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D1B2A),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('I Understand', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

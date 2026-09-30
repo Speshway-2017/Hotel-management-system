@@ -27,6 +27,7 @@ const Color white = Color(0xFFFFFFFF);
 const Color background = Color(0xFFF8FAFC);
 const Color surface = Color(0xFFFFFFFF);
 const Color surfaceSoft = Color(0xFFE7E9EE);
+const Color slateBg = Color(0xFFF1F5F9);
 const Color cardBackground = Color(0xFFFFFFFF);
 const Color cardBorder = Color(0xFFE2E8F0);
 const Color border = Color(0xFFE2E8F0);

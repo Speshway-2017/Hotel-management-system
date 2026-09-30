@@ -63,6 +63,46 @@ class GuestNotificationProvider with ChangeNotifier {
     }
   }
 
+  int getCountForCategory(String category) {
+    if (category == 'All') {
+      return _notifications.length;
+    } else if (category == 'Unread') {
+      return unreadCount;
+    } else if (category == 'Read') {
+      return _notifications.length - unreadCount;
+    } else {
+      final target = category.trim().toLowerCase();
+      return _notifications.where((n) {
+        final cat = n.category.trim().toLowerCase();
+        final type = n.type.trim().toLowerCase();
+        final msg = n.message.trim().toLowerCase();
+        final title = n.title.trim().toLowerCase();
+
+        if (target == 'bookings' && (cat.contains('book') || cat.contains('reserv') || cat.contains('stay') || cat.contains('check') || cat.contains('room') || type.contains('book') || type.contains('check') || type.contains('stay') || title.contains('booking') || title.contains('reservation') || title.contains('check-in') || title.contains('checked in') || title.contains('check-out') || title.contains('checked out') || title.contains('room assigned') || msg.contains('booking') || msg.contains('reservation') || msg.contains('check-in') || msg.contains('checked in') || msg.contains('check-out') || msg.contains('checked out') || msg.contains('room assigned'))) {
+          return true;
+        }
+        if (target == 'payments' &&
+            (cat.contains('pay') ||
+                cat.contains('bill') ||
+                cat.contains('folio') ||
+                cat.contains('refund') ||
+                type.contains('pay') ||
+                type.contains('refund') ||
+                msg.contains('paid') ||
+                msg.contains('payment') ||
+                msg.contains('refund') ||
+                title.contains('payment') ||
+                title.contains('refund'))) {
+          return true;
+        }
+        if (target == 'announcements' && (cat.contains('announc') || cat.contains('alert') || cat.contains('promo') || type.contains('announc') || cat.contains('general'))) {
+          return true;
+        }
+        return cat == target || type == target;
+      }).length;
+    }
+  }
+
   GuestNotificationProvider() {
     _registerSocketListeners();
     _registerFcmListeners();
@@ -144,10 +184,12 @@ class GuestNotificationProvider with ChangeNotifier {
         }
         _notifications = unique;
       } else {
-        if (!silent) _error = response.message;
+        if (!silent && response.statusCode != 401) {
+          _error = 'Unable to connect to server. Please check your connection.';
+        }
       }
     } catch (e) {
-      if (!silent) _error = e.toString();
+      if (!silent) _error = 'Unable to connect to server. Please check your connection.';
     } finally {
       if (!silent) {
         _isLoading = false;

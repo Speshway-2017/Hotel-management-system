@@ -17,9 +17,9 @@ class GuestBottomNav extends StatelessWidget {
 
   static const List<GuestNavItem> items = [
     GuestNavItem(
-      label: 'Home',
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
+      label: 'Bookings',
+      icon: Icons.calendar_month_outlined,
+      activeIcon: Icons.calendar_month_rounded,
     ),
     GuestNavItem(
       label: 'Search',
@@ -27,9 +27,9 @@ class GuestBottomNav extends StatelessWidget {
       activeIcon: Icons.search_rounded,
     ),
     GuestNavItem(
-      label: 'Bookings',
-      icon: Icons.calendar_month_outlined,
-      activeIcon: Icons.calendar_month_rounded,
+      label: 'Home',
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
     ),
     GuestNavItem(
       label: 'Payments',

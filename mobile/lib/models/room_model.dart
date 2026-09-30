@@ -30,6 +30,18 @@ class RoomModel {
   double get basePrice => baseRate;
   String get mainImage => images.isNotEmpty ? images.first : '';
 
+  bool get isOccupied =>
+      status.toLowerCase().contains('occup') ||
+      status.toLowerCase().contains('stay') ||
+      status.toLowerCase().contains('checked-in') ||
+      status.toLowerCase().contains('checked in');
+
+  bool get isReservedStatus =>
+      isReserved ||
+      status.toLowerCase().contains('reserv') ||
+      status.toLowerCase().contains('confirm') ||
+      status.toLowerCase().contains('book');
+
   RoomModel({
     required this.id,
     required this.roomNumber,
@@ -164,12 +176,36 @@ class RoomModel {
 
     final rat = double.tryParse(json['rating']?.toString() ?? '4.9') ?? 4.9;
 
+    final rawStatus = (json['status'] ?? json['operationalStatus'] ?? 'Available').toString();
+    final bool isOcc = rawStatus.toLowerCase().contains('occup') ||
+        rawStatus.toLowerCase().contains('stay') ||
+        rawStatus.toLowerCase().contains('checked-in') ||
+        rawStatus.toLowerCase().contains('checked in');
+    final bool isRes = json['isReserved'] == true ||
+        rawStatus.toLowerCase().contains('reserv') ||
+        rawStatus.toLowerCase().contains('confirm') ||
+        rawStatus.toLowerCase().contains('book');
+    final bool isAvail = (json['isAvailable'] == true || rawStatus.toLowerCase().contains('avail')) &&
+        !isOcc &&
+        !isRes &&
+        rawStatus.toLowerCase() != 'blocked' &&
+        rawStatus.toLowerCase() != 'maintenance';
+
+    String normalizedStatus = 'Available';
+    if (isOcc) {
+      normalizedStatus = 'Occupied';
+    } else if (isRes) {
+      normalizedStatus = 'Reserved';
+    } else if (rawStatus.toLowerCase() == 'blocked' || rawStatus.toLowerCase() == 'maintenance') {
+      normalizedStatus = 'Maintenance';
+    }
+
     return RoomModel(
       id: json['id'] ?? json['_id'] ?? '',
       roomNumber: json['roomNumber']?.toString() ?? '',
       category: json['category'] ?? json['type'] ?? 'Standard Room',
-      status: json['status'] ?? 'Available',
-      operationalStatus: json['operationalStatus'] ?? json['status'] ?? 'Available',
+      status: normalizedStatus,
+      operationalStatus: json['operationalStatus'] ?? normalizedStatus,
       ratePlan: json['ratePlan'] ?? 'Standard Plan',
       baseRate: bRate,
       currentRate: cRate,
@@ -177,8 +213,8 @@ class RoomModel {
       capacity: json['capacity']?.toString() ?? '2 Adults',
       bedType: json['bedType']?.toString() ?? json['beds']?.toString() ?? 'King Bed',
       propertyId: json['propertyId']?.toString() ?? 'HS-9HQ8P',
-      isReserved: json['isReserved'] == true,
-      isAvailable: json['isAvailable'] == true || (json['status'] == 'Available' && json['isReserved'] != true),
+      isReserved: isRes,
+      isAvailable: isAvail,
       guest: json['guest'],
       checkIn: json['checkIn'],
       checkOut: json['checkOut'],

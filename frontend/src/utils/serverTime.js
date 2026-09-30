@@ -228,8 +228,36 @@ export const getCheckInStatusInfo = (booking) => {
     return { isAllowed: false, allowed: false, reason: "No booking data", label: "Check-In", checkInTime: "12:00 PM" };
   }
 
+  const statusLower = String(booking.status || "").toLowerCase().trim();
+  const isAlreadyCheckedIn = ["checked-in", "checked in", "staying", "staying-in", "in-house", "active"].includes(statusLower);
   const checkInDate = booking.checkIn || booking.checkInDate || "Today";
   const checkInTime = booking.checkInTime || booking.checkInSlot || "12:00 PM";
+
+  if (isAlreadyCheckedIn) {
+    return {
+      isAllowed: false,
+      allowed: false,
+      isAlreadyCheckedIn: true,
+      reason: "Guest is currently In-House / Checked-in.",
+      tooltip: `Guest checked in. Status: In-House.`,
+      label: "In-House",
+      checkInTime
+    };
+  }
+
+  const isTerminal = ["checked-out", "checked out", "cancelled", "canceled", "no-show"].includes(statusLower);
+  if (isTerminal) {
+    return {
+      isAllowed: false,
+      allowed: false,
+      isTerminal: true,
+      reason: `Booking is ${booking.status}.`,
+      tooltip: `Booking is ${booking.status}.`,
+      label: booking.status,
+      checkInTime
+    };
+  }
+
   const scheduledTime = parseDateTimeToIST(checkInDate, checkInTime);
   const serverNow = getServerTime();
 

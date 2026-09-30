@@ -32,9 +32,14 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
   Future<void> _updateStatus(String newStatus) async {
     final provider = context.read<ReservationProvider>();
     final messenger = ScaffoldMessenger.of(context);
+    final currentStatus = _reservation.status.toLowerCase();
+    final isPendingOrConfirmed = currentStatus == 'confirmed' ||
+        currentStatus == 'pending' ||
+        currentStatus == 'reserved' ||
+        currentStatus == 'pending check-in';
 
-    // Strict Check-in Time Enforcement: only allowed from 12:00 PM on booking date
-    if (newStatus == 'Checked-in' || newStatus == 'checked_in') {
+    // Strict Check-in Time Enforcement: only applied when transitioning from Confirmed/Pending to Checked-in
+    if ((newStatus == 'Checked-in' || newStatus == 'checked_in') && isPendingOrConfirmed) {
       if (!Formatters.isCheckInAllowed(_reservation.checkIn)) {
         messenger.showSnackBar(
           SnackBar(
@@ -97,6 +102,9 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
       setState(() {
         _reservation = _reservation.copyWith(status: newStatus);
       });
+      try {
+        context.read<RoomProvider>().fetchAll(silent: true);
+      } catch (_) {}
     } else if (mounted) {
       messenger.showSnackBar(
         SnackBar(
@@ -802,18 +810,16 @@ class _ManagerReservationDetailScreenState extends State<ManagerReservationDetai
     final stLower = _reservation.status.toLowerCase();
     final isCancelled = stLower == 'cancelled' || stLower == 'canceled';
     final isExplicitCheckedOut = stLower == 'checked-out' || stLower == 'checked_out' || stLower == 'completed';
-    final isExplicitCheckedIn = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'active' || stLower == 'staying';
-    final isConfirmed = stLower == 'confirmed';
+    final isCheckedIn = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'active' || stLower == 'staying' || stLower == 'in-house';
+    final isConfirmed = (stLower == 'confirmed' || stLower == 'pending' || stLower == 'reserved' || stLower == 'pending check-in') && !isCheckedIn && !isExplicitCheckedOut && !isCancelled;
     final payLower = _reservation.paymentStatus.toLowerCase();
     final isPaid = payLower == 'paid' || payLower == 'settled' || payLower == 'completed' || _reservation.balance <= 0;
 
     final now = DateTime.now();
     final canCheckInNow = Formatters.isCheckInAllowed(_reservation.checkIn, null, now);
-    final isCheckOutTimePassed = isExplicitCheckedIn && Formatters.isCheckOutDue(_reservation.checkOut, null, now);
-
-    final isCheckedOut = isExplicitCheckedOut || isCheckOutTimePassed;
-    final isCheckedIn = isExplicitCheckedIn && !isCheckOutTimePassed;
-    final displayStatus = isCheckOutTimePassed ? 'Checked-out' : _reservation.status;
+    final isCheckedOut = isExplicitCheckedOut;
+    final isCheckOutTimePassed = isCheckedOut && Formatters.isCheckOutDue(_reservation.checkOut, null, now);
+    final displayStatus = _reservation.status;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
