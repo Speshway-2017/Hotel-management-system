@@ -1,44 +1,73 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Panel, Tag } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 import { 
   Bell, CheckCheck, Calendar, CreditCard, FileText, 
-  Sparkles, RefreshCw, AlertCircle, CheckCircle2, MessageSquare, Hotel 
+  Sparkles, RefreshCw, AlertCircle, CheckCircle2, MessageSquare, Hotel,
+  LogOut, Clock, Key, ArrowRight
 } from "lucide-react";
 
 export const Route = createFileRoute("/guest/notifications")({
   head: () => ({
     meta: [
       { title: "Notifications — Hour Stay" },
-      { name: "description", content: "Stay updates, booking confirmations, payment receipts, and stay alerts." }
+      { name: "description", content: "Stay updates, check-out reminders, booking confirmations, and stay alerts." }
     ]
   }),
   component: GuestNotificationsPage
 });
 
-function getToneForCategory(cat) {
-  switch (cat) {
-    case "Booking Confirmation":
-    case "Payment Update":
-      return "success";
-    case "Check-in Reminder":
-    case "Service & Folio":
-      return "warning";
-    case "Invoice Notification":
-      return "brand";
-    case "Feedback Reminder":
-      return "info";
-    default:
-      return "brand";
+function getToneForCategory(cat, title = "") {
+  const c = (cat || "").toLowerCase();
+  const t = (title || "").toLowerCase();
+
+  if (c.includes("check-out") || c.includes("checkout") || t.includes("check-out") || t.includes("checked out")) {
+    return "warning";
   }
+  if (c.includes("check-in") || c.includes("checkin") || t.includes("check-in") || t.includes("checked in")) {
+    return "success";
+  }
+  if (c.includes("payment") || c.includes("folio") || c.includes("bill") || c.includes("invoice")) {
+    return "success";
+  }
+  if (c.includes("booking") || c.includes("reserv") || c.includes("stay")) {
+    return "brand";
+  }
+  if (c.includes("feedback") || c.includes("review")) {
+    return "info";
+  }
+  return "brand";
+}
+
+function getCategoryIcon(cat, title = "") {
+  const c = (cat || "").toLowerCase();
+  const t = (title || "").toLowerCase();
+
+  if (c.includes("check-out") || c.includes("checkout") || t.includes("check-out") || t.includes("checked out")) {
+    return LogOut;
+  }
+  if (c.includes("check-in") || c.includes("checkin") || t.includes("check-in") || t.includes("checked in") || t.includes("room assigned")) {
+    return Key;
+  }
+  if (c.includes("payment") || c.includes("folio") || c.includes("bill") || c.includes("invoice")) {
+    return CreditCard;
+  }
+  if (c.includes("feedback") || c.includes("review")) {
+    return MessageSquare;
+  }
+  if (c.includes("booking") || c.includes("reserv") || c.includes("stay")) {
+    return Calendar;
+  }
+  return Bell;
 }
 
 import { notificationsService } from "@/services/notifications";
 import { subscribeRealtimeSync } from "@/services/socket";
 
 function GuestNotificationsPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [filterType, setFilterType] = useState("All"); // 'All' | 'Unread' | 'Bookings' | 'Payments'
@@ -77,13 +106,15 @@ function GuestNotificationsPage() {
   useEffect(() => {
     fetchNotifications(false);
 
-    const handleFocus = () => fetchNotifications(true);
+    const handleFocus = () => fetchNotifications(true);
+    window.addEventListener("focus", handleFocus);
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchNotifications(true);
     });
 
-    return () => {
+    return () => {
+      window.removeEventListener("focus", handleFocus);
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -117,12 +148,40 @@ function GuestNotificationsPage() {
 
   const filteredNotifications = notifications.filter((n) => {
     if (filterType === "Unread") return !n.read;
-    if (filterType === "Bookings") return n.category === "Booking Confirmation" || n.category === "Check-in Reminder";
-    if (filterType === "Payments") return n.category === "Payment Update" || n.category === "Invoice Notification" || n.category === "Service & Folio";
+    const cat = (n.category || "").toLowerCase();
+    const title = (n.title || "").toLowerCase();
+    const msg = (n.message || "").toLowerCase();
+
+    if (filterType === "Bookings") {
+      return (
+        cat.includes("book") ||
+        cat.includes("reserv") ||
+        cat.includes("stay") ||
+        cat.includes("check") ||
+        title.includes("check-out") ||
+        title.includes("check-in") ||
+        title.includes("booking") ||
+        msg.includes("check-out") ||
+        msg.includes("checked out") ||
+        msg.includes("check-in") ||
+        msg.includes("checked in")
+      );
+    }
+    if (filterType === "Payments") {
+      return (
+        cat.includes("pay") ||
+        cat.includes("invoice") ||
+        cat.includes("folio") ||
+        cat.includes("bill") ||
+        title.includes("payment") ||
+        msg.includes("payment") ||
+        msg.includes("folio")
+      );
+    }
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;h;
 
   return (
     <div className="space-y-6 text-left font-ui animate-fade-in">
@@ -189,47 +248,73 @@ function GuestNotificationsPage() {
           </div>
         ) : (
           <div className="p-4 space-y-3">
-            {filteredNotifications.map((n) => (
-              <div
-                key={n.id}
-                onClick={() => !n.read && handleMarkAsRead(n.id)}
-                className={cn(
-                  "bg-white rounded-xl border border-navy/10 p-4 shadow-soft hover:shadow-lift transition-all duration-300 flex flex-col md:flex-row md:items-start justify-between gap-4 relative cursor-pointer text-left block border-l-4",
-                  !n.read ? "border-l-purple bg-purple/[0.01] shadow-[0_2px_12px_rgba(124,58,237,0.04)]" : "border-l-transparent opacity-90"
-                )}
-              >
-                {/* Left Side: Unread purple dot + Title/Message */}
-                <div className="flex items-start gap-3 flex-1 min-w-0 text-left">
-                  <span className={cn("size-2.5 rounded-full mt-1.5 shrink-0", n.read ? "bg-transparent" : "bg-purple animate-pulse")} />
-                  
-                  <div className="flex-1 min-w-0 space-y-1.5 text-left">
-                    <div className="flex flex-wrap items-center gap-2 text-left">
-                      <h4 className={cn("text-xs font-bold text-navy truncate text-left", !n.read && "text-purple font-extrabold")}>
-                        {n.title}
-                      </h4>
-                      <Tag tone={getToneForCategory(n.category)}>{n.category}</Tag>
+            {filteredNotifications.map((n) => {
+              const IconComp = getCategoryIcon(n.category, n.title);
+              const isCheckout = (n.title || "").toLowerCase().includes("check-out") || (n.category || "").toLowerCase().includes("check-out") || (n.message || "").toLowerCase().includes("check-out");
+
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => !n.read && handleMarkAsRead(n.id)}
+                  className={cn(
+                    "bg-white rounded-xl border border-navy/10 p-4 shadow-soft hover:shadow-lift transition-all duration-300 flex flex-col md:flex-row md:items-start justify-between gap-4 relative cursor-pointer text-left block border-l-4",
+                    !n.read 
+                      ? isCheckout 
+                        ? "border-l-amber-500 bg-amber-500/[0.02] shadow-[0_2px_12px_rgba(217,119,6,0.06)]"
+                        : "border-l-purple bg-purple/[0.01] shadow-[0_2px_12px_rgba(124,58,237,0.04)]" 
+                      : "border-l-transparent opacity-90"
+                  )}
+                >
+                  {/* Left Side: Icon + Unread purple dot + Title/Message */}
+                  <div className="flex items-start gap-3.5 flex-1 min-w-0 text-left">
+                    <div className={cn(
+                      "size-9 rounded-xl flex items-center justify-center shrink-0 border transition-all",
+                      isCheckout 
+                        ? "bg-amber-50 border-amber-200 text-amber-600"
+                        : (n.category || "").toLowerCase().includes("check-in")
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                        : (n.category || "").toLowerCase().includes("pay")
+                        ? "bg-teal-50 border-teal-200 text-teal-600"
+                        : "bg-purple/10 border-purple/20 text-purple"
+                    )}>
+                      <IconComp className="size-4" />
                     </div>
-                    <p className="text-xs text-navy/75 leading-relaxed text-left font-medium">{n.message}</p>
+                    
+                    <div className="flex-1 min-w-0 space-y-1.5 text-left">
+                      <div className="flex flex-wrap items-center gap-2 text-left">
+                        <h4 className={cn(
+                          "text-xs font-bold text-navy truncate text-left", 
+                          !n.read && (isCheckout ? "text-amber-700 font-extrabold" : "text-purple font-extrabold")
+                        )}>
+                          {n.title}
+                        </h4>
+                        <Tag tone={getToneForCategory(n.category, n.title)}>{n.category}</Tag>
+                      </div>
+                      <p className="text-xs text-navy/75 leading-relaxed text-left font-medium">{n.message}</p>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Timestamp & Mark Read CTA */}
+                  <div className="flex flex-row md:flex-col items-center md:items-end gap-3 md:gap-1.5 shrink-0 self-start md:self-auto justify-between md:justify-end w-full md:w-auto text-left md:text-right border-t md:border-t-0 pt-2 md:pt-0 border-navy/5">
+                    <span className="text-[11px] text-navy/50 font-semibold whitespace-nowrap">{n.timestamp}</span>
+                    {!n.read && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkAsRead(n.id);
+                        }}
+                        className={cn(
+                          "text-[10px] font-bold px-2.5 py-1 rounded-md border-none cursor-pointer hover:underline",
+                          isCheckout ? "text-amber-700 bg-amber-100/80" : "text-purple bg-purple/10"
+                        )}
+                      >
+                        Mark as Read
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                {/* Right Side: Timestamp & Mark Read CTA */}
-                <div className="flex flex-row md:flex-col items-center md:items-end gap-3 md:gap-1.5 shrink-0 self-start md:self-auto justify-between md:justify-end w-full md:w-auto text-left md:text-right border-t md:border-t-0 pt-2 md:pt-0 border-navy/5">
-                  <span className="text-[11px] text-navy/50 font-semibold whitespace-nowrap">{n.timestamp}</span>
-                  {!n.read && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMarkAsRead(n.id);
-                      }}
-                      className="text-[10px] font-bold text-purple hover:underline bg-purple/10 px-2.5 py-1 rounded-md border-none cursor-pointer"
-                    >
-                      Mark as Read
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Panel>

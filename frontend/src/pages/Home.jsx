@@ -286,10 +286,13 @@ function Home() {
                     <span className="relative mt-1.5 block">
                       <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
                       <Input 
-                        type="date" 
+                        type={heroCheckIn ? "date" : "text"} 
+                        placeholder="dd-mm-yyyy"
+                        onFocus={(e) => { e.target.type = "date"; try { e.target.showPicker(); } catch(_) {} }}
+                        onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                         value={heroCheckIn}
                         onChange={e => setHeroCheckIn(e.target.value)}
-                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-xs text-navy font-semibold" 
+                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-xs text-navy font-semibold placeholder:text-gray-400" 
                       />
                     </span>
                   </label>
@@ -298,10 +301,13 @@ function Home() {
                     <span className="relative mt-1.5 block">
                       <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
                       <Input 
-                        type="date" 
+                        type={heroCheckOut ? "date" : "text"} 
+                        placeholder="dd-mm-yyyy"
+                        onFocus={(e) => { e.target.type = "date"; try { e.target.showPicker(); } catch(_) {} }}
+                        onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
                         value={heroCheckOut}
                         onChange={e => setHeroCheckOut(e.target.value)}
-                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-xs text-navy font-semibold" 
+                        className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-xs text-navy font-semibold placeholder:text-gray-400" 
                       />
                     </span>
                   </label>

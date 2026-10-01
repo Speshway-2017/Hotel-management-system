@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hour_stay_mobile/colours.dart';
 import 'package:hour_stay_mobile/core/constants/api_endpoints.dart';
+import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/room_model.dart';
 
 typedef RoomBookingCallback = void Function(
@@ -128,19 +129,44 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     final selIn = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
     final selOut = DateTime(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
 
-    if (widget.room.isOccupied) {
-      if (widget.room.checkIn != null && widget.room.checkOut != null) {
-        final rIn = DateTime.tryParse(widget.room.checkIn!);
-        final rOut = DateTime.tryParse(widget.room.checkOut!);
+    if (widget.room.bookedRanges.isNotEmpty) {
+      for (final range in widget.room.bookedRanges) {
+        final rIn = Formatters.parseDateSafe(range.checkIn);
+        final rOut = Formatters.parseDateSafe(range.checkOut);
         if (rIn != null && rOut != null) {
           final rInDate = DateTime(rIn.year, rIn.month, rIn.day);
           final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
-          return selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
+          final overlaps = selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
+          if (overlaps) {
+            final st = range.status.toLowerCase();
+            if (st.contains('occup') || st.contains('stay') || st.contains('checked-in') || st.contains('checked in') || st.contains('in-house') || st.contains('active')) {
+              return true;
+            }
+          }
         }
       }
+    }
+
+    if (widget.room.checkIn != null && widget.room.checkOut != null && widget.room.checkIn!.isNotEmpty && widget.room.checkOut!.isNotEmpty) {
+      final rIn = Formatters.parseDateSafe(widget.room.checkIn);
+      final rOut = Formatters.parseDateSafe(widget.room.checkOut);
+      if (rIn != null && rOut != null) {
+        final rInDate = DateTime(rIn.year, rIn.month, rIn.day);
+        final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
+        // Overlap exists only if: selIn < rOutDate AND selOut > rInDate
+        // On check-out day, selIn == rOutDate is NOT an overlap!
+        final overlaps = selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
+        if (overlaps) {
+          return widget.room.isOccupied;
+        }
+        return false;
+      }
+    }
+
+    if (widget.room.isOccupied) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      if (!selIn.isAfter(today) && selOut.isAfter(today)) return true;
+      if (selIn.isBefore(today)) return true;
     }
     return false;
   }
@@ -151,19 +177,39 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     final selIn = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
     final selOut = DateTime(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
 
-    if (widget.room.isReserved || widget.room.isReservedStatus || !widget.room.isAvailable) {
-      if (widget.room.checkIn != null && widget.room.checkOut != null) {
-        final rIn = DateTime.tryParse(widget.room.checkIn!);
-        final rOut = DateTime.tryParse(widget.room.checkOut!);
+    if (widget.room.bookedRanges.isNotEmpty) {
+      for (final range in widget.room.bookedRanges) {
+        final rIn = Formatters.parseDateSafe(range.checkIn);
+        final rOut = Formatters.parseDateSafe(range.checkOut);
         if (rIn != null && rOut != null) {
           final rInDate = DateTime(rIn.year, rIn.month, rIn.day);
           final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
-          return selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
+          final overlaps = selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
+          if (overlaps) {
+            return true;
+          }
         }
       }
+    }
+
+    if (widget.room.checkIn != null && widget.room.checkOut != null && widget.room.checkIn!.isNotEmpty && widget.room.checkOut!.isNotEmpty) {
+      final rIn = Formatters.parseDateSafe(widget.room.checkIn);
+      final rOut = Formatters.parseDateSafe(widget.room.checkOut);
+      if (rIn != null && rOut != null) {
+        final rInDate = DateTime(rIn.year, rIn.month, rIn.day);
+        final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
+        final overlaps = selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
+        if (overlaps) {
+          return widget.room.isReserved || widget.room.isReservedStatus;
+        }
+        return false;
+      }
+    }
+
+    if (widget.room.isReserved || widget.room.isReservedStatus) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      if (!selIn.isAfter(today) && selOut.isAfter(today)) return true;
+      if (selIn.isBefore(today)) return true;
     }
     return false;
   }

@@ -1,3 +1,33 @@
+class BookedRange {
+  final String checkIn;
+  final String checkOut;
+  final String status;
+  final String? guest;
+
+  BookedRange({
+    required this.checkIn,
+    required this.checkOut,
+    this.status = 'Confirmed',
+    this.guest,
+  });
+
+  factory BookedRange.fromJson(Map<String, dynamic> json) {
+    return BookedRange(
+      checkIn: json['checkIn']?.toString() ?? '',
+      checkOut: json['checkOut']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'Confirmed',
+      guest: json['guest']?.toString() ?? json['guestName']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'checkIn': checkIn,
+    'checkOut': checkOut,
+    'status': status,
+    'guest': guest,
+  };
+}
+
 class RoomModel {
   final String id;
   final String roomNumber;
@@ -16,6 +46,7 @@ class RoomModel {
   final String? guest;
   final String? checkIn;
   final String? checkOut;
+  final List<BookedRange> bookedRanges;
   final Map<int, double> rates;
   final List<String> amenities;
   final List<String> images;
@@ -60,6 +91,7 @@ class RoomModel {
     this.guest,
     this.checkIn,
     this.checkOut,
+    List<BookedRange>? bookedRanges,
     Map<int, double>? rates,
     List<String>? amenities,
     List<String>? images,
@@ -68,7 +100,8 @@ class RoomModel {
     this.city,
     this.cancellationPolicy,
     this.rating = 4.9,
-  })  : rates = rates ??
+  })  : bookedRanges = bookedRanges ?? const [],
+        rates = rates ??
             {
               2: (baseRate * 0.3).roundToDouble(),
               3: (baseRate * 0.4).roundToDouble(),
@@ -104,6 +137,7 @@ class RoomModel {
     String? guest,
     String? checkIn,
     String? checkOut,
+    List<BookedRange>? bookedRanges,
     Map<int, double>? rates,
     List<String>? amenities,
     List<String>? images,
@@ -131,6 +165,7 @@ class RoomModel {
       guest: guest ?? this.guest,
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
+      bookedRanges: bookedRanges ?? this.bookedRanges,
       rates: rates ?? this.rates,
       amenities: amenities ?? this.amenities,
       images: images ?? this.images,
@@ -172,6 +207,32 @@ class RoomModel {
       imagesList = (json['images'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
     } else if (json['image'] != null && json['image'].toString().trim().isNotEmpty) {
       imagesList = [json['image'].toString().trim()];
+    }
+
+    List<BookedRange> rangesList = [];
+    if (json['bookedRanges'] != null && json['bookedRanges'] is List) {
+      for (final item in (json['bookedRanges'] as List)) {
+        if (item is Map<String, dynamic>) {
+          rangesList.add(BookedRange.fromJson(item));
+        } else if (item is Map) {
+          rangesList.add(BookedRange.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    } else if (json['activeBookings'] != null && json['activeBookings'] is List) {
+      for (final item in (json['activeBookings'] as List)) {
+        if (item is Map<String, dynamic>) {
+          rangesList.add(BookedRange.fromJson(item));
+        } else if (item is Map) {
+          rangesList.add(BookedRange.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    } else if (json['checkIn'] != null && json['checkOut'] != null && json['checkIn'].toString().isNotEmpty && json['checkOut'].toString().isNotEmpty) {
+      rangesList.add(BookedRange(
+        checkIn: json['checkIn'].toString(),
+        checkOut: json['checkOut'].toString(),
+        status: json['status']?.toString() ?? 'Confirmed',
+        guest: json['guest']?.toString(),
+      ));
     }
 
     final rat = double.tryParse(json['rating']?.toString() ?? '4.9') ?? 4.9;
@@ -218,6 +279,7 @@ class RoomModel {
       guest: json['guest'],
       checkIn: json['checkIn'],
       checkOut: json['checkOut'],
+      bookedRanges: rangesList,
       rates: customRates.isNotEmpty ? customRates : null,
       amenities: amenitiesList.isNotEmpty ? amenitiesList : null,
       images: imagesList,
@@ -243,6 +305,7 @@ class RoomModel {
       'capacity': capacity,
       'bedType': bedType,
       'propertyId': propertyId,
+      'bookedRanges': bookedRanges.map((e) => e.toJson()).toList(),
       'rates': rates.map((k, v) => MapEntry(k.toString(), v)),
       'amenities': amenities,
       'images': images,

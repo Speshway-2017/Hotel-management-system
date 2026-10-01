@@ -1341,14 +1341,14 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
     final t = title.toLowerCase();
     final m = message.toLowerCase();
 
-    if (t.contains('check-in') || t.contains('checked in') || m.contains('checked in') || cat.contains('check-in')) {
+    if (t.contains('check-out') || t.contains('checked out') || m.contains('checked out') || m.contains('check-out') || cat.contains('check-out') || cat.contains('checkout')) {
+      return const Color(0xFFD97706);
+    }
+    if (t.contains('check-in') || t.contains('checked in') || m.contains('checked in') || m.contains('check-in') || cat.contains('check-in') || cat.contains('checkin')) {
       return emerald;
     }
     if (t.contains('room assigned') || m.contains('room assigned')) {
       return gold;
-    }
-    if (t.contains('check-out') || t.contains('checked out') || m.contains('checked out')) {
-      return purple;
     }
     if (cat.contains('book') || cat.contains('reserv') || cat.contains('stay')) {
       return purple;
@@ -1373,14 +1373,14 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
     final t = title.toLowerCase();
     final m = message.toLowerCase();
 
-    if (t.contains('check-in') || t.contains('checked in') || m.contains('checked in') || cat.contains('check-in')) {
+    if (t.contains('check-out') || t.contains('checked out') || m.contains('checked out') || m.contains('check-out') || cat.contains('check-out') || cat.contains('checkout')) {
+      return const Color(0xFFFEF3C7);
+    }
+    if (t.contains('check-in') || t.contains('checked in') || m.contains('checked in') || m.contains('check-in') || cat.contains('check-in') || cat.contains('checkin')) {
       return const Color(0xFFDCFCE7);
     }
     if (t.contains('room assigned') || m.contains('room assigned')) {
       return const Color(0xFFFFF7E6);
-    }
-    if (t.contains('check-out') || t.contains('checked out') || m.contains('checked out')) {
-      return const Color(0xFFEDE9FE);
     }
     if (cat.contains('book') || cat.contains('reserv') || cat.contains('stay')) {
       return const Color(0xFFF3E8FF);
@@ -1405,14 +1405,14 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
     final t = title.toLowerCase();
     final m = message.toLowerCase();
 
-    if (t.contains('check-in') || t.contains('checked in') || m.contains('checked in') || cat.contains('check-in')) {
+    if (t.contains('check-out') || t.contains('checked out') || m.contains('checked out') || m.contains('check-out') || cat.contains('check-out') || cat.contains('checkout')) {
+      return Icons.logout_rounded;
+    }
+    if (t.contains('check-in') || t.contains('checked in') || m.contains('checked in') || m.contains('check-in') || cat.contains('check-in') || cat.contains('checkin')) {
       return Icons.how_to_reg_rounded;
     }
     if (t.contains('room assigned') || m.contains('room assigned')) {
       return Icons.meeting_room_rounded;
-    }
-    if (t.contains('check-out') || t.contains('checked out') || m.contains('checked out')) {
-      return Icons.luggage_rounded;
     }
     if (cat.contains('book') || cat.contains('reserv') || cat.contains('stay')) {
       return Icons.calendar_month_rounded;
