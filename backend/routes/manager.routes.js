@@ -20,7 +20,7 @@ import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCa
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
-import { isCheckInAllowed, formatISTDateTime } from '../utils/dateUtils.js';
+import { isCheckInAllowed, formatISTDateTime, parseDateSafe } from '../utils/dateUtils.js';
 import { processAutoCheckouts } from '../services/autoCheckout.service.js';
 import {
   validateAadhaarConsistency,
@@ -812,6 +812,8 @@ router.get('/rooms', async (req, res) => {
 
     const parseTime = (dateStr) => {
       if (!dateStr) return null;
+      const parsed = parseDateSafe(dateStr);
+      if (parsed) return parsed.getTime();
       const t = new Date(dateStr).getTime();
       return isNaN(t) ? null : t;
     };

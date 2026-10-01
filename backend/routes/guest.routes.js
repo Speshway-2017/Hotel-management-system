@@ -11,7 +11,13 @@ import { Room, Feedback, Payment, Approval } from '../models/managerData.model.j
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { notifyFeedbackEvent, triggerNotification, notifyAccountDeletionEvent } from '../utils/notification.helper.js';
 import { calculateStayNights } from '../utils/dateUtils.js';
-import { extractRoomNumber } from '../utils/roomHelper.js';
+import {
+  extractRoomNumber,
+  isBookingMatchingRoom,
+  parseDateToDayUtc,
+  isStayDateOverlapping,
+  isBookingStatusActive
+} from '../utils/roomHelper.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { findPropertySafely } from '../utils/propertyCache.js';
 import { processAutoCheckouts } from '../services/autoCheckout.service.js';
@@ -49,12 +55,108 @@ router.use(guestAuth);
 
 router.get('/rooms', async (req, res) => {
   try {
-    const targetPropId = req.user?.propertyId || 'HS-9HQ8P';
-    let dbRooms = await Room.find({ propertyId: targetPropId }).sort({ roomNumber: 1 });
+    const targetPropId = req.query.propertyId || req.user?.propertyId || 'HS-9HQ8P';
+    const { checkIn, checkOut } = req.query;
+
+    let dbRooms = await Room.find({
+      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+    }).sort({ roomNumber: 1 });
+
     if (!dbRooms || dbRooms.length === 0) {
       dbRooms = await Room.find().sort({ roomNumber: 1 });
     }
-    return sendSuccess(res, 200, dbRooms, 'Guest available rooms retrieved');
+
+    const allBookings = await Booking.find({
+      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+    });
+    const activeBookings = allBookings.filter(b => isBookingStatusActive(b.status));
+
+    const reqInDay = parseDateToDayUtc(checkIn);
+    const reqOutDay = parseDateToDayUtc(checkOut);
+
+    const mapped = dbRooms.map(rm => {
+      const roomBookings = activeBookings.filter(b => isBookingMatchingRoom(b, rm));
+      const bookedRanges = roomBookings.map(b => ({
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        status: b.status,
+        guest: b.guest || b.guestName || ''
+      }));
+
+      let isOccupied = false;
+      let isReserved = false;
+      let matchedBooking = null;
+
+      if (reqInDay !== null && reqOutDay !== null) {
+        for (const b of roomBookings) {
+          if (isStayDateOverlapping(reqInDay, reqOutDay, b.checkIn, b.checkOut)) {
+            matchedBooking = b;
+            const bStatus = String(b.status || '').toLowerCase();
+            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house')) {
+              isOccupied = true;
+            } else {
+              isReserved = true;
+            }
+            break;
+          }
+        }
+      } else {
+        const todayUtc = parseDateToDayUtc(new Date());
+        for (const b of roomBookings) {
+          const bIn = parseDateToDayUtc(b.checkIn);
+          const bOut = parseDateToDayUtc(b.checkOut);
+          if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
+            matchedBooking = b;
+            const bStatus = String(b.status || '').toLowerCase();
+            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house')) {
+              isOccupied = true;
+            } else {
+              isReserved = true;
+            }
+            break;
+          }
+        }
+      }
+
+      let displayStatus = rm.status || "Available";
+      if (rm.status !== 'Blocked' && rm.status !== 'Maintenance') {
+        if (isOccupied || rm.status === 'Occupied') {
+          displayStatus = 'Occupied';
+        } else if (isReserved || rm.status === 'Reserved') {
+          displayStatus = 'Reserved';
+        } else {
+          displayStatus = 'Available';
+        }
+      }
+
+      const isAvailable = displayStatus === "Available";
+
+      return {
+        id: rm._id ? String(rm._id) : (rm.id || `RM-${rm.roomNumber}`),
+        _id: rm._id ? String(rm._id) : (rm.id || `RM-${rm.roomNumber}`),
+        roomNumber: rm.roomNumber,
+        name: `${rm.category} (Room ${rm.roomNumber})`,
+        category: rm.category || "Standard Room",
+        status: displayStatus,
+        operationalStatus: rm.status || "Available",
+        isReserved: displayStatus === "Reserved",
+        isAvailable: isAvailable,
+        guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : '',
+        checkIn: matchedBooking ? matchedBooking.checkIn : (bookedRanges[0]?.checkIn || ''),
+        checkOut: matchedBooking ? matchedBooking.checkOut : (bookedRanges[0]?.checkOut || ''),
+        bookedRanges: bookedRanges,
+        baseRate: rm.baseRate || 3000,
+        currentRate: rm.currentRate || rm.baseRate || 3000,
+        floor: rm.floor || 'Floor 1',
+        capacity: rm.capacity || '2 Adults',
+        bedType: rm.bedType || 'King Bed',
+        propertyId: rm.propertyId,
+        amenities: rm.amenities || [],
+        images: rm.images || []
+      };
+    });
+
+    return sendSuccess(res, 200, mapped, 'Guest available rooms retrieved');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to load rooms');
   }
@@ -802,12 +904,22 @@ const syncGuestBookingNotifications = async (user) => {
       Notification.find({ userId: String(userId) }, { message: 1, title: 1 }).lean()
     ]);
 
-    const existingRefs = new Set();
+    const existingCheckouts = new Set();
+    const existingCheckins = new Set();
+    const existingConfirmations = new Set();
     for (const n of existingNotifs || []) {
       const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
       const matches = text.match(/([a-z0-9_-]{4,})/g);
       if (matches) {
-        for (const m of matches) existingRefs.add(m);
+        for (const m of matches) {
+          if (text.includes('check-out') || text.includes('checked out') || text.includes('checkout')) {
+            existingCheckouts.add(m);
+          } else if (text.includes('check-in') || text.includes('checked in') || text.includes('checkin')) {
+            existingCheckins.add(m);
+          } else {
+            existingConfirmations.add(m);
+          }
+        }
       }
     }
 
@@ -824,32 +936,48 @@ const syncGuestBookingNotifications = async (user) => {
       const status = (b.status || '').toLowerCase();
       const propId = b.propertyId || 'HS-9HQ8P';
 
-      if (!existingRefs.has(bIdLower)) {
-        existingRefs.add(bIdLower);
-        let title = 'Booking Confirmed!';
-        let message = `Your stay at ${hotelName} (${roomInfo}) is confirmed for ${checkIn} → ${checkOut}. [Ref: #${bId}]`;
-        let category = 'Bookings';
-
-        if (status === 'checked-in' || status === 'checked_in' || status === 'checked in' || status === 'staying' || status === 'active') {
-          title = 'Check-in Confirmed!';
-          message = `Welcome! Your check-in to ${roomInfo} at ${hotelName} is complete. Enjoy your stay! [Ref: #${bId}]`;
-          category = 'Check-in';
-        } else if (status === 'checked-out' || status === 'checked_out' || status === 'checked out' || status === 'completed') {
-          title = 'Check-out Completed';
-          message = `Thank you for staying with us at ${hotelName} (${roomInfo}). We hope you had a pleasant experience! [Ref: #${bId}]`;
-          category = 'Stay';
+      if (status === 'checked-out' || status === 'checked_out' || status === 'checked out' || status === 'completed') {
+        if (!existingCheckouts.has(bIdLower)) {
+          existingCheckouts.add(bIdLower);
+          toInsert.push({
+            userId: String(userId),
+            role: 'guest',
+            propertyId: propId,
+            title: 'Check-out Time Arrived',
+            message: `Your scheduled check-out time has arrived for ${roomInfo} at ${hotelName}. Thank you for choosing Hour Stay! We hope you had a pleasant stay. [Ref: #${bId}]`,
+            category: 'Check-out',
+            isRead: false,
+            createdAt: b.updatedAt || b.createdAt || new Date()
+          });
         }
-
-        toInsert.push({
-          userId: String(userId),
-          role: 'guest',
-          propertyId: propId,
-          title,
-          message,
-          category,
-          isRead: false,
-          createdAt: b.updatedAt || b.createdAt || new Date()
-        });
+      } else if (status === 'checked-in' || status === 'checked_in' || status === 'checked in' || status === 'staying' || status === 'active') {
+        if (!existingCheckins.has(bIdLower)) {
+          existingCheckins.add(bIdLower);
+          toInsert.push({
+            userId: String(userId),
+            role: 'guest',
+            propertyId: propId,
+            title: 'Check-in Confirmed!',
+            message: `Welcome! Your check-in to ${roomInfo} at ${hotelName} is complete. Enjoy your stay! [Ref: #${bId}]`,
+            category: 'Check-in',
+            isRead: false,
+            createdAt: b.updatedAt || b.createdAt || new Date()
+          });
+        }
+      } else {
+        if (!existingConfirmations.has(bIdLower)) {
+          existingConfirmations.add(bIdLower);
+          toInsert.push({
+            userId: String(userId),
+            role: 'guest',
+            propertyId: propId,
+            title: 'Booking Confirmed!',
+            message: `Your stay at ${hotelName} (${roomInfo}) is confirmed for ${checkIn} → ${checkOut}. [Ref: #${bId}]`,
+            category: 'Booking Confirmation',
+            isRead: false,
+            createdAt: b.createdAt || new Date()
+          });
+        }
       }
     }
 

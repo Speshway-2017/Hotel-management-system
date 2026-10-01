@@ -6,7 +6,6 @@ import 'package:hour_stay_mobile/core/constants/api_endpoints.dart';
 import 'package:hour_stay_mobile/models/room_model.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/auth_provider.dart';
-import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
 import 'package:hour_stay_mobile/screens/guest/bookings/guest_booking_detail_screen.dart';
 import 'package:hour_stay_mobile/screens/auth/login_screen.dart';
@@ -1474,7 +1473,6 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                         onPressed: isSubmitting
                             ? null
                             : () async {
-                                final bookingProv = context.read<GuestBookingProvider>();
                                 final navigator = Navigator.of(context);
                                 final messenger = ScaffoldMessenger.of(context);
 
@@ -1506,8 +1504,23 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
 
                                   // Post booking to backend API
                                   final res = await ApiService.post('/v1/public/bookings', bookingPayload);
+                                  if (!res.success) {
+                                    final String errMsg = (res.message != null && res.message!.isNotEmpty)
+                                        ? res.message!
+                                        : (res.data is Map && (res.data['message'] ?? res.data['error']) != null
+                                            ? (res.data['message'] ?? res.data['error']).toString()
+                                            : 'Selected room is unavailable for the chosen dates. Please select other dates.');
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(errMsg),
+                                        backgroundColor: ruby,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
                                   ReservationModel? createdRes;
-                                  if (res.success && res.data != null) {
+                                  if (res.data != null) {
                                     final dataMap = res.data is Map<String, dynamic>
                                         ? (res.data['booking'] is Map<String, dynamic>
                                             ? res.data['booking']
@@ -1518,17 +1531,6 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                         createdRes = ReservationModel.fromJson(dataMap as Map<String, dynamic>);
                                       } catch (_) {}
                                     }
-                                  }
-
-                                  if (!res.success) {
-                                    // Fallback to guestBookings
-                                    await bookingProv.bookRoom(
-                                      roomId: room.id,
-                                      checkIn: DateFormat('yyyy-MM-dd').format(effectiveCheckIn),
-                                      checkOut: DateFormat('yyyy-MM-dd').format(effectiveCheckOut),
-                                      stayType: 'overnight',
-                                      totalAmount: totalPayable,
-                                    );
                                   }
 
                                   if (createdRes == null) {
@@ -1549,6 +1551,9 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                       propertyId: room.propertyId,
                                     );
                                   }
+
+                                  // Refresh room inventory to reflect current booking status
+                                  _loadPropertiesAndRooms(silent: true);
 
                                   navigator.pop();
                                   _showBookingSuccessDialog(room, totalPayable, createdRes);

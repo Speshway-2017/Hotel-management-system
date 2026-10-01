@@ -1,6 +1,7 @@
 import { Room } from '../models/managerData.model.js';
 import Booking from '../models/booking.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from './socketEmitter.js';
+import { parseDateSafe } from './dateUtils.js';
 
 /**
  * Robustly extracts a clean 3-4 digit room number (or normalized room identifier)
@@ -53,6 +54,81 @@ export const extractRoomNumber = (val) => {
   if (standaloneMatch) return standaloneMatch[1];
 
   return null;
+};
+
+/**
+ * Normalizes date to UTC midnight timestamp (milliseconds) for reliable calendar day comparisons
+ */
+export const parseDateToDayUtc = (val) => {
+  if (!val) return null;
+  const d = parseDateSafe(val);
+  if (!d || isNaN(d.getTime())) return null;
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+};
+
+/**
+ * Checks if a booking's status should block room inventory
+ */
+export const isBookingStatusActive = (status) => {
+  if (!status) return true;
+  const s = String(status).trim().toLowerCase();
+  const inactiveStatuses = ['cancelled', 'canceled', 'checked-out', 'checked out', 'no-show', 'no show', 'void', 'inactive', 'failed'];
+  return !inactiveStatuses.includes(s);
+};
+
+/**
+ * Matches a booking to a physical Room model object via ObjectId, roomNumber, or text
+ */
+export const isBookingMatchingRoom = (booking, room) => {
+  if (!booking || !room) return false;
+
+  const rmId = room._id ? String(room._id) : (room.id ? String(room.id) : null);
+  const bRoomId = booking.roomId ? String(booking.roomId) : null;
+
+  // 1. Exact ObjectId match
+  if (rmId && bRoomId && rmId === bRoomId) {
+    return true;
+  }
+
+  // 2. Room number match
+  const rmNum = extractRoomNumber(room.roomNumber || room.room || room.num || room);
+  if (!rmNum) return false;
+
+  const bNum = extractRoomNumber(booking.roomNumber) ||
+               extractRoomNumber(booking.room) ||
+               extractRoomNumber(booking.num) ||
+               extractRoomNumber(booking);
+
+  if (bNum && String(bNum).trim() === String(rmNum).trim()) {
+    return true;
+  }
+
+  // 3. Text search match for room number in booking room string
+  if (booking.room && typeof booking.room === 'string') {
+    const regex = new RegExp(`\\b${rmNum}\\b`);
+    if (regex.test(booking.room)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Mathematically checks if requested stay [reqIn, reqOut] overlaps an existing booking [bIn, bOut]
+ * Formula: reqIn < bOut AND reqOut > bIn
+ */
+export const isStayDateOverlapping = (reqIn, reqOut, bIn, bOut) => {
+  const reqInMs = parseDateToDayUtc(reqIn);
+  const reqOutMs = parseDateToDayUtc(reqOut);
+  const bInMs = parseDateToDayUtc(bIn);
+  const bOutMs = parseDateToDayUtc(bOut);
+
+  if (reqInMs === null || reqOutMs === null || bInMs === null || bOutMs === null) {
+    return false;
+  }
+
+  return (reqInMs < bOutMs && reqOutMs > bInMs);
 };
 
 /**

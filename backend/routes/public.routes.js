@@ -13,7 +13,14 @@ import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitt
 import { triggerNotification, notifyFeedbackEvent, notifyBookingEvent } from '../utils/notification.helper.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { calculateStayNights, parseDateSafe, formatISTDateTime } from '../utils/dateUtils.js';
-import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
+import {
+  extractRoomNumber,
+  syncRoomStatus,
+  isBookingMatchingRoom,
+  parseDateToDayUtc,
+  isStayDateOverlapping,
+  isBookingStatusActive
+} from '../utils/roomHelper.js';
 import {
   validateBookingAadhaarConsistency,
   syncVerifiedAadhaarToGuestProfile
@@ -229,19 +236,14 @@ router.get('/properties/:id/rooms', async (req, res) => {
       dbRooms = await Room.find().sort({ roomNumber: 1 });
     }
 
-    // Fetch active bookings to evaluate date-range availability & room status
-    const activeBookings = await Booking.find({
-      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in', 'Checked In', 'Staying', 'Pre-checked', 'Reserved'] }
+    // Fetch all active bookings to evaluate date-range availability & room status
+    const allBookings = await Booking.find({
+      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
     });
+    const activeBookings = allBookings.filter(b => isBookingStatusActive(b.status));
 
-    const parseTime = (dateStr) => {
-      if (!dateStr) return null;
-      const t = new Date(dateStr).getTime();
-      return isNaN(t) ? null : t;
-    };
-
-    const reqIn = parseTime(checkIn);
-    const reqOut = parseTime(checkOut);
+    const reqInDay = parseDateToDayUtc(checkIn);
+    const reqOutDay = parseDateToDayUtc(checkOut);
 
     const mapped = dbRooms.map((rm) => {
       const rate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3000);
@@ -260,36 +262,53 @@ router.get('/properties/:id/rooms', async (req, res) => {
         : [];
       const capacityStr = String(rm.capacity || "2 Adults");
 
-      // Check for matching active booking
+      // Find all active bookings matching this room
+      const roomBookings = activeBookings.filter(b => isBookingMatchingRoom(b, rm));
+
+      const bookedRanges = roomBookings.map(b => ({
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        status: b.status,
+        guest: b.guest || b.guestName || ''
+      }));
+
       let matchedBooking = null;
       let isOccupied = false;
       let isReserved = false;
 
-      for (const b of activeBookings) {
-        if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') continue;
-
-        const bRoomNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : null) || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
-        const matchesRoom = (b.roomId && String(b.roomId) === String(rm._id)) ||
-                            (bRoomNum && String(bRoomNum).trim() === String(rm.roomNumber).trim()) ||
-                            (b.room && String(b.room).includes(String(rm.roomNumber)));
-        if (!matchesRoom) continue;
-
-        const bIn = parseTime(b.checkIn);
-        const bOut = parseTime(b.checkOut);
-
-        const dateOverlap = (!reqIn || !reqOut || !bIn || !bOut) ? true : (reqIn < bOut && reqOut > bIn);
-        if (dateOverlap) {
-          matchedBooking = b;
-          if (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying') {
-            isOccupied = true;
-          } else {
-            isReserved = true;
+      if (reqInDay !== null && reqOutDay !== null) {
+        for (const b of roomBookings) {
+          if (isStayDateOverlapping(reqInDay, reqOutDay, b.checkIn, b.checkOut)) {
+            matchedBooking = b;
+            const bStatus = String(b.status || '').toLowerCase();
+            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('occup') || bStatus.includes('in-house')) {
+              isOccupied = true;
+            } else {
+              isReserved = true;
+            }
+            break;
+          }
+        }
+      } else {
+        const todayUtc = parseDateToDayUtc(new Date());
+        for (const b of roomBookings) {
+          const bIn = parseDateToDayUtc(b.checkIn);
+          const bOut = parseDateToDayUtc(b.checkOut);
+          if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
+            matchedBooking = b;
+            const bStatus = String(b.status || '').toLowerCase();
+            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('occup') || bStatus.includes('in-house')) {
+              isOccupied = true;
+            } else {
+              isReserved = true;
+            }
+            break;
           }
         }
       }
 
       let displayStatus = rm.status || "Available";
-      if (rm.status !== 'Blocked') {
+      if (rm.status !== 'Blocked' && rm.status !== 'Maintenance') {
         if (isOccupied || rm.status === 'Occupied') {
           displayStatus = 'Occupied';
         } else if (isReserved || rm.status === 'Reserved') {
@@ -320,8 +339,9 @@ router.get('/properties/:id/rooms', async (req, res) => {
         isReserved: displayStatus === "Reserved",
         isAvailable: isAvailable,
         guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : '',
-        checkIn: matchedBooking ? matchedBooking.checkIn : '',
-        checkOut: matchedBooking ? matchedBooking.checkOut : '',
+        checkIn: matchedBooking ? matchedBooking.checkIn : (bookedRanges[0]?.checkIn || ''),
+        checkOut: matchedBooking ? matchedBooking.checkOut : (bookedRanges[0]?.checkOut || ''),
+        bookedRanges: bookedRanges,
         amenities: amenitiesArr,
         description: rm.description || `Luxury ${rm.category} located on ${rm.floor || 'Floor 1'}.`,
         floor: rm.floor || "Floor 1",
@@ -339,6 +359,70 @@ router.get('/properties/:id/rooms', async (req, res) => {
     });
 
     return sendSuccess(res, 200, validMapped, 'Property rooms retrieved from MongoDB');
+  } catch (err) {
+    return sendError(res, 500, err.message);
+  }
+});
+
+// GET /api/v1/public/properties/:id/rooms/:roomNumber/availability
+router.get('/properties/:id/rooms/:roomNumber/availability', async (req, res) => {
+  try {
+    const { id, roomNumber } = req.params;
+    const { checkIn, checkOut } = req.query;
+    const targetPropId = id || 'HS-9HQ8P';
+
+    const cleanNum = extractRoomNumber(roomNumber);
+    const room = await Room.findOne({
+      $or: [
+        { roomNumber: cleanNum, propertyId: targetPropId },
+        { roomNumber: cleanNum },
+        { _id: mongoose.Types.ObjectId.isValid(roomNumber) ? roomNumber : new mongoose.Types.ObjectId() }
+      ]
+    });
+
+    if (!room) {
+      return sendError(res, 404, 'Room not found');
+    }
+
+    const allBookings = await Booking.find({
+      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+    });
+    const activeBookings = allBookings.filter(b => isBookingStatusActive(b.status));
+    const roomBookings = activeBookings.filter(b => isBookingMatchingRoom(b, room));
+
+    const bookedRanges = roomBookings.map(b => ({
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+      status: b.status,
+      guest: b.guest || b.guestName || ''
+    }));
+
+    let isAvailable = room.status !== 'Blocked' && room.status !== 'Maintenance';
+    let overlappingBooking = null;
+
+    if (checkIn && checkOut) {
+      for (const b of roomBookings) {
+        if (isStayDateOverlapping(checkIn, checkOut, b.checkIn, b.checkOut)) {
+          isAvailable = false;
+          overlappingBooking = {
+            checkIn: b.checkIn,
+            checkOut: b.checkOut,
+            status: b.status,
+            guest: b.guest || b.guestName || ''
+          };
+          break;
+        }
+      }
+    }
+
+    return sendSuccess(res, 200, {
+      roomNumber: room.roomNumber,
+      category: room.category,
+      isAvailable,
+      status: isAvailable ? 'Available' : (overlappingBooking?.status === 'Checked-in' ? 'Occupied' : 'Reserved'),
+      bookedRanges,
+      overlappingBooking
+    }, 'Room availability evaluated');
   } catch (err) {
     return sendError(res, 500, err.message);
   }
@@ -387,28 +471,26 @@ router.post('/bookings', async (req, res) => {
     const nights = calculateStayNights(cIn, cOut);
 
     // 1. Overlapping Date Availability Check
-    const parseDateToMs = (val) => {
-      const parsed = parseDateSafe(val);
-      return parsed ? parsed.getTime() : new Date(val).getTime();
-    };
+    const reqInDay = parseDateToDayUtc(cIn);
+    const reqOutDay = parseDateToDayUtc(cOut);
 
-    const newCheckIn = parseDateToMs(cIn);
-    const newCheckOut = parseDateToMs(cOut);
-
-    if (isNaN(newCheckIn) || isNaN(newCheckOut) || newCheckIn > newCheckOut) {
-      return sendError(res, 400, 'Invalid check-in or check-out date range');
+    if (reqInDay === null || reqOutDay === null || reqInDay >= reqOutDay) {
+      return sendError(res, 400, 'Invalid check-in or check-out date range. Check-out must be after check-in.');
     }
 
     // Fetch physical rooms and existing active bookings for property
-    let allPropRooms = await Room.find({ propertyId: targetPropId });
+    let allPropRooms = await Room.find({
+      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+    });
     if (!allPropRooms || allPropRooms.length === 0) {
       allPropRooms = await Room.find();
     }
 
-    const existingBookings = await Booking.find({
-      propertyId: targetPropId,
-      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
+    const allExistingBookings = await Booking.find({
+      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
     });
+
+    const activeExistingBookings = allExistingBookings.filter(b => isBookingStatusActive(b.status));
 
     let assignedRoomId = roomId || null;
     let assignedRoomNumber = null;
@@ -425,19 +507,15 @@ router.post('/bookings', async (req, res) => {
     }
 
     if (!assignedRoomNumber && room) {
-      const match = room.match(/\b\d{3,4}\b/);
-      if (match) assignedRoomNumber = match[0];
+      assignedRoomNumber = extractRoomNumber(room);
     }
 
     const targetCategory = rType || room || 'Standard Room';
 
-    // Filter active bookings that overlap with requested [newCheckIn, newCheckOut]
-    const overlappingActiveBookings = existingBookings.filter(b => {
-      if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') return false;
-      const bIn = new Date(b.checkIn).getTime();
-      const bOut = new Date(b.checkOut).getTime();
-      return (newCheckIn < bOut && newCheckOut > bIn);
-    });
+    // Filter active bookings that overlap with requested stay dates [cIn, cOut]
+    const overlappingActiveBookings = activeExistingBookings.filter(b => 
+      isStayDateOverlapping(reqInDay, reqOutDay, b.checkIn, b.checkOut)
+    );
 
     // Find all rooms matching target category
     const categoryRooms = allPropRooms.filter(r => {
@@ -452,20 +530,15 @@ router.post('/bookings', async (req, res) => {
 
     // Identify which category rooms are vacant for requested date range
     const availableCategoryRooms = categoryRooms.filter(r => {
-      const isTaken = overlappingActiveBookings.some(b => {
-        const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
-        return (bRoomNum && String(bRoomNum).trim() === String(r.roomNumber).trim()) ||
-               (b.roomId && String(b.roomId) === String(r._id));
-      });
+      const isTaken = overlappingActiveBookings.some(b => isBookingMatchingRoom(b, r));
       const statusStr = String(r.status || 'Available').toLowerCase();
       const isStatusAvailable = statusStr === 'available' || statusStr === 'vacant clean' || statusStr === 'vacant';
       return !isTaken && isStatusAvailable;
     });
 
     let finalAssignedRoom = null;
-    let isUnavailable = false;
 
-    // If a specific room was requested, check if it's free
+    // If a specific room was requested, strictly check that room's availability
     if (assignedRoomNumber || assignedRoomId) {
       const requestedRoom = allPropRooms.find(r => 
         (assignedRoomId && String(r._id) === String(assignedRoomId)) ||
@@ -473,47 +546,38 @@ router.post('/bookings', async (req, res) => {
       );
 
       if (requestedRoom) {
-        const isSpecificRoomTaken = overlappingActiveBookings.some(b => {
-          const bRoomNum = b.roomId || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
-          return (bRoomNum && String(bRoomNum).trim() === String(requestedRoom.roomNumber).trim()) ||
-                 (b.roomId && String(b.roomId) === String(requestedRoom._id));
-        });
+        const isSpecificRoomTaken = overlappingActiveBookings.some(b => isBookingMatchingRoom(b, requestedRoom));
         const statusStr = String(requestedRoom.status || 'Available').toLowerCase();
         const isStatusAvailable = statusStr === 'available' || statusStr === 'vacant clean' || statusStr === 'vacant';
 
-        if (!isSpecificRoomTaken && isStatusAvailable) {
-          finalAssignedRoom = requestedRoom;
+        if (isSpecificRoomTaken || !isStatusAvailable) {
+          return sendError(
+            res,
+            409,
+            `Room ${requestedRoom.roomNumber} is unavailable for selected dates (${cIn} to ${cOut}) due to an existing booking. Please choose different dates.`
+          );
         }
+
+        finalAssignedRoom = requestedRoom;
       }
     }
 
-    // If specific room wasn't available or none requested, assign from available rooms in category
+    // If no specific room was requested or assigned, assign from available rooms in requested category
     if (!finalAssignedRoom && availableCategoryRooms.length > 0) {
       finalAssignedRoom = availableCategoryRooms[0];
     }
 
-    // If no room is available in category, check availability state
+    // If still no room is available, reject with explicit unavailability error
     if (!finalAssignedRoom) {
-      if (categoryRooms.length > 0) {
-        // All rooms in this category are truly occupied
-        isUnavailable = true;
-      } else {
-        // Fallback: check overall property occupancy
-        const totalCount = allPropRooms.length || 10;
-        if (overlappingActiveBookings.length >= totalCount) {
-          isUnavailable = true;
-        }
-      }
+      return sendError(
+        res,
+        409,
+        `All ${targetCategory} rooms are fully booked for selected dates (${cIn} to ${cOut}). Please choose different dates.`
+      );
     }
 
-    if (isUnavailable) {
-      return sendError(res, 400, 'Selected room or category is unavailable for the chosen date range.');
-    }
-
-    if (finalAssignedRoom) {
-      assignedRoomId = finalAssignedRoom._id ? String(finalAssignedRoom._id) : assignedRoomId;
-      assignedRoomNumber = finalAssignedRoom.roomNumber;
-    }
+    assignedRoomId = finalAssignedRoom._id ? String(finalAssignedRoom._id) : assignedRoomId;
+    assignedRoomNumber = finalAssignedRoom.roomNumber;
 
     let bookingCity = req.body.city || req.body.guestCity || req.body.hotelCity;
     let targetPropObj = null;

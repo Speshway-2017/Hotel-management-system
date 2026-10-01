@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { 
   MapPin, Star, Calendar, Users, Coffee, Bed, 
-  ArrowRight, ShieldCheck, Wifi, Sparkles, CheckCircle2, RotateCcw, Search as SearchIcon, Filter, Hotel
+  ArrowRight, ShieldCheck, Wifi, Sparkles, CheckCircle2, RotateCcw, Search as SearchIcon, Filter, Hotel, X
 } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Input } from "@/components/ui/input";
@@ -31,11 +31,11 @@ export function SearchPage() {
   const [error, setError] = useState("");
 
   const urlParams = new URLSearchParams(window.location.search);
-  const locationParam = urlParams.get('location') || localStorage.getItem('search_location') || "";
-  const checkInParam = urlParams.get('checkIn') || localStorage.getItem('booking_check_in') || "";
-  const checkOutParam = urlParams.get('checkOut') || localStorage.getItem('booking_check_out') || "";
+  const locationParam = urlParams.get('location') || "";
+  const checkInParam = urlParams.get('checkIn') || "";
+  const checkOutParam = urlParams.get('checkOut') || "";
 
-  // Search & Filter States
+  // Search & Filter States (Never prefilled with dummy dates)
   const [searchTerm, setSearchTerm] = useState(locationParam);
   const [checkInDate, setCheckInDate] = useState(checkInParam);
   const [checkOutDate, setCheckOutDate] = useState(checkOutParam);
@@ -47,9 +47,19 @@ export function SearchPage() {
   const [minRating, setMinRating] = useState(0);
 
   useEffect(() => {
-    if (checkInDate) localStorage.setItem('booking_check_in', checkInDate);
-    if (checkOutDate) localStorage.setItem('booking_check_out', checkOutDate);
-    if (searchTerm) localStorage.setItem('search_location', searchTerm);
+    if (checkInDate) {
+      localStorage.setItem('booking_check_in', checkInDate);
+    } else {
+      localStorage.removeItem('booking_check_in');
+    }
+    if (checkOutDate) {
+      localStorage.setItem('booking_check_out', checkOutDate);
+    } else {
+      localStorage.removeItem('booking_check_out');
+    }
+    if (searchTerm) {
+      localStorage.setItem('search_location', searchTerm);
+    }
   }, [checkInDate, checkOutDate, searchTerm]);
 
   useEffect(() => {
@@ -146,6 +156,11 @@ export function SearchPage() {
 
   const resetFilters = () => {
     setSearchTerm("");
+    setCheckInDate("");
+    setCheckOutDate("");
+    localStorage.removeItem('search_location');
+    localStorage.removeItem('booking_check_in');
+    localStorage.removeItem('booking_check_out');
     setSelectedCity("all");
     setSelectedClassification("all");
     setMaxPrice(30000);
@@ -186,41 +201,123 @@ export function SearchPage() {
             </div>
 
             {/* Prominent Search Bar with Dates */}
-            <div className="grid gap-3 sm:grid-cols-[1fr_180px_180px] max-w-4xl">
+            <div className="grid gap-3 sm:grid-cols-[1fr_190px_190px] max-w-4xl">
               <div className="relative">
-                <SearchIcon className="absolute left-4 top-3.5 size-5 text-navy/40" />
-                <Input 
-                  type="text"
-                  placeholder="Search hotels by destination or location (e.g. Hyderabad, Jaipur, Goa)..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    localStorage.setItem('search_location', e.target.value);
-                  }}
-                  className="w-full h-12 bg-cream/35 border-navy/10 pl-12 pr-4 rounded-xl text-xs sm:text-sm font-semibold text-navy focus-visible:ring-purple/50 shadow-inner"
-                />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Destination</span>
+                <div className="relative">
+                  <SearchIcon className="absolute left-4 top-3.5 size-5 text-navy/40 pointer-events-none" />
+                  <Input 
+                    type="text"
+                    placeholder="Destination (e.g. Hyderabad, Jaipur, Goa)..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      localStorage.setItem('search_location', e.target.value);
+                    }}
+                    className="w-full h-12 bg-cream/35 border-navy/10 pl-12 pr-4 rounded-xl text-xs sm:text-sm font-semibold text-navy placeholder:text-gray-400 focus-visible:ring-purple/50 shadow-inner"
+                  />
+                </div>
               </div>
+
+              {/* Check-in Date Input */}
               <div className="relative">
-                <Input 
-                  type="date"
-                  value={checkInDate}
-                  onChange={(e) => {
-                    setCheckInDate(e.target.value);
-                    localStorage.setItem('booking_check_in', e.target.value);
-                  }}
-                  className="w-full h-12 bg-cream/35 border-navy/10 px-3 rounded-xl text-xs font-semibold text-navy focus-visible:ring-purple/50 shadow-inner"
-                />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Check-in</span>
+                <div className="relative flex items-center">
+                  <Calendar className="absolute left-3.5 size-4.5 text-purple pointer-events-none z-10" />
+                  <Input 
+                    type={checkInDate ? "date" : "text"}
+                    placeholder="dd-mm-yyyy"
+                    aria-label="Check-in Date"
+                    value={checkInDate}
+                    min={new Date().toISOString().split('T')[0]}
+                    onFocus={(e) => {
+                      e.target.type = "date";
+                      try { e.target.showPicker(); } catch (_) {}
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value) {
+                        e.target.type = "text";
+                      }
+                    }}
+                    onChange={(e) => {
+                      setCheckInDate(e.target.value);
+                      if (e.target.value) {
+                        localStorage.setItem('booking_check_in', e.target.value);
+                      } else {
+                        localStorage.removeItem('booking_check_in');
+                      }
+                      if (checkOutDate && e.target.value && e.target.value >= checkOutDate) {
+                        const nextDay = new Date(e.target.value);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        const nextDayStr = nextDay.toISOString().split('T')[0];
+                        setCheckOutDate(nextDayStr);
+                        localStorage.setItem('booking_check_out', nextDayStr);
+                      }
+                    }}
+                    className="w-full h-12 bg-cream/35 border-navy/10 pl-10 pr-8 rounded-xl text-xs sm:text-sm font-semibold text-navy placeholder:text-gray-400 focus-visible:ring-purple/50 shadow-inner cursor-pointer"
+                  />
+                  {checkInDate && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCheckInDate("");
+                        localStorage.removeItem('booking_check_in');
+                      }}
+                      className="absolute right-2.5 p-1 rounded-full text-gray-400 hover:text-navy hover:bg-navy/5 cursor-pointer"
+                      title="Clear check-in date"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Check-out Date Input */}
               <div className="relative">
-                <Input 
-                  type="date"
-                  value={checkOutDate}
-                  onChange={(e) => {
-                    setCheckOutDate(e.target.value);
-                    localStorage.setItem('booking_check_out', e.target.value);
-                  }}
-                  className="w-full h-12 bg-cream/35 border-navy/10 px-3 rounded-xl text-xs font-semibold text-navy focus-visible:ring-purple/50 shadow-inner"
-                />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Check-out</span>
+                <div className="relative flex items-center">
+                  <Calendar className="absolute left-3.5 size-4.5 text-purple pointer-events-none z-10" />
+                  <Input 
+                    type={checkOutDate ? "date" : "text"}
+                    placeholder="dd-mm-yyyy"
+                    aria-label="Check-out Date"
+                    value={checkOutDate}
+                    min={checkInDate ? checkInDate : new Date().toISOString().split('T')[0]}
+                    onFocus={(e) => {
+                      e.target.type = "date";
+                      try { e.target.showPicker(); } catch (_) {}
+                    }}
+                    onBlur={(e) => {
+                      if (!e.target.value) {
+                        e.target.type = "text";
+                      }
+                    }}
+                    onChange={(e) => {
+                      setCheckOutDate(e.target.value);
+                      if (e.target.value) {
+                        localStorage.setItem('booking_check_out', e.target.value);
+                      } else {
+                        localStorage.removeItem('booking_check_out');
+                      }
+                    }}
+                    className="w-full h-12 bg-cream/35 border-navy/10 pl-10 pr-8 rounded-xl text-xs sm:text-sm font-semibold text-navy placeholder:text-gray-400 focus-visible:ring-purple/50 shadow-inner cursor-pointer"
+                  />
+                  {checkOutDate && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCheckOutDate("");
+                        localStorage.removeItem('booking_check_out');
+                      }}
+                      className="absolute right-2.5 p-1 rounded-full text-gray-400 hover:text-navy hover:bg-navy/5 cursor-pointer"
+                      title="Clear check-out date"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

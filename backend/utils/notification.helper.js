@@ -470,7 +470,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
     // 5. Notify Guest
     let guestTitle = action === 'created' || action === 'booked' ? 'Booking Confirmed!' :
       action === 'checkin' ? 'Check-in Confirmed!' :
-      action === 'checkout' ? 'Check-out Completed' :
+      action === 'checkout' ? 'Check-out Time Arrived' :
       action === 'room_assigned' ? 'Room Assigned' :
       action === 'extended' ? 'Stay Extended' :
       action === 'cancelled' ? 'Reservation Cancelled' : title;
@@ -480,7 +480,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       : action === 'checkin'
       ? `Welcome! You have checked in to Room ${roomInfo}. Enjoy your stay! [Ref: #${bookingId}]`
       : action === 'checkout'
-      ? `Thank you for choosing Hour Stay! We hope you had a pleasant stay in Room ${roomInfo}. [Ref: #${bookingId}]`
+      ? `Your scheduled check-out time has arrived for Room ${roomInfo}. Thank you for choosing Hour Stay! We hope you had a pleasant stay. [Ref: #${bookingId}]`
       : action === 'room_assigned'
       ? `Room ${roomInfo} has been assigned for your reservation. [Ref: #${bookingId}]`
       : action === 'extended'
@@ -489,15 +489,20 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       ? `Your reservation #${bookingId} for ${roomInfo} has been cancelled.`
       : msg;
 
+    const guestCategory = action === 'checkout' ? 'Check-out' :
+      action === 'checkin' ? 'Check-in' :
+      action === 'created' || action === 'booked' ? 'Booking Confirmation' :
+      'Stay';
+
     await triggerNotification({
       req,
       io: socketIo,
-      userId: targetGuestId || booking.email || null,
+      userId: targetGuestId || (booking.guestId ? String(booking.guestId) : null) || booking.email || null,
       role: 'guest',
       propertyId: propId,
       title: guestTitle,
       message: guestMsg,
-      category: 'Booking Confirmation',
+      category: guestCategory,
       data: { bookingId, guestName, room: roomInfo, action }
     });
 
@@ -505,8 +510,8 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
     if (socketIo) {
       emitRealtimeSync(socketIo, propId, 'booking_created', { booking, propertyId: propId });
       emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), action, booking, propertyId: propId });
-      emitRealtimeSync(socketIo, propId, 'guest_notification', { action, bookingId, title: guestTitle, message: guestMsg });
-      emitRealtimeSync(socketIo, propId, 'notification_created', { action, bookingId, role: 'guest', userId: targetGuestId });
+      emitRealtimeSync(socketIo, propId, 'guest_notification', { action, bookingId, title: guestTitle, message: guestMsg, category: guestCategory });
+      emitRealtimeSync(socketIo, propId, 'notification_created', { action, bookingId, role: 'guest', userId: targetGuestId, title: guestTitle, message: guestMsg, category: guestCategory });
       emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: `booking_${action}`, bookingId });
     }
   } catch (err) {

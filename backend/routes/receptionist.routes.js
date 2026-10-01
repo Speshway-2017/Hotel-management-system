@@ -14,10 +14,17 @@ import {
 } from '../models/managerData.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { findPropertySafely } from '../utils/propertyCache.js';
-import { isToday, calculateStayNights, isCheckInAllowed, formatISTDateTime } from '../utils/dateUtils.js';
+import { isToday, calculateStayNights, isCheckInAllowed, formatISTDateTime, parseDateSafe } from '../utils/dateUtils.js';
 import { runAutoCheckoutSweep, processAutoCheckouts } from '../services/autoCheckout.service.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
-import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
+import {
+  extractRoomNumber,
+  syncRoomStatus,
+  isBookingMatchingRoom,
+  parseDateToDayUtc,
+  isStayDateOverlapping,
+  isBookingStatusActive
+} from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
 import {
   validateAadhaarConsistency,
@@ -570,61 +577,68 @@ router.get('/rooms', async (req, res) => {
     }
     
     // Fetch all active bookings for property
-    const bookings = await Booking.find({
-      $or: [{ propertyId }, { hotelId: propertyId }],
-      status: { $in: ['Confirmed', 'Paid', 'Pending', 'Checked-in'] }
+    const allBookings = await Booking.find({
+      $or: [{ propertyId }, { hotelId: propertyId }]
     });
-    
-    const parseTime = (dateStr) => {
-      if (!dateStr) return null;
-      const t = new Date(dateStr).getTime();
-      return isNaN(t) ? null : t;
-    };
+    const bookings = allBookings.filter(b => isBookingStatusActive(b.status));
 
-    const reqIn = parseTime(checkIn);
-    const reqOut = parseTime(checkOut);
+    const reqInDay = parseDateToDayUtc(checkIn);
+    const reqOutDay = parseDateToDayUtc(checkOut);
 
     const roomsList = rooms.map(r => {
-      const activeCheckIn = bookings.find(b => (b.status === 'Checked-in' || b.status === 'Checked In' || b.status === 'Staying') && (
-        (b.roomId && (String(b.roomId) === String(r._id) || String(b.roomId) === String(r.roomNumber))) ||
-        (b.roomNumber && String(b.roomNumber).trim() === String(r.roomNumber).trim()) ||
-        (b.room && String(b.room).match(/\b\d{3,4}\b/)?.[0] === String(r.roomNumber).trim()) ||
-        (b.room && String(b.room).includes(String(r.roomNumber)))
-      ));
-      
-      let isReservedForDates = false;
+      const roomBookings = bookings.filter(b => isBookingMatchingRoom(b, r));
+
+      const bookedRanges = roomBookings.map(b => ({
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        status: b.status,
+        guest: b.guest || b.guestName || ''
+      }));
+
+      let activeCheckIn = null;
       let reservedBooking = null;
 
-      // Find any confirmed reservation linked to this room
-      reservedBooking = bookings.find(b => {
-        if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') return false;
-        
-        const bRoomNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : null) || (b.room ? b.room.match(/\b\d{3,4}\b/)?.[0] : null);
-        const matchesRoom = (b.roomId && String(b.roomId) === String(r._id)) || 
-                            (bRoomNum && String(bRoomNum).trim() === String(r.roomNumber).trim()) ||
-                            (b.room && String(b.room).includes(String(r.roomNumber)));
-        if (!matchesRoom) return false;
-
-        const bIn = parseTime(b.checkIn);
-        const bOut = parseTime(b.checkOut);
-
-        if (reqIn && reqOut && bIn && bOut) {
-          return (reqIn < bOut && reqOut > bIn);
+      if (reqInDay !== null && reqOutDay !== null) {
+        for (const b of roomBookings) {
+          if (isStayDateOverlapping(reqInDay, reqOutDay, b.checkIn, b.checkOut)) {
+            const bStatus = String(b.status || '').toLowerCase();
+            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house')) {
+              activeCheckIn = b;
+              break;
+            } else {
+              if (!reservedBooking) reservedBooking = b;
+            }
+          }
         }
-
-        return true;
-      });
-
-      if (reservedBooking && !activeCheckIn) {
-        isReservedForDates = true;
+      } else {
+        const todayUtc = parseDateToDayUtc(new Date());
+        for (const b of roomBookings) {
+          const bIn = parseDateToDayUtc(b.checkIn);
+          const bOut = parseDateToDayUtc(b.checkOut);
+          if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
+            const bStatus = String(b.status || '').toLowerCase();
+            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house')) {
+              activeCheckIn = b;
+              break;
+            } else {
+              if (!reservedBooking) reservedBooking = b;
+            }
+          }
+        }
       }
+
+      const isReservedForDates = reservedBooking !== null && activeCheckIn === null;
 
       // Compute display status
       let displayStatus = r.status || 'Available';
-      if (activeCheckIn) {
-        displayStatus = 'Occupied';
-      } else if (isReservedForDates || r.status === 'Reserved' || (reservedBooking && ['Confirmed', 'Paid', 'Pending', 'Pre-checked'].includes(reservedBooking.status))) {
-        displayStatus = 'Reserved';
+      if (r.status !== 'Blocked' && r.status !== 'Maintenance') {
+        if (activeCheckIn || r.status === 'Occupied') {
+          displayStatus = 'Occupied';
+        } else if (isReservedForDates || r.status === 'Reserved') {
+          displayStatus = 'Reserved';
+        } else {
+          displayStatus = 'Available';
+        }
       }
 
       return {
@@ -638,11 +652,12 @@ router.get('/rooms', async (req, res) => {
         status: displayStatus,
         operationalStatus: r.status || 'Available',
         isReserved: isReservedForDates,
-        isAvailable: (r.status === 'Available' || !r.status) && !isReservedForDates && !activeCheckIn,
+        isAvailable: (displayStatus === 'Available') && !isReservedForDates && !activeCheckIn,
         housekeeping: r.status === 'Dirty' ? 'Dirty' : 'Inspected',
         guest: activeCheckIn ? activeCheckIn.guest : (reservedBooking ? reservedBooking.guest : ''),
-        checkIn: activeCheckIn ? activeCheckIn.checkIn : (reservedBooking ? reservedBooking.checkIn : ''),
-        checkOut: activeCheckIn ? activeCheckIn.checkOut : (reservedBooking ? reservedBooking.checkOut : ''),
+        checkIn: activeCheckIn ? activeCheckIn.checkIn : (reservedBooking ? reservedBooking.checkIn : (bookedRanges[0]?.checkIn || '')),
+        checkOut: activeCheckIn ? activeCheckIn.checkOut : (reservedBooking ? reservedBooking.checkOut : (bookedRanges[0]?.checkOut || '')),
+        bookedRanges: bookedRanges,
         bookingRef: activeCheckIn ? (activeCheckIn.bookingId || activeCheckIn._id) : (reservedBooking ? (reservedBooking.bookingId || reservedBooking._id) : null),
         notes: activeCheckIn ? `Occupied by guest ${activeCheckIn.guest} (Checkout: ${activeCheckIn.checkOut}).` : (isReservedForDates ? `Reserved for guest ${reservedBooking?.guest} (${reservedBooking?.checkIn} → ${reservedBooking?.checkOut}).` : 'No special alerts.')
       };
@@ -878,8 +893,13 @@ router.post('/reservations', async (req, res) => {
     const hasVerifiedId = Boolean(finalDocNumber && (isAadhaar || bookingStatus === 'Checked-in'));
 
     // Overlapping Date Availability Check
-    const newCheckIn = new Date(checkIn).getTime();
-    const newCheckOut = new Date(checkOut).getTime();
+    const parseDateToMs = (val) => {
+      const parsed = parseDateSafe(val);
+      return parsed ? parsed.getTime() : new Date(val).getTime();
+    };
+
+    const newCheckIn = parseDateToMs(checkIn);
+    const newCheckOut = parseDateToMs(checkOut);
 
     let assignedRoomId = roomId || null;
     const roomNum = req.body.roomNumber || (room ? String(room).match(/\b\d{3,4}\b/)?.[0] : null);
@@ -898,8 +918,9 @@ router.post('/reservations', async (req, res) => {
         const sameRoom = (roomNum && bRoomNum === roomNum) || (assignedRoomId && b.roomId === assignedRoomId);
         if (!sameRoom) return false;
 
-        const bIn = new Date(b.checkIn).getTime();
-        const bOut = new Date(b.checkOut).getTime();
+        const bIn = parseDateToMs(b.checkIn);
+        const bOut = parseDateToMs(b.checkOut);
+        if (isNaN(bIn) || isNaN(bOut)) return false;
         return (newCheckIn < bOut && newCheckOut > bIn);
       });
 
