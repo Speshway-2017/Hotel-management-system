@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { calculateStayNights } from '../utils/dateUtils.js';
+import { calculateStayNights, formatToYYYYMMDD, parseDateSafe } from '../utils/dateUtils.js';
 import { extractRoomNumber } from '../utils/roomHelper.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,8 +74,15 @@ bookingSchema.pre('validate', function(next) {
     this.originalAmount = this.totalAmount + disc;
   }
 
+  if (this.checkIn) {
+    this.checkIn = formatToYYYYMMDD(this.checkIn) || this.checkIn;
+  }
+  if (this.checkOut) {
+    this.checkOut = formatToYYYYMMDD(this.checkOut) || this.checkOut;
+  }
+
   if (!this.createdAt) {
-    this.createdAt = this.checkIn ? new Date(this.checkIn) : new Date();
+    this.createdAt = this.checkIn ? (parseDateSafe(this.checkIn) || new Date()) : new Date();
   }
   if (!this.guestName && this.guest) {
     this.guestName = this.guest;
@@ -636,9 +643,10 @@ const Booking = {
       cleanData.paidAmount = Number(cleanData.paidAmount);
     }
     cleanData.guest = cleanData.guest || cleanData.guestName || 'Guest';
-    cleanData.checkIn = cleanData.checkIn || cleanData.checkInDate || '2026-09-01';
-    cleanData.checkOut = cleanData.checkOut || cleanData.checkOutDate || '2026-09-02';
+    cleanData.checkIn = formatToYYYYMMDD(cleanData.checkIn || cleanData.checkInDate) || cleanData.checkIn || cleanData.checkInDate;
+    cleanData.checkOut = formatToYYYYMMDD(cleanData.checkOut || cleanData.checkOutDate) || cleanData.checkOut || cleanData.checkOutDate;
     cleanData.nights = Number(cleanData.nights) || calculateStayNights(cleanData.checkIn, cleanData.checkOut);
+    cleanData.dates = `${cleanData.checkIn} → ${cleanData.checkOut}`;
     cleanData.propertyId = cleanData.propertyId || 'HS-9HQ8P';
     cleanData.city = cleanData.city || cleanData.hotelCity || 'Hyderabad';
     if (!cleanData.roomNumber) {

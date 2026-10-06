@@ -12,7 +12,7 @@ import Coupon from '../models/coupon.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { triggerNotification, notifyFeedbackEvent, notifyBookingEvent } from '../utils/notification.helper.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
-import { calculateStayNights, parseDateSafe, formatISTDateTime } from '../utils/dateUtils.js';
+import { calculateStayNights, parseDateSafe, formatISTDateTime, formatToYYYYMMDD } from '../utils/dateUtils.js';
 import {
   extractRoomNumber,
   syncRoomStatus,
@@ -453,8 +453,8 @@ router.post('/bookings', async (req, res) => {
     } = req.body;
 
     const gName = guestName || guest;
-    const cIn = checkInDate || checkIn;
-    const cOut = checkOutDate || checkOut;
+    const cIn = formatToYYYYMMDD(checkInDate || checkIn);
+    const cOut = formatToYYYYMMDD(checkOutDate || checkOut);
     const rType = roomType || room || 'Standard Room';
     const rawGross = Number(req.body.originalAmount || (req.body.roomBaseTotal ? (Number(req.body.roomBaseTotal) + Number(req.body.gstAmount || 0)) : (totalAmount || amount || 7080)));
     const rawPassedFinal = Number(totalAmount || amount || 0);

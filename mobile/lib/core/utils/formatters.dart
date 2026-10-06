@@ -37,23 +37,23 @@ class Formatters {
       } catch (_) {}
     }
 
-    // Match DD-MM-YYYY or DD/MM/YYYY (e.g. 11-09-2026 or 11/09/2026)
-    final dmyRegex = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})');
-    final dmyMatch = dmyRegex.firstMatch(s);
-    if (dmyMatch != null) {
-      final day = int.tryParse(dmyMatch.group(1)!) ?? 1;
-      final month = int.tryParse(dmyMatch.group(2)!) ?? 1;
-      final year = int.tryParse(dmyMatch.group(3)!) ?? DateTime.now().year;
-      return DateTime(year, month, day);
-    }
-
-    // Match YYYY-MM-DD or YYYY/MM/DD (e.g. 2026-09-11)
+    // Match YYYY-MM-DD or YYYY/MM/DD (e.g. 2026-10-07) - Check YYYY first
     final ymdRegex = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})');
     final ymdMatch = ymdRegex.firstMatch(s);
     if (ymdMatch != null) {
       final year = int.tryParse(ymdMatch.group(1)!) ?? DateTime.now().year;
       final month = int.tryParse(ymdMatch.group(2)!) ?? 1;
       final day = int.tryParse(ymdMatch.group(3)!) ?? 1;
+      return DateTime(year, month, day);
+    }
+
+    // Match DD-MM-YYYY or DD/MM/YYYY (e.g. 07-10-2026 or 07/10/2026)
+    final dmyRegex = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})');
+    final dmyMatch = dmyRegex.firstMatch(s);
+    if (dmyMatch != null) {
+      final day = int.tryParse(dmyMatch.group(1)!) ?? 1;
+      final month = int.tryParse(dmyMatch.group(2)!) ?? 1;
+      final year = int.tryParse(dmyMatch.group(3)!) ?? DateTime.now().year;
       return DateTime(year, month, day);
     }
 

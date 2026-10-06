@@ -7,6 +7,8 @@ import 'package:hour_stay_mobile/models/room_model.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/auth_provider.dart';
 import 'package:hour_stay_mobile/providers/manager/room_provider.dart';
+import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
+import 'package:hour_stay_mobile/providers/guest/guest_folio_provider.dart';
 import 'package:hour_stay_mobile/screens/guest/bookings/guest_booking_detail_screen.dart';
 import 'package:hour_stay_mobile/screens/auth/login_screen.dart';
 import 'guest_room_detail_screen.dart';
@@ -1475,6 +1477,8 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                             : () async {
                                 final navigator = Navigator.of(context);
                                 final messenger = ScaffoldMessenger.of(context);
+                                final guestBookingProv = context.read<GuestBookingProvider>();
+                                final guestFolioProv = context.read<GuestFolioProvider>();
 
                                 setModalState(() => isSubmitting = true);
                                 try {
@@ -1554,6 +1558,10 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
 
                                   // Refresh room inventory to reflect current booking status
                                   _loadPropertiesAndRooms(silent: true);
+                                  try {
+                                    guestBookingProv.fetchDashboardData(silent: true);
+                                    guestFolioProv.fetchMyFolios(silent: true);
+                                  } catch (_) {}
 
                                   navigator.pop();
                                   _showBookingSuccessDialog(room, totalPayable, createdRes);

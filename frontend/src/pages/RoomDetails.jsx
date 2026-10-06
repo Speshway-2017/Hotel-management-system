@@ -49,7 +49,7 @@ export function RoomDetailsPage() {
 
     Promise.all([
       publicService.getProperty(targetPropId).catch(() => null),
-      publicService.getPropertyRooms(targetPropId).catch(() => null)
+      publicService.getPropertyRooms(targetPropId, { checkIn: checkInDate, checkOut: checkOutDate }).catch(() => null)
     ]).then(([propRes, roomsRes]) => {
       if (!isMounted) return;
 
@@ -69,9 +69,15 @@ export function RoomDetailsPage() {
       });
 
       if (matchedRooms.length > 0) {
-        // Pick first available room or first room in category
-        const avail = matchedRooms.find(r => r.status === 'Available' || r.isAvailable === true);
-        setSelectedRoom(avail || matchedRooms[0]);
+        // If current selected room is still in matched rooms, update to fresh object
+        const existing = selectedRoom ? matchedRooms.find(r => r.roomNumber === selectedRoom.roomNumber) : null;
+        if (existing) {
+          setSelectedRoom(existing);
+        } else {
+          // Pick first available room or first room in category
+          const avail = matchedRooms.find(r => r.status === 'Available' || r.isAvailable === true);
+          setSelectedRoom(avail || matchedRooms[0]);
+        }
       } else if (fetchedRooms.length > 0) {
         setSelectedRoom(fetchedRooms[0]);
       }
@@ -80,7 +86,7 @@ export function RoomDetailsPage() {
     });
 
     return () => { isMounted = false; };
-  }, [targetPropId, decodedParam]);
+  }, [targetPropId, decodedParam, checkInDate, checkOutDate]);
 
   const handleBookNow = () => {
     if (!selectedRoom) return;
@@ -372,12 +378,12 @@ export function RoomDetailsPage() {
 
                           <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
                             !roomAvail 
-                              ? "bg-gray-200 text-gray-600" 
+                              ? (rm.status === 'Reserved' ? "bg-amber-100 text-amber-800" : "bg-gray-200 text-gray-600") 
                               : isSelected 
                                 ? "bg-white/20 text-white" 
                                 : "bg-emerald-100 text-emerald-700"
                           }`}>
-                            {roomAvail ? (isSelected ? "✓ Selected" : "Available") : "Occupied"}
+                            {roomAvail ? (isSelected ? "✓ Selected" : "Available") : (rm.status === 'Reserved' ? "Reserved" : "Occupied")}
                           </span>
                         </div>
                       );
@@ -456,7 +462,7 @@ export function RoomDetailsPage() {
                   size="touch"
                   className="w-full h-11 text-xs font-bold cursor-pointer disabled:opacity-50 mt-2"
                 >
-                  {isAvailable ? "Book Now — Instant Confirmation" : "Room Unavailable"}
+                  {isAvailable ? "Book Now — Instant Confirmation" : selectedRoom?.status === "Reserved" ? "Dates Reserved" : "Room Unavailable"}
                 </Button>
 
                 <div className="p-3 bg-purple/5 rounded-xl border border-purple/10 text-[10px] text-gray-500 space-y-1">

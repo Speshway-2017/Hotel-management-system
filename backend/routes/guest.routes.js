@@ -10,7 +10,7 @@ import Notification from '../models/notification.model.js';
 import { Room, Feedback, Payment, Approval } from '../models/managerData.model.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { notifyFeedbackEvent, triggerNotification, notifyAccountDeletionEvent } from '../utils/notification.helper.js';
-import { calculateStayNights } from '../utils/dateUtils.js';
+import { calculateStayNights, formatToYYYYMMDD, parseDateSafe } from '../utils/dateUtils.js';
 import {
   extractRoomNumber,
   isBookingMatchingRoom,
@@ -274,8 +274,8 @@ router.get('/bookings', async (req, res) => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
       const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
-      const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
-      const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
+      const checkIn = formatToYYYYMMDD(b.checkIn || b.checkInDate) || (b.checkIn ? String(b.checkIn) : '2026-10-07');
+      const checkOut = formatToYYYYMMDD(b.checkOut || b.checkOutDate) || (b.checkOut ? String(b.checkOut) : '2026-10-08');
       const bId = b.bookingId || b._id || b.id;
       const fb = feedbackMap.get(String(bId)) || feedbackMap.get(String(b._id)) || feedbackMap.get(String(b.bookingId));
       
@@ -291,7 +291,7 @@ router.get('/bookings', async (req, res) => {
         cancellationFee = Number(b.cancellationFee);
       } else {
         try {
-          const checkInDate = new Date(checkIn);
+          const checkInDate = parseDateSafe(checkIn) || new Date(checkIn);
           const now = new Date();
           const diffHours = (checkInDate - now) / (1000 * 60 * 60);
           if (diffHours < 24 && diffHours > -48) {
@@ -361,8 +361,8 @@ router.get('/dashboard', async (req, res) => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
       const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
-      const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
-      const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
+      const checkIn = formatToYYYYMMDD(b.checkIn || b.checkInDate) || (b.checkIn ? String(b.checkIn) : '2026-10-07');
+      const checkOut = formatToYYYYMMDD(b.checkOut || b.checkOutDate) || (b.checkOut ? String(b.checkOut) : '2026-10-08');
       const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
 
       return {
@@ -1800,8 +1800,8 @@ const handleGetSingleBooking = async (req, res) => {
       return sendError(res, 404, 'Booking not found');
     }
     const prop = await Property.findOne({ $or: [{ _id: booking.propertyId }, { id: booking.propertyId }] });
-    const checkIn = booking.checkIn || booking.checkInDate || '2026-09-01';
-    const checkOut = booking.checkOut || booking.checkOutDate || '2026-09-03';
+    const checkIn = formatToYYYYMMDD(booking.checkIn || booking.checkInDate) || (booking.checkIn ? String(booking.checkIn) : '2026-10-07');
+    const checkOut = formatToYYYYMMDD(booking.checkOut || booking.checkOutDate) || (booking.checkOut ? String(booking.checkOut) : '2026-10-08');
     const totalAmount = Number(booking.amount || booking.totalAmount || 0);
     const balance = Number(booking.balance || 0);
     const paidAmount = (booking.paymentStatus === 'Paid' || booking.status === 'Confirmed' || booking.status === 'Cancelled' || booking.status === 'Checked-out') 
@@ -1813,7 +1813,7 @@ const handleGetSingleBooking = async (req, res) => {
       cancellationFee = Number(booking.cancellationFee);
     } else {
       try {
-        const checkInDate = new Date(checkIn);
+        const checkInDate = parseDateSafe(checkIn) || new Date(checkIn);
         const now = new Date();
         const diffHours = (checkInDate - now) / (1000 * 60 * 60);
         if (diffHours < 24 && diffHours > -48) {
@@ -2060,8 +2060,8 @@ router.get('/payments', async (req, res) => {
       const address = prop ? (prop.settings?.address || prop.address || `${city}, India`) : 'Hitech City, Hyderabad, Telangana';
       const gstNo = prop?.settings?.gstin || '36AABCS1429B1Z5';
 
-      const checkIn = b.checkIn || b.checkInDate || '2026-09-01';
-      const checkOut = b.checkOut || b.checkOutDate || '2026-09-03';
+      const checkIn = formatToYYYYMMDD(b.checkIn || b.checkInDate) || (b.checkIn ? String(b.checkIn) : '2026-10-07');
+      const checkOut = formatToYYYYMMDD(b.checkOut || b.checkOutDate) || (b.checkOut ? String(b.checkOut) : '2026-10-08');
 
       const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
       const balance = Number(b.balance || 0);
