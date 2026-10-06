@@ -36,8 +36,8 @@ export const publicService = {
   getProperty: async (id) => {
     return await apiClient.get(`${PUBLIC_PREFIX}/properties/${id}`);
   },
-  getPropertyRooms: async (id) => {
-    return await apiClient.get(`${PUBLIC_PREFIX}/properties/${id}/rooms`);
+  getPropertyRooms: async (id, params = {}) => {
+    return await apiClient.get(`${PUBLIC_PREFIX}/properties/${id}/rooms`, { params });
   },
   createBooking: async (bookingData) => {
     return await apiClient.post(`${PUBLIC_PREFIX}/bookings`, bookingData);

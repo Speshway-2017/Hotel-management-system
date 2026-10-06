@@ -4,9 +4,13 @@
  */
 
 export const parseDateSafe = (val) => {
-  if (!val) return null;
+  if (val === null || val === undefined) return null;
   if (val instanceof Date) {
     return isNaN(val.getTime()) ? null : val;
+  }
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
   }
   const s = String(val).trim();
   if (!s) return null;
@@ -17,22 +21,28 @@ export const parseDateSafe = (val) => {
     return d;
   }
 
-  // Match DD-MM-YYYY or DD/MM/YYYY (e.g. 04-09-2026)
-  const dmyMatch = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-  if (dmyMatch) {
-    const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1;
-    const year = parseInt(dmyMatch[3], 10);
-    const parsed = new Date(year, month, day);
-    if (!isNaN(parsed.getTime())) return parsed;
+  // Handle numeric string timestamp (e.g. "1791331200000")
+  if (/^\d{11,14}$/.test(s)) {
+    const d = new Date(Number(s));
+    if (!isNaN(d.getTime())) return d;
   }
 
-  // Match YYYY-MM-DD (e.g. 2026-09-04)
+  // Match YYYY-MM-DD (e.g. 2026-10-07)
   const ymdMatch = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (ymdMatch) {
     const year = parseInt(ymdMatch[1], 10);
     const month = parseInt(ymdMatch[2], 10) - 1;
     const day = parseInt(ymdMatch[3], 10);
+    const parsed = new Date(year, month, day);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  // Match DD-MM-YYYY or DD/MM/YYYY (e.g. 07-10-2026)
+  const dmyMatch = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
     const parsed = new Date(year, month, day);
     if (!isNaN(parsed.getTime())) return parsed;
   }

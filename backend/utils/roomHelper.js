@@ -60,7 +60,11 @@ export const extractRoomNumber = (val) => {
  * Normalizes date to UTC midnight timestamp (milliseconds) for reliable calendar day comparisons
  */
 export const parseDateToDayUtc = (val) => {
-  if (!val) return null;
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number' && val > 10000000000) {
+    const d = new Date(val);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
   const d = parseDateSafe(val);
   if (!d || isNaN(d.getTime())) return null;
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
@@ -119,10 +123,10 @@ export const isBookingMatchingRoom = (booking, room) => {
  * Formula: reqIn < bOut AND reqOut > bIn
  */
 export const isStayDateOverlapping = (reqIn, reqOut, bIn, bOut) => {
-  const reqInMs = parseDateToDayUtc(reqIn);
-  const reqOutMs = parseDateToDayUtc(reqOut);
-  const bInMs = parseDateToDayUtc(bIn);
-  const bOutMs = parseDateToDayUtc(bOut);
+  const reqInMs = typeof reqIn === 'number' && reqIn > 10000000000 ? reqIn : parseDateToDayUtc(reqIn);
+  const reqOutMs = typeof reqOut === 'number' && reqOut > 10000000000 ? reqOut : parseDateToDayUtc(reqOut);
+  const bInMs = typeof bIn === 'number' && bIn > 10000000000 ? bIn : parseDateToDayUtc(bIn);
+  const bOutMs = typeof bOut === 'number' && bOut > 10000000000 ? bOut : parseDateToDayUtc(bOut);
 
   if (reqInMs === null || reqOutMs === null || bInMs === null || bOutMs === null) {
     return false;
