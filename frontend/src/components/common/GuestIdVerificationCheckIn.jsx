@@ -34,6 +34,7 @@ import { receptionistService } from "@/services/receptionist";
 import { managerService } from "@/services/manager";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
+import { emitRealtimeEvent, subscribeRealtimeSync } from "@/services/socket";
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
 import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 import { validateWithZod, guestIdVerificationSchema } from "@/schemas";

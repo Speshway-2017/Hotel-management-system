@@ -3,6 +3,7 @@ import Property from '../models/property.model.js';
 import { ManagerNotification, ReceptionistNotification } from '../models/managerData.model.js';
 import User from '../models/user.model.js';
 import { emitRealtimeSync } from './socketEmitter.js';
+import { sendPushToTokens } from '../services/fcm.service.js';
 
 // In-memory 60-second duplicate suppression cache
 const recentNotificationCache = new Map();
@@ -358,7 +359,21 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
         }
 
         if (tokens.size > 0) {
-          console.log(`📱 [FCM PUSH] Dispatching single notification to ${tokens.size} device tokens: "${cleanTitle}"`);
+          sendPushToTokens(Array.from(tokens), {
+            title: cleanTitle,
+            body: cleanMsg,
+            data: {
+              ...(data || {}),
+              notificationId: notif._id || notif.id,
+              category: category || 'General',
+              role: role || '',
+              propertyId: targetPropId || ''
+            },
+            notificationId: notif._id || notif.id,
+            category: category || 'General',
+            role: role || '',
+            propertyId: targetPropId || ''
+          }).catch(pushErr => console.warn("⚠️ FCM push dispatch notice:", pushErr.message));
         }
       }
     } catch (fcmErr) {

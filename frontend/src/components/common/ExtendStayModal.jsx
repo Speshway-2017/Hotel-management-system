@@ -215,8 +215,11 @@ export function ExtendStayModal({ booking, isOpen, onClose, onSuccess, userRole 
   const handleConfirmExtend = async () => {
     const val = validateWithZod(extendStaySchema, {
       extraDays: additionalNights,
+      extendDays: additionalNights,
+      newCheckOut: newCheckOutDate,
       additionalAmount: totalAdditionalAmount,
-      reason: notes
+      reason: notes || undefined,
+      notes: notes || undefined
     });
 
     if (!val.isValid) {

@@ -239,9 +239,12 @@ function ManagerExtendReservation() {
     }
 
     const val = validateWithZod(extendStaySchema, {
-      extraDays: Math.max(1, calculation.additionalNights),
+      extraDays: calculation.additionalNights,
+      extendDays: calculation.additionalNights,
+      newCheckOut: newCheckOutDate,
       additionalAmount: calculation.totalAdditionalAmount,
-      reason: notes
+      reason: notes || undefined,
+      notes: notes || undefined
     });
 
     if (!val.isValid) {
@@ -434,39 +437,45 @@ function ManagerExtendReservation() {
                   style={{ backgroundColor: '#f1f5f9', borderColor: '#cbd5e1', color: '#0f172a' }}
                 >
                   <Clock className="size-4 text-slate-500 shrink-0" />
-                  <span>{formatDisplayDateWithTime(currentCheckOutDate, currentCheckOutTime)}</span>
+                  <span className="text-left font-bold">{formatDisplayDateWithTime(currentCheckOutDate, currentCheckOutTime)}</span>
                 </div>
-                <span className="text-[10px] font-semibold mt-1 block" style={{ color: '#64748b' }}>
+                <span className="text-[10px] font-semibold mt-1 block text-left" style={{ color: '#64748b' }}>
                   Extension duration calculates strictly from this point.
                 </span>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="new-check-out-date" className="text-xs font-bold flex items-center justify-between" style={{ color: '#0f172a' }}>
-                  <span>New Check-Out Date & Time <span className="text-rose-500">*</span></span>
+                <Label className="text-xs font-bold block text-left" style={{ color: '#0f172a' }}>
+                  New Check-Out Date & Time <span className="text-rose-500">*</span>
                 </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    id="new-check-out-date"
-                    type="date"
-                    min={currentCheckOutDate}
-                    value={newCheckOutDate}
-                    onChange={(e) => setNewCheckOutDate(e.target.value)}
-                    required
-                    className="col-span-2 h-10 text-xs font-bold"
-                    style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
-                  />
-                  <Input
-                    id="new-check-out-time"
-                    type="time"
-                    value={newCheckOutTime}
-                    onChange={(e) => setNewCheckOutTime(e.target.value)}
-                    required
-                    className="col-span-1 h-10 text-xs font-bold"
-                    style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1 text-left">
+                    <span className="text-[10px] font-bold block uppercase tracking-wider" style={{ color: '#64748b' }}>Check-Out Date</span>
+                    <Input
+                      id="new-check-out-date"
+                      type="date"
+                      min={currentCheckOutDate}
+                      value={newCheckOutDate}
+                      onChange={(e) => setNewCheckOutDate(e.target.value)}
+                      required
+                      className="w-full h-10 text-xs font-bold text-left px-3 rounded-xl"
+                      style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
+                    />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <span className="text-[10px] font-bold block uppercase tracking-wider" style={{ color: '#64748b' }}>Check-Out Time</span>
+                    <Input
+                      id="new-check-out-time"
+                      type="time"
+                      value={newCheckOutTime}
+                      onChange={(e) => setNewCheckOutTime(e.target.value)}
+                      required
+                      className="w-full h-10 text-xs font-bold text-left px-3 rounded-xl"
+                      style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
+                    />
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold block" style={{ color: '#4338ca' }}>
+                <span className="text-[11px] font-bold block pt-1 text-left" style={{ color: '#4338ca' }}>
                   Selected: {formatDisplayDateWithTime(newCheckOutDate, newCheckOutTime)}
                 </span>
               </div>
@@ -474,28 +483,11 @@ function ManagerExtendReservation() {
 
             {/* Quick Presets */}
             <div className="space-y-2 pt-2 border-t" style={{ borderColor: '#f1f5f9' }}>
-              <span className="text-[11px] font-black uppercase tracking-wider block" style={{ color: '#475569' }}>
+              <span className="text-[11px] font-black uppercase tracking-wider block text-left" style={{ color: '#475569' }}>
                 Quick Extend Presets
               </span>
-              <div className="flex flex-wrap gap-2">
-                <span className="text-[10px] font-bold self-center uppercase mr-1" style={{ color: '#64748b' }}>Hours:</span>
-                {[
-                  { label: "+2 Hours", type: "hours", value: 2 },
-                  { label: "+4 Hours (Half Day)", type: "hours", value: 4 },
-                  { label: "+6 Hours", type: "hours", value: 6 }
-                ].map((p, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleApplyPreset(p.type, p.value)}
-                    className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-xs hover:border-indigo-400"
-                    style={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#0f172a' }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-
-                <span className="text-[10px] font-bold self-center uppercase mx-1" style={{ color: '#64748b' }}>Nights:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase mr-1" style={{ color: '#64748b' }}>Nights:</span>
                 {[
                   { label: "+1 Night", type: "nights", value: 1 },
                   { label: "+2 Nights", type: "nights", value: 2 },
@@ -507,7 +499,7 @@ function ManagerExtendReservation() {
                     key={idx}
                     type="button"
                     onClick={() => handleApplyPreset(p.type, p.value)}
-                    className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-xs hover:bg-indigo-100"
+                    className="px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-xs hover:bg-indigo-100"
                     style={{ backgroundColor: '#eef2ff', borderColor: '#c7d2fe', color: '#4338ca' }}
                   >
                     {p.label}
@@ -516,11 +508,11 @@ function ManagerExtendReservation() {
               </div>
             </div>
 
-            {/* Agreed Nightly Base Tariff Rate */}
-            <div className="pt-3 border-t grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ borderColor: '#f1f5f9' }}>
-              <div>
-                <Label htmlFor="daily-rate" className="text-xs font-bold block mb-1" style={{ color: '#0f172a' }}>
-                  Agreed Nightly Base Tariff (₹)
+            {/* Agreed Nightly Base Tariff & Extension Reason Row (Same Line) */}
+            <div className="pt-3 border-t grid grid-cols-1 sm:grid-cols-2 gap-4 items-start" style={{ borderColor: '#f1f5f9' }}>
+              <div className="space-y-1.5 text-left">
+                <Label htmlFor="daily-rate" className="text-xs font-bold block text-left" style={{ color: '#0f172a' }}>
+                  Agreed Nightly Base Tariff (₹) <span className="text-rose-500">*</span>
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold" style={{ color: '#64748b' }}>₹</span>
@@ -531,28 +523,31 @@ function ManagerExtendReservation() {
                     step="any"
                     value={dailyRate}
                     onChange={(e) => setDailyRate(Math.max(0, Number(e.target.value)))}
-                    className="pl-7 h-10 text-xs font-bold"
+                    className="pl-7 w-full h-10 text-xs font-bold text-left rounded-xl"
                     style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
                   />
                 </div>
-                <span className="text-[10px] font-semibold mt-1 block" style={{ color: '#64748b' }}>
-                  Pro-rata hourly rate: ~{inr(Math.max(250, Math.round(dailyRate / 8)))}/hr
+                <span className="text-[10px] font-semibold block text-left" style={{ color: '#64748b' }}>
+                  Base rate applied per additional extended night.
                 </span>
               </div>
 
-              <div>
-                <Label htmlFor="notes" className="text-xs font-bold block mb-1" style={{ color: '#0f172a' }}>
-                  Extension Reason / Staff Remarks (Optional)
+              <div className="space-y-1.5 text-left">
+                <Label htmlFor="notes" className="text-xs font-bold block text-left" style={{ color: '#0f172a' }}>
+                  Extension Reason / Staff Remarks <span className="text-slate-400 font-normal">(Optional)</span>
                 </Label>
-                <Textarea
+                <Input
                   id="notes"
-                  rows={2}
-                  placeholder="e.g. Guest extended stay for business schedule."
+                  type="text"
+                  placeholder="e.g. Guest extended stay for business schedule"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="text-xs resize-none"
+                  className="w-full h-10 text-xs font-medium text-left rounded-xl px-3"
                   style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
                 />
+                <span className="text-[10px] font-semibold block text-left" style={{ color: '#64748b' }}>
+                  Internal notes stored on reservation folio ledger.
+                </span>
               </div>
             </div>
 

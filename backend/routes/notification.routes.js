@@ -7,6 +7,7 @@ import { ManagerNotification } from '../models/managerData.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { getAdminManagedPropertyIds, isAllowedForSuperAdminNotification, purgeGuestAccountDeletionNotifications } from '../utils/notification.helper.js';
+import { sendPushToTokens } from '../services/fcm.service.js';
 
 const router = express.Router();
 
@@ -777,6 +778,62 @@ router.delete('/fcm-token', protect, async (req, res) => {
 
     await User.findOneAndUpdate({ $or: query }, update, { new: true });
     return res.status(200).json({ success: true, message: 'FCM device token unregistered successfully' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 8. Test Push Notification dispatch to authenticated user
+router.post('/test-push', protect, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
+    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
+      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    }
+
+    const user = await User.findOne({ $or: query });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const tokens = new Set();
+    if (user.fcmToken) tokens.add(user.fcmToken);
+    if (Array.isArray(user.fcmTokens)) {
+      for (const t of user.fcmTokens) {
+        if (t) tokens.add(t);
+      }
+    }
+
+    if (tokens.size === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No FCM device tokens registered for this user. Please open the Flutter mobile app and log in to register your device.'
+      });
+    }
+
+    const title = req.body.title || '🔔 Hour Stay Test Notification';
+    const body = req.body.body || `Hello ${user.name || 'Guest'}, your FCM mobile push notification connection is working perfectly!`;
+
+    const result = await sendPushToTokens(Array.from(tokens), {
+      title,
+      body,
+      data: {
+        category: 'Test',
+        role: user.role || 'guest',
+        propertyId: user.propertyId || 'HS-9HQ8P',
+        test: 'true'
+      },
+      category: 'Test',
+      role: user.role || 'guest',
+      propertyId: user.propertyId || 'HS-9HQ8P'
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Push notification dispatched to ${tokens.size} registered device token(s)`,
+      data: result
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

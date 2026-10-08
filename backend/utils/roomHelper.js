@@ -28,7 +28,19 @@ export const extractRoomNumber = (val) => {
       const parsed = extractRoomNumber(String(val.num));
       if (parsed) return parsed;
     }
-    if (val.roomId && typeof val.roomId === 'string' && /^\d{3,4}$/.test(val.roomId.trim())) {
+    if (val.assignedRoom && String(val.assignedRoom).trim()) {
+      const parsed = extractRoomNumber(String(val.assignedRoom));
+      if (parsed) return parsed;
+    }
+    if (val.roomType && String(val.roomType).trim()) {
+      const parsed = extractRoomNumber(String(val.roomType));
+      if (parsed) return parsed;
+    }
+    if (val.category && String(val.category).trim()) {
+      const parsed = extractRoomNumber(String(val.category));
+      if (parsed) return parsed;
+    }
+    if (val.roomId && typeof val.roomId === 'string' && /^\d{1,4}$/.test(val.roomId.trim())) {
       return val.roomId.trim();
     }
     return null;
@@ -45,7 +57,7 @@ export const extractRoomNumber = (val) => {
   const prefixMatch = str.match(/(?:room|rm|#)\s*(\d{1,4})\b/i);
   if (prefixMatch) return prefixMatch[1];
 
-  // 2. Standard 3-4 digit hotel room number with word boundary: 101, 201, 301, 501
+  // 2. Standard 3-4 digit hotel room number with word boundary: 101, 201, 301, 501, 101 AC
   const match34 = str.match(/\b\d{3,4}\b/);
   if (match34) return match34[0];
 
@@ -76,7 +88,7 @@ export const parseDateToDayUtc = (val) => {
 export const isBookingStatusActive = (status) => {
   if (!status) return true;
   const s = String(status).trim().toLowerCase();
-  const inactiveStatuses = ['cancelled', 'canceled', 'checked-out', 'checked out', 'no-show', 'no show', 'void', 'inactive', 'failed'];
+  const inactiveStatuses = ['cancelled', 'canceled', 'checked-out', 'checked out', 'checkout', 'completed', 'no-show', 'no show', 'void', 'inactive', 'failed'];
   return !inactiveStatuses.includes(s);
 };
 
@@ -101,17 +113,24 @@ export const isBookingMatchingRoom = (booking, room) => {
   const bNum = extractRoomNumber(booking.roomNumber) ||
                extractRoomNumber(booking.room) ||
                extractRoomNumber(booking.num) ||
+               extractRoomNumber(booking.roomType) ||
+               extractRoomNumber(booking.category) ||
+               extractRoomNumber(booking.assignedRoom) ||
+               extractRoomNumber(booking.roomId) ||
                extractRoomNumber(booking);
 
   if (bNum && String(bNum).trim() === String(rmNum).trim()) {
     return true;
   }
 
-  // 3. Text search match for room number in booking room string
-  if (booking.room && typeof booking.room === 'string') {
-    const regex = new RegExp(`\\b${rmNum}\\b`);
-    if (regex.test(booking.room)) {
-      return true;
+  // 3. Text search match for room number in booking strings
+  const testStrings = [booking.room, booking.roomNumber, booking.roomType, booking.category, booking.assignedRoom, booking.name].filter(Boolean);
+  for (const s of testStrings) {
+    if (typeof s === 'string') {
+      const regex = new RegExp(`\\b${rmNum}\\b`);
+      if (regex.test(s)) {
+        return true;
+      }
     }
   }
 
@@ -133,6 +152,95 @@ export const isStayDateOverlapping = (reqIn, reqOut, bIn, bOut) => {
   }
 
   return (reqInMs < bOutMs && reqOutMs > bInMs);
+};
+
+/**
+ * Centralized, bulletproof evaluator for room availability over a date range.
+ * Evaluates active overlapping bookings, active check-ins, and computes accurate displayStatus and isAvailable flags.
+ */
+export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], checkIn = null, checkOut = null) => {
+  const roomBookings = (activeBookings || []).filter(b => isBookingMatchingRoom(b, room));
+
+  const bookedRanges = roomBookings.map(b => ({
+    checkIn: b.checkIn,
+    checkOut: b.checkOut,
+    status: b.status,
+    guest: b.guest || b.guestName || '',
+    bookingId: b.bookingId || b.id || b._id
+  }));
+
+  const reqInDay = parseDateToDayUtc(checkIn);
+  const reqOutDay = parseDateToDayUtc(checkOut);
+
+  let activeCheckIn = null;
+  let reservedBooking = null;
+
+  if (reqInDay !== null && reqOutDay !== null) {
+    for (const b of roomBookings) {
+      if (isStayDateOverlapping(reqInDay, reqOutDay, b.checkIn, b.checkOut)) {
+        const bStatus = String(b.status || '').toLowerCase().trim();
+        if (bStatus.includes('checked-in') || bStatus.includes('checked in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup')) {
+          activeCheckIn = b;
+          break;
+        } else {
+          if (!reservedBooking) reservedBooking = b;
+        }
+      }
+    }
+  } else {
+    // If no dates provided, evaluate based on today
+    const todayUtc = parseDateToDayUtc(new Date());
+    for (const b of roomBookings) {
+      const bIn = parseDateToDayUtc(b.checkIn);
+      const bOut = parseDateToDayUtc(b.checkOut);
+      if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
+        const bStatus = String(b.status || '').toLowerCase().trim();
+        if (bStatus.includes('checked-in') || bStatus.includes('checked in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup')) {
+          activeCheckIn = b;
+          break;
+        } else {
+          if (!reservedBooking) reservedBooking = b;
+        }
+      }
+    }
+  }
+
+  const isBlocked = ['blocked', 'maintenance', 'out of order', 'cleaning', 'dirty'].includes(String(room.status || '').toLowerCase().trim());
+  
+  let displayStatus = room.status || 'Available';
+  let isAvailable = false;
+  let isReserved = false;
+
+  if (isBlocked) {
+    displayStatus = room.status || 'Blocked';
+    isAvailable = false;
+    isReserved = false;
+  } else if (activeCheckIn) {
+    displayStatus = 'Occupied';
+    isAvailable = false;
+    isReserved = false;
+  } else if (reservedBooking) {
+    displayStatus = 'Reserved';
+    isAvailable = false;
+    isReserved = true;
+  } else {
+    // If no active booking overlapping the dates / today and not blocked, it is AVAILABLE!
+    displayStatus = 'Available';
+    isAvailable = true;
+    isReserved = false;
+  }
+
+  const matchedBooking = activeCheckIn || reservedBooking || (roomBookings.length > 0 ? roomBookings[0] : null);
+
+  return {
+    displayStatus,
+    isAvailable,
+    isReserved,
+    activeCheckIn,
+    reservedBooking,
+    matchedBooking,
+    bookedRanges
+  };
 };
 
 /**

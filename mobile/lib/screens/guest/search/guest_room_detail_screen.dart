@@ -159,9 +159,6 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
       }
     }
 
-    if (widget.room.isOccupied) {
-      return true;
-    }
     return false;
   }
 
@@ -180,7 +177,10 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
           final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
           final overlaps = selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
           if (overlaps) {
-            return true;
+            final st = range.status.toLowerCase();
+            if (!st.contains('cancel') && !st.contains('checked-out') && !st.contains('checked out')) {
+              return true;
+            }
           }
         }
       }
@@ -199,9 +199,6 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
       }
     }
 
-    if (widget.room.isReserved || widget.room.isReservedStatus) {
-      return true;
-    }
     return false;
   }
 
@@ -1257,6 +1254,37 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
 
   // 3. Room Core Specs Grid
   Widget _buildRoomSpecsGrid(RoomModel room) {
+    // Determine dynamic room status
+    String statusDisplay;
+    Color statusColor;
+    Color statusBgColor;
+
+    if (_hasSelectedDates) {
+      if (_isStayOccupied) {
+        statusDisplay = 'Occupied';
+        statusColor = const Color(0xFFDC2626);
+        statusBgColor = const Color(0xFFFEE2E2);
+      } else if (_isStayReserved) {
+        statusDisplay = 'Reserved';
+        statusColor = const Color(0xFFD97706);
+        statusBgColor = const Color(0xFFFEF3C7);
+      } else {
+        statusDisplay = 'Available';
+        statusColor = const Color(0xFF059669);
+        statusBgColor = const Color(0xFFD1FAE5);
+      }
+    } else {
+      if (room.status.toLowerCase() == 'maintenance' || room.status.toLowerCase() == 'blocked') {
+        statusDisplay = 'Maintenance';
+        statusColor = const Color(0xFFDC2626);
+        statusBgColor = const Color(0xFFFEE2E2);
+      } else {
+        statusDisplay = 'Available';
+        statusColor = const Color(0xFF059669);
+        statusBgColor = const Color(0xFFD1FAE5);
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1285,7 +1313,16 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
             children: [
               Expanded(child: _buildSpecBox(Icons.layers_rounded, 'Floor Level', room.floor.isNotEmpty ? room.floor : '1st Floor')),
               Container(width: 1, height: 40, color: cardBorder),
-              Expanded(child: _buildSpecBox(Icons.verified_rounded, 'Room Status', room.isAvailable ? 'Available' : 'Reserved')),
+              Expanded(
+                child: _buildSpecBox(
+                  Icons.verified_rounded,
+                  'Room Status',
+                  statusDisplay,
+                  valueColor: statusColor,
+                  iconColor: statusColor,
+                  iconBgColor: statusBgColor,
+                ),
+              ),
             ],
           ),
         ],
@@ -1637,7 +1674,14 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     );
   }
 
-  Widget _buildSpecBox(IconData icon, String title, String value) {
+  Widget _buildSpecBox(
+    IconData icon,
+    String title,
+    String value, {
+    Color? valueColor,
+    Color? iconColor,
+    Color? iconBgColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
@@ -1645,10 +1689,10 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: purpleBg,
+              color: iconBgColor ?? purpleBg,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 18, color: purple),
+            child: Icon(icon, size: 18, color: iconColor ?? purple),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1659,7 +1703,11 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: navy),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: valueColor ?? navy,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

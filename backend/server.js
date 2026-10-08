@@ -20,6 +20,7 @@ const PORT = process.env.PORT || 5000;
 
 import { seedUsers } from './scripts/seed.js';
 import { purgeGuestAccountDeletionNotifications } from './utils/notification.helper.js';
+import { initializeFirebaseAdmin } from './config/firebase.config.js';
 
 import { Server } from 'socket.io';
 import { startAutoCheckoutScheduler } from './services/autoCheckout.service.js';
@@ -29,6 +30,9 @@ import { startAutoCheckoutScheduler } from './services/autoCheckout.service.js';
 const startServer = async () => {
   // Connect to Database
   await connectDB();
+
+  // Initialize Firebase Admin SDK for FCM
+  initializeFirebaseAdmin();
 
   // Seed demo workspace accounts
   await seedUsers();
