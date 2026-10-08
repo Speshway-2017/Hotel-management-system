@@ -141,13 +141,30 @@ export const subscribeRealtimeSync = (callback, events = ALL_REALTIME_EVENTS) =>
  * Emit a real-time event enriched with current propertyId
  */
 export const emitRealtimeEvent = (eventName, data = {}) => {
-  const propertyId = getCurrentPropertyId();
-  invalidateApiCache();
-  socket.emit(eventName, {
-    ...data,
-    propertyId: data.propertyId || propertyId || null,
-    timestamp: Date.now()
-  });
+  try {
+    const propertyId = getCurrentPropertyId();
+    invalidateApiCache();
+    socket.emit(eventName, {
+      ...data,
+      propertyId: data.propertyId || propertyId || null,
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    console.warn('Realtime event emit warning:', err);
+  }
 };
 
+// Expose globally to guarantee availability across all components and execution contexts
+if (typeof window !== 'undefined') {
+  window.emitRealtimeEvent = emitRealtimeEvent;
+  window.subscribeRealtimeSync = subscribeRealtimeSync;
+  window.socket = socket;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.emitRealtimeEvent = emitRealtimeEvent;
+  globalThis.subscribeRealtimeSync = subscribeRealtimeSync;
+  globalThis.socket = socket;
+}
+
 export default socket;
+

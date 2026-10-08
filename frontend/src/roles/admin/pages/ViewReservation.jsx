@@ -20,7 +20,7 @@ import {
   Building
 } from "lucide-react";
 import { toast } from "sonner";
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
 import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
@@ -77,6 +77,12 @@ function ViewReservation() {
         toast.error(checkInStatus.reason);
         return;
       }
+      const source = booking?.source || "";
+      const isWalkIn = source.toLowerCase().includes("walk-in") || source === "Direct Walk-in";
+      if (!isWalkIn) {
+        navigate({ to: `/admin/check-in/${booking._id || booking.id || booking.bookingId || id}` });
+        return;
+      }
     }
 
     try {
@@ -86,6 +92,9 @@ function ViewReservation() {
       if (res.success) {
         toast.success(`Reservation status updated to ${newStatus}`);
         setBooking(prev => ({ ...prev, status: newStatus }));
+        emitRealtimeEvent('booking_updated', { id: booking._id || booking.id, status: newStatus });
+        emitRealtimeEvent('room_status_changed', { status: newStatus });
+        emitRealtimeEvent('dashboard_sync', { action: 'status_update', status: newStatus });
       } else {
         toast.error(res.message || "Failed to update status");
       }
@@ -101,6 +110,8 @@ function ViewReservation() {
       const res = await superAdminService.deleteReservation(booking._id || booking.id);
       if (res.success) {
         toast.success("Reservation cancelled and inventory released.");
+        emitRealtimeEvent('booking_updated', { id: booking._id || booking.id, status: 'Cancelled' });
+        emitRealtimeEvent('dashboard_sync', { action: 'booking_cancelled' });
         navigate({ to: "/admin/reservations" });
       } else {
         toast.error(res.message || "Failed to cancel reservation");

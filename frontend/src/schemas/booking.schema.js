@@ -11,6 +11,7 @@ import {
   aadhaarSchema,
   optionalAadhaarSchema,
   dateSchema,
+  optionalDateSchema,
   priceSchema,
   positiveIntegerSchema,
   nonNegativeNumberSchema
@@ -115,11 +116,35 @@ export const walkInBookingSchema = z
   });
 
 // Stay Extension Form (Modal & Page)
-export const extendStaySchema = z.object({
-  extraDays: positiveIntegerSchema("Extension days", 1),
-  additionalAmount: priceSchema("Additional amount", { allowZero: true }),
-  reason: optionalTextSchema(300)
-});
+export const extendStaySchema = z
+  .object({
+    extraDays: z.union([z.number(), z.string()]).optional(),
+    extendDays: z.union([z.number(), z.string()]).optional(),
+    days: z.union([z.number(), z.string()]).optional(),
+    newCheckOut: optionalDateSchema,
+    additionalAmount: priceSchema("Additional amount", { allowZero: true }),
+    reason: optionalTextSchema(500),
+    notes: optionalTextSchema(500)
+  })
+  .superRefine((data, ctx) => {
+    const daysVal = data.extraDays ?? data.extendDays ?? data.days;
+    if ((daysVal === undefined || daysVal === null || daysVal === "") && !data.newCheckOut) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Extension duration or new checkout date is required",
+        path: ["extraDays"]
+      });
+    } else if (daysVal !== undefined && daysVal !== null && daysVal !== "") {
+      const num = Number(daysVal);
+      if (isNaN(num) || num < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Extension duration must be a valid non-negative number",
+          path: ["extraDays"]
+        });
+      }
+    }
+  });
 
 // Front Desk ID Verification & Room Check-In
 export const guestIdVerificationSchema = z

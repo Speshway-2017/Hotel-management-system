@@ -141,4 +141,31 @@ const badDates = validateWithZod(publicBookingSchema, {
 console.assert(!badDates.isValid, 'Checkout before checkin must fail');
 console.assert(badDates.errors.checkOut, 'Should report error on checkOut date');
 
+// 8. Test extendStaySchema
+console.log('--- 8. Testing Extend Stay Schema ---');
+const goodHourlyExtend = validateWithZod(extendStaySchema, {
+  extraDays: 0,
+  extendDays: 0,
+  newCheckOut: '2026-10-09',
+  additionalAmount: 500,
+  notes: 'Extended for 4 hours'
+});
+console.assert(goodHourlyExtend.isValid, 'Hourly extend must pass');
+
+const goodNightlyExtend = validateWithZod(extendStaySchema, {
+  extraDays: 2,
+  extendDays: 2,
+  newCheckOut: '2026-10-11',
+  additionalAmount: '6000',
+  reason: 'Family staying 2 extra nights'
+});
+console.assert(goodNightlyExtend.isValid, 'Nightly extend must pass');
+console.assert(goodNightlyExtend.data.additionalAmount === 6000, 'Additional amount coerced to number');
+
+const invalidExtend = validateWithZod(extendStaySchema, {
+  additionalAmount: 'invalid-amount'
+});
+console.assert(!invalidExtend.isValid, 'Invalid amount must fail');
+console.log('✅ Extend stay schema passes all validation scenarios');
+
 console.log('\n🎉 ALL UPDATED ZOD SCHEMA TESTS PASSED SUCCESSFULLY!\n');

@@ -1,16 +1,31 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/constants/api_endpoints.dart';
 import '../firebase_options.dart';
+import '../screens/guest/notifications/guest_notifications_screen.dart';
 import '../screens/manager/notifications/manager_notifications_screen.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 
 /// Global navigator key for notification tap deep linking across the app.
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
+/// High importance Android notification channel for system tray alerts.
+const AndroidNotificationChannel _highImportanceChannel = AndroidNotificationChannel(
+  'hourstay_high_importance_channel',
+  'Hour Stay Notifications',
+  description: 'This channel is used for HMS guest and manager notifications & alerts.',
+  importance: Importance.max,
+  playSound: true,
+  enableVibration: true,
+);
+
+final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
 /// Top-level background message handler required by Firebase Cloud Messaging.
 @pragma('vm:entry-point')
@@ -20,8 +35,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('📬 [FCM BACKGROUND] Message received: ${message.messageId}');
-    debugPrint('📬 [FCM BACKGROUND] Title: ${message.notification?.title}');
-    debugPrint('📬 [FCM BACKGROUND] Body: ${message.notification?.body}');
+    debugPrint('📬 [FCM BACKGROUND] Title: ${message.notification?.title ?? message.data['title']}');
+    debugPrint('📬 [FCM BACKGROUND] Body: ${message.notification?.body ?? message.data['body']}');
     debugPrint('📬 [FCM BACKGROUND] Data: ${message.data}');
   } catch (e) {
     debugPrint('⚠️ [FCM BACKGROUND] Error handling background message: $e');
@@ -46,7 +61,7 @@ class NotificationService {
   /// Returns the latest cached FCM token, if available.
   static String? get cachedToken => _cachedToken;
 
-  /// Initialize Firebase and configure Firebase Cloud Messaging listeners.
+  /// Initialize Firebase, local notifications, and configure Firebase Cloud Messaging listeners.
   static Future<void> initialize() async {
     if (_isInitialized) {
       debugPrint('ℹ️ [FCM] NotificationService already initialized.');
@@ -76,60 +91,141 @@ class NotificationService {
 
       debugPrint('🔔 [FCM] Permission status: ${settings.authorizationStatus}');
 
-      // 3. Set presentation options for foreground notifications
+      // 3. Initialize Flutter Local Notifications for Android foreground banners
+      const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettingsDarwin = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      const initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
+      );
+
+      await _localNotifications.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          debugPrint('🎯 [LOCAL NOTIF TAP] User tapped local notification: ${response.payload}');
+          if (response.payload != null && response.payload!.isNotEmpty) {
+            try {
+              final Map<String, dynamic> data = jsonDecode(response.payload!);
+              _routeNotificationData(data);
+            } catch (_) {
+              _routeNotificationData({});
+            }
+          } else {
+            _routeNotificationData({});
+          }
+        },
+      );
+
+      // 4. Create Android Notification Channel
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_highImportanceChannel);
+
+      // Request Android 13+ notification permissions via local notifications plugin as well
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+
+      // 5. Set presentation options for foreground notifications
       await messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
       );
 
-      // 4. Register Background Message Handler
+      // 6. Register Background Message Handler
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      // 5. Handle Foreground Messages
+      // 7. Handle Foreground Messages: Show Heads-up Local Notification & notify streams
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('📩 [FCM FOREGROUND] Push notification received:');
         debugPrint('   Message ID: ${message.messageId}');
-        debugPrint('   Title: ${message.notification?.title}');
-        debugPrint('   Body: ${message.notification?.body}');
+        debugPrint('   Title: ${message.notification?.title ?? message.data['title']}');
+        debugPrint('   Body: ${message.notification?.body ?? message.data['body']}');
         debugPrint('   Data: ${message.data}');
+
         _foregroundMessageController.add(message);
+
+        // Display local heads-up notification in system tray
+        final title = message.notification?.title ?? message.data['title'] ?? 'Hour Stay';
+        final body = message.notification?.body ?? message.data['body'] ?? '';
+
+        if (title.isNotEmpty || body.isNotEmpty) {
+          _localNotifications.show(
+            message.hashCode,
+            title,
+            body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _highImportanceChannel.id,
+                _highImportanceChannel.name,
+                channelDescription: _highImportanceChannel.description,
+                importance: Importance.max,
+                priority: Priority.high,
+                icon: '@mipmap/ic_launcher',
+                playSound: true,
+                enableVibration: true,
+              ),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            payload: jsonEncode(message.data),
+          );
+        }
       });
 
-      // 6. Handle notification click when app is in background
+      // 8. Handle notification click when app is in background
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('🚀 [FCM RESUMED] User tapped notification from background:');
-        debugPrint('   Title: ${message.notification?.title}');
+        debugPrint('   Title: ${message.notification?.title ?? message.data['title']}');
         debugPrint('   Data: ${message.data}');
         _notificationTapController.add(message);
         _handleNotificationTapRouting(message);
       });
 
-      // 7. Handle notification click when app was launched from terminated state
+      // 9. Handle notification click when app was launched from terminated state
       final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('🎯 [FCM TERMINATED] App launched from terminated state via notification:');
-        debugPrint('   Title: ${initialMessage.notification?.title}');
+        debugPrint('   Title: ${initialMessage.notification?.title ?? initialMessage.data['title']}');
         debugPrint('   Data: ${initialMessage.data}');
-        Future.delayed(const Duration(milliseconds: 1000), () {
+        Future.delayed(const Duration(milliseconds: 1200), () {
           _notificationTapController.add(initialMessage);
           _handleNotificationTapRouting(initialMessage);
         });
       }
 
-      // 8. Handle Token Refresh
+      // 10. Handle Token Refresh
       messaging.onTokenRefresh.listen((newToken) async {
         debugPrint('🔄 [FCM REFRESH] FCM Token refreshed: $newToken');
         _cachedToken = newToken;
         await syncTokenWithBackend(newToken);
       });
 
-      // 9. Fetch current device token
+      // 11. Fetch current device token & subscribe to broadcast topics
       try {
         _cachedToken = await messaging.getToken();
         if (_cachedToken != null) {
-          debugPrint('✅ [FCM TOKEN] Device Token retrieved successfully:');
+          debugPrint('================================================================');
+          debugPrint('📱 [FCM DEVICE TOKEN GENERATED SUCCESSFULLY]:');
           debugPrint('   $_cachedToken');
+          debugPrint('================================================================');
+
+          // Subscribe to general broadcast topics
+          try {
+            await messaging.subscribeToTopic('hourstay_global');
+            await messaging.subscribeToTopic('hourstay_all');
+          } catch (_) {}
+
+          // Automatically sync with backend if user is already authenticated
+          unawaited(syncTokenWithBackend(_cachedToken));
         } else {
           debugPrint('⚠️ [FCM TOKEN] getToken returned null (may occur on non-supported platforms).');
         }
@@ -146,12 +242,25 @@ class NotificationService {
   }
 
   static void _handleNotificationTapRouting(RemoteMessage message) {
+    _routeNotificationData(message.data);
+  }
+
+  static Future<void> _routeNotificationData(Map<String, dynamic> data) async {
     try {
-      debugPrint('🎯 [FCM ROUTE] Routing notification tap with data: ${message.data}');
+      debugPrint('🎯 [FCM ROUTE] Routing notification with data: $data');
       final navState = rootNavigatorKey.currentState;
-      if (navState != null) {
+      if (navState == null) return;
+
+      final user = await StorageService.getUser();
+      final userRole = (user?.role ?? data['role']?.toString() ?? 'guest').toLowerCase();
+
+      if (userRole == 'manager') {
         navState.push(
           MaterialPageRoute(builder: (_) => const ManagerNotificationsScreen()),
+        );
+      } else {
+        navState.push(
+          MaterialPageRoute(builder: (_) => const GuestNotificationsScreen()),
         );
       }
     } catch (err) {
@@ -164,7 +273,7 @@ class NotificationService {
     try {
       final authToken = await StorageService.getToken();
       if (authToken == null || authToken.isEmpty) {
-        debugPrint('ℹ️ [FCM SYNC] User not authenticated. Token will sync upon login.');
+        debugPrint('ℹ️ [FCM SYNC] User not authenticated yet. Token will sync upon login.');
         return false;
       }
 
@@ -181,7 +290,7 @@ class NotificationService {
         return false;
       }
 
-      debugPrint('📤 [FCM SYNC] Sending FCM token to backend...');
+      debugPrint('📤 [FCM SYNC] Sending FCM token to backend (/auth/fcm-token)...');
       final response = await ApiService.post(ApiEndpoints.fcmToken, {
         'token': token,
         'platform': defaultTargetPlatform.name,
