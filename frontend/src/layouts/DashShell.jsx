@@ -1036,9 +1036,9 @@ export function DashShell({ role, children }) {
             {(() => {
               if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/manager" || pathname === "/guest" || pathname === "/reception" || pathname === "/admin/" || pathname === "/super-admin/" || pathname === "/manager/" || pathname === "/guest/" || pathname === "/reception/") {
                 return (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap">
+                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap mb-1">
                     <span className="text-navy font-bold">Dashboard</span>
-                  </div>
+                  </nav>
                 );
               }
               const isNotificationDetails = pathname.match(/^\/(admin|super-admin|manager|reception|guest)\/notifications\/([^\/]+)$/);
@@ -1047,25 +1047,29 @@ export function DashShell({ role, children }) {
                 const parentUrl = `/${prefix}/notifications`;
                 const roleHome = prefix === "super-admin" ? "/super-admin" : (prefix === "manager" ? "/manager" : (prefix === "reception" ? "/reception" : (prefix === "guest" ? "/guest" : "/admin")));
                 return (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap">
+                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap mb-1">
                     <Link 
                       to={roleHome} 
                       style={{ color: '#2563eb' }}
-                      className="hover:underline transition-colors font-medium cursor-pointer"
+                      className="hover:underline transition-colors font-medium cursor-pointer shrink-0"
                     >
                       Dashboard
                     </Link>
-                    <span className="text-muted-foreground/45">/</span>
-                    <Link 
-                      to={parentUrl} 
-                      style={{ color: '#2563eb' }}
-                      className="hover:underline transition-colors font-medium cursor-pointer"
-                    >
-                      Notifications
-                    </Link>
-                    <span className="text-muted-foreground/45">/</span>
-                    <span className="text-navy font-bold">Notification Details</span>
-                  </div>
+                    <span className="inline-flex items-center gap-1.5 shrink-0 max-w-full">
+                      <span className="text-muted-foreground/45" aria-hidden>/</span>
+                      <Link 
+                        to={parentUrl} 
+                        style={{ color: '#2563eb' }}
+                        className="hover:underline transition-colors font-medium cursor-pointer truncate max-w-[180px] sm:max-w-none"
+                      >
+                        Notifications
+                      </Link>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 shrink-0 max-w-full">
+                      <span className="text-muted-foreground/45" aria-hidden>/</span>
+                      <span className="text-navy font-bold truncate max-w-[200px] sm:max-w-none">Notification Details</span>
+                    </span>
+                  </nav>
                 );
               }
               const mappings = {
@@ -1339,11 +1343,11 @@ export function DashShell({ role, children }) {
 
               if (segments) {
                 return (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap">
+                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap mb-1">
                     <Link 
                       to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : (role === "reception" ? "/reception" : (role === "guest" ? "/guest" : "/admin")))} 
                       style={{ color: '#2563eb' }}
-                      className="hover:underline transition-colors font-medium cursor-pointer"
+                      className="hover:underline transition-colors font-medium cursor-pointer shrink-0"
                     >
                       Dashboard
                     </Link>
@@ -1352,25 +1356,25 @@ export function DashShell({ role, children }) {
                       const label = typeof seg === "object" ? seg.label : seg;
                       const to = typeof seg === "object" ? seg.to : null;
                       return (
-                        <React.Fragment key={idx}>
-                          <span className="text-muted-foreground/45">/</span>
+                        <span key={idx} className="inline-flex items-center gap-1.5 shrink-0 max-w-full">
+                          <span className="text-muted-foreground/45" aria-hidden>/</span>
                           {to && !isLast ? (
                             <Link 
                               to={to} 
                               style={{ color: '#2563eb' }}
-                              className="hover:underline transition-colors font-medium cursor-pointer"
+                              className="hover:underline transition-colors font-medium cursor-pointer truncate max-w-[180px] sm:max-w-none"
                             >
                               {label}
                             </Link>
                           ) : (
-                            <span className={isLast ? "text-navy font-bold" : "text-muted-foreground font-normal"}>
+                            <span className={isLast ? "text-navy font-bold truncate max-w-[200px] sm:max-w-none" : "text-muted-foreground font-normal truncate max-w-[180px] sm:max-w-none"}>
                               {label}
                             </span>
                           )}
-                        </React.Fragment>
+                        </span>
                       );
                     })}
-                  </div>
+                  </nav>
                 );
               }
               return null;

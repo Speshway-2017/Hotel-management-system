@@ -19,7 +19,8 @@ import {
   isBookingMatchingRoom,
   parseDateToDayUtc,
   isStayDateOverlapping,
-  isBookingStatusActive
+  isBookingStatusActive,
+  evaluateRoomAvailabilityForDates
 } from '../utils/roomHelper.js';
 import {
   validateBookingAadhaarConsistency,
@@ -140,6 +141,8 @@ router.get('/branding', async (req, res) => {
 // GET /api/v1/public/properties
 router.get('/properties', async (req, res) => {
   try {
+    const { checkIn, checkOut } = req.query;
+
     // Purge test rooms from DB
     await Room.deleteMany({
       $or: [
@@ -151,12 +154,87 @@ router.get('/properties', async (req, res) => {
     await Property.findByIdAndDelete('HS-JAI').catch(() => {});
 
     const rawProperties = await Property.find();
-    const properties = rawProperties.filter(p => {
+    const activeProperties = rawProperties.filter(p => {
       const name = (p.name || p.settings?.hotelName || '').toLowerCase();
       const status = (p.status || '').toLowerCase();
       return status === 'active' && !name.includes('rambagh') && !name.includes('test property');
     });
-    return sendSuccess(res, 200, properties, 'Properties fetched successfully');
+
+    const isDatesSelected = Boolean(checkIn && checkOut);
+
+    // Fetch all active rooms and bookings to compute live property availability
+    const allRooms = await Room.find({
+      $and: [
+        { roomNumber: { $not: { $regex: /^test/i } } },
+        { category: { $not: { $regex: /^test/i } } }
+      ]
+    });
+
+    const allBookings = await Booking.find({
+      status: { $nin: ['Cancelled', 'Rejected'] }
+    });
+    const activeBookings = allBookings.filter(b => isBookingStatusActive(b.status));
+
+    const enrichedProperties = activeProperties.map(p => {
+      const pObj = p.toObject ? p.toObject() : { ...p };
+      const propIds = [String(p._id)];
+      if (p.id) propIds.push(String(p.id));
+
+      const propRooms = allRooms.filter(r => 
+        (r.propertyId && propIds.includes(String(r.propertyId))) ||
+        (r.hotelId && propIds.includes(String(r.hotelId)))
+      );
+
+      const propBookings = activeBookings.filter(b => 
+        (b.propertyId && propIds.includes(String(b.propertyId))) ||
+        (b.hotelId && propIds.includes(String(b.hotelId)))
+      );
+
+      let availableRooms = 0;
+      let occupiedRooms = 0;
+      let reservedRooms = 0;
+
+      propRooms.forEach(rm => {
+        const availEval = evaluateRoomAvailabilityForDates(rm, propBookings, isDatesSelected ? checkIn : null, isDatesSelected ? checkOut : null);
+        if (availEval.isAvailable) {
+          availableRooms += 1;
+        } else if (availEval.displayStatus === 'Occupied') {
+          occupiedRooms += 1;
+        } else if (availEval.displayStatus === 'Reserved') {
+          reservedRooms += 1;
+        }
+      });
+
+      const totalRooms = propRooms.length;
+
+      let availabilityStatus = 'Available';
+      if (!isDatesSelected) {
+        availabilityStatus = totalRooms > 0 ? `${totalRooms} Rooms Available` : 'Rooms Available';
+      } else {
+        if (totalRooms === 0) {
+          availabilityStatus = 'No Rooms Configured';
+        } else if (availableRooms > 0) {
+          availabilityStatus = `${availableRooms} of ${totalRooms} Available`;
+        } else if (occupiedRooms > 0) {
+          availabilityStatus = 'Occupied for Selected Dates';
+        } else {
+          availabilityStatus = 'Reserved for Selected Dates';
+        }
+      }
+
+      pObj.roomStats = {
+        totalRooms,
+        availableRooms: !isDatesSelected ? totalRooms : availableRooms,
+        occupiedRooms: !isDatesSelected ? 0 : occupiedRooms,
+        reservedRooms: !isDatesSelected ? 0 : reservedRooms,
+        isAvailable: !isDatesSelected ? (totalRooms > 0) : (availableRooms > 0),
+        availabilityStatus
+      };
+
+      return pObj;
+    });
+
+    return sendSuccess(res, 200, enrichedProperties, 'Properties fetched successfully');
   } catch (error) {
     console.error('GET /properties error:', error);
     return sendError(res, 500, error.message || 'Failed to fetch properties');
@@ -202,43 +280,45 @@ router.get('/properties/:id', async (req, res) => {
 router.get('/properties/:id/rooms', async (req, res) => {
   try {
     const { checkIn, checkOut } = req.query;
-    const targetPropId = req.params.id || 'HS-9HQ8P';
+    const targetPropId = req.params.id;
 
-    let dbRooms = await Room.find({ propertyId: targetPropId }).sort({ roomNumber: 1 });
-
-    if (!dbRooms || dbRooms.length === 0) {
-      dbRooms = await Room.find().sort({ roomNumber: 1 });
+    if (!targetPropId || targetPropId === 'all') {
+      return sendSuccess(res, 200, [], 'Rooms fetched successfully');
     }
 
-    // Seed 14 default room configurations if zero rooms exist in MongoDB
-    if (!dbRooms || dbRooms.length === 0) {
-      const rawProps = await Property.find();
-      const allProps = rawProps.filter(p => (p.status || '').toLowerCase() === 'active' && !(p.name || '').toLowerCase().includes('rambagh'));
-      const defaultPropId = allProps[0]?._id?.toString() || 'HS-9HQ8P';
+    // Resolve property document to get all equivalent IDs
+    let propDoc = null;
+    if (mongoose.Types.ObjectId.isValid(targetPropId)) {
+      propDoc = await Property.findById(targetPropId);
+    }
+    if (!propDoc) {
+      propDoc = await Property.findOne({ $or: [{ _id: targetPropId }, { id: targetPropId }] });
+    }
 
-      const defaultRoomsToSeed = [
-        { roomNumber: '101', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '102', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '103', category: 'Standard Room', status: 'Available', ratePlan: 'Standard Plan', baseRate: 3000, currentRate: 3000, dailyRate: 3000, floor: 'Floor 1', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '201', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '202', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '203', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 2', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '301', category: 'Executive Suite', status: 'Available', ratePlan: 'Executive Suite Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '302', category: 'Executive Suite', status: 'Available', ratePlan: 'Executive Suite Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '303', category: 'Executive Suite', status: 'Available', ratePlan: 'Executive Suite Plan', baseRate: 6500, currentRate: 6500, dailyRate: 6500, floor: 'Floor 3', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '401', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '402', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '403', category: 'Deluxe Room', status: 'Available', ratePlan: 'Deluxe Plan', baseRate: 4500, currentRate: 4500, dailyRate: 4500, floor: 'Floor 4', capacity: '2 Adults + 1 Child', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '501', category: 'Penthouse Suite', status: 'Available', ratePlan: 'Penthouse Plan', baseRate: 5500, currentRate: 5500, dailyRate: 5500, floor: 'Floor 5', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId },
-        { roomNumber: '502', category: 'Penthouse Suite', status: 'Available', ratePlan: 'Penthouse Plan', baseRate: 5500, currentRate: 5500, dailyRate: 5500, floor: 'Floor 5', capacity: '2 Adults', bedType: 'King Bed', propertyId: defaultPropId }
-      ];
-      await Room.insertMany(defaultRoomsToSeed);
-      dbRooms = await Room.find().sort({ roomNumber: 1 });
+    const propIds = [String(targetPropId)];
+    if (propDoc) {
+      if (propDoc._id) propIds.push(String(propDoc._id));
+      if (propDoc.id) propIds.push(String(propDoc.id));
+    }
+
+    // Strictly find rooms belonging to this property only
+    const dbRooms = await Room.find({
+      $or: [
+        { propertyId: { $in: propIds } },
+        { hotelId: { $in: propIds } }
+      ]
+    }).sort({ roomNumber: 1 });
+
+    if (!dbRooms || dbRooms.length === 0) {
+      return sendSuccess(res, 200, [], 'No rooms available for this property');
     }
 
     // Fetch all active bookings to evaluate date-range availability & room status
     const allBookings = await Booking.find({
-      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+      $or: [
+        { propertyId: { $in: propIds } },
+        { hotelId: { $in: propIds } }
+      ]
     });
     const activeBookings = allBookings.filter(b => isBookingStatusActive(b.status));
 
@@ -262,63 +342,10 @@ router.get('/properties/:id/rooms', async (req, res) => {
         : [];
       const capacityStr = String(rm.capacity || "2 Adults");
 
-      // Find all active bookings matching this room
-      const roomBookings = activeBookings.filter(b => isBookingMatchingRoom(b, rm));
-
-      const bookedRanges = roomBookings.map(b => ({
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
-        status: b.status,
-        guest: b.guest || b.guestName || ''
-      }));
-
-      let matchedBooking = null;
-      let isOccupied = false;
-      let isReserved = false;
-
-      if (reqInDay !== null && reqOutDay !== null) {
-        for (const b of roomBookings) {
-          if (isStayDateOverlapping(reqInDay, reqOutDay, b.checkIn, b.checkOut)) {
-            matchedBooking = b;
-            const bStatus = String(b.status || '').toLowerCase();
-            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('occup') || bStatus.includes('in-house')) {
-              isOccupied = true;
-            } else {
-              isReserved = true;
-            }
-            break;
-          }
-        }
-      } else {
-        const todayUtc = parseDateToDayUtc(new Date());
-        for (const b of roomBookings) {
-          const bIn = parseDateToDayUtc(b.checkIn);
-          const bOut = parseDateToDayUtc(b.checkOut);
-          if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
-            matchedBooking = b;
-            const bStatus = String(b.status || '').toLowerCase();
-            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('occup') || bStatus.includes('in-house')) {
-              isOccupied = true;
-            } else {
-              isReserved = true;
-            }
-            break;
-          }
-        }
-      }
-
-      let displayStatus = rm.status || "Available";
-      if (rm.status !== 'Blocked' && rm.status !== 'Maintenance') {
-        if (isOccupied || rm.status === 'Occupied') {
-          displayStatus = 'Occupied';
-        } else if (isReserved || rm.status === 'Reserved') {
-          displayStatus = 'Reserved';
-        } else if (rm.status === 'Available' || rm.status === 'Vacant Clean' || !rm.status) {
-          displayStatus = 'Available';
-        }
-      }
-
-      const isAvailable = displayStatus === "Available";
+      const availEval = evaluateRoomAvailabilityForDates(rm, activeBookings, checkIn, checkOut);
+      const displayStatus = availEval.displayStatus;
+      const isAvailable = availEval.isAvailable;
+      const matchedBooking = availEval.activeCheckIn || availEval.reservedBooking || (availEval.bookedRanges && availEval.bookedRanges[0] ? availEval.bookedRanges[0] : null);
 
       return {
         id: rm._id ? String(rm._id) : (rm.id || `RM-${rm.roomNumber}`),
@@ -339,9 +366,9 @@ router.get('/properties/:id/rooms', async (req, res) => {
         isReserved: displayStatus === "Reserved",
         isAvailable: isAvailable,
         guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : '',
-        checkIn: matchedBooking ? matchedBooking.checkIn : (bookedRanges[0]?.checkIn || ''),
-        checkOut: matchedBooking ? matchedBooking.checkOut : (bookedRanges[0]?.checkOut || ''),
-        bookedRanges: bookedRanges,
+        checkIn: matchedBooking ? matchedBooking.checkIn : (availEval.bookedRanges[0]?.checkIn || ''),
+        checkOut: matchedBooking ? matchedBooking.checkOut : (availEval.bookedRanges[0]?.checkOut || ''),
+        bookedRanges: availEval.bookedRanges || [],
         amenities: amenitiesArr,
         description: rm.description || `Luxury ${rm.category} located on ${rm.floor || 'Floor 1'}.`,
         floor: rm.floor || "Floor 1",
@@ -369,23 +396,49 @@ router.get('/properties/:id/rooms/:roomNumber/availability', async (req, res) =>
   try {
     const { id, roomNumber } = req.params;
     const { checkIn, checkOut } = req.query;
-    const targetPropId = id || 'HS-9HQ8P';
+    const targetPropId = id;
+
+    let propDoc = null;
+    if (mongoose.Types.ObjectId.isValid(targetPropId)) {
+      propDoc = await Property.findById(targetPropId);
+    }
+    if (!propDoc) {
+      propDoc = await Property.findOne({ $or: [{ _id: targetPropId }, { id: targetPropId }] });
+    }
+
+    const propIds = [String(targetPropId)];
+    if (propDoc) {
+      if (propDoc._id) propIds.push(String(propDoc._id));
+      if (propDoc.id) propIds.push(String(propDoc.id));
+    }
 
     const cleanNum = extractRoomNumber(roomNumber);
     const room = await Room.findOne({
-      $or: [
-        { roomNumber: cleanNum, propertyId: targetPropId },
-        { roomNumber: cleanNum },
-        { _id: mongoose.Types.ObjectId.isValid(roomNumber) ? roomNumber : new mongoose.Types.ObjectId() }
+      $and: [
+        {
+          $or: [
+            { roomNumber: cleanNum },
+            { _id: mongoose.Types.ObjectId.isValid(roomNumber) ? roomNumber : new mongoose.Types.ObjectId() }
+          ]
+        },
+        {
+          $or: [
+            { propertyId: { $in: propIds } },
+            { hotelId: { $in: propIds } }
+          ]
+        }
       ]
     });
 
     if (!room) {
-      return sendError(res, 404, 'Room not found');
+      return sendError(res, 404, 'Room not found for this property');
     }
 
     const allBookings = await Booking.find({
-      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+      $or: [
+        { propertyId: { $in: propIds } },
+        { hotelId: { $in: propIds } }
+      ]
     });
     const activeBookings = allBookings.filter(b => isBookingStatusActive(b.status));
     const roomBookings = activeBookings.filter(b => isBookingMatchingRoom(b, room));
@@ -467,7 +520,7 @@ router.post('/bookings', async (req, res) => {
       return sendError(res, 400, 'Missing required booking details (guest name, email, phone, check-in, and check-out)');
     }
 
-    const targetPropId = propertyId || 'HS-9HQ8P';
+    const targetPropId = propertyId;
     const nights = calculateStayNights(cIn, cOut);
 
     // 1. Overlapping Date Availability Check
@@ -478,16 +531,36 @@ router.post('/bookings', async (req, res) => {
       return sendError(res, 400, 'Invalid check-in or check-out date range. Check-out must be after check-in.');
     }
 
-    // Fetch physical rooms and existing active bookings for property
+    let propDoc = null;
+    if (mongoose.Types.ObjectId.isValid(targetPropId)) {
+      propDoc = await Property.findById(targetPropId);
+    }
+    if (!propDoc) {
+      propDoc = await Property.findOne({ $or: [{ _id: targetPropId }, { id: targetPropId }] });
+    }
+
+    const propIds = [String(targetPropId)];
+    if (propDoc) {
+      if (propDoc._id) propIds.push(String(propDoc._id));
+      if (propDoc.id) propIds.push(String(propDoc.id));
+    }
+
+    // Fetch physical rooms and existing active bookings strictly for this property
     let allPropRooms = await Room.find({
-      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+      $or: [
+        { propertyId: { $in: propIds } },
+        { hotelId: { $in: propIds } }
+      ]
     });
     if (!allPropRooms || allPropRooms.length === 0) {
-      allPropRooms = await Room.find();
+      return sendError(res, 400, 'No rooms available for the selected property.');
     }
 
     const allExistingBookings = await Booking.find({
-      $or: [{ propertyId: targetPropId }, { hotelId: targetPropId }]
+      $or: [
+        { propertyId: { $in: propIds } },
+        { hotelId: { $in: propIds } }
+      ]
     });
 
     const activeExistingBookings = allExistingBookings.filter(b => isBookingStatusActive(b.status));

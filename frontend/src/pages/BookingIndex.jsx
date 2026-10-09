@@ -30,6 +30,7 @@ function Booking() {
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [gstin, setGstin] = useState("");
+  const [pax, setPax] = useState(() => localStorage.getItem('booking_pax') || "2 Adults");
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState("");
 
@@ -322,31 +323,33 @@ function Booking() {
       return;
     }
 
-    const val = validateWithZod(publicBookingSchema, {
-      guestName,
-      email,
-      phone,
-      city: city || property?.settings?.city || property?.city || "Hyderabad",
-      checkIn: checkInDate,
-      checkOut: checkOutDate,
-      pax: pax || "2 Adults",
-      roomType: roomCategory
-    });
-
-    if (!val.isValid) {
-      setFieldErrors(val.errors);
-      setBookingError(val.firstError);
-      return;
-    }
-    setFieldErrors({});
-
-    if (!payableTotal || isNaN(payableTotal) || payableTotal <= 0) {
-      setBookingError("Booking amount validation failed: amount must be a positive number.");
-      return;
-    }
-
-    setSubmitting(true);
     try {
+      const val = validateWithZod(publicBookingSchema, {
+        guestName,
+        email,
+        phone,
+        city: city || property?.settings?.city || property?.city || "Hyderabad",
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        pax: pax || "2 Adults",
+        roomType: roomCategory
+      });
+
+      if (!val.isValid) {
+        setFieldErrors(val.errors);
+        setBookingError(val.firstError);
+        return;
+      }
+      setFieldErrors({});
+
+      const effectivePayable = Number(payableTotal !== undefined && payableTotal !== null && !isNaN(payableTotal) ? payableTotal : (roomBaseTotal + roomGst - discountAmount));
+      if (effectivePayable < 0) {
+        setBookingError("Booking amount validation failed: amount cannot be negative.");
+        return;
+      }
+
+      setSubmitting(true);
+
       const propId = property?._id || property?.id || localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
       const guestFullName = guestName.trim() || 'Guest';
 
@@ -360,7 +363,8 @@ function Booking() {
         checkIn: checkInDate,
         checkOutDate: checkOutDate,
         checkOut: checkOutDate,
-        nights: nights,
+        nights: nights || 1,
+        pax: pax || '2 Adults',
         roomType: roomCategory,
         roomNumber: selectedRoom?.roomNumber ? String(selectedRoom.roomNumber) : (selectedRoom?.num ? String(selectedRoom.num) : null),
         roomId: selectedRoom?._id || selectedRoom?.id || null,
@@ -373,9 +377,9 @@ function Booking() {
         originalAmount: grossTotal,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         coupon: appliedCoupon ? appliedCoupon.code : null,
-        discountAmount: discountAmount,
-        totalAmount: payableTotal,
-        amount: payableTotal,
+        discountAmount: discountAmount || 0,
+        totalAmount: effectivePayable,
+        amount: effectivePayable,
         specialRequests: gstin ? `GSTIN: ${gstin}` : ''
       };
 
@@ -450,26 +454,43 @@ function Booking() {
                 <h2 className="font-display text-xl font-bold text-navy border-b border-navy/5 pb-3">Guest Details</h2>
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="guestName" className="text-xs font-bold text-navy">Full Name</Label>
+                    <Label htmlFor="guestName" required className="text-xs font-bold text-navy">Full Name</Label>
                     <Input id="guestName" nameOnly className="mt-1.5 h-11 text-xs font-medium" value={guestName} onChange={e => { setGuestName(e.target.value); if (fieldErrors.guestName) setFieldErrors(p => ({ ...p, guestName: null })); }} placeholder="e.g. Surya Sharma" required />
                     {fieldErrors.guestName && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.guestName}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="em" className="text-xs font-bold text-navy">Email Address</Label>
+                    <Label htmlFor="em" required className="text-xs font-bold text-navy">Email Address</Label>
                     <Input id="em" type="email" className="mt-1.5 h-11 text-xs font-medium" value={email} onChange={e => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: null })); }} required />
                     {fieldErrors.email && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.email}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="mb" className="text-xs font-bold text-navy">Mobile Number</Label>
+                    <Label htmlFor="mb" required className="text-xs font-bold text-navy">Mobile Number</Label>
                     <Input id="mb" type="tel" className="mt-1.5 h-11 text-xs font-medium" value={phone} onChange={e => { setPhone(e.target.value); if (fieldErrors.phone) setFieldErrors(p => ({ ...p, phone: null })); }} required />
                     {fieldErrors.phone && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.phone}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="ct" className="text-xs font-bold text-navy">City</Label>
+                    <Label htmlFor="paxSelect" required className="text-xs font-bold text-navy">Guests (Pax)</Label>
+                    <select
+                      id="paxSelect"
+                      value={pax}
+                      onChange={e => {
+                        setPax(e.target.value);
+                        localStorage.setItem('booking_pax', e.target.value);
+                      }}
+                      className="mt-1.5 flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="1 Adult">1 Adult</option>
+                      <option value="2 Adults">2 Adults</option>
+                      <option value="3 Adults">3 Adults</option>
+                      <option value="4 Adults (Family)">4 Adults (Family)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="ct" required className="text-xs font-bold text-navy">City</Label>
                     <Input id="ct" textOnly className="mt-1.5 h-11 text-xs font-medium" value={city || (property?.settings?.city || property?.city || "Hyderabad")} onChange={e => { setCity(e.target.value); if (fieldErrors.city) setFieldErrors(p => ({ ...p, city: null })); }} placeholder="e.g. Hyderabad" />
                     {fieldErrors.city && <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.city}</p>}
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <Label htmlFor="gst" className="text-xs font-bold text-navy">GSTIN (Optional)</Label>
                     <Input id="gst" className="mt-1.5 h-11 text-xs font-medium" value={gstin} onChange={e => setGstin(e.target.value)} placeholder="e.g. 07AAAAA0000A1Z5" />
                   </div>

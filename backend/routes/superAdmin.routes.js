@@ -28,6 +28,7 @@ import {
   formatAadhaar
 } from '../utils/aadhaarValidator.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
+import { sendAccountCreatedEmail } from '../services/email.service.js';
 
 const router = express.Router();
 
@@ -453,6 +454,11 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       status: status || 'Active',
       dept: dept || 'Front Desk',
       shift: shift || 'Morning (06:00 - 14:00)'
+    });
+
+    // Send Account Credentials Email via Nodemailer
+    sendAccountCreatedEmail(newUser.email, newUser.name, newUser.role, password, targetPropertyId || 'Hour Stay Platform').catch(err => {
+      console.warn('⚠️ [SuperAdmin] Non-blocking account email error:', err.message);
     });
 
     await logAction(req.user, 'Created User', `${name} (${role})`, req);

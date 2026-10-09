@@ -368,7 +368,7 @@ function ReceptionProfilePage() {
               <form onSubmit={handleProfileSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-name" className="text-navy font-semibold text-xs">Full Name</Label>
+                    <Label htmlFor="edit-name" required className="text-navy font-semibold text-xs">Full Name</Label>
                     <Input
                       id="edit-name"
                       nameOnly
@@ -383,7 +383,7 @@ function ReceptionProfilePage() {
                     {profileErrors.name && <p className="text-[11px] font-bold text-rose-600">{profileErrors.name}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
+                    <Label htmlFor="edit-phone" required className="text-navy font-semibold text-xs">Mobile Number</Label>
                     <Input
                       id="edit-phone"
                       type="tel"
@@ -415,7 +415,7 @@ function ReceptionProfilePage() {
             <Panel title="Change Account Password" description="Update your security passcode.">
               <form onSubmit={handlePasswordSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="current-pw" className="text-navy font-semibold text-xs">Current Password</Label>
+                  <Label htmlFor="current-pw" required className="text-navy font-semibold text-xs">Current Password</Label>
                   <div className="relative">
                     <Input
                       id="current-pw"
@@ -441,7 +441,7 @@ function ReceptionProfilePage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="new-pw" className="text-navy font-semibold text-xs">New Password</Label>
+                    <Label htmlFor="new-pw" required className="text-navy font-semibold text-xs">New Password</Label>
                     <div className="relative">
                       <Input
                         id="new-pw"
@@ -466,7 +466,7 @@ function ReceptionProfilePage() {
                     {passwordErrors.newPassword && <p className="text-[11px] font-bold text-rose-600">{passwordErrors.newPassword}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="confirm-new-pw" className="text-navy font-semibold text-xs">Confirm New Password</Label>
+                    <Label htmlFor="confirm-new-pw" required className="text-navy font-semibold text-xs">Confirm New Password</Label>
                     <div className="relative">
                       <Input
                         id="confirm-new-pw"

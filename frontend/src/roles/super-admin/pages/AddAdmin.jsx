@@ -134,7 +134,7 @@ function AddAdmin() {
           </FormField>
 
           <div className="relative">
-            <Label htmlFor="admin-pass" className="text-xs text-navy font-semibold">Temporary Password <span className="text-error">*</span></Label>
+            <Label htmlFor="admin-pass" required className="text-xs text-navy font-semibold">Temporary Password</Label>
             <div className="relative mt-1">
               <Input
                 id="admin-pass"

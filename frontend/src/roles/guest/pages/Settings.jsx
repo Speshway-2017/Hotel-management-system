@@ -322,7 +322,9 @@ function GuestSettingsPage() {
 
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">Full Guest Name</label>
+                <label className="text-xs font-bold text-navy block">
+                  Full Guest Name <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <User className="size-4 text-navy/40 absolute left-3.5 top-3" />
                   <input
@@ -350,7 +352,9 @@ function GuestSettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">Email Address</label>
+                <label className="text-xs font-bold text-navy block">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <Mail className="size-4 text-navy/40 absolute left-3.5 top-3" />
                   <input
@@ -380,7 +384,9 @@ function GuestSettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">Phone / Mobile Number</label>
+                <label className="text-xs font-bold text-navy block">
+                  Phone / Mobile Number <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <Phone className="size-4 text-navy/40 absolute left-3.5 top-3" />
                   <input
@@ -653,7 +659,9 @@ function GuestSettingsPage() {
             <div className="space-y-4 max-w-md">
               
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">Current Password</label>
+                <label className="text-xs font-bold text-navy block">
+                  Current Password <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type={showCurrentPass ? "text" : "password"}
@@ -679,7 +687,9 @@ function GuestSettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">New Password</label>
+                <label className="text-xs font-bold text-navy block">
+                  New Password <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative">
                   <input
                     type={showNewPass ? "text" : "password"}
@@ -705,7 +715,9 @@ function GuestSettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">Confirm New Password</label>
+                <label className="text-xs font-bold text-navy block">
+                  Confirm New Password <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="password"
                   value={passwordForm.confirmPassword}

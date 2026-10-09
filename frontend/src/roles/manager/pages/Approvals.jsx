@@ -31,7 +31,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
       className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full"
     >
       <div>
-        <div className="h-8 flex items-start">
+        <div className="min-h-5 sm:h-8 flex items-start">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
         <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>

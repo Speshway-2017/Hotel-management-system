@@ -32,6 +32,8 @@ export function AuthCard({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -40,6 +42,26 @@ export function AuthCard({
   const searchParams = new URLSearchParams(window.location.search);
   const queryEmail = searchParams.get("email") || "";
   const queryOtp = searchParams.get("otp") || "";
+
+  const handleResendOtp = async () => {
+    const targetEmail = queryEmail || email;
+    if (!targetEmail) {
+      setError("Please provide an email address to resend the code.");
+      return;
+    }
+    try {
+      setResending(true);
+      setResendMessage("");
+      setError("");
+      await authService.resendOtp(targetEmail, "forgot");
+      setResendMessage("A new OTP code has been sent to your email.");
+      setTimeout(() => setResendMessage(""), 5000);
+    } catch (err) {
+      setError(err.message || "Failed to resend OTP. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -256,9 +278,17 @@ export function AuthCard({
                 <p className="text-[11px] font-bold text-rose-600 px-4 mt-1 animate-fade-in text-center">{fieldErrors.otp}</p>
               )}
               <div className="mt-2 text-center">
-                <button type="button" className="text-[11px] text-[#0099ff] hover:underline font-semibold bg-transparent border-none cursor-pointer">
-                  Resend OTP Code
+                <button 
+                  type="button" 
+                  onClick={handleResendOtp}
+                  disabled={resending}
+                  className="text-[11px] text-[#0099ff] hover:underline font-semibold bg-transparent border-none cursor-pointer disabled:opacity-50"
+                >
+                  {resending ? "Sending OTP…" : "Resend OTP Code"}
                 </button>
+                {resendMessage && (
+                  <p className="text-[11px] font-bold text-emerald-600 mt-1 animate-fade-in text-center">{resendMessage}</p>
+                )}
               </div>
             </div>
           )}

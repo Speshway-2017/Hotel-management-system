@@ -31,7 +31,7 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="h-8 flex items-start">
+          <div className="min-h-5 sm:h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
           <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums truncate">{value}</h3>
@@ -159,7 +159,7 @@ function GuestDashboardPage() {
     <div className="space-y-6 text-left font-ui">
       
       {/* KPI Cards Grid (Manager/Admin UI Style) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="dashboard-stats-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <PremiumStatCard
           label={upcoming ? "Upcoming Booking" : currentStay ? "Active Stay" : "Upcoming Booking"}
           value={upcoming ? upcoming.checkIn : currentStay ? currentStay.checkIn : "None"}

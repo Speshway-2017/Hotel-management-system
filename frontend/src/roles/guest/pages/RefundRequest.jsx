@@ -633,7 +633,9 @@ export function GuestRefundPage() {
             {refundMethod === "Bank Transfer" && (
               <div className="space-y-3 pt-1 text-xs">
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-navy">Account Holder Name</label>
+                  <label className="block text-[10px] font-bold text-navy">
+                    Account Holder Name <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
                     placeholder="Name as on bank passbook"

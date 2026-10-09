@@ -11,10 +11,20 @@ const labelVariants = cva(
 );
 
 const Label = React.forwardRef(
+  ({ className, children, required, ...props }, ref) => {
+    const hasAsteriskInText = typeof children === "string" && children.includes("*");
+    const cleanChildren = hasAsteriskInText && typeof children === "string" 
+      ? children.replace(/\*+/g, "").trim() 
+      : children;
+    const isRequired = Boolean(required || hasAsteriskInText);
 
-
-  ({ className, ...props }, ref) =>
-  <LabelPrimitive.Root ref={ref} className={cn(labelVariants(), className)} {...props} />
+    return (
+      <LabelPrimitive.Root ref={ref} className={cn(labelVariants(), className)} {...props}>
+        {cleanChildren}
+        {isRequired && <span className="text-red-600 font-bold ml-1 select-none" style={{ color: '#dc2626' }}>*</span>}
+      </LabelPrimitive.Root>
+    );
+  }
 );
 Label.displayName = LabelPrimitive.Root.displayName;
 

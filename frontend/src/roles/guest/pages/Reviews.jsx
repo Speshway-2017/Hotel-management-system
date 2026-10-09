@@ -388,7 +388,9 @@ function GuestReviewsPage() {
               
               {/* Select Stay Booking */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy">Select Stay Reservation</label>
+                <label className="text-xs font-bold text-navy">
+                  Select Stay Reservation <span className="text-red-600 font-bold ml-1">*</span>
+                </label>
                 {bookings.length > 0 ? (
                   <select
                     value={selectedBooking}
@@ -482,7 +484,9 @@ function GuestReviewsPage() {
 
               {/* Comments Textarea */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-navy block">Your Stay Experience</label>
+                <label className="text-xs font-bold text-navy block">
+                  Your Stay Experience <span className="text-red-600 font-bold ml-1">*</span>
+                </label>
                 <textarea
                   required
                   rows={3}

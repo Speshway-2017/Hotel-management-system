@@ -2,12 +2,28 @@ import { z } from "zod";
 
 /**
  * Reusable primitive validations enforcing strict constraints across all forms:
- * - Text fields -> allow text only; show validation error for invalid numbers.
+ * - Text fields -> allow text only; show validation error for invalid numbers or dummy repeated characters.
  * - Number fields -> allow numbers only; show validation error for invalid text.
- * - Email fields -> allow valid email format only.
- * - Phone fields -> numbers only with proper length validation (10 to 15 digits).
- * - Amount/price fields -> valid numbers/decimals only.
+ * - Email fields -> allow valid email format only; reject repeating dummy usernames.
+ * - Phone fields -> numbers only with proper length validation (10 to 15 digits); reject repeating digits.
+ * - Amount/price fields -> valid numbers/decimals only within positive/non-negative ranges.
+ * - Vehicle / Driver / Organization specific validators.
  */
+
+// Helper: Check if string has excessive consecutive repeated characters (e.g. "aaaaa", "11111")
+export const hasRepeatedChars = (val, threshold = 5) => {
+  if (!val || typeof val !== 'string') return false;
+  const regex = new RegExp(`(.)\\1{${threshold - 1},}`, 'i');
+  return regex.test(val.trim());
+};
+
+// Helper: Check if string consists of only 1 single distinct character (e.g. "aaaa", "0000000000")
+export const isAllSameChar = (val) => {
+  if (!val || typeof val !== 'string') return false;
+  const clean = val.trim().replace(/[\s-]/g, '');
+  if (clean.length <= 1) return false;
+  return clean.split('').every(c => c.toLowerCase() === clean[0].toLowerCase());
+};
 
 // 1. Text field validations (Allow text only; reject numbers or pure numeric input)
 export const textOnlySchema = (min = 1, message = "This field is required", max = 500) =>
@@ -18,6 +34,9 @@ export const textOnlySchema = (min = 1, message = "This field is required", max 
     .max(max, `Maximum length is ${max} characters`)
     .refine((val) => !/\d/.test(val), {
       message: "Text fields allow text only; numbers are not allowed"
+    })
+    .refine((val) => !hasRepeatedChars(val, 5), {
+      message: "Please enter valid text (repeated characters detected)"
     });
 
 export const optionalTextOnlySchema = (max = 500) =>
@@ -28,10 +47,13 @@ export const optionalTextOnlySchema = (max = 500) =>
     .refine((val) => !val || !/\d/.test(val), {
       message: "Text fields allow text only; numbers are not allowed"
     })
+    .refine((val) => !val || !hasRepeatedChars(val, 5), {
+      message: "Please enter valid text (repeated characters detected)"
+    })
     .optional()
     .or(z.literal(""));
 
-// Name validation: Strictly letters, spaces, hyphens, apostrophes, and dots (no digits)
+// Name validation: Strictly letters, spaces, hyphens, apostrophes, and dots (no digits, no repeated dummy chars)
 export const nameSchema = (min = 2, message = "Full name is required (minimum 2 characters)") =>
   z
     .string()
@@ -43,6 +65,12 @@ export const nameSchema = (min = 2, message = "Full name is required (minimum 2 
     })
     .refine((val) => /^[a-zA-Z\s.'-]+$/.test(val), {
       message: "Name can only contain alphabetic characters, spaces, hyphens, and dots"
+    })
+    .refine((val) => !hasRepeatedChars(val, 4), {
+      message: "Please enter a valid real name (repeated characters detected)"
+    })
+    .refine((val) => !isAllSameChar(val), {
+      message: "Please enter a valid real name"
     });
 
 export const optionalNameSchema = (max = 120) =>
@@ -56,6 +84,9 @@ export const optionalNameSchema = (max = 120) =>
     .refine((val) => !val || /^[a-zA-Z\s.'-]+$/.test(val), {
       message: "Name can only contain alphabetic characters, spaces, hyphens, and dots"
     })
+    .refine((val) => !val || (!hasRepeatedChars(val, 4) && !isAllSameChar(val)), {
+      message: "Please enter a valid real name"
+    })
     .optional()
     .or(z.literal(""));
 
@@ -67,6 +98,9 @@ export const citySchema = z
   .max(100, "City name is too long")
   .refine((val) => !/\d/.test(val), {
     message: "City must contain letters only; numbers are not allowed"
+  })
+  .refine((val) => !hasRepeatedChars(val, 5) && !isAllSameChar(val), {
+    message: "Please enter a valid city name"
   });
 
 export const optionalCitySchema = z
@@ -76,10 +110,13 @@ export const optionalCitySchema = z
   .refine((val) => !val || !/\d/.test(val), {
     message: "City must contain letters only; numbers are not allowed"
   })
+  .refine((val) => !val || (!hasRepeatedChars(val, 5) && !isAllSameChar(val)), {
+    message: "Please enter a valid city name"
+  })
   .optional()
   .or(z.literal(""));
 
-// General text schema (with optional strict textOnly mode)
+// General text schema (with optional strict textOnly mode and repeated char detection)
 export const textSchema = (min = 1, message = "This field is required", max = 500, { textOnly = false } = {}) => {
   let schema = z
     .string()
@@ -93,6 +130,10 @@ export const textSchema = (min = 1, message = "This field is required", max = 50
     });
   }
 
+  schema = schema.refine((val) => !hasRepeatedChars(val, 6), {
+    message: "Please enter valid text (excessive repeated characters detected)"
+  });
+
   return schema;
 };
 
@@ -101,10 +142,13 @@ export const optionalTextSchema = (max = 1000) =>
     .string()
     .trim()
     .max(max, `Maximum length is ${max} characters`)
+    .refine((val) => !val || !hasRepeatedChars(val, 7), {
+      message: "Please enter valid text (excessive repeated characters detected)"
+    })
     .optional()
     .or(z.literal(""));
 
-// 2. Email validation: Valid email format only
+// 2. Email validation: Valid email format only, no repetitive dummy localparts
 export const emailSchema = z
   .string()
   .trim()
@@ -113,7 +157,13 @@ export const emailSchema = z
   .regex(
     /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
     "Please enter a valid email address (e.g. user@example.com)"
-  );
+  )
+  .refine((val) => {
+    const localPart = val.split('@')[0] || '';
+    return !isAllSameChar(localPart) && !hasRepeatedChars(localPart, 6);
+  }, {
+    message: "Please enter a valid, real email address"
+  });
 
 export const optionalEmailSchema = z
   .string()
@@ -121,10 +171,17 @@ export const optionalEmailSchema = z
   .refine((val) => !val || /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val), {
     message: "Please enter a valid email address (e.g. user@example.com)"
   })
+  .refine((val) => {
+    if (!val) return true;
+    const localPart = val.split('@')[0] || '';
+    return !isAllSameChar(localPart) && !hasRepeatedChars(localPart, 6);
+  }, {
+    message: "Please enter a valid, real email address"
+  })
   .optional()
   .or(z.literal(""));
 
-// 3. Phone validation: Numbers only with proper length validation (10 to 15 digits)
+// 3. Phone validation: Numbers only with proper length validation (10 to 15 digits), no dummy repeating digits
 export const phoneSchema = z
   .string()
   .trim()
@@ -140,6 +197,12 @@ export const phoneSchema = z
     return digitsOnly.length >= 10 && digitsOnly.length <= 15;
   }, {
     message: "Phone number must be between 10 and 15 digits"
+  })
+  .refine((val) => {
+    const digitsOnly = val.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
+    return !isAllSameChar(digitsOnly);
+  }, {
+    message: "Please enter a valid phone number (cannot be all identical digits)"
   });
 
 export const optionalPhoneSchema = z
@@ -159,10 +222,17 @@ export const optionalPhoneSchema = z
   }, {
     message: "Phone number must be between 10 and 15 digits"
   })
+  .refine((val) => {
+    if (!val) return true;
+    const digitsOnly = val.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
+    return !isAllSameChar(digitsOnly);
+  }, {
+    message: "Please enter a valid phone number (cannot be all identical digits)"
+  })
   .optional()
   .or(z.literal(""));
 
-// 4. Aadhaar validation: exactly 12 numeric digits
+// 4. Aadhaar validation: exactly 12 numeric digits, no repeating all-same dummy digits
 export const aadhaarSchema = z
   .string()
   .trim()
@@ -172,6 +242,9 @@ export const aadhaarSchema = z
   })
   .refine((val) => val.replace(/\s/g, "").length === 12, {
     message: "Aadhaar number must be exactly 12 numeric digits"
+  })
+  .refine((val) => !isAllSameChar(val.replace(/\s/g, "")), {
+    message: "Invalid Aadhaar number (cannot be all identical digits)"
   });
 
 export const optionalAadhaarSchema = z
@@ -182,6 +255,9 @@ export const optionalAadhaarSchema = z
   })
   .refine((val) => !val || val.replace(/\s/g, "").length === 12, {
     message: "Aadhaar number must be exactly 12 numeric digits"
+  })
+  .refine((val) => !val || !isAllSameChar(val.replace(/\s/g, "")), {
+    message: "Invalid Aadhaar number (cannot be all identical digits)"
   })
   .optional()
   .or(z.literal(""));
@@ -268,9 +344,60 @@ export const passwordSchema = z
   .min(6, "Password must be at least 6 characters")
   .max(100, "Password is too long");
 
+// 9. Vehicle & Transport Primitives
+export const vehicleNumberSchema = z
+  .string()
+  .trim()
+  .min(4, "Vehicle registration number is required")
+  .max(20, "Vehicle number is too long")
+  .transform((v) => v.toUpperCase().replace(/\s+/g, ''))
+  .refine((v) => /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$/.test(v) || /^[A-Z0-9-]{4,15}$/.test(v), {
+    message: "Please enter a valid vehicle registration number (e.g. TS09EA1234 or DL1CAA0001)"
+  });
+
+export const drivingLicenseSchema = z
+  .string()
+  .trim()
+  .min(5, "Driving license number is required")
+  .max(30, "Driving license number is too long")
+  .transform((v) => v.toUpperCase().trim())
+  .refine((v) => !isAllSameChar(v), {
+    message: "Please enter a valid driving license number"
+  });
+
+// 10. GSTIN, PAN & Pincode Primitives
+export const gstinSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.toUpperCase())
+  .refine((v) => !v || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(v), {
+    message: "Please enter a valid 15-character GSTIN (e.g. 07AAAAA0000A1Z5)"
+  })
+  .optional()
+  .or(z.literal(""));
+
+export const panSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.toUpperCase())
+  .refine((v) => !v || /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v), {
+    message: "Please enter a valid 10-character PAN (e.g. ABCDE1234F)"
+  })
+  .optional()
+  .or(z.literal(""));
+
+export const pincodeSchema = z
+  .string()
+  .trim()
+  .refine((v) => !v || /^[1-9][0-9]{5}$/.test(v.replace(/\s/g, '')), {
+    message: "Please enter a valid 6-digit Indian PIN code"
+  })
+  .optional()
+  .or(z.literal(""));
+
 /**
  * Universal field-level validator for immediate live and on-blur feedback.
- * @param {string} type - 'text' | 'name' | 'city' | 'email' | 'tel' | 'phone' | 'number' | 'integer' | 'amount' | 'price'
+ * @param {string} type - 'text' | 'name' | 'city' | 'email' | 'tel' | 'phone' | 'number' | 'integer' | 'amount' | 'price' | 'vehicle' | 'license'
  * @param {any} value - The input value to validate
  * @param {object} options - Configuration options (e.g. required, min, max, fieldName)
  * @returns {{ isValid: boolean, error: string | null }}
@@ -291,6 +418,11 @@ export function validateFieldValue(type, value, options = {}) {
       return { isValid: false, error: `${fieldName} is required` };
     }
     return { isValid: true, error: null };
+  }
+
+  // Check repeated characters across text/name/email/phone
+  if (type !== "password" && hasRepeatedChars(strVal, 6)) {
+    return { isValid: false, error: `${fieldName} contains invalid repeated characters` };
   }
 
   switch (type) {
@@ -324,6 +456,9 @@ export function validateFieldValue(type, value, options = {}) {
           error: `Name must be at least ${options.minLength || 2} characters`
         };
       }
+      if (isAllSameChar(strVal)) {
+        return { isValid: false, error: "Please enter a valid real name" };
+      }
       return { isValid: true, error: null };
     }
 
@@ -337,6 +472,9 @@ export function validateFieldValue(type, value, options = {}) {
       if (strVal.length < 2) {
         return { isValid: false, error: "City name must be at least 2 characters" };
       }
+      if (isAllSameChar(strVal)) {
+        return { isValid: false, error: "Please enter a valid city name" };
+      }
       return { isValid: true, error: null };
     }
 
@@ -347,6 +485,10 @@ export function validateFieldValue(type, value, options = {}) {
           isValid: false,
           error: "Please enter a valid email address (e.g. user@example.com)"
         };
+      }
+      const local = strVal.split('@')[0];
+      if (isAllSameChar(local)) {
+        return { isValid: false, error: "Please enter a valid email address" };
       }
       return { isValid: true, error: null };
     }
@@ -365,6 +507,17 @@ export function validateFieldValue(type, value, options = {}) {
           isValid: false,
           error: "Phone number must be between 10 and 15 digits"
         };
+      }
+      if (isAllSameChar(digitsOnly)) {
+        return { isValid: false, error: "Phone number cannot be all identical digits" };
+      }
+      return { isValid: true, error: null };
+    }
+
+    case "vehicle": {
+      const clean = strVal.toUpperCase().replace(/\s+/g, '');
+      if (!/^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$/.test(clean) && !/^[A-Z0-9-]{4,15}$/.test(clean)) {
+        return { isValid: false, error: "Please enter a valid vehicle number (e.g. TS09EA1234)" };
       }
       return { isValid: true, error: null };
     }

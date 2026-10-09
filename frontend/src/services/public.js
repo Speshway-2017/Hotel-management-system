@@ -30,8 +30,8 @@ export const publicService = {
   getMedia: async () => {
     return await apiClient.get(`${PUBLIC_PREFIX}/media`);
   },
-  getProperties: async () => {
-    return await apiClient.get(`${PUBLIC_PREFIX}/properties`);
+  getProperties: async (params = {}) => {
+    return await apiClient.get(`${PUBLIC_PREFIX}/properties`, { params });
   },
   getProperty: async (id) => {
     return await apiClient.get(`${PUBLIC_PREFIX}/properties/${id}`);

@@ -26,6 +26,11 @@ export const authService = {
     return await apiClient.post('/auth/forgot-password', { email });
   },
 
+  // Resend OTP code
+  resendOtp: async (email, type = 'forgot') => {
+    return await apiClient.post('/auth/resend-otp', { email, type });
+  },
+
   // Verify OTP code
   verifyOtp: async (email, otp) => {
     return await apiClient.post('/auth/verify-otp', { email, otp });
