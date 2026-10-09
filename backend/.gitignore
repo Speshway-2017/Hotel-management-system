@@ -43,6 +43,11 @@ coverage
 .env.local
 .env.development.local
 
+# Sensitive Credentials / Keys
+service-account.json
+service-account*.json
+firebase-adminsdk*.json
+
 # Editor files and OS files
 .vscode/*
 !.vscode/extensions.json
