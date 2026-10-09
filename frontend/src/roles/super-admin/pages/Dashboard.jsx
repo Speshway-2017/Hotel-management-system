@@ -23,7 +23,7 @@ function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColo
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="h-8 flex items-start">
+          <div className="min-h-5 sm:h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
           <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
@@ -233,7 +233,7 @@ function SuperAdminDashboard() {
 
 
       {/* KPI Cards Row - 6 Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 dashboard-stats-grid">
         <PremiumStatCard
           label="Total Properties"
           value={loading ? "—" : `${totalProperties} Hotels`}

@@ -26,8 +26,8 @@ export const publicBookingSchema = z
     city: citySchema,
     checkIn: dateSchema,
     checkOut: dateSchema,
-    pax: textSchema(1, "Number of guests is required"),
-    roomType: textSchema(1, "Room type selection is required"),
+    pax: optionalTextSchema(50).default("2 Adults"),
+    roomType: optionalTextSchema(100).default("Standard Room"),
     aadhaarNumber: optionalAadhaarSchema,
     specialRequests: optionalTextSchema(500)
   })

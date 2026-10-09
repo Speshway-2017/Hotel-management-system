@@ -72,7 +72,7 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="h-8 flex items-start">
+          <div className="min-h-5 sm:h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
           <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
@@ -339,7 +339,7 @@ function AdminDashboard() {
     <div className="space-y-6 text-left animate-fade-in">
       
       {/* Consolidated Critical KPIs Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 font-ui">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 font-ui dashboard-stats-grid">
         <PremiumStatCard label="Occupied Rooms" value={occupiedRooms.toString()} hint="In-stay guests" icon={Users} accentColor="#5B21B6" />
         <PremiumStatCard label="Reserved Rooms" value={reservedRooms.toString()} hint="Confirmed bookings" icon={Calendar} accentColor="#F59E0B" />
         <PremiumStatCard label="Available Rooms" value={availableRooms.toString()} hint="Vacant to sell" icon={CheckCircle2} accentColor="#2E7D32" />

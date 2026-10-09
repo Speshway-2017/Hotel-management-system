@@ -89,7 +89,7 @@ function PremiumStatCard({ label, value, hint, accentColor = "#0d1b2a" }) {
       className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left"
     >
       <div>
-        <div className="h-8 flex items-start">
+        <div className="min-h-5 sm:h-8 flex items-start">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
         </div>
         <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none">{value}</h3>
@@ -637,17 +637,17 @@ function ReservationsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1050px] table-fixed">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full text-left border-collapse min-w-[1050px] table-auto">
                   <thead>
                     <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                      <th className="py-4 pl-4 pr-2 text-left w-[14%]">Guest Info</th>
-                      <th className="py-4 px-2 text-left w-[12%]">Room / Type</th>
-                      <th className="py-4 px-3 text-left w-[16%]">Stay Dates</th>
-                      <th className="py-4 px-3 text-left w-[12%]">Channel / Type</th>
-                      <th className="py-4 px-3 text-left w-[14%]">Payment</th>
-                      <th className="py-4 px-3 text-left w-[14%]">Status</th>
-                      <th className="py-4 pl-3 pr-4 text-left min-w-[240px] whitespace-nowrap">Actions</th>
+                      <th className="py-3.5 pl-4 pr-3 text-left whitespace-nowrap min-w-[160px]">Guest Info</th>
+                      <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[140px]">Room / Type</th>
+                      <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[190px]">Stay Dates</th>
+                      <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[130px]">Channel / Type</th>
+                      <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[140px]">Payment</th>
+                      <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[140px]">Status</th>
+                      <th className="py-3.5 pl-3 pr-4 text-left min-w-[220px] whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted text-xs text-[#2a2a2a]">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { 
   MapPin, Star, Calendar, Users, Coffee, Bed, 
   ShieldCheck, Wifi, Sparkles, CheckCircle2, Phone, Mail, Globe, Clock, FileText, ArrowRight, ChevronRight
@@ -10,11 +10,7 @@ import { Button } from "@/components/ui/button";
 import { inr } from "@/data/hs-data";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
-
-import jaipurImg from "@/assets/resort_jaipur.png";
-import palaceImg from "@/assets/palace_udaipur.png";
-import goaImg from "@/assets/beach_goa.png";
-import keralaImg from "@/assets/retreat_kerala.png";
+import { getHotelGallery, getHotelImage, getRoomCategoryImages } from "@/utils/hotelImages";
 
 export const Route = {
   head: () => ({
@@ -27,6 +23,7 @@ export const Route = {
 };
 
 export function HotelDetailsPage() {
+  const navigate = useNavigate();
   const params = useParams() || {};
   let routePropId = params.propertyId || params.id;
   if (!routePropId && typeof window !== 'undefined') {
@@ -34,6 +31,13 @@ export function HotelDetailsPage() {
     if (match && match[1]) routePropId = match[1];
   }
   const targetId = routePropId || localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
+
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const urlCheckIn = urlParams.get('checkIn');
+  const urlCheckOut = urlParams.get('checkOut');
+
+  const [checkInDate, setCheckInDate] = useState(() => urlCheckIn || localStorage.getItem('booking_check_in') || '');
+  const [checkOutDate, setCheckOutDate] = useState(() => urlCheckOut || localStorage.getItem('booking_check_out') || '');
 
   const [property, setProperty] = useState(null);
   const [rooms, setRooms] = useState([]);
@@ -46,9 +50,13 @@ export function HotelDetailsPage() {
     setLoading(true);
     setError("");
 
+    const roomQueryParams = {};
+    if (checkInDate) roomQueryParams.checkIn = checkInDate;
+    if (checkOutDate) roomQueryParams.checkOut = checkOutDate;
+
     Promise.all([
       publicService.getProperty(targetId).catch(err => ({ success: false, error: err })),
-      publicService.getPropertyRooms(targetId).catch(err => ({ success: false, error: err }))
+      publicService.getPropertyRooms(targetId, roomQueryParams).catch(err => ({ success: false, error: err }))
     ]).then(async ([propRes, roomsRes]) => {
       if (!isMounted) return;
 
@@ -62,7 +70,11 @@ export function HotelDetailsPage() {
       if (!foundProperty) {
         const allPropsRes = await publicService.getProperties().catch(() => null);
         if (allPropsRes && allPropsRes.success && Array.isArray(allPropsRes.data) && allPropsRes.data.length > 0) {
-          foundProperty = allPropsRes.data.find(p => p._id === targetId || p.id === targetId) || allPropsRes.data[0];
+          foundProperty = allPropsRes.data.find(p => 
+            String(p._id) === String(targetId) || 
+            String(p.id) === String(targetId) || 
+            String(p.propertyId) === String(targetId)
+          ) || allPropsRes.data[0];
         }
       }
 
@@ -78,14 +90,7 @@ export function HotelDetailsPage() {
         setError("Hotel details not found.");
       }
 
-      let fetchedRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
-
-      if (fetchedRooms.length === 0) {
-        const fallbackAllRes = await publicService.getPropertyRooms('all').catch(() => null);
-        if (fallbackAllRes && fallbackAllRes.success && Array.isArray(fallbackAllRes.data) && fallbackAllRes.data.length > 0) {
-          fetchedRooms = fallbackAllRes.data;
-        }
-      }
+      const fetchedRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
 
       if (isMounted) {
         setRooms(fetchedRooms);
@@ -95,20 +100,23 @@ export function HotelDetailsPage() {
     });
 
     return () => { isMounted = false; };
-  }, [targetId]);
+  }, [targetId, checkInDate, checkOutDate]);
 
   const handleNavigateToRoom = (type) => {
     if (property) {
       localStorage.setItem('selected_property_id', property._id || property.id || targetId);
       localStorage.setItem('selected_property_data', JSON.stringify(property));
     }
-    const targetRoom = type.roomsList.find(r => r.status === 'Available' || r.isAvailable === true) || type.roomsList[0];
+    if (checkInDate) localStorage.setItem('booking_check_in', checkInDate);
+    if (checkOutDate) localStorage.setItem('booking_check_out', checkOutDate);
+
+    const targetRoom = type?.roomsList?.find(r => r.status === 'Available' || r.isAvailable === true) || type?.roomsList?.[0];
     if (targetRoom) {
       localStorage.setItem('selected_room_data', JSON.stringify(targetRoom));
     }
 
-    const roomParam = encodeURIComponent(type.id || type.category);
-    window.location.href = `/rooms/${roomParam}`;
+    const roomParam = encodeURIComponent(type?.category || type?.id || "Standard Room");
+    navigate(`/rooms/${roomParam}`);
   };
 
   if (loading) {
@@ -157,11 +165,10 @@ export function HotelDetailsPage() {
     ? s.amenities 
     : (typeof s.amenities === 'string' ? s.amenities.split(',').map(a => a.trim()).filter(Boolean) : ["Free High-Speed WiFi", "Swimming Pool", "Spa & Wellness", "24/7 Room Service", "Fine Dining Restaurant"]);
 
-  const gallery = (Array.isArray(s.gallery) && s.gallery.length > 0) ? s.gallery : 
-                  (Array.isArray(s.photos) && s.photos.length > 0) ? s.photos : 
-                  [jaipurImg, palaceImg, goaImg, keralaImg];
+  const gallery = getHotelGallery(property);
+  const mainImage = selectedImage || gallery[0] || getHotelImage(property);
 
-  const mainImage = selectedImage || gallery[0] || jaipurImg;
+  const isDatesSelected = Boolean(checkInDate && checkOutDate);
 
   // Group rooms by Room Type (category)
   const roomTypesMap = {};
@@ -190,13 +197,20 @@ export function HotelDetailsPage() {
           : (typeof rm.amenities === 'string' ? rm.amenities.split(',').map(a => a.trim()).filter(Boolean) : []),
         images: Array.isArray(rm.images) ? rm.images.filter(Boolean) : [],
         roomsList: [],
-        availableCount: 0
+        availableCount: 0,
+        occupiedCount: 0,
+        reservedCount: 0
       };
     }
     roomTypesMap[cat].roomsList.push(rm);
-    const isAvail = rm.status === 'Available' || rm.isAvailable === true;
+
+    const isAvail = !isDatesSelected ? true : (rm.status === 'Available' || rm.isAvailable === true);
     if (isAvail) {
       roomTypesMap[cat].availableCount += 1;
+    } else if (rm.status === 'Occupied') {
+      roomTypesMap[cat].occupiedCount += 1;
+    } else if (rm.status === 'Reserved' || rm.isReserved) {
+      roomTypesMap[cat].reservedCount += 1;
     }
   });
 
@@ -305,16 +319,50 @@ export function HotelDetailsPage() {
 
               {/* Available Rooms Section - 1 Card Per Configured Room Type */}
               <div className="space-y-6 font-ui text-left">
-                <div className="flex justify-between items-center border-b border-navy/5 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-navy/5 pb-3">
                   <div>
                     <h2 className="font-display text-2xl sm:text-3xl font-bold text-navy">Available Rooms</h2>
-                    <p className="text-xs sm:text-sm text-gray-600 font-ui">Configured room types and live tariffs fetched from MongoDB</p>
+                    <p className="text-xs sm:text-sm text-gray-600 font-ui">Configured room types and live tariffs evaluated for your stay dates</p>
                   </div>
                   {roomTypeCards.length > 0 && (
-                    <span className="text-xs font-bold text-purple bg-purple/10 px-3.5 py-1 rounded-full border border-purple/20">
+                    <span className="text-xs font-bold text-purple bg-purple/10 px-3.5 py-1 rounded-full border border-purple/20 self-start sm:self-auto">
                       {roomTypeCards.length} Room Types
                     </span>
                   )}
+                </div>
+
+                {/* Stay Dates Live Selector */}
+                <div className="bg-white rounded-2xl p-4 border border-navy/10 flex flex-wrap items-center justify-between gap-4 shadow-soft">
+                  <div className="flex items-center gap-2 text-xs font-bold text-navy">
+                    <Calendar className="size-4 text-purple" />
+                    <span>Check Availability for Stay Dates:</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Check-In</span>
+                      <input 
+                        type="date" 
+                        value={checkInDate} 
+                        onChange={(e) => {
+                          setCheckInDate(e.target.value);
+                          localStorage.setItem('booking_check_in', e.target.value);
+                        }}
+                        className="h-8 px-2.5 rounded-lg border border-navy/15 bg-white text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Check-Out</span>
+                      <input 
+                        type="date" 
+                        value={checkOutDate} 
+                        onChange={(e) => {
+                          setCheckOutDate(e.target.value);
+                          localStorage.setItem('booking_check_out', e.target.value);
+                        }}
+                        className="h-8 px-2.5 rounded-lg border border-navy/15 bg-white text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {roomTypeCards.length === 0 ? (
@@ -326,14 +374,16 @@ export function HotelDetailsPage() {
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {roomTypeCards.map((type) => {
-                      const hasUploadedImages = type.images.length > 0;
-                      const primaryRoomImage = hasUploadedImages ? type.images[0] : null;
+                      const hasUploadedImages = type.images && type.images.length > 0;
+                      const categoryFallbackImages = getRoomCategoryImages(type.category);
+                      const primaryRoomImage = hasUploadedImages ? type.images[0] : categoryFallbackImages[0];
                       const isAvailable = type.availableCount > 0;
 
                       return (
                         <div 
                           key={type.category} 
-                          className="bg-white rounded-2xl border border-navy/10 shadow-soft hover:shadow-md hover:border-purple/20 overflow-hidden transition-all duration-300 flex flex-col justify-between font-ui"
+                          onClick={() => handleNavigateToRoom(type)}
+                          className="bg-white rounded-2xl border border-navy/10 shadow-soft hover:shadow-lg hover:border-purple/30 overflow-hidden transition-all duration-300 flex flex-col justify-between font-ui cursor-pointer group"
                         >
                           {/* Image Thumbnail Container */}
                           <div className="h-48 relative bg-navy/5 border-b border-navy/5 overflow-hidden">
@@ -341,7 +391,7 @@ export function HotelDetailsPage() {
                               <img 
                                 src={primaryRoomImage} 
                                 alt={type.category} 
-                                className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" 
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                               />
                             ) : (
                               <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-navy/5 to-purple/5 text-navy/40">
@@ -358,9 +408,21 @@ export function HotelDetailsPage() {
                             </div>
 
                             <span className={`absolute bottom-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider backdrop-blur-md ${
-                              isAvailable ? "bg-emerald-600/90 text-white" : "bg-gray-600/90 text-white"
+                              !isDatesSelected 
+                                ? "bg-emerald-600/90 text-white" 
+                                : (isAvailable 
+                                    ? "bg-emerald-600/90 text-white" 
+                                    : (type.occupiedCount > 0 
+                                        ? "bg-rose-600/90 text-white" 
+                                        : "bg-amber-600/90 text-white"))
                             }`}>
-                              {isAvailable ? `${type.availableCount} Available` : "Sold Out"}
+                              {!isDatesSelected 
+                                ? `${type.roomsList.length} Available` 
+                                : (isAvailable 
+                                    ? `${type.availableCount} Available` 
+                                    : (type.occupiedCount > 0 
+                                        ? "Occupied for Dates" 
+                                        : "Reserved for Dates"))}
                             </span>
                           </div>
 
@@ -369,7 +431,7 @@ export function HotelDetailsPage() {
                             <div className="space-y-2">
                               <div className="flex justify-between items-start gap-2">
                                 <div>
-                                  <h3 className="font-display text-lg font-bold text-navy leading-snug">
+                                  <h3 className="font-display text-lg font-bold text-navy leading-snug group-hover:text-purple transition-colors">
                                     {type.category}
                                   </h3>
                                   <div className="flex items-center gap-2.5 text-xs text-gray-600 mt-1 flex-wrap font-medium">
@@ -410,16 +472,25 @@ export function HotelDetailsPage() {
                               )}
                             </div>
 
-                            {/* Action Bar: Book Now Only */}
-                            <div className="pt-4 border-t border-navy/5 flex items-center justify-end gap-3 mt-3">
+                            {/* Action Bar: View Room / Book Now */}
+                            <div className="pt-4 border-t border-navy/5 flex items-center justify-between gap-3 mt-3">
+                              <span className="text-xs font-semibold text-purple group-hover:underline flex items-center gap-1">
+                                <span>Room Details</span>
+                                <ArrowRight className="size-3 transition-transform group-hover:translate-x-1" />
+                              </span>
                               <Button 
-                                onClick={() => handleNavigateToRoom(type)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNavigateToRoom(type);
+                                }}
                                 variant="hero" 
                                 size="touch" 
-                                disabled={!isAvailable}
-                                className="w-full text-xs h-9 px-5 cursor-pointer disabled:opacity-50 font-bold"
+                                disabled={isDatesSelected && !isAvailable}
+                                className="text-xs h-9 px-5 cursor-pointer disabled:opacity-50 font-bold"
                               >
-                                {isAvailable ? "Book Now" : "Sold Out"}
+                                {!isDatesSelected || isAvailable 
+                                  ? "Book Now" 
+                                  : (type.occupiedCount > 0 ? "Occupied" : "Reserved")}
                               </Button>
                             </div>
                           </div>

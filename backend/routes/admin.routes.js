@@ -14,6 +14,7 @@ import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCa
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
 import { extractRoomNumber, calculatePropertyStats } from '../utils/roomHelper.js';
+import { sendAccountCreatedEmail } from '../services/email.service.js';
 
 const router = express.Router();
 
@@ -1086,6 +1087,12 @@ const handleCreateUserOrStaff = async (req, res) => {
     }
 
     const staffPropId = newUser.propertyId || req.user?.propertyId;
+    
+    // Send Account Credentials Email via Nodemailer
+    sendAccountCreatedEmail(newUser.email, newUser.name, newUser.role, password, staffPropId || 'Hour Stay Property').catch(err => {
+      console.warn('⚠️ [Admin] Non-blocking account email error:', err.message);
+    });
+
     await triggerNotification({
       req,
       role: 'super-admin',

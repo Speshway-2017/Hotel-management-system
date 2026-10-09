@@ -511,7 +511,7 @@ function GuestProfilePage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-name" className="text-navy font-bold text-xs">Full Name</Label>
+                    <Label htmlFor="edit-name" required className="text-navy font-bold text-xs">Full Name</Label>
                     <Input
                       id="edit-name"
                       nameOnly
@@ -529,7 +529,7 @@ function GuestProfilePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-phone" className="text-navy font-bold text-xs">Phone / Mobile</Label>
+                    <Label htmlFor="edit-phone" required className="text-navy font-bold text-xs">Phone / Mobile</Label>
                     <Input
                       id="edit-phone"
                       type="tel"
@@ -547,7 +547,7 @@ function GuestProfilePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-city" className="text-navy font-bold text-xs">City</Label>
+                    <Label htmlFor="edit-city" required className="text-navy font-bold text-xs">City</Label>
                     <Input
                       id="edit-city"
                       textOnly
@@ -565,7 +565,7 @@ function GuestProfilePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-country" className="text-navy font-bold text-xs">Country</Label>
+                    <Label htmlFor="edit-country" required className="text-navy font-bold text-xs">Country</Label>
                     <Input
                       id="edit-country"
                       textOnly
@@ -583,7 +583,7 @@ function GuestProfilePage() {
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor="edit-address" className="text-navy font-bold text-xs">Address</Label>
+                    <Label htmlFor="edit-address" required className="text-navy font-bold text-xs">Address</Label>
                     <Input
                       id="edit-address"
                       value={profileData.address}
@@ -636,7 +636,7 @@ function GuestProfilePage() {
             <Panel title="Change Account Password" description="Update your login password credentials.">
               <form onSubmit={handlePasswordSubmit} className="p-6 bg-white rounded-b-2xl space-y-4 text-left">
                 <div className="space-y-1.5">
-                  <Label htmlFor="current-pw" className="text-navy font-bold text-xs">Current Password</Label>
+                  <Label htmlFor="current-pw" required className="text-navy font-bold text-xs">Current Password</Label>
                   <div className="relative">
                     <Input
                       id="current-pw"
@@ -665,7 +665,7 @@ function GuestProfilePage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="new-pw" className="text-navy font-bold text-xs">New Password</Label>
+                    <Label htmlFor="new-pw" required className="text-navy font-bold text-xs">New Password</Label>
                     <div className="relative">
                       <Input
                         id="new-pw"
@@ -693,7 +693,7 @@ function GuestProfilePage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="confirm-new-pw" className="text-navy font-bold text-xs">Confirm New Password</Label>
+                    <Label htmlFor="confirm-new-pw" required className="text-navy font-bold text-xs">Confirm New Password</Label>
                     <div className="relative">
                       <Input
                         id="confirm-new-pw"

@@ -258,153 +258,385 @@
 
 /* Breakpoint 992px (Desktop Small / Tablet Landscape) */
 @media (max-width: 992px) {
-  /* Prevent horizontal scrolling and allow layouts to wrap */
   .flex-row-wrap {
     flex-wrap: wrap !important;
   }
 
-  /* Responsive grid sizing for search page filters, grids, features cards */
-  .grid-cols-3,
-  .grid-cols-4,
-  .md\:grid-cols-3,
-  .md\:grid-cols-4,
-  .lg\:grid-cols-3,
-  .lg\:grid-cols-4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  /* Ensure main hero overlays fit nicely */
   .h-full.w-full.object-cover {
     object-position: center;
   }
 }
 
-/* Breakpoint 768px (Tablet Portrait) */
+/* ----------------------------------------------------
+   Mobile Responsive System for HMS (All Roles & Pages)
+   Applies strictly to <= 768px - Desktop view is 100% preserved
+   ---------------------------------------------------- */
 @media (max-width: 768px) {
-  /* Flatten all grids to a single-column layout where necessary */
-  .grid-cols-2,
-  .grid-cols-3,
-  .grid-cols-4,
-  .md\:grid-cols-2,
-  .md\:grid-cols-3,
-  .md\:grid-cols-4,
-  .lg\:grid-cols-2,
-  .lg\:grid-cols-3,
-  .lg\:grid-cols-4 {
-    grid-template-columns: minmax(0, 1fr) !important;
+  /* 1. Enforce 3 columns for all dashboard & sub-page statistics grids */
+  .dashboard-stats-grid,
+  .stat-cards-grid,
+  .dashboard-kpi-grid,
+  .grid:has(> .PremiumStatCard),
+  .grid:has(> .StatCard),
+  .grid:has(> div > .PremiumStatCard),
+  .grid:has(> div > .StatCard),
+  .grid:has(> [class*="StatCard"]),
+  .grid:has(> div > [class*="StatCard"]) {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.375rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
-  /* Flexbox stacking */
-  .flex-md-col {
+  /* 2. Compact padding and symmetrical scaling for Stat Cards on mobile */
+  .PremiumStatCard,
+  .StatCard,
+  [class*="StatCard"],
+  .dashboard-stats-grid > div,
+  .dashboard-stats-grid > div > .PremiumStatCard,
+  .dashboard-stats-grid > div > .StatCard {
+    padding: 0.45rem 0.35rem !important;
+    min-height: 78px !important;
+    height: 100% !important;
+    border-radius: 0.5rem !important;
+    border-left-width: 3.5px !important;
+    display: flex !important;
     flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    max-width: 100% !important;
   }
 
-  /* Responsive spacing to maximize screen real estate */
-  .p-10, .p-12, .p-14, .p-20,
-  .sm\:p-10, .md\:p-14, .lg\:p-20 {
-    padding: 1.5rem !important;
+  /* Stat Card top row / label */
+  .PremiumStatCard .flex.items-start.justify-between,
+  .StatCard .flex.items-start.justify-between {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    width: 100% !important;
   }
 
-  .py-12, .py-20, .py-24,
-  .md\:py-20, .lg\:py-24 {
-    padding-top: 2.5rem !important;
-    padding-bottom: 2.5rem !important;
+  .PremiumStatCard .h-8,
+  .StatCard .h-8,
+  .PremiumStatCard .min-h-5,
+  .StatCard .min-h-5 {
+    height: auto !important;
+    min-height: 0 !important;
   }
 
-  .px-10, .px-12, .px-14, .px-20,
-  .sm\:px-10, .md\:px-14, .lg\:px-20 {
-    padding-left: 1.25rem !important;
-    padding-right: 1.25rem !important;
+  .PremiumStatCard p:first-child,
+  .StatCard p:first-child,
+  .PremiumStatCard [class*="text-[10px]"],
+  .PremiumStatCard [class*="text-[9px]"],
+  .StatCard [class*="text-[10px]"] {
+    font-size: 0.525rem !important;
+    line-height: 1.15 !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em !important;
+    margin: 0 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
   }
 
-  .gap-8, .gap-10, .gap-12,
-  .md\:gap-8, .lg\:gap-12 {
-    gap: 1.25rem !important;
+  /* Stat Card metric value */
+  .PremiumStatCard h3,
+  .PremiumStatCard h4,
+  .StatCard p.text-2xl,
+  .StatCard h3,
+  .StatCard p.font-black,
+  .PremiumStatCard .tabular-nums {
+    font-size: 0.8rem !important;
+    line-height: 1.15 !important;
+    font-weight: 800 !important;
+    margin-top: 0.2rem !important;
+    letter-spacing: -0.02em !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
-  /* Adjust typography to fit screen without wrapping excessively */
+  /* Stat Card icon wrapper */
+  .PremiumStatCard span[class*="size-8"],
+  .PremiumStatCard span[class*="size-7"],
+  .PremiumStatCard span[class*="size-6"],
+  .StatCard span[class*="size-9"],
+  .StatCard span[class*="size-8"],
+  .StatCard span[class*="size-6"] {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    min-width: 1.25rem !important;
+    min-height: 1.25rem !important;
+    border-radius: 0.3rem !important;
+    margin-left: 0.15rem !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .PremiumStatCard span[class*="size-8"] svg,
+  .PremiumStatCard span[class*="size-7"] svg,
+  .PremiumStatCard span[class*="size-6"] svg,
+  .StatCard span[class*="size-9"] svg,
+  .StatCard span[class*="size-8"] svg,
+  .StatCard span[class*="size-6"] svg {
+    width: 0.65rem !important;
+    height: 0.65rem !important;
+  }
+
+  /* Stat Card bottom row (delta / hint) */
+  .PremiumStatCard .mt-auto,
+  .StatCard .mt-auto,
+  .StatCard .mt-4 {
+    margin-top: 0.2rem !important;
+    padding-top: 0.1rem !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.2rem !important;
+    font-size: 0.5rem !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+  }
+
+  .PremiumStatCard .mt-auto span,
+  .StatCard .mt-auto span,
+  .StatCard .mt-4 span {
+    font-size: 0.5rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .PremiumStatCard .mt-auto svg,
+  .StatCard .mt-auto svg,
+  .StatCard .mt-4 svg {
+    width: 0.6rem !important;
+    height: 0.6rem !important;
+  }
+
+  /* 3. Universal viewport and horizontal overflow prevention */
+  html, body, #root, .dashboard-theme {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    position: relative !important;
+  }
+
+  main {
+    padding: 0.625rem !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* 4. Multi-column form and content grids adapt smoothly to mobile */
+  .grid.lg\:grid-cols-2:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.lg\:grid-cols-3:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.lg\:grid-cols-4:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.lg\:grid-cols-12:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.md\:grid-cols-2:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.md\:grid-cols-3:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.md\:grid-cols-4:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.sm\:grid-cols-2:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.sm\:grid-cols-3:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.sm\:grid-cols-4:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)),
+  .grid.sm\:grid-cols-5:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+
+  .grid.grid-cols-2:not(.dashboard-stats-grid):not(.stat-cards-grid):not(:has(> .PremiumStatCard)):not(:has(> .StatCard)) {
+    gap: 0.5rem !important;
+  }
+
+  /* 5. Filter & search bar panels on all pages */
+  .p-4.flex.flex-col.md\:flex-row,
+  .flex.flex-col.lg\:flex-row,
+  .flex.flex-col.md\:flex-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .w-80, .w-72, .w-64, .w-96, .sm\:w-48, .sm\:w-64, .sm\:w-80 {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* 6. Form controls, textareas, and select boxes */
+  input, select, textarea {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 7. Responsive data tables behavior */
+  .overflow-x-auto,
+  [class*="overflow-x-auto"],
+  .TableContainer,
+  .Panel > div:has(table),
+  .bg-white:has(table) {
+    width: 100% !important;
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch !important;
+    overflow-x: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  table {
+    width: 100% !important;
+    min-width: max-content !important;
+    border-collapse: collapse !important;
+  }
+
+  table th, table td {
+    padding: 0.5rem 0.65rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* 8. Action buttons and icon groups protection */
+  .ActionGroup {
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+  }
+
+  .ActionIcon,
+  button[class*="size-"],
+  span[class*="size-"],
+  .ActionGroup button {
+    min-height: unset !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 9. Navigation tabs, breadcrumbs, and headers */
+  .overflow-x-auto.scrollbar-none,
+  .HorizontalRouteTabs,
+  div:has(> button[class*="border-b-2"]) {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+  }
+
+  nav[aria-label="Breadcrumb"],
+  nav[aria-label="breadcrumb"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.25rem 0.4rem !important;
+    font-size: 0.725rem !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-bottom: 0.5rem !important;
+    text-align: left !important;
+  }
+
+  nav[aria-label="Breadcrumb"] a,
+  nav[aria-label="breadcrumb"] a,
+  nav[aria-label="Breadcrumb"] span,
+  nav[aria-label="breadcrumb"] span {
+    min-height: unset !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 0.725rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* 10. Modals and Drawers */
+  [role="dialog"],
+  .modal-container {
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Typography on mobile */
   h1, .text-4xl, .text-5xl, .text-6xl, .sm\:text-6xl {
-    font-size: 2rem !important; /* ~32px */
+    font-size: 1.5rem !important;
     line-height: 1.25 !important;
   }
 
   h2, .text-3xl, .md\:text-4xl {
-    font-size: 1.6rem !important; /* ~25px */
+    font-size: 1.3rem !important;
     line-height: 1.3 !important;
   }
 
   h3, .text-2xl {
-    font-size: 1.3rem !important; /* ~21px */
+    font-size: 1.15rem !important;
   }
 
-  /* Forms & booking steps padding/margin adjustments */
-  .rounded-\[32px\] {
-    border-radius: 20px !important;
-  }
-
-  .rounded-\[40px\] {
-    border-radius: 24px !important;
-  }
-
-  /* Responsive data tables behavior */
-  .overflow-x-auto {
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Ensure table headers and values scale properly */
-  table {
-    width: 100% !important;
-    min-width: 600px; /* Allow horizontal scrolling instead of squeezing columns to 0px */
+  /* Recharts ResponsiveContainer safety */
+  .recharts-responsive-container {
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
 
 /* Breakpoint 576px (Mobile Landscape) */
 @media (max-width: 576px) {
-  /* Extra mobile optimization for spacing */
   .p-6, .p-8, .sm\:p-8 {
-    padding: 1rem !important;
+    padding: 0.875rem !important;
   }
 
   .px-6, .px-8, .sm\:px-8 {
-    padding-left: 0.875rem !important;
-    padding-right: 0.875rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
   }
 
-  /* Full-width cards */
   .max-w-\[480px\], .max-w-\[430px\] {
     max-width: 100% !important;
-  }
-
-  /* Ensure all inputs and buttons are touch-friendly (minimum target size of 44px) */
-  input, select, textarea, button, .h-10, .h-11, .h-12 {
-    min-height: 44px !important;
-  }
-
-  /* Slider Caption text wrapping adjustment */
-  .text-right.text-xs {
-    text-align: center !important;
-    margin-top: 0.5rem;
   }
 }
 
 /* Breakpoint 480px (Mobile Portrait) */
 @media (max-width: 480px) {
-  /* Tighten paddings */
   .p-4, .p-5, .sm\:p-6 {
-    padding: 0.75rem !important;
+    padding: 0.625rem !important;
   }
 
-  /* Stack elements on narrow layouts */
   .flex-xs-col {
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 0.75rem !important;
+    gap: 0.625rem !important;
   }
 
-  /* Ensure image elements don't cause layout overflow */
   img {
     max-width: 100% !important;
     height: auto !important;
+  }
+}
+
+/* Breakpoint 360px (Extra Compact Mobile) */
+@media (max-width: 360px) {
+  .dashboard-stats-grid,
+  .stat-cards-grid,
+  .grid:has(> .PremiumStatCard),
+  .grid:has(> .StatCard) {
+    gap: 0.25rem !important;
+  }
+
+  .PremiumStatCard,
+  .StatCard {
+    padding: 0.35rem 0.25rem !important;
+    min-height: 76px !important;
+  }
+
+  .PremiumStatCard p:first-child,
+  .StatCard p:first-child {
+    font-size: 0.48rem !important;
+  }
+
+  .PremiumStatCard h3,
+  .StatCard p.text-2xl {
+    font-size: 0.72rem !important;
   }
 }
 

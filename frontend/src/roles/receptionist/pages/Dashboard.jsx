@@ -36,12 +36,12 @@ function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2
   return (
     <div
       style={{ "--accent-color": accentColor }}
-      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left"
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left font-ui"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
-          <h3 className="mt-2.5 font-sans text-base font-bold text-slate-800 leading-none tracking-tight tabular-nums">{value}</h3>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight truncate">{label}</p>
+          <h3 className="mt-2 font-sans text-base font-bold text-slate-800 leading-none tracking-tight tabular-nums truncate">{value}</h3>
         </div>
         {Icon && (
           <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
@@ -289,7 +289,7 @@ function FrontDeskDashboard() {
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
 
       {/* Premium KPI Stat Cards Grid */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-6">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-6 dashboard-stats-grid">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked' || a.status === 'Confirmed').length} Expected, ${arrivals.filter(a => a.status === 'Checked-In' || a.status === 'Checked-in').length} Checked In`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
         <PremiumStatCard label="In-Stay" value={stats.inStay || 0} hint={`${stats.occupied || 0} Room occupied`} icon={Users} accentColor="#10b981" />

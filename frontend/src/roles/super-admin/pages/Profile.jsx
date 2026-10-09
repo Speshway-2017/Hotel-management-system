@@ -324,10 +324,11 @@ function SuperAdminProfile() {
               <form onSubmit={handleProfileSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-name" className="text-navy font-semibold text-xs">Full Name</Label>
+                    <Label htmlFor="edit-name" required className="text-navy font-semibold text-xs">Full Name</Label>
                     <Input
                       id="edit-name"
                       nameOnly
+                      required
                       value={profileData.name}
                       onChange={(e) => {
                         setProfileData({ ...profileData, name: e.target.value });
@@ -340,10 +341,11 @@ function SuperAdminProfile() {
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-phone" className="text-navy font-semibold text-xs">Mobile Number</Label>
+                    <Label htmlFor="edit-phone" required className="text-navy font-semibold text-xs">Mobile Number</Label>
                     <Input
                       id="edit-phone"
                       type="tel"
+                      required
                       value={profileData.phone}
                       onChange={(e) => {
                         setProfileData({ ...profileData, phone: e.target.value });
@@ -373,11 +375,12 @@ function SuperAdminProfile() {
             <Panel title="Change Account Password" description="Update your security passcode.">
               <form onSubmit={handlePasswordSubmit} className="p-6 bg-white rounded-b-xl space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="current-pw" className="text-navy font-semibold text-xs">Current Password</Label>
+                  <Label htmlFor="current-pw" required className="text-navy font-semibold text-xs">Current Password</Label>
                   <div className="relative">
                     <Input
                       id="current-pw"
                       type={showPass.current ? "text" : "password"}
+                      required
                       value={passwordData.currentPassword}
                       onChange={(e) => {
                         setPasswordData({ ...passwordData, currentPassword: e.target.value });
@@ -400,11 +403,12 @@ function SuperAdminProfile() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="new-pw" className="text-navy font-semibold text-xs">New Password</Label>
+                    <Label htmlFor="new-pw" required className="text-navy font-semibold text-xs">New Password</Label>
                     <div className="relative">
                       <Input
                         id="new-pw"
                         type={showPass.new ? "text" : "password"}
+                        required
                         value={passwordData.newPassword}
                         onChange={(e) => {
                           setPasswordData({ ...passwordData, newPassword: e.target.value });
@@ -426,7 +430,7 @@ function SuperAdminProfile() {
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="confirm-new-pw" className="text-navy font-semibold text-xs">Confirm New Password</Label>
+                    <Label htmlFor="confirm-new-pw" required className="text-navy font-semibold text-xs">Confirm New Password</Label>
                     <div className="relative">
                       <Input
                         id="confirm-new-pw"

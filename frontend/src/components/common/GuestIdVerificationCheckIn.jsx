@@ -537,7 +537,7 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
           <div className="bg-white rounded-2xl border border-navy/10 p-5 shadow-soft space-y-3">
             <label className="text-xs font-bold text-navy block flex items-center gap-1.5">
               <Building2 className="size-4 text-purple shrink-0" />
-              Assign / Confirm Physical Room Number *
+              Assign / Confirm Physical Room Number <span className="text-red-600 font-bold ml-1">*</span>
             </label>
             <select
               value={assignedRoom}

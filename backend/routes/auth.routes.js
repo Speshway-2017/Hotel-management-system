@@ -10,6 +10,12 @@ import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { notifyAccountDeletionEvent } from '../utils/notification.helper.js';
 import CMS from '../models/cms.model.js';
 
+import { 
+  sendForgotPasswordOtpEmail, 
+  sendRegistrationOtpEmail, 
+  sendGenericOtpEmail 
+} from '../services/email.service.js';
+
 const router = express.Router();
 
 // Helper to generate JWT Token
@@ -33,15 +39,26 @@ router.post('/register', async (req, res) => {
       return sendError(res, 400, 'User with this email already exists');
     }
 
+    // Generate 6-digit OTP code for registration verification / welcome
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
     const user = await User.create({
       name,
       email,
       password,
       mobile,
-      role: role || 'guest'
+      role: role || 'guest',
+      otp,
+      otpExpires
     });
 
     if (user) {
+      // Send Registration OTP Email asynchronously via Nodemailer
+      sendRegistrationOtpEmail(user.email, user.name, otp).catch(err => {
+        console.warn('⚠️ [Auth Register] Non-blocking email error:', err.message);
+      });
+
       return sendSuccess(res, 201, {
         token: generateToken(user._id),
         user: {
@@ -52,7 +69,7 @@ router.post('/register', async (req, res) => {
           mobile: user.mobile,
           propertyId: user.propertyId || null
         }
-      }, 'User registered successfully');
+      }, 'User registered successfully. Verification OTP has been sent to your registered email.');
     } else {
       return sendError(res, 400, 'Invalid user data');
     }
@@ -125,7 +142,17 @@ router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
 
   try {
-    const user = await User.findOne({ email });
+    if (!email) {
+      return sendError(res, 400, 'Email is required');
+    }
+
+    const user = await User.findOne({ 
+      $or: [
+        { email: (email || '').trim().toLowerCase() },
+        { email: (email || '').trim() }
+      ]
+    });
+
     if (!user) {
       return sendError(res, 404, 'No account found with this email');
     }
@@ -133,17 +160,59 @@ router.post('/forgot-password', async (req, res) => {
     // Generate 6-digit OTP code
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.otp = otp;
-    user.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     await user.save();
 
-    // Print OTP in backend terminal for testing/development
-    console.log('\n----------------------------------------');
-    console.log(`🔐 [OTP DEV ONLY] OTP code for ${email} is: ${otp}`);
-    console.log('----------------------------------------\n');
+    // Send OTP via Nodemailer
+    const emailResult = await sendForgotPasswordOtpEmail(user.email, user.name, otp);
 
-    return sendSuccess(res, 200, {}, 'OTP verification code generated and printed to console');
+    return sendSuccess(res, 200, {
+      email: user.email,
+      sent: emailResult.success
+    }, 'OTP verification code sent to your registered email address');
   } catch (error) {
     console.error('Forgot Password Error:', error);
+    return sendError(res, 500, error.message);
+  }
+});
+
+// @desc    Resend OTP code for password reset or verification
+// @route   POST /api/auth/resend-otp
+// @access  Public
+router.post('/resend-otp', async (req, res) => {
+  const { email, type } = req.body;
+
+  try {
+    if (!email) {
+      return sendError(res, 400, 'Email is required');
+    }
+
+    const user = await User.findOne({ 
+      $or: [
+        { email: (email || '').trim().toLowerCase() },
+        { email: (email || '').trim() }
+      ]
+    });
+
+    if (!user) {
+      return sendError(res, 404, 'No account found with this email');
+    }
+
+    // Generate fresh 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await user.save();
+
+    if (type === 'register') {
+      await sendRegistrationOtpEmail(user.email, user.name, otp);
+    } else {
+      await sendForgotPasswordOtpEmail(user.email, user.name, otp);
+    }
+
+    return sendSuccess(res, 200, { email: user.email }, 'A fresh OTP verification code has been sent to your email');
+  } catch (error) {
+    console.error('Resend OTP Error:', error);
     return sendError(res, 500, error.message);
   }
 });

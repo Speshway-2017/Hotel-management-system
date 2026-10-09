@@ -261,22 +261,28 @@ export function Notice({
 }
 
 export function Crumbs({ items }) {
+  if (!items || !items.length) return null;
   return (
-    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-      {items.map((it, i) =>
-      <span key={it.label} className="flex items-center gap-1.5">
-          {it.to ?
-        <Link to={it.to} className="transition-colors hover:text-foreground">
-              {it.label}
-            </Link> :
-
-        <span className="text-foreground">{it.label}</span>
-        }
-          {i < items.length - 1 && <span aria-hidden>/</span>}
-        </span>
-      )}
-    </nav>);
-
+    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mb-3">
+      {items.map((it, i) => {
+        const isLast = i === items.length - 1;
+        return (
+          <span key={it.label || i} className="inline-flex items-center gap-1.5 shrink-0 max-w-full">
+            {it.to && !isLast ? (
+              <Link to={it.to} className="text-blue-600 hover:underline transition-colors font-medium cursor-pointer truncate max-w-[180px] sm:max-w-none">
+                {it.label}
+              </Link>
+            ) : (
+              <span className={cn(isLast ? "text-navy font-bold truncate max-w-[200px] sm:max-w-none" : "text-muted-foreground font-normal truncate max-w-[180px] sm:max-w-none")}>
+                {it.label}
+              </span>
+            )}
+            {!isLast && <span className="text-muted-foreground/45 select-none" aria-hidden>/</span>}
+          </span>
+        );
+      })}
+    </nav>
+  );
 }
 
 export function HorizontalRouteTabs({ tabs }) {

@@ -452,7 +452,7 @@ function Contact() {
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="name" className="text-xs font-bold text-navy ml-2">Full Name</Label>
+                    <Label htmlFor="name" required className="text-xs font-bold text-navy ml-2">Full Name</Label>
                     <Input 
                       id="name" 
                       nameOnly
@@ -466,7 +466,7 @@ function Contact() {
                     {errors["name"] && <p className="mt-1 text-[10px] text-error ml-2">{errors["name"]}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="phone" className="text-xs font-bold text-navy ml-2">Mobile Number</Label>
+                    <Label htmlFor="phone" required className="text-xs font-bold text-navy ml-2">Mobile Number</Label>
                     <Input 
                       id="phone" 
                       type="tel"
@@ -483,7 +483,7 @@ function Contact() {
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="email" className="text-xs font-bold text-navy ml-2">Email Address</Label>
+                    <Label htmlFor="email" required className="text-xs font-bold text-navy ml-2">Email Address</Label>
                     <Input 
                       id="email" 
                       type="email"
@@ -497,7 +497,7 @@ function Contact() {
                     {errors["email"] && <p className="mt-1 text-[10px] text-error ml-2">{errors["email"]}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="hotel" className="text-xs font-bold text-navy ml-2">Hotel / Property Name</Label>
+                    <Label htmlFor="hotel" required className="text-xs font-bold text-navy ml-2">Hotel / Property Name</Label>
                     <Input 
                       id="hotel" 
                       placeholder="Gulmohar Palace Jaipur" 
@@ -524,7 +524,7 @@ function Contact() {
                 </div>
 
                 <div>
-                  <Label htmlFor="message" className="text-xs font-bold text-navy ml-2">How can we help?</Label>
+                  <Label htmlFor="message" required className="text-xs font-bold text-navy ml-2">How can we help?</Label>
                   <Textarea 
                     id="message" 
                     rows={4}

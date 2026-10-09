@@ -10,3 +10,5 @@ export * from "./roomsAndProperties.schema.js";
 export * from "./staffAndGuests.schema.js";
 export * from "./couponsAndPlans.schema.js";
 export * from "./feedbackAndRefunds.schema.js";
+export * from "./vehiclesAndDrivers.schema.js";
+export * from "./organization.schema.js";

@@ -9,11 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { inr } from "@/data/hs-data";
 import { publicService } from "@/services/public";
-
-import jaipurImg from "@/assets/resort_jaipur.png";
-import palaceImg from "@/assets/palace_udaipur.png";
-import goaImg from "@/assets/beach_goa.png";
-import keralaImg from "@/assets/retreat_kerala.png";
+import { getHotelImage } from "@/utils/hotelImages";
 
 export const Route = createFileRoute("/search")({
   head: () => ({
@@ -26,6 +22,7 @@ export const Route = createFileRoute("/search")({
 });
 
 export function SearchPage() {
+  const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -63,9 +60,16 @@ export function SearchPage() {
   }, [checkInDate, checkOutDate, searchTerm]);
 
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
-    publicService.getProperties()
+
+    const queryParams = {};
+    if (checkInDate) queryParams.checkIn = checkInDate;
+    if (checkOutDate) queryParams.checkOut = checkOutDate;
+
+    publicService.getProperties(queryParams)
       .then(res => {
+        if (!isMounted) return;
         if (res.success && res.data) {
           // Only show active properties
           const activeOnly = res.data.filter(p => p.status === 'Active' || !p.status);
@@ -73,12 +77,14 @@ export function SearchPage() {
         }
       })
       .catch(err => {
-        setError(err.message || "Failed to load hotel listings.");
+        if (isMounted) setError(err.message || "Failed to load hotel listings.");
       })
       .finally(() => {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       });
-  }, []);
+
+    return () => { isMounted = false; };
+  }, [checkInDate, checkOutDate]);
 
   // Unique cities list for filter dropdown
   const cities = useMemo(() => {
@@ -130,7 +136,12 @@ export function SearchPage() {
       const rating = parseFloat(s.rating || 4.9);
       if (minRating > 0 && rating < minRating) return false;
 
-      // 6. Amenities check
+      // 6. Only available filter
+      if (onlyAvailable && p.roomStats) {
+        if (!p.roomStats.isAvailable) return false;
+      }
+
+      // 7. Amenities check
       if (selectedAmenities.length > 0) {
         const propAmenities = Array.isArray(s.amenities)
           ? s.amenities.map(a => a.toLowerCase())
@@ -144,7 +155,7 @@ export function SearchPage() {
 
       return true;
     });
-  }, [properties, searchTerm, selectedCity, selectedClassification, maxPrice, selectedAmenities, minRating]);
+  }, [properties, searchTerm, selectedCity, selectedClassification, maxPrice, selectedAmenities, minRating, onlyAvailable]);
 
   const handleAmenityToggle = (amenity) => {
     if (selectedAmenities.includes(amenity)) {
@@ -167,17 +178,6 @@ export function SearchPage() {
     setSelectedAmenities([]);
     setOnlyAvailable(false);
     setMinRating(0);
-  };
-
-  const getHotelImage = (p) => {
-    const s = p.settings || {};
-    if (s.logo) return s.logo;
-    if (Array.isArray(s.gallery) && s.gallery[0]) return s.gallery[0];
-    if (Array.isArray(s.photos) && s.photos[0]) return s.photos[0];
-    if (p._id === 'HS-UDA' || p.id === 'HS-UDA') return palaceImg;
-    if (p._id === 'HS-GOA' || p.id === 'HS-GOA') return goaImg;
-    if (p._id === 'HS-KER' || p.id === 'HS-KER') return keralaImg;
-    return jaipurImg;
   };
 
   return (
@@ -414,6 +414,19 @@ export function SearchPage() {
                   </div>
                 </div>
 
+                {/* Availability Filter */}
+                <div className="space-y-2 pt-2 border-t border-navy/5">
+                  <label className="flex items-center gap-2.5 text-xs font-semibold text-navy cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={onlyAvailable}
+                      onChange={(e) => setOnlyAvailable(e.target.checked)}
+                      className="size-4 rounded accent-purple border-navy/10"
+                    />
+                    <span>Only show available hotels</span>
+                  </label>
+                </div>
+
                 {/* Key Amenities Checkboxes */}
                 <div className="space-y-2 pt-2 border-t border-navy/5">
                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Popular Amenities</label>
@@ -440,7 +453,7 @@ export function SearchPage() {
               {loading ? (
                 <div className="bg-white rounded-2xl p-16 border border-navy/5 text-center space-y-4">
                   <div className="mx-auto size-10 rounded-full border-4 border-purple border-t-transparent animate-spin" />
-                  <p className="text-sm font-semibold text-gray-500">Fetching active properties from MongoDB...</p>
+                  <p className="text-sm font-semibold text-gray-500">Fetching active properties and room availability from MongoDB...</p>
                 </div>
               ) : error ? (
                 <div className="bg-white rounded-2xl p-12 border border-rose-200 text-center space-y-3">
@@ -481,6 +494,9 @@ export function SearchPage() {
                       const classification = s.classification || "5-Star Luxury";
                       const rating = s.rating || "4.9";
                       const startingPrice = s.baseRate || 3500;
+                      const isDatesSelected = Boolean(checkInDate && checkOutDate);
+                      const stats = property.roomStats || {};
+                      const isAvail = stats.isAvailable !== false;
                       
                       const amenitiesList = Array.isArray(s.amenities)
                         ? s.amenities.slice(0, 4)
@@ -489,17 +505,46 @@ export function SearchPage() {
                       return (
                         <article 
                           key={propId}
-                          className="grid sm:grid-cols-[280px_1fr] bg-white rounded-2xl border border-navy/5 shadow-soft hover:shadow-md hover:border-purple/20 overflow-hidden transition-all duration-300"
+                          onClick={() => {
+                            if (propId) localStorage.setItem('selected_property_id', propId);
+                            if (property) localStorage.setItem('selected_property_data', JSON.stringify(property));
+                            const queryStr = (checkInDate && checkOutDate) ? `?checkIn=${encodeURIComponent(checkInDate)}&checkOut=${encodeURIComponent(checkOutDate)}` : '';
+                            navigate(`/hotels/${propId}${queryStr}`);
+                          }}
+                          className="grid sm:grid-cols-[280px_1fr] bg-white rounded-2xl border border-navy/5 shadow-soft hover:shadow-lg hover:border-purple/30 overflow-hidden transition-all duration-300 cursor-pointer group"
                         >
                           {/* Image Thumbnail */}
                           <div className="relative h-56 sm:h-full min-h-[220px] bg-navy overflow-hidden">
                             <img 
                               src={getHotelImage(property)} 
                               alt={hotelName} 
-                              className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             />
-                            <div className="absolute top-3 left-3 bg-navy/85 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-gold uppercase tracking-wider border border-gold/20">
-                              {classification}
+                            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                              <div className="bg-navy/85 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-gold uppercase tracking-wider border border-gold/20">
+                                {classification}
+                              </div>
+                            </div>
+
+                            {/* Room Availability Badge on Thumbnail */}
+                            <div className="absolute bottom-3 left-3">
+                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider backdrop-blur-md shadow-sm ${
+                                !isDatesSelected 
+                                  ? "bg-emerald-600/90 text-white" 
+                                  : (isAvail 
+                                      ? "bg-emerald-600/90 text-white" 
+                                      : (stats.occupiedRooms > 0 
+                                          ? "bg-rose-600/90 text-white" 
+                                          : (stats.reservedRooms > 0 ? "bg-amber-600/90 text-white" : "bg-gray-700/90 text-white")))
+                              }`}>
+                                {!isDatesSelected 
+                                  ? (stats.totalRooms > 0 ? `${stats.totalRooms} Rooms Available` : "All Rooms Available") 
+                                  : (isAvail 
+                                      ? `${stats.availableRooms || 1} Available for Dates` 
+                                      : (stats.occupiedRooms > 0 
+                                          ? "Occupied for Dates" 
+                                          : (stats.reservedRooms > 0 ? "Reserved for Dates" : "No Rooms Available")))}
+                              </span>
                             </div>
                           </div>
 
@@ -508,7 +553,7 @@ export function SearchPage() {
                             <div className="space-y-2">
                               <div className="flex justify-between items-start gap-4">
                                 <div>
-                                  <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">{hotelName}</h2>
+                                  <h2 className="font-display text-xl sm:text-2xl font-bold text-navy group-hover:text-purple transition-colors">{hotelName}</h2>
                                   <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
                                     <MapPin className="size-3.5 text-purple shrink-0" />
                                     <span>{address}</span>
@@ -546,11 +591,20 @@ export function SearchPage() {
                                 </div>
                               </div>
 
-                              <Button asChild variant="hero" size="touch" className="h-10 px-5 text-xs font-bold cursor-pointer">
-                                <Link to={`/hotels/${propId}`}>
-                                  <span>View Details</span>
-                                  <ArrowRight className="size-3.5 ml-1" />
-                                </Link>
+                              <Button 
+                                variant="hero" 
+                                size="touch" 
+                                className="h-10 px-5 text-xs font-bold cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (propId) localStorage.setItem('selected_property_id', propId);
+                                  if (property) localStorage.setItem('selected_property_data', JSON.stringify(property));
+                                  const queryStr = (checkInDate && checkOutDate) ? `?checkIn=${encodeURIComponent(checkInDate)}&checkOut=${encodeURIComponent(checkOutDate)}` : '';
+                                  navigate(`/hotels/${propId}${queryStr}`);
+                                }}
+                              >
+                                <span>{!isDatesSelected || isAvail ? "View Details" : "View Hotel (Occupied)"}</span>
+                                <ArrowRight className="size-3.5 ml-1 transition-transform group-hover:translate-x-1" />
                               </Button>
                             </div>
                           </div>

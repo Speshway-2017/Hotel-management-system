@@ -456,7 +456,9 @@ Hour Stay Speshway Luxury Hotel`
 
                 {/* Email Subject */}
                 <div>
-                  <label className="text-xs font-bold text-navy block mb-1">Email Subject</label>
+                  <label className="text-xs font-bold text-navy block mb-1">
+                    Email Subject <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   <input
                     type="text"
                     required
@@ -475,7 +477,9 @@ Hour Stay Speshway Luxury Hotel`
 
                 {/* Response Message Body */}
                 <div>
-                  <label className="text-xs font-bold text-navy block mb-1">Reply Message Content</label>
+                  <label className="text-xs font-bold text-navy block mb-1">
+                    Reply Message Content <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   <textarea
                     rows={12}
                     required

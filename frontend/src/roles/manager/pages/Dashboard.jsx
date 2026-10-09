@@ -26,11 +26,11 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
   return (
     <div
       style={{ "--accent-color": accentColor }}
-      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full"
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="h-8 flex items-start">
+          <div className="min-h-5 sm:h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
           <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
@@ -267,7 +267,7 @@ function ManagerDashboard() {
     <div className="space-y-6 text-left">
 
       {/* KPI Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 dashboard-stats-grid">
         <div>
           <PremiumStatCard label="Arrivals" value={arrivalsToday.length.toString()} hint="Today's bookings" icon={Calendar} accentColor="#FF7A59" />
         </div>

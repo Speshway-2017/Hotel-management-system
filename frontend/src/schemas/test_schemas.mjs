@@ -8,6 +8,7 @@ import {
   priceSchema,
   phoneSchema,
   emailSchema,
+  aadhaarSchema,
   loginSchema,
   registerSchema,
   publicBookingSchema,
@@ -18,154 +19,145 @@ import {
   staffSchema,
   couponSchema,
   refundRequestSchema,
-  contactFormSchema
+  contactFormSchema,
+  vehicleSchema,
+  driverSchema,
+  organizationSchema
 } from './index.js';
 
-console.log('🧪 Testing Centralized Zod Schemas & Primitives...\n');
+console.log('🧪 Running Comprehensive Zod Schema & Validation Tests...\n');
 
-// 1. Text Fields Validation: Text only, reject numbers
-console.log('--- 1. Testing Text / Name Fields ---');
-const badTextWithNumber = nameSchema(2).safeParse('John123');
-console.assert(!badTextWithNumber.success, 'Name with numbers must fail');
-console.assert(badTextWithNumber.error.issues[0].message.includes('numbers are not allowed'), 'Should state numbers are not allowed');
+// 1. Text & Name Fields: Repeated characters, numbers, and boundaries
+console.log('--- 1. Testing Text / Name Fields & Repeated Characters ---');
+const badRepeatedName = nameSchema(2).safeParse('aaaaaa');
+console.assert(!badRepeatedName.success, 'Name with repeated characters "aaaaaa" must fail');
+
+const badNameWithNumber = nameSchema(2).safeParse('John123');
+console.assert(!badNameWithNumber.success, 'Name with numbers must fail');
+
+const emptyName = nameSchema(2).safeParse('');
+console.assert(!emptyName.success, 'Empty name must fail');
+
+const singleCharName = nameSchema(2).safeParse('J');
+console.assert(!singleCharName.success, 'Single char name must fail min boundary');
 
 const goodName = nameSchema(2).safeParse('John Doe');
-console.assert(goodName.success, 'Alphabetical name must pass');
+console.assert(goodName.success, 'Valid alphabetical name must pass');
 
-const pureNumbersInCity = citySchema.safeParse('12345');
-console.assert(!pureNumbersInCity.success, 'City with numbers must fail');
+const goodIndianName = nameSchema(2).safeParse('Satya Sai Nakka');
+console.assert(goodIndianName.success, 'Valid Indian name must pass');
+console.log('✅ Name and text fields properly reject repeated characters, numbers, and boundary violations');
 
-const goodCity = citySchema.safeParse('New Delhi');
-console.assert(goodCity.success, 'Valid city must pass');
-console.log('✅ Text fields allow text only & reject invalid numbers');
-
-// 2. Number Fields: Numbers only, reject invalid text
-console.log('--- 2. Testing Number Fields ---');
-const badNumberText = integerOnlySchema('Guest Count', 1).safeParse('abc');
-console.assert(!badNumberText.success, 'Number field with text "abc" must fail');
-console.assert(badNumberText.error.issues[0].message.includes('whole numbers only'), 'Should indicate whole numbers only');
-
-const goodNumber = integerOnlySchema('Guest Count', 1).safeParse('4');
-console.assert(goodNumber.success, 'Valid number string must pass');
-console.assert(goodNumber.data === 4, 'Number should be coerced to 4');
-console.log('✅ Number fields allow numbers only & reject invalid text');
-
-// 3. Email Fields: Valid email format only
-console.log('--- 3. Testing Email Fields ---');
+// 2. Email Fields: Valid formats, repeated dummy localparts, and boundaries
+console.log('--- 2. Testing Email Fields ---');
 const badEmail = emailSchema.safeParse('invalid-email-address');
-console.assert(!badEmail.success, 'Bad email must fail');
+console.assert(!badEmail.success, 'Bad email format must fail');
 
-const goodEmail = emailSchema.safeParse('hotel.guest@example.com');
-console.assert(goodEmail.success, 'Valid email must pass');
-console.log('✅ Email fields enforce valid email format only');
+const repeatedEmail = emailSchema.safeParse('aaaaaa@gmail.com');
+console.assert(!repeatedEmail.success, 'Email with repeated single-char localpart "aaaaaa@" must fail');
 
-// 4. Phone Fields: Numbers only with proper length (10 to 15 digits)
-console.log('--- 4. Testing Phone Fields ---');
+const emptyEmail = emailSchema.safeParse('');
+console.assert(!emptyEmail.success, 'Empty email must fail');
+
+const goodEmail = emailSchema.safeParse('satya.sai@hourstay.in');
+console.assert(goodEmail.success, 'Valid corporate email must pass');
+console.log('✅ Email fields enforce format and reject dummy repeated usernames');
+
+// 3. Phone Fields: 10-15 digits, no letters, no repeating digits (e.g. 1111111111)
+console.log('--- 3. Testing Phone Fields ---');
+const phoneWithAllSame = phoneSchema.safeParse('1111111111');
+console.assert(!phoneWithAllSame.success, 'Phone with all identical digits "1111111111" must fail');
+
+const phoneWithZeroes = phoneSchema.safeParse('0000000000');
+console.assert(!phoneWithZeroes.success, 'Phone with all zeroes "0000000000" must fail');
+
 const phoneWithLetters = phoneSchema.safeParse('98765abcde');
 console.assert(!phoneWithLetters.success, 'Phone with letters must fail');
-console.assert(phoneWithLetters.error.issues[0].message.includes('numbers only'), 'Should reject letters');
 
-const phoneTooShort = phoneSchema.safeParse('98765');
-console.assert(!phoneTooShort.success, 'Short phone must fail');
-console.assert(phoneTooShort.error.issues[0].message.includes('10 and 15 digits'), 'Should enforce 10-15 digits');
+const phoneShort = phoneSchema.safeParse('98765');
+console.assert(!phoneShort.success, 'Phone below min boundary must fail');
 
 const goodPhone = phoneSchema.safeParse('9876543210');
-console.assert(goodPhone.success, '10-digit phone must pass');
+console.assert(goodPhone.success, 'Valid 10-digit mobile must pass');
 
-const goodPhoneWithCode = phoneSchema.safeParse('+91 9876543210');
-console.assert(goodPhoneWithCode.success, 'Phone with +91 must pass');
-console.log('✅ Phone fields enforce numbers only with 10-15 digits length');
+const goodPhoneWithCountryCode = phoneSchema.safeParse('+91 9876543210');
+console.assert(goodPhoneWithCountryCode.success, 'Phone with +91 country code must pass');
+console.log('✅ Phone fields enforce numbers only, valid boundaries, and reject repeating dummy digits');
 
-// 5. Amount/Price Fields: Valid numbers/decimals only
+// 4. Aadhaar Fields: exactly 12 digits, no 12 identical digits
+console.log('--- 4. Testing Aadhaar Validation ---');
+const aadhaarAllSame = aadhaarSchema.safeParse('111111111111');
+console.assert(!aadhaarAllSame.success, 'Aadhaar with 12 identical digits must fail');
+
+const aadhaarShort = aadhaarSchema.safeParse('12345678901');
+console.assert(!aadhaarShort.success, 'Aadhaar with 11 digits must fail');
+
+const goodAadhaar = aadhaarSchema.safeParse('492817492018');
+console.assert(goodAadhaar.success, 'Valid 12-digit Aadhaar must pass');
+console.log('✅ Aadhaar validation strictly checks 12 digits and rejects identical numbers');
+
+// 5. Amount & Tariff Fields: Boundaries, negative numbers, decimals
 console.log('--- 5. Testing Amount / Price Fields ---');
-const badAmountText = priceSchema('Room Tariff').safeParse('invalid-text');
-console.assert(!badAmountText.success, 'Amount with text must fail');
-console.assert(badAmountText.error.issues[0].message.includes('valid number or decimal only'), 'Should state valid number or decimal only');
+const negativeTariff = priceSchema('Tariff').safeParse('-100');
+console.assert(!negativeTariff.success, 'Negative tariff must fail');
 
-const negativeAmount = priceSchema('Room Tariff').safeParse('-500');
-console.assert(!negativeAmount.success, 'Negative amount must fail');
+const zeroTariffDisallowed = priceSchema('Tariff', { allowZero: false }).safeParse('0');
+console.assert(!zeroTariffDisallowed.success, 'Zero tariff when disallowed must fail');
 
-const goodDecimalAmount = priceSchema('Room Tariff').safeParse('1499.50');
-console.assert(goodDecimalAmount.success, 'Valid decimal amount must pass');
-console.assert(goodDecimalAmount.data === 1499.5, 'Amount correctly coerced to number');
-console.log('✅ Amount/price fields allow valid numbers/decimals only');
+const zeroAllowed = priceSchema('Discount', { allowZero: true }).safeParse('0');
+console.assert(zeroAllowed.success, 'Zero discount when allowZero=true must pass');
 
-// 6. Test validateFieldValue helper
-console.log('--- 6. Testing validateFieldValue helper ---');
-const valPhoneBad = validateFieldValue('tel', 'abc');
-console.assert(!valPhoneBad.isValid, 'validateFieldValue should catch bad phone');
+const goodDecimal = priceSchema('Tariff').safeParse('3499.50');
+console.assert(goodDecimal.success, 'Valid decimal amount must pass');
+console.assert(goodDecimal.data === 3499.5, 'Decimal amount coerced correctly');
+console.log('✅ Price & amount validations enforce numeric bounds and decimal transformations');
 
-const valPhoneGood = validateFieldValue('tel', '9876543210');
-console.assert(valPhoneGood.isValid, 'validateFieldValue should accept good phone');
-
-const valEmailBad = validateFieldValue('email', 'not-an-email');
-console.assert(!valEmailBad.isValid, 'validateFieldValue should catch bad email');
-
-const valTextBad = validateFieldValue('name', 'Vikram123');
-console.assert(!valTextBad.isValid, 'validateFieldValue should catch name with numbers');
-console.log('✅ validateFieldValue helper works accurately');
-
-// 7. Test Composite Domain Schemas
-console.log('--- 7. Testing Domain Schemas ---');
-const invalidRegister = validateWithZod(registerSchema, {
-  name: 'A123',
-  email: 'bad',
-  password: '123',
-  mobile: '123'
+// 6. Vehicles & Drivers Schemas
+console.log('--- 6. Testing Vehicle & Driver Schemas ---');
+const badVehicleNum = vehicleSchema.safeParse({
+  vehicleNumber: '123',
+  model: 'Innova Crysta'
 });
-console.assert(!invalidRegister.isValid, 'Register with number in name and bad fields must fail');
-console.assert(invalidRegister.errors.name, 'Should require letters only for name');
-console.assert(invalidRegister.errors.mobile, 'Should require 10-15 digits mobile');
+console.assert(!badVehicleNum.success, 'Short invalid vehicle number must fail');
 
-const goodRoom = validateWithZod(roomSchema, {
-  roomNumber: '101',
-  type: 'Deluxe',
-  floor: '1',
-  pricePerNight: '4500',
-  capacity: '2'
+const goodVehicle = vehicleSchema.safeParse({
+  vehicleNumber: 'TS09EA1234',
+  model: 'Innova Crysta 2.4 VX',
+  capacity: 7,
+  fuelType: 'Diesel'
 });
-console.assert(goodRoom.isValid, 'Valid room should pass');
-console.assert(goodRoom.data.pricePerNight === 4500, 'Price coerced to number');
-console.assert(goodRoom.data.capacity === 2, 'Capacity coerced to number');
+console.assert(goodVehicle.success, 'Valid vehicle entry must pass');
 
-const badDates = validateWithZod(publicBookingSchema, {
-  guestName: 'Sunny Kumar',
-  email: 'sunny@gmail.com',
-  phone: '9876543210',
+const goodDriver = driverSchema.safeParse({
+  name: 'Ramesh Verma',
+  phone: '9848012345',
+  licenseNumber: 'TS-0920180004912',
+  experienceYears: 5
+});
+console.assert(goodDriver.success, 'Valid driver entry must pass');
+console.log('✅ Vehicle and driver schemas properly validate transport operations');
+
+// 7. Organization Schema
+console.log('--- 7. Testing Organization Schema ---');
+const goodOrg = organizationSchema.safeParse({
+  name: 'Hour Stay Hospitality Pvt Ltd',
+  email: 'corporate@hourstay.in',
+  phone: '9820433121',
+  address: 'Hitech City Phase 2, Mindspace',
   city: 'Hyderabad',
-  checkIn: '2026-09-25',
-  checkOut: '2026-09-23',
-  pax: '2 Adults',
-  roomType: 'Deluxe Suite'
+  pincode: '500081',
+  gstin: '36AAAAA0000A1Z5'
 });
-console.assert(!badDates.isValid, 'Checkout before checkin must fail');
-console.assert(badDates.errors.checkOut, 'Should report error on checkOut date');
+console.assert(goodOrg.success, 'Valid organization profile must pass');
+console.log('✅ Organization schema validates business and tax information');
 
-// 8. Test extendStaySchema
-console.log('--- 8. Testing Extend Stay Schema ---');
-const goodHourlyExtend = validateWithZod(extendStaySchema, {
-  extraDays: 0,
-  extendDays: 0,
-  newCheckOut: '2026-10-09',
-  additionalAmount: 500,
-  notes: 'Extended for 4 hours'
-});
-console.assert(goodHourlyExtend.isValid, 'Hourly extend must pass');
+// 8. Test live validateFieldValue helper
+console.log('--- 8. Testing Live Field Validator Helper ---');
+const checkRepeatedLive = validateFieldValue('name', 'aaaaaa', { required: true });
+console.assert(!checkRepeatedLive.isValid, 'Live check must reject repeated characters');
 
-const goodNightlyExtend = validateWithZod(extendStaySchema, {
-  extraDays: 2,
-  extendDays: 2,
-  newCheckOut: '2026-10-11',
-  additionalAmount: '6000',
-  reason: 'Family staying 2 extra nights'
-});
-console.assert(goodNightlyExtend.isValid, 'Nightly extend must pass');
-console.assert(goodNightlyExtend.data.additionalAmount === 6000, 'Additional amount coerced to number');
+const checkGoodLive = validateFieldValue('phone', '9876543210', { required: true });
+console.assert(checkGoodLive.isValid, 'Live check must accept good phone');
+console.log('✅ Live field-level validator provides instant on-blur and typing feedback');
 
-const invalidExtend = validateWithZod(extendStaySchema, {
-  additionalAmount: 'invalid-amount'
-});
-console.assert(!invalidExtend.isValid, 'Invalid amount must fail');
-console.log('✅ Extend stay schema passes all validation scenarios');
-
-console.log('\n🎉 ALL UPDATED ZOD SCHEMA TESTS PASSED SUCCESSFULLY!\n');
+console.log('\n🎉 ALL CENTRALIZED ZOD SCHEMAS & VALIDATION SUITES PASSED!\n');

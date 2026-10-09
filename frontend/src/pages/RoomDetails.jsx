@@ -7,11 +7,7 @@ import { inr } from "@/data/hs-data";
 import { calculateStayNights } from "@/utils/dateUtils";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
-
-import jaipurImg from "@/assets/resort_jaipur.png";
-import goaImg from "@/assets/beach_goa.png";
-import palaceImg from "@/assets/palace_udaipur.png";
-import keralaImg from "@/assets/retreat_kerala.png";
+import { getRoomImages, getHotelImage } from "@/utils/hotelImages";
 
 export const Route = {
   head: () => ({
@@ -120,6 +116,24 @@ export function RoomDetailsPage() {
     );
   }
 
+  if (!property || (allPropertyRooms.length === 0 && !selectedRoom)) {
+    return (
+      <SiteLayout>
+        <div className="min-h-screen bg-cream py-20 text-center font-ui max-w-lg mx-auto px-4">
+          <div className="bg-white rounded-3xl p-8 border border-navy/5 shadow-soft">
+            <h2 className="text-2xl font-bold text-navy mb-2">No Rooms Configured</h2>
+            <p className="text-navy/60 text-sm mb-6">
+              There are currently no active room configurations available for {property?.name || property?.settings?.hotelName || "this hotel"}.
+            </p>
+            <Button onClick={() => window.location.href = '/search'} variant="hero" size="touch" className="cursor-pointer">
+              Explore Available Hotels
+            </Button>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
+
   const s = property?.settings || {};
   
   // Format Hotel Name safely (never show raw MongoDB ObjectId string as name)
@@ -153,24 +167,11 @@ export function RoomDetailsPage() {
 
   const isAvailable = selectedRoom?.status === 'Available' || selectedRoom?.isAvailable === true;
 
-  // Resolve room images uploaded from Admin or property gallery
-  let roomImages = [];
-  if (Array.isArray(selectedRoom?.images) && selectedRoom.images.length > 0) {
-    roomImages = selectedRoom.images.filter(Boolean);
-  }
-  if (roomImages.length === 0 && Array.isArray(s.gallery) && s.gallery.length > 0) {
-    roomImages = s.gallery.filter(Boolean);
-  }
-  if (roomImages.length === 0 && Array.isArray(s.photos) && s.photos.length > 0) {
-    roomImages = s.photos.filter(Boolean);
-  }
-  if (roomImages.length === 0) {
-    roomImages = [jaipurImg, palaceImg, goaImg, keralaImg];
-  }
-
-  const mainImg = roomImages[0] || jaipurImg;
-  const sideImg1 = roomImages[1] || roomImages[0] || palaceImg;
-  const sideImg2 = roomImages[2] || roomImages[0] || goaImg;
+  // Resolve room images matching room category or uploaded assets
+  const roomImages = getRoomImages(selectedRoom, property);
+  const mainImg = roomImages[0];
+  const sideImg1 = roomImages[1] || roomImages[0];
+  const sideImg2 = roomImages[2] || roomImages[0];
 
   // Resolve room amenities robustly (room amenities -> hotel amenities -> default room amenities)
   let roomAmenities = [];

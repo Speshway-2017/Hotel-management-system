@@ -30,6 +30,7 @@ import {
   formatAadhaar
 } from '../utils/aadhaarValidator.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
+import { sendAccountCreatedEmail } from '../services/email.service.js';
 
 const router = express.Router();
 
@@ -1408,6 +1409,11 @@ router.post('/staff', async (req, res) => {
       dept: dept || 'Front Office',
       shift: shift || 'Morning Shift',
       status: 'Active'
+    });
+
+    // Send Account Credentials Email via Nodemailer
+    sendAccountCreatedEmail(newUser.email, newUser.name, newUser.role, password, req.user.propertyId || 'Hour Stay Property').catch(err => {
+      console.warn('⚠️ [Manager] Non-blocking account email error:', err.message);
     });
 
     const io = req.app.get('socketio');

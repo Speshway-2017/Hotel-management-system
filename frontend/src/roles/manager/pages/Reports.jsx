@@ -66,7 +66,7 @@ function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColo
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="h-8 flex items-start">
+          <div className="min-h-5 sm:h-8 flex items-start">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
           </div>
           <h3 className="mt-1.5 font-sans tracking-tight tabular-nums text-lg font-bold text-slate-800 leading-none whitespace-nowrap">{value}</h3>

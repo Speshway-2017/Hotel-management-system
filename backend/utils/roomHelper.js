@@ -187,28 +187,12 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
         }
       }
     }
-  } else {
-    // If no dates provided, evaluate based on today
-    const todayUtc = parseDateToDayUtc(new Date());
-    for (const b of roomBookings) {
-      const bIn = parseDateToDayUtc(b.checkIn);
-      const bOut = parseDateToDayUtc(b.checkOut);
-      if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
-        const bStatus = String(b.status || '').toLowerCase().trim();
-        if (bStatus.includes('checked-in') || bStatus.includes('checked in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup')) {
-          activeCheckIn = b;
-          break;
-        } else {
-          if (!reservedBooking) reservedBooking = b;
-        }
-      }
-    }
   }
 
-  const isBlocked = ['blocked', 'maintenance', 'out of order', 'cleaning', 'dirty'].includes(String(room.status || '').toLowerCase().trim());
+  const isBlocked = ['blocked', 'maintenance', 'out of order'].includes(String(room.status || '').toLowerCase().trim());
   
-  let displayStatus = room.status || 'Available';
-  let isAvailable = false;
+  let displayStatus = 'Available';
+  let isAvailable = true;
   let isReserved = false;
 
   if (isBlocked) {
@@ -224,7 +208,8 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
     isAvailable = false;
     isReserved = true;
   } else {
-    // If no active booking overlapping the dates / today and not blocked, it is AVAILABLE!
+    // Before dates are selected or when dates have no overlapping bookings:
+    // Room is displayed as Available!
     displayStatus = 'Available';
     isAvailable = true;
     isReserved = false;
