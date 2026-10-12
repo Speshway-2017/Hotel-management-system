@@ -141,8 +141,21 @@ export function normalizeRoomList(rooms = [], reservations = []) {
       }
     }
 
+    const amenitiesText = Array.isArray(rm.amenities)
+      ? rm.amenities.join(' ')
+      : String(rm.amenities || '');
+    const isNonAc = rm.type === 'Non-AC' ||
+      rm.category?.toLowerCase().includes('non-ac') ||
+      rm.category?.toLowerCase().includes('non ac') ||
+      amenitiesText.toLowerCase().includes('non-ac') ||
+      (amenitiesText.toLowerCase().includes('fan') && !amenitiesText.toLowerCase().includes('air condition')) ||
+      (!amenitiesText.toLowerCase().includes('air condition') && Number(rm.baseRate || rm.currentRate) < 2800);
+
+    const resolvedType = rm.type || (isNonAc ? 'Non-AC' : 'AC');
+
     return {
       ...rm,
+      type: resolvedType,
       roomNumber: num || rm.roomNumber,
       num: num || rm.num,
       status,

@@ -4,10 +4,11 @@ import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
-import { Bed, ArrowLeft, Upload, Trash2, Save } from "lucide-react";
+import { Bed, ArrowLeft, Upload, Trash2, Save, Snowflake, Wind, Check } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { validateWithZod, roomSchema } from "@/schemas";
+import { emitRealtimeEvent } from "@/services/socket";
 
 export const Route = createFileRoute("/admin/rooms/edit/$id")({
   head: () => ({
@@ -27,6 +28,9 @@ function EditRoomPage() {
   const [properties, setProperties] = useState([]);
   const [dbRoomId, setDbRoomId] = useState(targetId);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Room Variant state: 'AC' (Air Conditioned) or 'Non-AC'
+  const [roomVariant, setRoomVariant] = useState("AC");
 
   // Load existing room types from database
   const [roomTypes, setRoomTypes] = useState([
@@ -166,7 +170,14 @@ function EditRoomPage() {
 
           setCapacity(matched.capacity || "2 Adults");
           setBedType(matched.bedType || "King Bed");
-          setAmenities(Array.isArray(matched.amenities) ? matched.amenities.join(', ') : (matched.amenities || "Air Conditioning, High-speed Wi-Fi"));
+          const rawAmenities = Array.isArray(matched.amenities) ? matched.amenities.join(', ') : (matched.amenities || "Air Conditioning, High-speed Wi-Fi");
+          setAmenities(rawAmenities);
+
+          const isNon = matched.type === 'Non-AC' ||
+                        (matched.category && (matched.category.toLowerCase().includes('non-ac') || matched.category.toLowerCase().includes('non ac'))) ||
+                        (!rawAmenities.toLowerCase().includes('air condition') && rawAmenities.toLowerCase().includes('fan'));
+          setRoomVariant(isNon ? "Non-AC" : "AC");
+
           setDescription(matched.description || "");
           if (Array.isArray(matched.images)) setImages(matched.images);
         }
@@ -178,6 +189,26 @@ function EditRoomPage() {
       init();
     }
   }, [targetId]);
+
+  const handleVariantToggle = (variant) => {
+    setRoomVariant(variant);
+    if (variant === "Non-AC") {
+      const filtered = amenities
+        .split(",")
+        .map(a => a.trim())
+        .filter(a => !a.toLowerCase().includes("air condition") && !a.toLowerCase().includes("ac"));
+      if (!filtered.some(a => a.toLowerCase().includes("fan"))) {
+        filtered.push("Ceiling Fan");
+      }
+      setAmenities(filtered.filter(Boolean).join(", "));
+    } else {
+      const items = amenities.split(",").map(a => a.trim()).filter(Boolean);
+      if (!items.some(a => a.toLowerCase().includes("air condition"))) {
+        items.unshift("Air Conditioning");
+      }
+      setAmenities(items.filter(a => a.toLowerCase() !== "ceiling fan").join(", "));
+    }
+  };
 
   const handleImageFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -283,6 +314,7 @@ function EditRoomPage() {
       await adminService.updateRoom(updateTarget, {
         roomNumber,
         category: finalCategory,
+        type: roomVariant,
         status,
         ratePlan,
         baseRate: finalRate,
@@ -296,7 +328,12 @@ function EditRoomPage() {
         images
       });
 
-      toast.success(`Room #${roomNumber} updated successfully with rate ₹${finalRate.toLocaleString('en-IN')}!`);
+      emitRealtimeEvent('room_updated', { roomNumber, category: finalCategory, type: roomVariant });
+      emitRealtimeEvent('room_status_changed', { roomNumber, status });
+      emitRealtimeEvent('availability_changed', { roomNumber });
+      emitRealtimeEvent('dashboard_sync', { action: 'room_updated', roomNumber });
+
+      toast.success(`Room #${roomNumber} (${roomVariant} - ${finalCategory}) updated successfully with rate ₹${finalRate.toLocaleString('en-IN')}!`);
       navigate({ to: "/admin/rooms" });
     } catch (err) {
       toast.error(err.message || "Failed to update room.");
@@ -339,6 +376,56 @@ function EditRoomPage() {
                   <option value="Floor 4">Floor 4</option>
                 </Select>
               </FormField>
+            </div>
+
+            {/* AC / Non-AC Variant Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-navy">
+                Room Climate & Variant (AC / Non-AC)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleVariantToggle("AC")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                    roomVariant === "AC"
+                      ? "border-purple bg-purple/5 ring-2 ring-purple/20 text-purple"
+                      : "border-muted/50 hover:border-navy/20 bg-white text-muted-foreground"
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-lg shrink-0 ${roomVariant === "AC" ? "bg-purple text-white" : "bg-muted/30 text-muted-foreground"}`}>
+                    <Snowflake className="size-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-navy flex items-center gap-1">
+                      AC Room
+                      {roomVariant === "AC" && <Check className="size-3 text-purple" />}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">Air conditioned · AC amenities included</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleVariantToggle("Non-AC")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                    roomVariant === "Non-AC"
+                      ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-500/20 text-emerald-800"
+                      : "border-muted/50 hover:border-navy/20 bg-white text-muted-foreground"
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-lg shrink-0 ${roomVariant === "Non-AC" ? "bg-emerald-600 text-white" : "bg-muted/30 text-muted-foreground"}`}>
+                    <Wind className="size-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-navy flex items-center gap-1">
+                      Non-AC Room
+                      {roomVariant === "Non-AC" && <Check className="size-3 text-emerald-600" />}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">Non-Air Conditioned · Budget tariff & fan</div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <FormField label="Room Category / Type" required id="category">

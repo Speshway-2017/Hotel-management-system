@@ -246,18 +246,19 @@ export const syncRoomStatus = async (roomNumber, newStatus, propertyId, io = nul
     query.$or = [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }];
   }
 
-  let updatedRoom = await Room.findOneAndUpdate(
+  await Room.updateMany(
     query,
-    { status: targetStatus },
-    { new: true }
+    { status: targetStatus }
   );
 
+  let updatedRoom = await Room.findOne(query);
+
   if (!updatedRoom) {
-    updatedRoom = await Room.findOneAndUpdate(
+    await Room.updateMany(
       { roomNumber: cleanRoomNum },
-      { status: targetStatus },
-      { new: true }
+      { status: targetStatus }
     );
+    updatedRoom = await Room.findOne({ roomNumber: cleanRoomNum });
   }
 
   if (io && propertyId) {

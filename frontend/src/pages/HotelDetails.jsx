@@ -11,6 +11,7 @@ import { inr } from "@/data/hs-data";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
 import { getHotelGallery, getHotelImage, getRoomCategoryImages } from "@/utils/hotelImages";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = {
   head: () => ({
@@ -45,9 +46,8 @@ export function HotelDetailsPage() {
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
+  const loadHotelData = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError("");
 
     const roomQueryParams = {};
@@ -58,8 +58,6 @@ export function HotelDetailsPage() {
       publicService.getProperty(targetId).catch(err => ({ success: false, error: err })),
       publicService.getPropertyRooms(targetId, roomQueryParams).catch(err => ({ success: false, error: err }))
     ]).then(async ([propRes, roomsRes]) => {
-      if (!isMounted) return;
-
       let foundProperty = null;
       if (propRes && propRes.success && propRes.data) {
         foundProperty = propRes.data;
@@ -91,15 +89,22 @@ export function HotelDetailsPage() {
       }
 
       const fetchedRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
-
-      if (isMounted) {
-        setRooms(fetchedRooms);
-      }
+      setRooms(fetchedRooms);
     }).finally(() => {
-      if (isMounted) setLoading(false);
+      if (!isSilent) setLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    loadHotelData(false);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadHotelData(true);
     });
 
-    return () => { isMounted = false; };
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [targetId, checkInDate, checkOutDate]);
 
   const handleNavigateToRoom = (type) => {
@@ -170,16 +175,20 @@ export function HotelDetailsPage() {
 
   const isDatesSelected = Boolean(checkInDate && checkOutDate);
 
-  // Group rooms by Room Type (category)
+  // Group rooms by Room Type (category) - ensure exactly 1 card per distinct room category
   const roomTypesMap = {};
   rooms.forEach(rm => {
     const statusVal = (rm.status || "").toLowerCase();
     if (['dirty', 'cleaning', 'maintenance', 'out of order'].includes(statusVal)) return;
 
-    const cat = rm.category || 'Standard Room';
+    const rawCat = rm.category || 'Standard Room';
+    const cat = rawCat.replace(/\s*\(?(non-?ac|ac)\)?/gi, '').trim() || 'Standard Room';
+
     const planName = (rm.ratePlan && rm.ratePlan !== 'Standard Plan' && rm.ratePlan !== 'Standard Rate Plan')
       ? rm.ratePlan
       : (cat.toLowerCase().includes('deluxe') ? 'Deluxe Plan' : cat.toLowerCase().includes('suite') ? 'Executive Suite Plan' : `${cat} Plan`);
+
+    const rate = Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3000);
 
     if (!roomTypesMap[cat]) {
       roomTypesMap[cat] = {
@@ -187,7 +196,7 @@ export function HotelDetailsPage() {
         category: cat,
         name: cat,
         description: rm.description || `Luxury ${cat} configuration with modern amenities.`,
-        price: Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3000),
+        price: rate,
         ratePlan: planName,
         beds: rm.beds || rm.bedType || 'King Bed',
         capacity: rm.capacity || '2 Adults',
@@ -199,19 +208,55 @@ export function HotelDetailsPage() {
         roomsList: [],
         availableCount: 0,
         occupiedCount: 0,
-        reservedCount: 0
+        reservedCount: 0,
+        hasAc: false,
+        hasNonAc: false
       };
+    } else {
+      roomTypesMap[cat].price = Math.min(roomTypesMap[cat].price, rate);
     }
+
     roomTypesMap[cat].roomsList.push(rm);
 
-    const isAvail = !isDatesSelected ? true : (rm.status === 'Available' || rm.isAvailable === true);
-    if (isAvail) {
-      roomTypesMap[cat].availableCount += 1;
-    } else if (rm.status === 'Occupied') {
-      roomTypesMap[cat].occupiedCount += 1;
-    } else if (rm.status === 'Reserved' || rm.isReserved) {
-      roomTypesMap[cat].reservedCount += 1;
+    const isNonAc = rm.type === 'Non-AC' || rawCat.toLowerCase().includes('non-ac') || (Array.isArray(rm.amenities) && rm.amenities.some(a => a.toLowerCase().includes('fan')));
+    if (isNonAc) {
+      roomTypesMap[cat].hasNonAc = true;
+    } else {
+      roomTypesMap[cat].hasAc = true;
     }
+  });
+
+  // Calculate distinct physical room counts per category
+  Object.values(roomTypesMap).forEach(catObj => {
+    const distinctRoomsMap = {};
+    catObj.roomsList.forEach(r => {
+      const num = String(r.roomNumber || '').trim();
+      if (!distinctRoomsMap[num]) distinctRoomsMap[num] = [];
+      distinctRoomsMap[num].push(r);
+    });
+
+    catObj.distinctRoomsCount = Object.keys(distinctRoomsMap).length;
+    let availCount = 0;
+    let occCount = 0;
+    let resCount = 0;
+
+    Object.values(distinctRoomsMap).forEach(variants => {
+      const isOcc = variants.some(v => v.status === 'Occupied');
+      const isRes = variants.some(v => v.status === 'Reserved' || v.isReserved);
+      const isAvail = variants.some(v => v.status === 'Available' || v.isAvailable === true) && !isOcc;
+
+      if (!isDatesSelected || isAvail) {
+        availCount += 1;
+      } else if (isOcc) {
+        occCount += 1;
+      } else if (isRes) {
+        resCount += 1;
+      }
+    });
+
+    catObj.availableCount = availCount;
+    catObj.occupiedCount = occCount;
+    catObj.reservedCount = resCount;
   });
 
   const roomTypeCards = Object.values(roomTypesMap);
@@ -401,10 +446,15 @@ export function HotelDetailsPage() {
                             )}
 
                             {/* Badges Overlay */}
-                            <div className="absolute top-3 left-3 flex gap-2">
+                            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
                               <span className="bg-navy/85 text-gold text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider backdrop-blur-md border border-gold/20">
                                 {type.category}
                               </span>
+                              {type.hasAc && type.hasNonAc && (
+                                <span className="bg-emerald-700/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-md">
+                                  AC & Non-AC
+                                </span>
+                              )}
                             </div>
 
                             <span className={`absolute bottom-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider backdrop-blur-md ${
@@ -417,9 +467,9 @@ export function HotelDetailsPage() {
                                         : "bg-amber-600/90 text-white"))
                             }`}>
                               {!isDatesSelected 
-                                ? `${type.roomsList.length} Available` 
+                                ? `${type.distinctRoomsCount || type.roomsList.length} Rooms Available` 
                                 : (isAvailable 
-                                    ? `${type.availableCount} Available` 
+                                    ? `${type.availableCount} Rooms Available` 
                                     : (type.occupiedCount > 0 
                                         ? "Occupied for Dates" 
                                         : "Reserved for Dates"))}
@@ -448,6 +498,7 @@ export function HotelDetailsPage() {
                                 </div>
 
                                 <div className="text-right shrink-0">
+                                  <span className="text-[10px] text-gray-400 font-medium block">Starting from</span>
                                   <span className="font-price text-xl font-bold text-navy block leading-none tracking-tight">
                                     {inr(type.price)}
                                   </span>

@@ -589,6 +589,15 @@ function Booking() {
                         Room {selectedRoom.roomNumber} ({selectedRoom.floor || 'Floor 1'})
                       </span>
                     )}
+                    {selectedRoom?.type && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-block ${
+                        selectedRoom.type === 'Non-AC'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-purple/10 text-purple border border-purple/20'
+                      }`}>
+                        {selectedRoom.type}
+                      </span>
+                    )}
                     <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-2 py-0.5 rounded inline-block">
                       {ratePlanDisplay}
                     </span>

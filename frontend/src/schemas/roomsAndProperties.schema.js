@@ -23,7 +23,7 @@ export const roomSchema = z
     floor: textSchema(1, "Floor is required"),
     pricePerNight: priceSchema("Room tariff").optional(),
     baseRate: priceSchema("Base tariff").optional(),
-    capacity: positiveIntegerSchema("Guest capacity", 1).optional(),
+    capacity: z.union([positiveIntegerSchema("Guest capacity", 1), z.string()]).optional(),
     status: z.string().optional().default("Available"),
     amenities: z.any().optional()
   })

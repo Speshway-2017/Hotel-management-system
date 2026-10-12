@@ -295,6 +295,13 @@ router.put('/properties/:id', authorize('super-admin'), async (req, res) => {
       category: 'Property Update'
     });
 
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, id, 'room_updated', { propertyId: id, action: 'property_updated' });
+      emitRealtimeSync(io, id, 'availability_changed', { propertyId: id });
+      emitRealtimeSync(io, id, 'dashboard_sync', { propertyId: id, action: 'property_updated' });
+    }
+
     return sendSuccess(res, 200, updated, 'Property updated successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to update property');

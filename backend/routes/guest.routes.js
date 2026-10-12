@@ -151,8 +151,13 @@ router.get('/rooms', async (req, res) => {
         capacity: rm.capacity || '2 Adults',
         bedType: rm.bedType || 'King Bed',
         propertyId: rm.propertyId,
-        amenities: rm.amenities || [],
-        images: rm.images || []
+        images: (Array.isArray(rm.images) && rm.images.filter(Boolean).length > 0)
+          ? rm.images.filter(Boolean)
+          : (rm.category && rm.category.toLowerCase().includes('deluxe'))
+              ? ['https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160189/hourstay_hms_assets/win4vnjsb2f6gs8yxz6t.jpg', 'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1000&q=80']
+              : (rm.category && rm.category.toLowerCase().includes('suite'))
+                  ? ['https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160250/hourstay_hms_assets/b04x9vyzbi2n0c80pqru.jpg', 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1000&q=80']
+                  : ['https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160110/hourstay_hms_assets/gcvimdwyma48fdua8fxg.jpg', 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80']
       };
     });
 

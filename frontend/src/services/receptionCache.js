@@ -47,9 +47,10 @@ class ReceptionDataCache {
         // When real-time events fire, invalidate or trigger background refresh
         if (eventName?.includes('booking') || eventName?.includes('checkin') || eventName?.includes('checkout')) {
           this.prefetchAll(true);
-        } else if (eventName?.includes('room')) {
+        } else if (eventName?.includes('room') || eventName?.includes('availability')) {
           this.cache.delete('rooms');
           this.cache.delete('dashboard');
+          this.prefetchAll(true);
         } else if (eventName?.includes('payment')) {
           this.cache.delete('payments');
           this.cache.delete('dashboard');

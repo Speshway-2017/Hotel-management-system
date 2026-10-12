@@ -641,14 +641,27 @@ router.get('/rooms', async (req, res) => {
         }
       }
 
+      const amenitiesStr = Array.isArray(r.amenities) ? r.amenities.join(', ') : String(r.amenities || '');
+      const isNonAc = r.type === 'Non-AC' ||
+                      (r.category && (r.category.toLowerCase().includes('non-ac') || r.category.toLowerCase().includes('non ac'))) ||
+                      (amenitiesStr.toLowerCase().includes('fan') && !amenitiesStr.toLowerCase().includes('air condition')) ||
+                      (!amenitiesStr.toLowerCase().includes('air condition') && Number(r.baseRate || r.currentRate) < 2800);
+      const resolvedType = r.type || (isNonAc ? 'Non-AC' : 'AC');
+      const rate = Number(r.currentRate || r.baseRate || r.dailyRate || 3500);
+
       return {
         id: r._id ? String(r._id) : r.id,
         _id: r._id ? String(r._id) : r.id,
         room: r.roomNumber,
         roomNumber: r.roomNumber,
+        type: resolvedType,
         floor: `Floor ${r.roomNumber ? String(r.roomNumber)[0] : '1'}`,
         roomType: r.category,
         category: r.category,
+        baseRate: rate,
+        currentRate: rate,
+        dailyRate: rate,
+        amenities: r.amenities,
         status: displayStatus,
         operationalStatus: r.status || 'Available',
         isReserved: isReservedForDates,
@@ -682,10 +695,13 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
       else if (housekeeping === 'Inspected') updateData.status = 'Available';
     }
 
-    const updated = await Room.findOneAndUpdate(
+    await Room.updateMany(
       { roomNumber: req.params.roomNumber, propertyId },
-      updateData,
-      { new: true }
+      updateData
+    );
+
+    const updated = await Room.findOne(
+      { roomNumber: req.params.roomNumber, propertyId }
     );
 
     if (!updated) {
