@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Star, MapPin, Bed, Users, Sparkles, Clock, FileText, ChevronRight, ShieldCheck, Info, Calendar } from "lucide-react";
+import { Check, Star, MapPin, Bed, Users, Sparkles, Clock, FileText, ChevronRight, ShieldCheck, Info, Calendar, Snowflake, Wind, CheckCircle2 } from "lucide-react";
 import { SiteLayout } from "@/layouts/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { inr } from "@/data/hs-data";
@@ -8,6 +8,7 @@ import { calculateStayNights } from "@/utils/dateUtils";
 import { publicService } from "@/services/public";
 import { authService } from "@/services/auth";
 import { getRoomImages, getHotelImage } from "@/utils/hotelImages";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = {
   head: () => ({
@@ -32,66 +33,276 @@ export function RoomDetailsPage() {
 
   const [property, setProperty] = useState(null);
   const [allPropertyRooms, setAllPropertyRooms] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [selectedRoomNumber, setSelectedRoomNumber] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState(() => {
+    const raw = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+    if (raw.includes('non-ac') || raw.includes('non%20ac') || raw.includes('nonac')) return 'Non-AC';
+    try {
+      const stored = localStorage.getItem('selected_room_data');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.type === 'Non-AC' || parsed.category?.toLowerCase().includes('non-ac')) return 'Non-AC';
+      }
+    } catch (_) {}
+    return 'AC';
+  });
   const [loading, setLoading] = useState(true);
 
   // Reservation Date Selectors
   const [checkInDate, setCheckInDate] = useState(() => localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0]);
   const [checkOutDate, setCheckOutDate] = useState(() => localStorage.getItem('booking_check_out') || new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
+  const loadRoomDetailsData = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
 
     Promise.all([
       publicService.getProperty(targetPropId).catch(() => null),
       publicService.getPropertyRooms(targetPropId, { checkIn: checkInDate, checkOut: checkOutDate }).catch(() => null)
     ]).then(([propRes, roomsRes]) => {
-      if (!isMounted) return;
-
       if (propRes && propRes.success && propRes.data) {
         setProperty(propRes.data);
       }
 
-      let fetchedRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
+      const fetchedRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
       setAllPropertyRooms(fetchedRooms);
-
-      // Match target room by category or ID
-      let matchedRooms = fetchedRooms.filter(r => {
-        const catName = decodedParam.toLowerCase();
-        const rCat = (r.category || "").toLowerCase();
-        const rId = String(r.id || r._id || "").toLowerCase();
-        return rCat.includes(catName) || rId === catName || catName.includes(rCat);
-      });
-
-      if (matchedRooms.length > 0) {
-        // If current selected room is still in matched rooms, update to fresh object
-        const existing = selectedRoom ? matchedRooms.find(r => r.roomNumber === selectedRoom.roomNumber) : null;
-        if (existing) {
-          setSelectedRoom(existing);
-        } else {
-          // Pick first available room or first room in category
-          const avail = matchedRooms.find(r => r.status === 'Available' || r.isAvailable === true);
-          setSelectedRoom(avail || matchedRooms[0]);
-        }
-      } else if (fetchedRooms.length > 0) {
-        setSelectedRoom(fetchedRooms[0]);
-      }
     }).finally(() => {
-      if (isMounted) setLoading(false);
+      if (!isSilent) setLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    loadRoomDetailsData(false);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      loadRoomDetailsData(true);
     });
 
-    return () => { isMounted = false; };
-  }, [targetPropId, decodedParam, checkInDate, checkOutDate]);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [targetPropId, checkInDate, checkOutDate]);
+
+  // Match rooms belonging to this category or room number
+  const matchedCategoryRooms = useMemo(() => {
+    const cleanParam = decodedParam.toLowerCase().trim();
+    const cleanNoVariant = cleanParam.replace(/\s*\(?(non-?ac|ac)\)?/gi, '').trim();
+
+    // Find if cleanParam references a specific room by id or roomNumber
+    const refRoom = allPropertyRooms.find(r => 
+      String(r.id || r._id || '').toLowerCase() === cleanParam ||
+      String(r.roomNumber || '').toLowerCase() === cleanParam
+    );
+
+    const targetCategory = refRoom?.category 
+      ? refRoom.category.replace(/\s*\(?(non-?ac|ac)\)?/gi, '').trim().toLowerCase()
+      : cleanNoVariant;
+
+    const filtered = allPropertyRooms.filter(r => {
+      const s1 = (r.status || "").toLowerCase();
+      if (['dirty', 'cleaning', 'maintenance', 'out of order'].includes(s1)) return false;
+      const rCat = (r.category || "").toLowerCase().trim();
+      const rCatClean = rCat.replace(/\s*\(?(non-?ac|ac)\)?/gi, '').trim();
+      const rNum = String(r.roomNumber || "").toLowerCase().trim();
+      const rId = String(r.id || r._id || "").toLowerCase().trim();
+
+      return (
+        rCatClean === targetCategory ||
+        rCatClean.includes(targetCategory) ||
+        targetCategory.includes(rCatClean) ||
+        rNum === cleanParam ||
+        rId === cleanParam
+      );
+    });
+
+    return filtered.length > 0 ? filtered : allPropertyRooms;
+  }, [allPropertyRooms, decodedParam]);
+
+  // Group rooms by physical room number (e.g. 101, 102, 201)
+  const roomsByNumber = useMemo(() => {
+    const map = {};
+    matchedCategoryRooms.forEach(r => {
+      const s1 = (r.status || "").toLowerCase();
+      if (['dirty', 'cleaning', 'maintenance', 'out of order'].includes(s1)) return false;
+      const num = String(r.roomNumber || '101').trim();
+      if (!map[num]) map[num] = [];
+      map[num].push(r);
+    });
+    return map;
+  }, [matchedCategoryRooms]);
+
+  const distinctRoomNumbers = useMemo(() => Object.keys(roomsByNumber), [roomsByNumber]);
+
+  // Active selected room number
+  const activeRoomNum = useMemo(() => {
+    if (selectedRoomNumber && roomsByNumber[selectedRoomNumber]) {
+      return selectedRoomNumber;
+    }
+    const cleanParam = decodedParam.toLowerCase().trim();
+    const matchedExactNum = distinctRoomNumbers.find(num => num.toLowerCase() === cleanParam);
+    if (matchedExactNum) return matchedExactNum;
+
+    const roomById = allPropertyRooms.find(r => String(r.id || r._id || '').toLowerCase() === cleanParam);
+    if (roomById && roomsByNumber[String(roomById.roomNumber)]) {
+      return String(roomById.roomNumber);
+    }
+
+    return distinctRoomNumbers[0] || "101";
+  }, [selectedRoomNumber, roomsByNumber, distinctRoomNumbers, decodedParam, allPropertyRooms]);
+
+  // For the active room number, retrieve all variants
+  const activeVariants = useMemo(() => {
+    return roomsByNumber[activeRoomNum] || [];
+  }, [roomsByNumber, activeRoomNum]);
+
+  // Determine AC and Non-AC configurations for this specific room number
+  const { acVariant, nonAcVariant } = useMemo(() => {
+    const isNonAc = (r) => {
+      const amenitiesText = Array.isArray(r.amenities) ? r.amenities.join(' ') : String(r.amenities || '');
+      return r.type === 'Non-AC' ||
+        r.category?.toLowerCase().includes('non-ac') ||
+        r.category?.toLowerCase().includes('non ac') ||
+        (amenitiesText.toLowerCase().includes('fan') && !amenitiesText.toLowerCase().includes('air condition')) ||
+        (!amenitiesText.toLowerCase().includes('air condition') && Number(r.baseRate || r.currentRate) < 2800);
+    };
+
+    const acFound = activeVariants.find(r => !isNonAc(r));
+    const nonAcFound = activeVariants.find(r => isNonAc(r));
+
+    const refRoom = acFound || nonAcFound || activeVariants[0] || {};
+    const refRate = Number(refRoom.currentRate || refRoom.baseRate || refRoom.dailyRate || 3000);
+
+    const acRate = Number(acFound?.currentRate || acFound?.baseRate || refRate || 3000);
+    const nonAcRate = Number(nonAcFound?.currentRate || nonAcFound?.baseRate || (acFound ? Math.round(refRate * 0.74) : 2200));
+
+    const resolvedAc = acFound || {
+      ...refRoom,
+      _id: `${refRoom._id || refRoom.id || 'RM'}-ac`,
+      id: `${refRoom._id || refRoom.id || 'RM'}-ac`,
+      roomNumber: activeRoomNum,
+      type: 'AC',
+      category: refRoom.category ? refRoom.category.replace(/\s*\(?non-?ac\)?/i, '').trim() : 'Standard Room',
+      baseRate: acRate,
+      currentRate: acRate,
+      dailyRate: acRate,
+      status: refRoom.status || 'Available',
+      isAvailable: refRoom.isAvailable !== false,
+      amenities: Array.isArray(refRoom.amenities)
+        ? [...refRoom.amenities.filter(a => !a.toLowerCase().includes('fan')), 'Air Conditioning']
+        : ['Air Conditioning', 'High-Speed Wi-Fi', 'Smart TV', 'Room Service']
+    };
+
+    const resolvedNonAc = nonAcFound || {
+      ...refRoom,
+      _id: `${refRoom._id || refRoom.id || 'RM'}-nonac`,
+      id: `${refRoom._id || refRoom.id || 'RM'}-nonac`,
+      roomNumber: activeRoomNum,
+      type: 'Non-AC',
+      category: refRoom.category ? (refRoom.category.toLowerCase().includes('non-ac') ? refRoom.category : `${refRoom.category} (Non-AC)`) : 'Standard Room (Non-AC)',
+      baseRate: nonAcRate,
+      currentRate: nonAcRate,
+      dailyRate: nonAcRate,
+      status: refRoom.status || 'Available',
+      isAvailable: refRoom.isAvailable !== false,
+      amenities: Array.isArray(refRoom.amenities)
+        ? [...refRoom.amenities.filter(a => !a.toLowerCase().includes('air condition') && !a.toLowerCase().includes('ac')), 'Ceiling Fan']
+        : ['Ceiling Fan', 'High-Speed Wi-Fi', 'Flat Screen TV', 'Room Service']
+    };
+
+    return { acVariant: resolvedAc, nonAcVariant: resolvedNonAc };
+  }, [activeVariants, activeRoomNum]);
+
+  // The active selected room variant object
+  const activeSelectedRoom = selectedVariant === 'Non-AC' ? nonAcVariant : acVariant;
+
+  const s = property?.settings || {};
+  let hotelName = s.hotelName || s.name || property?.name || "Speshway Luxury Hotel";
+  if (/^[0-9a-fA-F]{24}$/.test(hotelName) || /^HS-[A-Z0-9]+$/.test(hotelName)) {
+    hotelName = "Speshway Luxury Hotel";
+  }
+
+  const city = s.city || property?.city || "Hyderabad";
+  const location = [s.address, s.city, s.state, s.country].filter(Boolean).join(", ") || `${city}, India`;
+  const rating = s.rating || "4.9";
+  const classification = s.classification || "5-Star Luxury";
+
+  const roomCategoryBase = activeSelectedRoom?.category?.replace(/\s*\(?(non-?ac|ac)\)?/gi, '').trim() || "Standard Room";
+  const roomDisplayTitle = `${roomCategoryBase} (${selectedVariant})`;
+  const bedType = activeSelectedRoom?.beds || activeSelectedRoom?.bedType || "King Bed";
+  const capacity = activeSelectedRoom?.capacity || `Max ${activeSelectedRoom?.occupancy || 2} Guests`;
+  const roomFloor = activeSelectedRoom?.floor || `Floor ${String(activeRoomNum)[0] || '1'}`;
+  const ratePlan = (activeSelectedRoom?.ratePlan && activeSelectedRoom.ratePlan !== "Standard Rate Plan" && activeSelectedRoom.ratePlan !== "Standard Plan")
+    ? activeSelectedRoom.ratePlan
+    : `${roomCategoryBase} Standard Plan`;
+
+  const roomDescription = activeSelectedRoom?.description || (
+    selectedVariant === 'Non-AC'
+      ? `Naturally ventilated ${roomCategoryBase} (Room ${activeRoomNum}) equipped with high-speed ceiling fan, large windows, and hospitality comforts.`
+      : `Climate-controlled ${roomCategoryBase} (Room ${activeRoomNum}) featuring split air conditioning, premium linen, and modern hospitality amenities.`
+  );
+
+  // Live pricing & taxes
+  const nightlyTariff = Number(activeSelectedRoom?.currentRate || activeSelectedRoom?.baseRate || activeSelectedRoom?.dailyRate || (selectedVariant === 'Non-AC' ? 2200 : 3000));
+  const nightsCount = calculateStayNights(checkInDate, checkOutDate);
+  const baseTariffTotal = nightlyTariff * nightsCount;
+  const gstTax = Math.round(baseTariffTotal * 0.18);
+  const totalPayable = baseTariffTotal + gstTax;
+
+  const isAvailable = activeSelectedRoom?.status === 'Available' || activeSelectedRoom?.isAvailable === true;
+
+  // Resolve room images
+  const roomImages = getRoomImages(activeSelectedRoom, property);
+  const mainImg = roomImages[0];
+  const sideImg1 = roomImages[1] || roomImages[0];
+  const sideImg2 = roomImages[2] || roomImages[0];
+
+  // Resolve amenities matching selected variant
+  const roomAmenities = useMemo(() => {
+    let list = [];
+    if (Array.isArray(activeSelectedRoom?.amenities) && activeSelectedRoom.amenities.length > 0) {
+      list = activeSelectedRoom.amenities.filter(Boolean);
+    } else if (typeof activeSelectedRoom?.amenities === 'string' && activeSelectedRoom.amenities.trim()) {
+      list = activeSelectedRoom.amenities.split(',').map(a => a.trim()).filter(Boolean);
+    }
+
+    if (selectedVariant === 'Non-AC') {
+      list = list.filter(a => !a.toLowerCase().includes('air condition') && !a.toLowerCase().includes(' ac'));
+      if (!list.some(a => a.toLowerCase().includes('fan'))) {
+        list.unshift('Ceiling Fan');
+      }
+    } else {
+      list = list.filter(a => !a.toLowerCase().includes('fan') || a.toLowerCase().includes('exhaust'));
+      if (!list.some(a => a.toLowerCase().includes('air condition'))) {
+        list.unshift('Air Conditioning');
+      }
+    }
+
+    if (list.length === 0) {
+      list = selectedVariant === 'Non-AC'
+        ? ["Ceiling Fan", "Free High-Speed WiFi", "Flat Screen Smart TV", "24/7 Room Service", "Ensuite Marble Bathroom"]
+        : ["Air Conditioning", "Free High-Speed WiFi", "Flat Screen Smart TV", "24/7 Room Service", "Ensuite Marble Bathroom"];
+    }
+    return list;
+  }, [activeSelectedRoom, selectedVariant]);
 
   const handleBookNow = () => {
-    if (!selectedRoom) return;
+    if (!activeSelectedRoom) return;
 
     if (property) {
       localStorage.setItem('selected_property_id', property._id || property.id || targetPropId);
       localStorage.setItem('selected_property_data', JSON.stringify(property));
     }
-    localStorage.setItem('selected_room_data', JSON.stringify(selectedRoom));
+    const bookingPayload = {
+      ...activeSelectedRoom,
+      type: selectedVariant,
+      roomNumber: activeRoomNum,
+      room: `Room ${activeRoomNum}`,
+      currentRate: nightlyTariff,
+      baseRate: nightlyTariff,
+      dailyRate: nightlyTariff,
+      category: `${roomCategoryBase} (${selectedVariant})`
+    };
+
+    localStorage.setItem('selected_room_data', JSON.stringify(bookingPayload));
     localStorage.setItem('booking_check_in', checkInDate);
     localStorage.setItem('booking_check_out', checkOutDate);
 
@@ -116,7 +327,7 @@ export function RoomDetailsPage() {
     );
   }
 
-  if (!property || (allPropertyRooms.length === 0 && !selectedRoom)) {
+  if (!property || (allPropertyRooms.length === 0 && !activeSelectedRoom)) {
     return (
       <SiteLayout>
         <div className="min-h-screen bg-cream py-20 text-center font-ui max-w-lg mx-auto px-4">
@@ -134,99 +345,36 @@ export function RoomDetailsPage() {
     );
   }
 
-  const s = property?.settings || {};
-  
-  // Format Hotel Name safely (never show raw MongoDB ObjectId string as name)
-  let hotelName = s.hotelName || s.name || property?.name || "Speshway Luxury Hotel";
-  if (/^[0-9a-fA-F]{24}$/.test(hotelName) || /^HS-[A-Z0-9]+$/.test(hotelName)) {
-    hotelName = "Speshway Luxury Hotel";
-  }
-
-  const city = s.city || property?.city || "Hyderabad";
-  const location = [s.address, s.city, s.state, s.country].filter(Boolean).join(", ") || `${city}, India`;
-  const rating = s.rating || "4.9";
-  const classification = s.classification || "5-Star Luxury";
-
-  // Format Room Category / Type
-  const roomType = selectedRoom?.category || decodedParam || "Standard Room";
-  const roomNumber = selectedRoom?.roomNumber ? `Room ${selectedRoom.roomNumber}` : "";
-  const bedType = selectedRoom?.beds || selectedRoom?.bedType || "King Bed";
-  const capacity = selectedRoom?.capacity || `Max ${selectedRoom?.occupancy || 2} Guests`;
-  const roomFloor = selectedRoom?.floor || "Floor 1";
-  const ratePlan = (selectedRoom?.ratePlan && selectedRoom.ratePlan !== "Standard Rate Plan" && selectedRoom.ratePlan !== "Standard Plan")
-    ? selectedRoom.ratePlan
-    : (roomType.toLowerCase().includes('deluxe') ? 'Deluxe Rate Plan' : roomType.toLowerCase().includes('suite') ? 'Executive Suite Plan' : roomType.toLowerCase().includes('villa') ? 'Villa Suite Plan' : `${roomType} Rate Plan`);
-  const roomDescription = selectedRoom?.description || `Experience superior comfort in our ${roomType}, featuring premium furnishings and state-of-the-art amenities.`;
-
-  // Calculate pricing & taxes
-  const nightlyTariff = Number(selectedRoom?.currentRate || selectedRoom?.baseRate || selectedRoom?.dailyRate || 3000);
-  const nightsCount = calculateStayNights(checkInDate, checkOutDate);
-  const baseTariffTotal = nightlyTariff * nightsCount;
-  const gstTax = Math.round(baseTariffTotal * 0.18);
-  const totalPayable = baseTariffTotal + gstTax;
-
-  const isAvailable = selectedRoom?.status === 'Available' || selectedRoom?.isAvailable === true;
-
-  // Resolve room images matching room category or uploaded assets
-  const roomImages = getRoomImages(selectedRoom, property);
-  const mainImg = roomImages[0];
-  const sideImg1 = roomImages[1] || roomImages[0];
-  const sideImg2 = roomImages[2] || roomImages[0];
-
-  // Resolve room amenities robustly (room amenities -> hotel amenities -> default room amenities)
-  let roomAmenities = [];
-  if (Array.isArray(selectedRoom?.amenities) && selectedRoom.amenities.length > 0) {
-    roomAmenities = selectedRoom.amenities.filter(Boolean);
-  } else if (typeof selectedRoom?.amenities === 'string' && selectedRoom.amenities.trim()) {
-    roomAmenities = selectedRoom.amenities.split(',').map(a => a.trim()).filter(Boolean);
-  }
-
-  if (roomAmenities.length === 0 && Array.isArray(s.amenities) && s.amenities.length > 0) {
-    roomAmenities = s.amenities.filter(Boolean);
-  } else if (roomAmenities.length === 0 && typeof s.amenities === 'string' && s.amenities.trim()) {
-    roomAmenities = s.amenities.split(',').map(a => a.trim()).filter(Boolean);
-  }
-
-  if (roomAmenities.length === 0) {
-    roomAmenities = [
-      "Free High-Speed WiFi",
-      "Air Conditioning",
-      "Flat Screen Smart TV",
-      "24/7 Room Service",
-      "Ensuite Marble Bathroom",
-      "Safety Deposit Box"
-    ];
-  }
-
-  // Category rooms list for room selector
-  const roomsInSameCategory = allPropertyRooms.filter(r => {
-    const s1 = (r.status || "").toLowerCase();
-    if (['dirty', 'cleaning', 'maintenance', 'out of order'].includes(s1)) return false;
-    const cat = (r.category || "").toLowerCase();
-    return cat === roomType.toLowerCase();
-  });
-
   return (
     <SiteLayout>
       <div className="bg-cream min-h-screen py-8 font-ui text-left">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
 
           {/* 1. Breadcrumb */}
-          <nav className="flex items-center gap-2 text-xs text-gray-500 mb-4 font-medium">
+          <nav className="flex items-center gap-2 text-xs text-gray-500 mb-4 font-medium flex-wrap">
             <Link to="/search" className="hover:text-purple">Stays</Link>
             <ChevronRight className="size-3" />
             <Link to={`/hotels/${property?._id || property?.id || targetPropId}`} className="hover:text-purple">{hotelName}</Link>
             <ChevronRight className="size-3" />
-            <span className="text-navy font-bold">{roomType}</span>
+            <span className="text-navy font-bold">{roomDisplayTitle}</span>
+            <ChevronRight className="size-3" />
+            <span className="text-purple font-mono font-bold">Room #{activeRoomNum}</span>
           </nav>
 
           {/* 2. Hotel Name & Room Type Header */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-navy/5 shadow-soft mb-8">
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
               <div>
-                <div className="flex items-center gap-3 mb-1.5">
+                <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                   <span className="bg-purple/10 text-purple text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border border-purple/20">
                     {classification}
+                  </span>
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                    selectedVariant === "Non-AC"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-purple/10 text-purple border-purple/20"
+                  }`}>
+                    {selectedVariant} Variant
                   </span>
                   <div className="flex items-center gap-1 text-gold text-xs font-bold">
                     <Star className="size-4 fill-gold text-gold" />
@@ -236,7 +384,7 @@ export function RoomDetailsPage() {
                 <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-navy">{hotelName}</h1>
                 <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-1.5 mt-2 font-medium font-ui">
                   <MapPin className="size-4 text-purple shrink-0" />
-                  <span>{roomType} {roomNumber ? `(${roomNumber})` : ""} — {location}</span>
+                  <span>{roomDisplayTitle} (Room {activeRoomNum}) — {location}</span>
                 </p>
               </div>
 
@@ -244,7 +392,7 @@ export function RoomDetailsPage() {
                 <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
                   isAvailable ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-700 border border-gray-200"
                 }`}>
-                  {selectedRoom?.status || (isAvailable ? "Available" : "Occupied")}
+                  {activeSelectedRoom?.status || (isAvailable ? "Available" : "Occupied")}
                 </span>
               </div>
             </div>
@@ -253,15 +401,15 @@ export function RoomDetailsPage() {
           {/* 3. Image Gallery */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
             <div className="lg:col-span-2 h-[340px] sm:h-[420px] rounded-2xl overflow-hidden bg-navy relative border border-navy/5 shadow-soft">
-              <img src={mainImg} alt={roomType} className="w-full h-full object-cover" />
+              <img src={mainImg} alt={roomDisplayTitle} className="w-full h-full object-cover" />
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
               <div className="h-[160px] sm:h-[202px] rounded-2xl overflow-hidden bg-navy relative border border-navy/5 shadow-soft">
-                <img src={sideImg1} alt={`${roomType} view 1`} className="w-full h-full object-cover" />
+                <img src={sideImg1} alt={`${roomDisplayTitle} view 1`} className="w-full h-full object-cover" />
               </div>
               <div className="h-[160px] sm:h-[202px] rounded-2xl overflow-hidden bg-navy relative border border-navy/5 shadow-soft">
-                <img src={sideImg2} alt={`${roomType} view 2`} className="w-full h-full object-cover" />
+                <img src={sideImg2} alt={`${roomDisplayTitle} view 2`} className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
@@ -271,8 +419,217 @@ export function RoomDetailsPage() {
             
             {/* Left 2 Columns: Room Details & Specs */}
             <div className="lg:col-span-2 space-y-8">
-              
-              {/* 4. Room Overview */}
+
+              {/* 4. Room Number Selector */}
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
+                <div className="flex justify-between items-center border-b border-navy/5 pb-3">
+                  <div>
+                    <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">
+                      1. Select Room Number
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      Choose a physical room number in {roomCategoryBase}
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-navy/5 text-navy border border-navy/10">
+                    {distinctRoomNumbers.length} Rooms
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {distinctRoomNumbers.map((num) => {
+                    const isSelectedNum = String(activeRoomNum).trim() === String(num).trim();
+                    const variants = roomsByNumber[num] || [];
+                    const isNumAvail = variants.some(r => r.status === 'Available' || r.isAvailable === true);
+
+                    return (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setSelectedRoomNumber(num)}
+                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                          isSelectedNum
+                            ? "bg-navy text-white border-navy shadow-md ring-2 ring-purple/40"
+                            : "bg-white border-navy/15 text-navy hover:border-purple/50 hover:bg-purple/[0.02]"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono text-base font-bold">Room {num}</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                            isSelectedNum
+                              ? "bg-white/20 text-white"
+                              : isNumAvail
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-gray-100 text-gray-500"
+                          }`}>
+                            {isNumAvail ? "Active" : "Occupied"}
+                          </span>
+                        </div>
+                        <span className={`text-[10px] ${isSelectedNum ? "text-white/70" : "text-gray-400"}`}>
+                          {variants[0]?.floor || 'Floor 1'} · {variants[0]?.capacity || '2 Adults'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Two Categories: AC & Non-AC for Selected Room Number */}
+              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-navy/5 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">
+                        2. Choose Climate Category for Room #{activeRoomNum}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Room {activeRoomNum} is available in two climate configurations. Select your preferred category:
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 w-fit">
+                    AC & Non-AC Available
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Category 1: Air Conditioned (AC) */}
+                  <div
+                    onClick={() => setSelectedVariant("AC")}
+                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between gap-4 ${
+                      selectedVariant === "AC"
+                        ? "bg-purple/[0.04] border-purple shadow-md ring-2 ring-purple/20"
+                        : "bg-white border-navy/15 hover:border-purple/40 shadow-soft"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`p-2.5 rounded-xl ${selectedVariant === "AC" ? "bg-purple text-white shadow-sm" : "bg-purple/10 text-purple"}`}>
+                            <Snowflake className="size-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-display text-base sm:text-lg font-bold text-navy">Air Conditioned</h3>
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-purple/10 text-purple border border-purple/20">
+                                AC
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-500">Premium climate-controlled stay</p>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="font-price text-xl font-bold text-navy block leading-none">
+                            {inr(acVariant.currentRate || acVariant.baseRate || 3000)}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-medium block mt-0.5">/ night</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-600 leading-relaxed font-ui">
+                        Full individual temperature control with split air conditioning, King Bed bedding, high-speed Wi-Fi & Smart TV.
+                      </p>
+
+                      {/* Feature Badges */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple/10 text-purple">
+                          <CheckCircle2 className="size-3" /> Air Conditioning
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
+                          <CheckCircle2 className="size-3 text-purple" /> High-Speed Wi-Fi
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
+                          <CheckCircle2 className="size-3 text-purple" /> Smart TV
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-navy/10 flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-emerald-500 inline-block" /> Available
+                      </span>
+
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full transition-all ${
+                        selectedVariant === "AC"
+                          ? "bg-purple text-white shadow-sm"
+                          : "bg-navy/5 text-navy hover:bg-navy/10"
+                      }`}>
+                        {selectedVariant === "AC" ? "✓ Selected (AC)" : "Select AC"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Category 2: Non-Air Conditioned (Non-AC) */}
+                  <div
+                    onClick={() => setSelectedVariant("Non-AC")}
+                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between gap-4 ${
+                      selectedVariant === "Non-AC"
+                        ? "bg-emerald-50/60 border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
+                        : "bg-white border-navy/15 hover:border-emerald-400 shadow-soft"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`p-2.5 rounded-xl ${selectedVariant === "Non-AC" ? "bg-emerald-600 text-white shadow-sm" : "bg-emerald-50 text-emerald-700"}`}>
+                            <Wind className="size-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-display text-base sm:text-lg font-bold text-navy">Non-Air Conditioned</h3>
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Non-AC
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-500">Naturally aerated economical stay</p>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="font-price text-xl font-bold text-navy block leading-none">
+                            {inr(nonAcVariant.currentRate || nonAcVariant.baseRate || 2200)}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-medium block mt-0.5">/ night</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-600 leading-relaxed font-ui">
+                        Naturally ventilated room with powerful high-speed ceiling fan, fresh airflow, large windows, Wi-Fi & TV.
+                      </p>
+
+                      {/* Feature Badges */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                          <CheckCircle2 className="size-3" /> Ceiling Fan
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
+                          <CheckCircle2 className="size-3 text-emerald-600" /> High-Speed Wi-Fi
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
+                          <CheckCircle2 className="size-3 text-emerald-600" /> Flat Screen TV
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-navy/10 flex justify-between items-center">
+                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-emerald-500 inline-block" /> Available
+                      </span>
+
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full transition-all ${
+                        selectedVariant === "Non-AC"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "bg-navy/5 text-navy hover:bg-navy/10"
+                      }`}>
+                        {selectedVariant === "Non-AC" ? "✓ Selected (Non-AC)" : "Select Non-AC"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. Room Overview */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-5">
                 <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Room Overview</h2>
                 <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-ui">{roomDescription}</p>
@@ -312,9 +669,18 @@ export function RoomDetailsPage() {
                 </div>
               </div>
 
-              {/* 5. Room Amenities */}
+              {/* 7. Room Amenities */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Room Amenities</h2>
+                <div className="flex justify-between items-center border-b border-navy/5 pb-3">
+                  <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">Room Amenities</h2>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                    selectedVariant === 'Non-AC'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-purple/10 text-purple border border-purple/20'
+                  }`}>
+                    {selectedVariant} Package
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {roomAmenities.map((a, i) => (
                     <div key={i} className="flex items-center gap-2.5 p-3 rounded-xl bg-cream/40 border border-navy/5 text-xs text-navy font-semibold">
@@ -325,12 +691,14 @@ export function RoomDetailsPage() {
                 </div>
               </div>
 
-              {/* 6. Pricing & Taxes Breakdown */}
+              {/* 8. Pricing & Taxes Breakdown */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
                 <h2 className="font-display text-xl sm:text-2xl font-bold text-navy border-b border-navy/5 pb-3">Pricing & Tariff Details</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div className="p-4 rounded-xl bg-purple/5 border border-purple/15 space-y-1">
-                    <span className="text-[10px] text-purple font-bold uppercase tracking-wider block">Base Nightly Tariff</span>
+                    <span className="text-[10px] text-purple font-bold uppercase tracking-wider block">
+                      {selectedVariant} Nightly Tariff
+                    </span>
                     <div className="flex items-baseline gap-2">
                       <span className="font-price text-xl font-bold text-navy tracking-tight">{inr(nightlyTariff)}</span>
                       <span className="text-gray-500 text-[10px] font-medium">/ night</span>
@@ -345,54 +713,6 @@ export function RoomDetailsPage() {
                 </div>
               </div>
 
-              {/* 7. Available Room Selection in Category */}
-              {roomsInSameCategory.length > 0 && (
-                <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                  <div className="flex justify-between items-center border-b border-navy/5 pb-3">
-                    <div>
-                      <h2 className="font-display text-xl font-bold text-navy">Select Room Configuration</h2>
-                      <p className="text-xs text-gray-500">Choose your specific room number for this stay</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {roomsInSameCategory.map((rm) => {
-                      const roomAvail = rm.status === 'Available' || rm.isAvailable === true;
-                      const isSelected = selectedRoom?.roomNumber === rm.roomNumber;
-
-                      return (
-                        <div
-                          key={rm.roomNumber}
-                          onClick={() => roomAvail && setSelectedRoom(rm)}
-                          className={`p-4 rounded-xl border text-xs transition-all flex justify-between items-center ${
-                            !roomAvail
-                              ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60"
-                              : isSelected
-                                ? "bg-purple text-white border-purple shadow-soft cursor-pointer font-bold"
-                                : "bg-white border-navy/15 text-navy hover:border-purple/50 cursor-pointer font-medium"
-                          }`}
-                        >
-                          <div>
-                            <span className="font-mono text-sm block font-bold">Room {rm.roomNumber}</span>
-                            <span className="text-[10px] text-gray-500 block">{rm.floor || 'Floor 1'} · {rm.capacity || '2 Adults'}</span>
-                          </div>
-
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
-                            !roomAvail 
-                              ? (rm.status === 'Reserved' ? "bg-amber-100 text-amber-800" : "bg-gray-200 text-gray-600") 
-                              : isSelected 
-                                ? "bg-white/20 text-white" 
-                                : "bg-emerald-100 text-emerald-700"
-                          }`}>
-                            {roomAvail ? (isSelected ? "✓ Selected" : "Available") : (rm.status === 'Reserved' ? "Reserved" : "Occupied")}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
             </div>
 
             {/* Right Column: Sticky Reservation Summary & Date Selector */}
@@ -402,9 +722,19 @@ export function RoomDetailsPage() {
                 <h3 className="font-display text-lg font-bold text-navy border-b border-navy/5 pb-3">Reservation Summary</h3>
 
                 {/* Hotel & Room Selection Card */}
-                <div className="p-3.5 bg-cream/40 rounded-xl border border-navy/5 space-y-1 text-xs">
+                <div className="p-3.5 bg-cream/40 rounded-xl border border-navy/5 space-y-1.5 text-xs">
                   <strong className="font-bold text-navy block text-sm">{hotelName}</strong>
-                  <span className="text-gray-500 block">{roomType} {roomNumber ? `(${roomNumber})` : ""}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-700 font-semibold">{roomCategoryBase}</span>
+                    <span className={`text-[9.5px] font-black uppercase px-1.5 py-0.2 rounded ${
+                      selectedVariant === 'Non-AC'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-purple/10 text-purple border border-purple/20'
+                    }`}>
+                      {selectedVariant}
+                    </span>
+                  </div>
+                  <span className="text-gray-500 block">Room #{activeRoomNum} · {roomFloor}</span>
                   <span className="text-purple font-price font-bold block mt-1">{inr(nightlyTariff)} / night</span>
                 </div>
 
@@ -463,7 +793,7 @@ export function RoomDetailsPage() {
                   size="touch"
                   className="w-full h-11 text-xs font-bold cursor-pointer disabled:opacity-50 mt-2"
                 >
-                  {isAvailable ? "Book Now — Instant Confirmation" : selectedRoom?.status === "Reserved" ? "Dates Reserved" : "Room Unavailable"}
+                  {isAvailable ? `Book ${selectedVariant} — Instant Confirmation` : activeSelectedRoom?.status === "Reserved" ? "Dates Reserved" : "Room Unavailable"}
                 </Button>
 
                 <div className="p-3 bg-purple/5 rounded-xl border border-purple/10 text-[10px] text-gray-500 space-y-1">

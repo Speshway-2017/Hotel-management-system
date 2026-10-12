@@ -55,11 +55,20 @@ class RoomModel {
   final String? city;
   final String? cancellationPolicy;
   final double rating;
+  final String? climateType; // 'AC' or 'Non-AC'
 
   // Compatibility getters
   String get type => category;
   double get basePrice => baseRate;
   String get mainImage => images.isNotEmpty ? images.first : '';
+
+  bool get isNonAc =>
+      (climateType ?? '').toLowerCase().contains('non') ||
+      category.toLowerCase().contains('non-ac') ||
+      category.toLowerCase().contains('non ac') ||
+      (amenities.any((a) => a.toLowerCase().contains('fan') && !a.toLowerCase().contains('air condition')));
+
+  bool get isAc => !isNonAc;
 
   bool get isOccupied =>
       status.toLowerCase().contains('occup') ||
@@ -88,6 +97,7 @@ class RoomModel {
     this.propertyId = 'HS-9HQ8P',
     this.isReserved = false,
     this.isAvailable = true,
+    this.climateType,
     this.guest,
     this.checkIn,
     this.checkOut,
@@ -117,7 +127,35 @@ class RoomModel {
               'Air Conditioning',
               'Complimentary Toiletries',
             ],
-        images = images ?? const [];
+        images = (images != null && images.isNotEmpty)
+            ? images
+            : getCategoryDefaultImages(category);
+
+  static List<String> getCategoryDefaultImages(String category) {
+    final cat = category.toLowerCase();
+    if (cat.contains('penthouse') || cat.contains('presidential')) {
+      return const [
+        'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1000&q=80',
+        'https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160332/hourstay_hms_assets/i4l2j8umtjv7udp5drci.jpg',
+      ];
+    }
+    if (cat.contains('suite') || cat.contains('executive')) {
+      return const [
+        'https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160250/hourstay_hms_assets/b04x9vyzbi2n0c80pqru.jpg',
+        'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1000&q=80',
+      ];
+    }
+    if (cat.contains('deluxe')) {
+      return const [
+        'https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160189/hourstay_hms_assets/win4vnjsb2f6gs8yxz6t.jpg',
+        'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1000&q=80',
+      ];
+    }
+    return const [
+      'https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160110/hourstay_hms_assets/gcvimdwyma48fdua8fxg.jpg',
+      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
+    ];
+  }
 
   RoomModel copyWith({
     String? id,
@@ -146,6 +184,7 @@ class RoomModel {
     String? city,
     String? cancellationPolicy,
     double? rating,
+    String? climateType,
   }) {
     return RoomModel(
       id: id ?? this.id,
@@ -162,6 +201,7 @@ class RoomModel {
       propertyId: propertyId ?? this.propertyId,
       isReserved: isReserved ?? this.isReserved,
       isAvailable: isAvailable ?? this.isAvailable,
+      climateType: climateType ?? this.climateType,
       guest: guest ?? this.guest,
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
@@ -207,6 +247,15 @@ class RoomModel {
       imagesList = (json['images'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
     } else if (json['image'] != null && json['image'].toString().trim().isNotEmpty) {
       imagesList = [json['image'].toString().trim()];
+    } else if (json['photos'] != null && json['photos'] is List) {
+      imagesList = (json['photos'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    } else if (json['gallery'] != null && json['gallery'] is List) {
+      imagesList = (json['gallery'] as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    }
+
+    final catStr = (json['category'] ?? json['type'] ?? 'Standard Room').toString();
+    if (imagesList.isEmpty) {
+      imagesList = getCategoryDefaultImages(catStr);
     }
 
     List<BookedRange> rangesList = [];
@@ -288,6 +337,7 @@ class RoomModel {
       city: json['city']?.toString(),
       cancellationPolicy: json['cancellationPolicy']?.toString(),
       rating: rat,
+      climateType: json['type']?.toString(),
     );
   }
 
@@ -295,7 +345,8 @@ class RoomModel {
     return {
       'roomNumber': roomNumber,
       'category': category,
-      'type': category,
+      'type': climateType ?? category,
+      'climateType': climateType,
       'status': status,
       'ratePlan': ratePlan,
       'baseRate': baseRate,

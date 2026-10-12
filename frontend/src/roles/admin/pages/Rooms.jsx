@@ -16,7 +16,7 @@ import { Input, Select } from "@/components/hs/FormFields";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
-import { subscribeRealtimeSync } from "@/services/socket";
+import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 import {
   Bed,
@@ -193,17 +193,19 @@ function RoomsRatesPage() {
       } catch (e) {}
 
       const combinedTypes = [...(roomTypesList || []), ...cachedTypes];
-      const existingNums = new Set(initialRooms.map(r => String(r.roomNumber || r.num)));
+      const existingKeys = new Set(initialRooms.map(r => `${r.roomNumber || r.num}::${r.category}`));
 
       combinedTypes.forEach(t => {
         const assigned = Array.isArray(t.rooms) ? t.rooms : [];
         assigned.forEach(num => {
-          if (num && !existingNums.has(String(num))) {
-            existingNums.add(String(num));
+          const key = `${num}::${t.category}`;
+          if (num && !existingKeys.has(key)) {
+            existingKeys.add(key);
             initialRooms.push({
-              _id: `R-${num}`,
+              _id: `R-${num}-${t.category}`,
               roomNumber: String(num),
               category: t.category,
+              type: t.category.toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC',
               floor: `Floor ${String(num)[0] || '1'}`,
               status: "Available",
               baseRate: t.baseRate || 3500,
@@ -238,6 +240,7 @@ function RoomsRatesPage() {
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [variantFilter, setVariantFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -381,19 +384,21 @@ function RoomsRatesPage() {
       _id: `R-${formAddRoomNumber}`,
       roomNumber: formAddRoomNumber,
       category: targetType.category,
+      type: targetType.category.toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC',
       floor: formAddRoomFloor || "Floor 1",
       status: "Available",
       ratePlan: "Standard Plan",
       currentRate: Number(formAddRoomRate) || targetType.baseRate,
       dailyRate: Number(formAddRoomRate) || targetType.baseRate
     };
-    setRoomsList(prev => [...prev.filter(r => r.roomNumber !== formAddRoomNumber), newRoomObj]);
+    setRoomsList(prev => [...prev.filter(r => !(r.roomNumber === formAddRoomNumber && r.category === targetType.category)), newRoomObj]);
 
     // Create room via backend API
     try {
       await adminService.createRoom({
         roomNumber: formAddRoomNumber,
         category: targetType.category,
+        type: targetType.category.toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC',
         floor: formAddRoomFloor || "Floor 1",
         status: "Available",
         baseRate: Number(formAddRoomRate) || targetType.baseRate
@@ -404,7 +409,24 @@ function RoomsRatesPage() {
 
     setIsAddRoomToCategoryOpen(false);
     setFormAddRoomNumber("");
+    emitRealtimeEvent('room_created', { roomNumber: formAddRoomNumber, category: targetType.category });
+    emitRealtimeEvent('availability_changed', { roomNumber: formAddRoomNumber });
+    emitRealtimeEvent('dashboard_sync', { action: 'room_created', roomNumber: formAddRoomNumber });
     toast.success(`Room #${formAddRoomNumber} added to ${targetType.category}!`);
+  };
+
+  const handleDeleteRoom = async (rm) => {
+    if (!window.confirm(`Are you sure you want to delete Room #${rm.roomNumber} (${rm.category})?`)) return;
+    try {
+      await adminService.deleteRoom(rm._id || rm.id || rm.roomNumber);
+      emitRealtimeEvent('room_deleted', { roomNumber: rm.roomNumber, category: rm.category });
+      emitRealtimeEvent('availability_changed', { roomNumber: rm.roomNumber });
+      emitRealtimeEvent('dashboard_sync', { action: 'room_deleted', roomNumber: rm.roomNumber });
+      toast.success(`Room #${rm.roomNumber} (${rm.category}) deleted successfully!`);
+      loadData(false);
+    } catch (err) {
+      toast.error(err.message || "Failed to delete room.");
+    }
   };
 
   const handleToggleRoomTypeStatus = async (typeId) => {
@@ -495,6 +517,9 @@ function RoomsRatesPage() {
       const target = roomsList.find(r => r.roomNumber === roomNumberOrId || (r._id || r.id) === roomNumberOrId);
       const targetId = target?._id || target?.id || roomNumberOrId;
       await adminService.updateRoom(targetId, { status: newStatus });
+      emitRealtimeEvent('room_status_changed', { roomNumber: target?.roomNumber || roomNumberOrId, status: newStatus });
+      emitRealtimeEvent('availability_changed', { roomNumber: target?.roomNumber || roomNumberOrId });
+      emitRealtimeEvent('dashboard_sync', { action: 'room_status_changed', roomNumber: target?.roomNumber || roomNumberOrId });
       toast.success("Room status override updated.");
       loadData();
       setIsChangeStatusOpen(false);
@@ -577,8 +602,18 @@ function RoomsRatesPage() {
     const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
     const matchesType = typeFilter === "all" || rm.category === typeFilter;
     const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
+    const amenitiesText = Array.isArray(rm.amenities) ? rm.amenities.join(' ') : String(rm.amenities || '');
+    const isRoomNonAc = rm.type === 'Non-AC' ||
+      rm.category?.toLowerCase().includes('non-ac') ||
+      rm.category?.toLowerCase().includes('non ac') ||
+      amenitiesText.toLowerCase().includes('non-ac') ||
+      (amenitiesText.toLowerCase().includes('fan') && !amenitiesText.toLowerCase().includes('air condition')) ||
+      (!amenitiesText.toLowerCase().includes('air condition') && Number(rm.baseRate || rm.currentRate) < 2800);
+    const matchesVariant = variantFilter === "all" ||
+      (variantFilter === "Non-AC" && isRoomNonAc) ||
+      (variantFilter === "AC" && !isRoomNonAc);
 
-    return matchesSearch && matchesFloor && matchesType && matchesStatus;
+    return matchesSearch && matchesFloor && matchesType && matchesStatus && matchesVariant;
   });
 
   const totalPages = Math.ceil(filteredRooms.length / itemsPerPage) || 1;
@@ -648,7 +683,7 @@ function RoomsRatesPage() {
       {activeTab === "rooms" && (
         <div className="space-y-4 font-ui">
           {/* Filters Bar */}
-          <div className="bg-white border border-muted rounded-xl p-4 shadow-soft grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+          <div className="bg-white border border-muted rounded-xl p-4 shadow-soft grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
             <div className="relative col-span-1 sm:col-span-2">
               <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block mb-1 text-left">Search Rooms</span>
               <div className="relative">
@@ -674,6 +709,19 @@ function RoomsRatesPage() {
                 <option value="Floor 2">Floor 2</option>
                 <option value="Floor 3">Floor 3</option>
                 <option value="Floor 4">Floor 4</option>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1 text-left">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Climate</span>
+              <Select
+                value={variantFilter}
+                onChange={(e) => { setVariantFilter(e.target.value); setCurrentPage(1); }}
+                className="text-xs h-8.5 font-bold bg-[#FDFCFA]/20 border-muted"
+              >
+                <option value="all">All (AC & Non-AC)</option>
+                <option value="AC">AC Only</option>
+                <option value="Non-AC">Non-AC Only</option>
               </Select>
             </div>
 
@@ -714,43 +762,77 @@ function RoomsRatesPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs table-fixed">
                   <colgroup>
-                    <col className="w-[130px]" />
+                    <col className="w-[145px]" />
                     <col className="w-[180px]" />
-                    <col className="w-[110px]" />
-                    <col className="w-[140px]" />
+                    <col className="w-[100px]" />
                     <col className="w-[130px]" />
                     <col className="w-[120px]" />
                     <col className="w-[110px]" />
+                    <col className="w-[200px]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
-                      <th className="py-4.5 px-6 w-[130px] min-w-[130px]">Room Number</th>
+                      <th className="py-4.5 px-6 w-[145px] min-w-[145px]">Room Number</th>
                       <th className="py-4.5 px-4 w-[180px] min-w-[180px]">Room Type</th>
-                      <th className="py-4.5 px-4 w-[110px] min-w-[110px]">Floor</th>
-                      <th className="py-4.5 px-4 w-[140px] min-w-[140px]">Active Rate Plan</th>
-                      <th className="py-4.5 px-4 w-[130px] min-w-[130px]">Daily Rate</th>
-                      <th className="py-4.5 px-4 w-[120px] min-w-[120px]">Status</th>
-                      <th className="py-4.5 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
+                      <th className="py-4.5 px-4 w-[100px] min-w-[100px]">Floor</th>
+                      <th className="py-4.5 px-4 w-[130px] min-w-[130px]">Active Rate Plan</th>
+                      <th className="py-4.5 px-4 w-[120px] min-w-[120px]">Daily Rate</th>
+                      <th className="py-4.5 px-4 w-[110px] min-w-[110px]">Status</th>
+                      <th className="py-4.5 px-4 text-left min-w-[200px] whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
                     {paginatedRooms.map((rm) => {
                       const meta = statusMeta[rm.status] || statusMeta.Available;
                       const StatusIcon = meta.icon;
+                      const amenitiesText = Array.isArray(rm.amenities) ? rm.amenities.join(' ') : String(rm.amenities || '');
+                      const isNonAc = rm.type === 'Non-AC' ||
+                        rm.category?.toLowerCase().includes('non-ac') ||
+                        rm.category?.toLowerCase().includes('non ac') ||
+                        amenitiesText.toLowerCase().includes('non-ac') ||
+                        (amenitiesText.toLowerCase().includes('fan') && !amenitiesText.toLowerCase().includes('air condition')) ||
+                        (!amenitiesText.toLowerCase().includes('air condition') && Number(rm.baseRate || rm.currentRate) < 2800);
+                      
+                      // Check if counterpart variant already exists for this roomNumber
+                      const hasCounterpart = roomsList.some(other => {
+                        if (String(other.roomNumber).trim() !== String(rm.roomNumber).trim()) return false;
+                        if ((other._id && rm._id && other._id === rm._id)) return false;
+                        const otherAmenities = Array.isArray(other.amenities) ? other.amenities.join(' ') : String(other.amenities || '');
+                        const otherNonAc = other.type === 'Non-AC' ||
+                          other.category?.toLowerCase().includes('non-ac') ||
+                          other.category?.toLowerCase().includes('non ac') ||
+                          otherAmenities.toLowerCase().includes('non-ac') ||
+                          (otherAmenities.toLowerCase().includes('fan') && !otherAmenities.toLowerCase().includes('air condition'));
+                        return isNonAc ? !otherNonAc : otherNonAc;
+                      });
+
                       return (
-                        <tr key={rm._id} className="hover:bg-[#fcfcfc]/60 transition-colors group">
-                          <td className="py-4 px-6 font-bold text-navy-deep text-sm w-[130px] min-w-[130px] truncate">Room {rm.roomNumber}</td>
-                          <td className="py-4 px-4 font-bold text-brand w-[180px] min-w-[180px] truncate">{rm.category}</td>
-                          <td className="py-4 px-4 text-muted-foreground w-[110px] min-w-[110px] truncate">{rm.floor || 'Floor 1'}</td>
-                          <td className="py-4 px-4 font-mono text-[11px] text-muted-foreground w-[140px] min-w-[140px] truncate">{rm.ratePlan || 'Standard Plan'}</td>
-                          <td className="py-4 px-4 font-bold text-navy w-[130px] min-w-[130px] truncate">₹{Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500).toLocaleString('en-IN')}</td>
-                          <td className="py-4 px-4 w-[120px] min-w-[120px]">
+                        <tr key={rm._id || `${rm.roomNumber}-${rm.category}-${isNonAc ? 'nonac' : 'ac'}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
+                          <td className="py-4 px-6 font-bold text-navy-deep text-sm w-[145px] min-w-[145px]">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>Room {rm.roomNumber}</span>
+                              <span className={`text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                isNonAc
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-purple/10 text-purple border border-purple/20'
+                              }`}>
+                                {isNonAc ? 'Non-AC' : 'AC'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 font-bold text-brand w-[180px] min-w-[180px] truncate">
+                            {rm.category}{isNonAc && !rm.category?.toLowerCase().includes('non-ac') ? ' (Non-AC)' : ''}
+                          </td>
+                          <td className="py-4 px-4 text-muted-foreground w-[100px] min-w-[100px] truncate">{rm.floor || 'Floor 1'}</td>
+                          <td className="py-4 px-4 font-mono text-[11px] text-muted-foreground w-[130px] min-w-[130px] truncate">{rm.ratePlan || 'Standard Plan'}</td>
+                          <td className="py-4 px-4 font-bold text-navy w-[120px] min-w-[120px] truncate">₹{Number(rm.currentRate || rm.baseRate || rm.dailyRate || 3500).toLocaleString('en-IN')}</td>
+                          <td className="py-4 px-4 w-[110px] min-w-[110px]">
                             <Tag tone={meta.tone} className="flex items-center gap-1 w-fit select-none py-0.5">
                               <StatusIcon className="size-3" />
                               <span>{meta.label}</span>
                             </Tag>
                           </td>
-                          <td className="py-4 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
+                          <td className="py-4 px-4 text-left align-middle min-w-[200px] whitespace-nowrap">
                             <ActionGroup align="left">
                               <ViewActionButton
                                 onClick={() => navigate({ to: `/admin/rooms/view/${rm._id || rm.id || rm.roomNumber}` })}
@@ -768,6 +850,22 @@ function RoomsRatesPage() {
                               />
                               <EditActionButton
                                 onClick={() => navigate({ to: `/admin/rooms/edit/${rm._id || rm.id || rm.roomNumber}` })}
+                              />
+                              {!hasCounterpart && (
+                                <ActionButton
+                                  icon={Plus}
+                                  label={isNonAc ? "+ AC" : "+ Non-AC"}
+                                  title={isNonAc ? `Add AC configuration for Room ${rm.roomNumber}` : `Add Non-AC configuration for Room ${rm.roomNumber}`}
+                                  variant="secondary"
+                                  onClick={() => navigate({ to: `/admin/rooms/add?roomNumber=${rm.roomNumber}&variant=${isNonAc ? 'AC' : 'Non-AC'}&floor=${encodeURIComponent(rm.floor || 'Floor 1')}&category=${encodeURIComponent(rm.category)}` })}
+                                />
+                              )}
+                              <ActionButton
+                                icon={Trash2}
+                                label="Delete"
+                                title="Delete this room configuration"
+                                variant="danger"
+                                onClick={() => handleDeleteRoom(rm)}
                               />
                             </ActionGroup>
                           </td>

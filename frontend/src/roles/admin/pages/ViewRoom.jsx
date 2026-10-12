@@ -97,6 +97,13 @@ function ViewRoomPage() {
 
   const roomImages = Array.isArray(room.images) ? room.images.filter(Boolean) : [];
 
+  const amenitiesText = Array.isArray(room.amenities) ? room.amenities.join(' ') : String(room.amenities || '');
+  const isNonAc = room.type === 'Non-AC' ||
+    room.category?.toLowerCase().includes('non-ac') ||
+    room.category?.toLowerCase().includes('non ac') ||
+    (amenitiesText.toLowerCase().includes('fan') && !amenitiesText.toLowerCase().includes('air condition')) ||
+    (!amenitiesText.toLowerCase().includes('air condition') && Number(room.baseRate || room.currentRate) < 2800);
+
   return (
     <div className="space-y-4 text-left font-sans animate-fade-in font-ui">
       <div className="max-w-2xl space-y-6">
@@ -135,8 +142,17 @@ function ViewRoomPage() {
             
             <div className="grid grid-cols-2 gap-4 pb-4 border-b border-muted/40">
               <div>
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Room Number</span>
-                <strong className="block text-sm font-bold mt-1">Room {room.roomNumber}</strong>
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Room Number & Variant</span>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <strong className="block text-sm font-bold">Room {room.roomNumber}</strong>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                    isNonAc
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-purple/10 text-purple border border-purple/20'
+                  }`}>
+                    {isNonAc ? 'Non-AC' : 'AC'}
+                  </span>
+                </div>
               </div>
               <div>
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Room Category</span>

@@ -260,6 +260,61 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
     return list;
   }
 
+  // Deduplicate rooms so each physical room (propertyId + roomNumber) has exactly 1 card
+  List<RoomModel> get _deduplicatedRooms {
+    final list = _filteredRooms;
+    final Map<String, RoomModel> uniqueMap = {};
+    for (final room in list) {
+      final key = '${room.propertyId}_${room.roomNumber}';
+
+      // Collect all images across all climate variants for this physical room
+      final allVariantImages = _rooms
+          .where((r) => r.propertyId == room.propertyId && r.roomNumber == room.roomNumber)
+          .expand((r) => r.images)
+          .where((img) => img.trim().isNotEmpty)
+          .toSet()
+          .toList();
+
+      final roomWithImages = room.images.isNotEmpty
+          ? room.copyWith(images: {...room.images, ...allVariantImages}.toList())
+          : (allVariantImages.isNotEmpty
+              ? room.copyWith(images: allVariantImages)
+              : room.copyWith(images: RoomModel.getCategoryDefaultImages(room.category)));
+
+      if (!uniqueMap.containsKey(key)) {
+        uniqueMap[key] = roomWithImages;
+      } else {
+        // Keep starting rate variant or prefer AC as primary, while retaining all images
+        final existing = uniqueMap[key]!;
+        final mergedImages = {...roomWithImages.images, ...existing.images}.where((img) => img.trim().isNotEmpty).toList();
+        if (_calculateRoomPrice(room) < _calculateRoomPrice(existing)) {
+          uniqueMap[key] = roomWithImages.copyWith(images: mergedImages);
+        } else {
+          uniqueMap[key] = existing.copyWith(images: mergedImages);
+        }
+      }
+    }
+    return uniqueMap.values.toList();
+  }
+
+  bool _hasBothClimateVariants(RoomModel room) {
+    final variants = _rooms.where((r) => r.propertyId == room.propertyId && r.roomNumber == room.roomNumber);
+    final hasAc = variants.any((r) => !r.isNonAc);
+    final hasNonAc = variants.any((r) => r.isNonAc);
+    return hasAc && hasNonAc;
+  }
+
+  double _getRoomStartingPrice(RoomModel room) {
+    final variants = _rooms.where((r) => r.propertyId == room.propertyId && r.roomNumber == room.roomNumber);
+    if (variants.isEmpty) return _calculateRoomPrice(room);
+    double minRate = double.infinity;
+    for (final v in variants) {
+      final p = _calculateRoomPrice(v);
+      if (p < minRate) minRate = p;
+    }
+    return minRate < double.infinity ? minRate : _calculateRoomPrice(room);
+  }
+
   void _resetAllFilters() {
     setState(() {
       _searchController.clear();
@@ -304,7 +359,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredRooms;
+    final filtered = _deduplicatedRooms;
 
     return Scaffold(
       backgroundColor: background,
@@ -987,9 +1042,10 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // 3. ROOM & PROPERTY CARD
   // ==========================================
   Widget _buildRoomCard(RoomModel room) {
-    final price = _calculateRoomPrice(room);
-    final gstTax = (price * 0.18).roundToDouble();
-    final totalPayable = price + gstTax;
+    final hasBothVariants = _hasBothClimateVariants(room);
+    final startingPrice = _getRoomStartingPrice(room);
+    final gstTax = (startingPrice * 0.18).roundToDouble();
+    final totalPayable = startingPrice + gstTax;
 
     return Container(
       decoration: BoxDecoration(
@@ -1059,7 +1115,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            room.category,
+                            '${room.category.replaceAll(RegExp(r'\s*\(?(non-?ac|ac)\)?', caseSensitive: false), '').trim()} • Room ${room.roomNumber}',
                             style: const TextStyle(
                               fontSize: 15.5,
                               fontWeight: FontWeight.w800,
@@ -1069,15 +1125,56 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '₹${totalPayable.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: navy,
-                              letterSpacing: -0.3,
+                          if (hasBothVariants) ...[
+                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: emerald.withAlpha(20),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: emerald.withAlpha(80)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.ac_unit_rounded, size: 10, color: emerald),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'AC & Non-AC Available',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: emerald,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                          ],
+                          const SizedBox(height: 4),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              if (hasBothVariants)
+                                const Text(
+                                  'From ',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: muted,
+                                  ),
+                                ),
+                              Text(
+                                '₹${totalPayable.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: navy,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ],
                           ),
                           const Text(
                             'Final amount (incl. GST)',
@@ -1132,6 +1229,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       MaterialPageRoute(
         builder: (_) => GuestRoomDetailScreen(
           room: room,
+          allRooms: _rooms,
           checkInDate: null,
           checkOutDate: null,
           adultsCount: _adultsCount,
@@ -1165,31 +1263,79 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   }
 
   Widget _buildRoomHeroImage(RoomModel room) {
-    if (room.images.isNotEmpty && room.images.first.isNotEmpty) {
-      final imgUrl = ApiEndpoints.resolveImageUrl(room.images.first);
-      if (imgUrl.startsWith('data:image')) {
-        try {
-          return Image.memory(
-            base64Decode(imgUrl.split(',').last),
-            height: 170,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          );
-        } catch (_) {}
-      } else if (imgUrl.startsWith('http')) {
-        return Image.network(
-          imgUrl,
+    // Gather all candidate image URLs for this room
+    final candidateImages = [
+      ...room.images,
+      ..._rooms
+          .where((r) => r.propertyId == room.propertyId && r.roomNumber == room.roomNumber)
+          .expand((r) => r.images),
+      ...RoomModel.getCategoryDefaultImages(room.category),
+    ].map((img) => ApiEndpoints.resolveImageUrl(img)).where((img) => img.trim().isNotEmpty).toSet().toList();
+
+    return _buildRobustRoomImage(candidateImages, room, 0);
+  }
+
+  Widget _buildRobustRoomImage(List<String> urls, RoomModel room, int index) {
+    if (index >= urls.length) {
+      return _buildFallbackImageGradient(room);
+    }
+    final imgUrl = urls[index];
+    if (imgUrl.startsWith('data:image')) {
+      try {
+        return Image.memory(
+          base64Decode(imgUrl.split(',').last),
           height: 170,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _buildFallbackImageGradient(room),
         );
+      } catch (_) {
+        return _buildRobustRoomImage(urls, room, index + 1);
       }
+    } else if (imgUrl.startsWith('http')) {
+      return Image.network(
+        imgUrl,
+        height: 170,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            height: 170,
+            width: double.infinity,
+            color: const Color(0xFFF1F5F9),
+            child: const Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2, color: purple),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildRobustRoomImage(urls, room, index + 1);
+        },
+      );
     }
-    return _buildFallbackImageGradient(room);
+    return _buildRobustRoomImage(urls, room, index + 1);
   }
 
   Widget _buildFallbackImageGradient(RoomModel room) {
+    // As a final safety net, use reliable category imagery before plain gradient
+    final defaultCatImgs = RoomModel.getCategoryDefaultImages(room.category);
+    if (defaultCatImgs.isNotEmpty && defaultCatImgs.first.startsWith('http')) {
+      return Image.network(
+        defaultCatImgs.first,
+        height: 170,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildPlainGradientBox(room),
+      );
+    }
+    return _buildPlainGradientBox(room);
+  }
+
+  Widget _buildPlainGradientBox(RoomModel room) {
     return Container(
       height: 170,
       width: double.infinity,
@@ -1486,8 +1632,9 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                     'propertyId': room.propertyId,
                                     'roomId': room.id,
                                     'roomNumber': room.roomNumber,
-                                    'room': room.category,
-                                    'roomType': room.category,
+                                    'type': acVariant ?? (room.isNonAc ? 'Non-AC' : 'AC'),
+                                    'room': '${room.category} (${acVariant ?? (room.isNonAc ? "Non-AC" : "AC")})',
+                                    'roomType': '${room.category} (${acVariant ?? (room.isNonAc ? "Non-AC" : "AC")})',
                                     'guest': user.name,
                                     'guestName': user.name,
                                     'email': user.email,

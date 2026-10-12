@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
-import { Bed, ArrowLeft, Upload, Trash2 } from "lucide-react";
+import { Bed, ArrowLeft, Upload, Trash2, Snowflake, Wind, Sparkles, Info, Check } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { validateWithZod, roomSchema } from "@/schemas";
@@ -23,6 +23,10 @@ function AddRoomPage() {
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Room Variant state: 'AC' (Air Conditioned) or 'Non-AC'
+  const [roomVariant, setRoomVariant] = useState("AC");
+  const [existingRooms, setExistingRooms] = useState([]);
 
   // Load existing room types from database
   const [roomTypes, setRoomTypes] = useState([
@@ -56,18 +60,86 @@ function AddRoomPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await superAdminService.getProperties();
-        if (res.success && res.data && res.data.length > 0) {
-          setProperties(res.data);
-          const settings = res.data[0].settings || {};
+        const [propsRes, roomsRes] = await Promise.all([
+          superAdminService.getProperties().catch(() => ({})),
+          adminService.getRooms().catch(() => ({}))
+        ]);
+
+        if (propsRes.success && propsRes.data && propsRes.data.length > 0) {
+          setProperties(propsRes.data);
+          const settings = propsRes.data[0].settings || {};
           if (settings.roomTypes) {
             setRoomTypes(settings.roomTypes);
+          }
+        }
+
+        if (roomsRes.success && Array.isArray(roomsRes.data)) {
+          setExistingRooms(roomsRes.data);
+        }
+
+        // Support URL parameters: /admin/rooms/add?roomNumber=101&variant=Non-AC
+        if (typeof window !== "undefined") {
+          const urlParams = new URLSearchParams(window.location.search);
+          const paramRoom = urlParams.get("roomNumber");
+          const paramVariant = urlParams.get("variant");
+          const paramFloor = urlParams.get("floor");
+          const paramCategory = urlParams.get("category");
+
+          if (paramRoom) {
+            setRoomNumber(paramRoom);
+            const firstDigit = paramRoom.trim().charAt(0);
+            if (!isNaN(Number(firstDigit)) && Number(firstDigit) >= 1 && Number(firstDigit) <= 9) {
+              setFloor(`Floor ${firstDigit}`);
+            }
+          }
+          if (paramFloor) {
+            setFloor(paramFloor);
+          }
+          if (paramCategory) {
+            setSelectedType(paramCategory);
+          }
+          if (paramVariant) {
+            const isNon = paramVariant.toLowerCase().includes("non");
+            setRoomVariant(isNon ? "Non-AC" : "AC");
+            if (isNon) {
+              setAmenities("High-speed Wi-Fi, Flat Screen TV, Ceiling Fan");
+              setBaseRate("2200");
+            }
           }
         }
       } catch (err) {}
     }
     init();
   }, []);
+
+  const handleVariantToggle = (variant) => {
+    setRoomVariant(variant);
+    if (variant === "Non-AC") {
+      // Remove AC amenities and add Non-AC / ceiling fan default
+      const filtered = amenities
+        .split(",")
+        .map(a => a.trim())
+        .filter(a => !a.toLowerCase().includes("air condition") && !a.toLowerCase().includes("ac"));
+      if (!filtered.some(a => a.toLowerCase().includes("fan"))) {
+        filtered.push("Ceiling Fan");
+      }
+      setAmenities(filtered.filter(Boolean).join(", "));
+      // If default baseRate was 3000+, suggest standard Non-AC rate
+      if (Number(baseRate) >= 3000) {
+        setBaseRate("2200");
+      }
+    } else {
+      // Restore / ensure Air Conditioning is in amenities
+      const items = amenities.split(",").map(a => a.trim()).filter(Boolean);
+      if (!items.some(a => a.toLowerCase().includes("air condition"))) {
+        items.unshift("Air Conditioning");
+      }
+      setAmenities(items.filter(a => a.toLowerCase() !== "ceiling fan").join(", "));
+      if (Number(baseRate) <= 2500) {
+        setBaseRate("3000");
+      }
+    }
+  };
 
   const handleImageFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -100,10 +172,23 @@ function AddRoomPage() {
     if (typeVal !== "new") {
       const matched = roomTypes.find(t => t.category === typeVal);
       if (matched) {
-        setBaseRate((matched.baseRate || 3000).toString());
+        let rateToSet = matched.baseRate || 3000;
+        if (roomVariant === "Non-AC" && rateToSet >= 3000) {
+          rateToSet = Math.max(1500, Math.round(rateToSet * 0.75));
+        }
+        setBaseRate(rateToSet.toString());
         if (matched.ratePlan) setRatePlan(matched.ratePlan);
         setCapacity(matched.occupancy || "2 Adults");
-        setAmenities(matched.amenities || "");
+
+        let matchedAmenities = matched.amenities || "";
+        if (roomVariant === "Non-AC") {
+          matchedAmenities = String(matchedAmenities)
+            .split(",")
+            .map(s => s.trim())
+            .filter(s => !s.toLowerCase().includes("air condition") && !s.toLowerCase().includes("ac"))
+            .join(", ");
+        }
+        setAmenities(matchedAmenities);
       }
     } else {
       setBaseRate("");
@@ -172,6 +257,7 @@ function AddRoomPage() {
       await adminService.createRoom({
         roomNumber,
         category: finalCategory,
+        type: roomVariant,
         status: status || 'Available',
         ratePlan: ratePlan || 'Standard Plan',
         baseRate: finalRate,
@@ -182,18 +268,20 @@ function AddRoomPage() {
         bedType,
         amenities,
         description,
+        images
       });
 
-      // Realtime Socket broadcast so Admin, Manager, Receptionist auto-refresh
-      import('@/services/socket').then(({ socket }) => {
+      // Realtime Socket broadcast so Admin, Manager, Receptionist, and Search auto-refresh
+      import('@/services/socket').then(({ emitRealtimeEvent }) => {
         try {
-          socket.emit('room_status_changed', { action: 'room_added', roomNumber });
-          socket.emit('booking_updated', { action: 'room_added' });
-          socket.emit('availability_changed', { action: 'room_added' });
+          emitRealtimeEvent('room_created', { action: 'room_added', roomNumber, category: finalCategory, type: roomVariant });
+          emitRealtimeEvent('room_status_changed', { action: 'room_added', roomNumber, status: status || 'Available' });
+          emitRealtimeEvent('availability_changed', { action: 'room_added', roomNumber });
+          emitRealtimeEvent('dashboard_sync', { action: 'room_added', roomNumber });
         } catch (e) {}
       }).catch(() => {});
 
-      toast.success(`Room #${roomNumber} registered successfully with rate ₹${finalRate.toLocaleString('en-IN')}!`);
+      toast.success(`Room #${roomNumber} (${roomVariant} - ${finalCategory}) registered successfully with rate ₹${finalRate.toLocaleString('en-IN')}!`);
       navigate({ to: "/admin/rooms" });
     } catch (err) {
       toast.error(err.message || "Failed to create room.");
@@ -201,6 +289,10 @@ function AddRoomPage() {
       setLoading(false);
     }
   };
+
+  const matchingExistingRooms = existingRooms.filter(
+    r => String(r.roomNumber || r.num).trim() === String(roomNumber).trim()
+  );
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
@@ -243,6 +335,73 @@ function AddRoomPage() {
                   <option value="Floor 4">Floor 4</option>
                 </Select>
               </FormField>
+            </div>
+
+            {/* Smart Detection if Room already exists with other configurations */}
+            {roomNumber && matchingExistingRooms.length > 0 && (
+              <div className="p-3.5 bg-brand/5 border border-brand/20 rounded-xl text-xs space-y-1">
+                <div className="font-bold text-navy flex items-center gap-1.5">
+                  <Sparkles className="size-4 text-brand" />
+                  <span>Room #{roomNumber} has existing configuration</span>
+                </div>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  Room #{roomNumber} is currently registered as{" "}
+                  <span className="font-semibold text-navy">
+                    {matchingExistingRooms.map(r => `${r.category} (${r.type || 'AC'} · ₹${r.currentRate || r.baseRate})`).join(", ")}
+                  </span>.
+                  You can add a <span className="font-bold text-brand">{roomVariant}</span> variant with distinct tariffs and amenities.
+                </p>
+              </div>
+            )}
+
+            {/* AC / Non-AC Variant Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-navy">
+                Room Climate & Variant (AC / Non-AC)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleVariantToggle("AC")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                    roomVariant === "AC"
+                      ? "border-purple bg-purple/5 ring-2 ring-purple/20 text-purple"
+                      : "border-muted/50 hover:border-navy/20 bg-white text-muted-foreground"
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-lg shrink-0 ${roomVariant === "AC" ? "bg-purple text-white" : "bg-muted/30 text-muted-foreground"}`}>
+                    <Snowflake className="size-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-navy flex items-center gap-1">
+                      AC Room
+                      {roomVariant === "AC" && <Check className="size-3 text-purple" />}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">Air conditioned · AC amenities included</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleVariantToggle("Non-AC")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                    roomVariant === "Non-AC"
+                      ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-500/20 text-emerald-800"
+                      : "border-muted/50 hover:border-navy/20 bg-white text-muted-foreground"
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-lg shrink-0 ${roomVariant === "Non-AC" ? "bg-emerald-600 text-white" : "bg-muted/30 text-muted-foreground"}`}>
+                    <Wind className="size-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-navy flex items-center gap-1">
+                      Non-AC Room
+                      {roomVariant === "Non-AC" && <Check className="size-3 text-emerald-600" />}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">Non-Air Conditioned · Budget tariff & fan</div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <FormField label="Room Category / Type" required id="category">

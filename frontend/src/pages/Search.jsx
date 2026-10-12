@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { inr } from "@/data/hs-data";
 import { publicService } from "@/services/public";
 import { getHotelImage } from "@/utils/hotelImages";
+import { subscribeRealtimeSync } from "@/services/socket";
 
 export const Route = createFileRoute("/search")({
   head: () => ({
@@ -59,9 +60,8 @@ export function SearchPage() {
     }
   }, [checkInDate, checkOutDate, searchTerm]);
 
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
+  const fetchProperties = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
 
     const queryParams = {};
     if (checkInDate) queryParams.checkIn = checkInDate;
@@ -69,7 +69,6 @@ export function SearchPage() {
 
     publicService.getProperties(queryParams)
       .then(res => {
-        if (!isMounted) return;
         if (res.success && res.data) {
           // Only show active properties
           const activeOnly = res.data.filter(p => p.status === 'Active' || !p.status);
@@ -77,13 +76,23 @@ export function SearchPage() {
         }
       })
       .catch(err => {
-        if (isMounted) setError(err.message || "Failed to load hotel listings.");
+        if (!isSilent) setError(err.message || "Failed to load hotel listings.");
       })
       .finally(() => {
-        if (isMounted) setLoading(false);
+        if (!isSilent) setLoading(false);
       });
+  };
 
-    return () => { isMounted = false; };
+  useEffect(() => {
+    fetchProperties(false);
+
+    const unsubscribe = subscribeRealtimeSync(() => {
+      fetchProperties(true);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [checkInDate, checkOutDate]);
 
   // Unique cities list for filter dropdown

@@ -19,6 +19,7 @@ typedef RoomBookingCallback = void Function(
 
 class GuestRoomDetailScreen extends StatefulWidget {
   final RoomModel room;
+  final List<RoomModel>? allRooms;
   final DateTime? checkInDate;
   final DateTime? checkOutDate;
   final int adultsCount;
@@ -29,6 +30,7 @@ class GuestRoomDetailScreen extends StatefulWidget {
   const GuestRoomDetailScreen({
     super.key,
     required this.room,
+    this.allRooms,
     this.checkInDate,
     this.checkOutDate,
     this.adultsCount = 2,
@@ -51,6 +53,7 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
   late int _adultsCount;
   late int _childrenCount;
   late int _roomsCount;
+  late String _selectedRoomNumber;
   late String _selectedAcVariant; // 'AC' or 'Non-AC'
 
   @override
@@ -64,12 +67,10 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     _childrenCount = widget.childrenCount >= 0 ? widget.childrenCount : 0;
     _roomsCount = widget.roomsCount > 0 ? widget.roomsCount : 1;
 
-    // Detect initial AC variant from room amenities / category
-    final isAcByDefault = widget.room.amenities.any((a) =>
-            a.toLowerCase().contains('ac') ||
-            a.toLowerCase().contains('air') ||
-            a.toLowerCase().contains('condition')) ||
-        !widget.room.category.toLowerCase().contains('non-ac');
+    _selectedRoomNumber = widget.room.roomNumber;
+
+    // Detect initial AC variant from room
+    final isAcByDefault = !widget.room.isNonAc;
     _selectedAcVariant = isAcByDefault ? 'AC' : 'Non-AC';
   }
 
@@ -77,6 +78,44 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  // Room & Category Matching Getters
+  List<RoomModel> get _categoryRooms {
+    if (widget.allRooms == null || widget.allRooms!.isEmpty) {
+      return [widget.room];
+    }
+    final baseCat = widget.room.category.toLowerCase().replaceAll(RegExp(r'\s*\(?(non-?ac|ac)\)?'), '').trim();
+    return widget.allRooms!.where((r) {
+      final rCat = r.category.toLowerCase().replaceAll(RegExp(r'\s*\(?(non-?ac|ac)\)?'), '').trim();
+      return r.propertyId == widget.room.propertyId && (rCat == baseCat || r.roomNumber == widget.room.roomNumber);
+    }).toList();
+  }
+
+  List<RoomModel> get _variantsForSelectedRoom {
+    final list = _categoryRooms.where((r) => r.roomNumber == _selectedRoomNumber).toList();
+    if (list.isEmpty) return [widget.room];
+    return list;
+  }
+
+  RoomModel? get _acVariantRoom {
+    final list = _variantsForSelectedRoom;
+    return list.cast<RoomModel?>().firstWhere((r) => r != null && r.isAc, orElse: () => null);
+  }
+
+  RoomModel? get _nonAcVariantRoom {
+    final list = _variantsForSelectedRoom;
+    return list.cast<RoomModel?>().firstWhere((r) => r != null && r.isNonAc, orElse: () => null);
+  }
+
+  RoomModel get _activeRoomModel {
+    if (_selectedAcVariant == 'Non-AC' && _nonAcVariantRoom != null) {
+      return _nonAcVariantRoom!;
+    }
+    if (_acVariantRoom != null) {
+      return _acVariantRoom!;
+    }
+    return widget.room;
   }
 
   // Calculation Getters
@@ -88,16 +127,22 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     return diff > 0 ? diff : 1;
   }
 
-  double get _rawNightlyRate {
+  double get _acNightlyRate {
+    if (_acVariantRoom != null) {
+      return _acVariantRoom!.currentRate > 0 ? _acVariantRoom!.currentRate : _acVariantRoom!.baseRate;
+    }
     return widget.room.currentRate > 0 ? widget.room.currentRate : widget.room.baseRate;
   }
 
-  double get _effectiveNightlyRate {
-    if (_selectedAcVariant == 'Non-AC') {
-      // Non-AC economy tariff (15% reduction)
-      return (_rawNightlyRate * 0.85).roundToDouble();
+  double get _nonAcNightlyRate {
+    if (_nonAcVariantRoom != null) {
+      return _nonAcVariantRoom!.currentRate > 0 ? _nonAcVariantRoom!.currentRate : _nonAcVariantRoom!.baseRate;
     }
-    return _rawNightlyRate;
+    return (_acNightlyRate * 0.85).roundToDouble();
+  }
+
+  double get _effectiveNightlyRate {
+    return _selectedAcVariant == 'Non-AC' ? _nonAcNightlyRate : _acNightlyRate;
   }
 
   double get _extraGuestTariffPerNight {
@@ -502,7 +547,7 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              room.category,
+                              '${_activeRoomModel.category.replaceAll(RegExp(r'\s*\(?(non-?ac|ac)\)?', caseSensitive: false), '').trim()} • Room $_selectedRoomNumber',
                               style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
@@ -546,7 +591,7 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                             const Icon(Icons.star_rounded, size: 16, color: Color(0xFFB45309)),
                             const SizedBox(width: 4),
                             Text(
-                              room.rating.toStringAsFixed(1),
+                              _activeRoomModel.rating.toStringAsFixed(1),
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w900,
@@ -561,9 +606,9 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                   const SizedBox(height: 18),
 
                   // ==========================================
-                  // 1. SUB-CATEGORY & CLIMATE VARIANT (AC / Non-AC)
+                  // ROOM CLIMATE CATEGORY (AC / Non-AC)
                   // ==========================================
-                  _buildSectionTitle('ROOM SUB-CATEGORY & CLIMATE VARIANT', Icons.tune_rounded),
+                  _buildSectionTitle('CHOOSE CLIMATE CATEGORY (AC / Non-AC)', Icons.tune_rounded),
                   const SizedBox(height: 10),
                   _buildAcVariantSelector(),
                   const SizedBox(height: 18),
@@ -666,7 +711,7 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                 onPressed: isAvailable
                     ? () {
                         widget.onBookStay(
-                          room,
+                          _activeRoomModel,
                           checkInDate: _checkInDate,
                           checkOutDate: _checkOutDate,
                           adultsCount: _adultsCount,
@@ -732,17 +777,17 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     );
   }
 
-  // 1. AC / Non-AC Variant Selector
+  // AC / Non-AC Variant Selector
   Widget _buildAcVariantSelector() {
-    final acRate = _rawNightlyRate;
-    final nonAcRate = (_rawNightlyRate * 0.85).roundToDouble();
+    final acRate = _acNightlyRate;
+    final nonAcRate = _nonAcNightlyRate;
 
     return Row(
       children: [
         Expanded(
           child: _buildVariantCard(
-            title: 'AC Room',
-            subtitle: 'Climate Controlled',
+            title: 'Air Conditioned (AC)',
+            subtitle: 'Climate Controlled Luxury',
             priceTag: '₹${acRate.toStringAsFixed(0)} / night',
             icon: Icons.ac_unit_rounded,
             isSelected: _selectedAcVariant == 'AC',
@@ -754,7 +799,7 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
           child: _buildVariantCard(
             title: 'Non-AC Room',
             subtitle: 'Naturally Ventilated',
-            priceTag: '₹${nonAcRate.toStringAsFixed(0)} / night (-15%)',
+            priceTag: '₹${nonAcRate.toStringAsFixed(0)} / night',
             icon: Icons.air_rounded,
             isSelected: _selectedAcVariant == 'Non-AC',
             onTap: () => setState(() => _selectedAcVariant = 'Non-AC'),
@@ -1616,16 +1661,26 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
   }
 
   Widget _buildImageCarousel(RoomModel room) {
-    if (room.images.isEmpty) {
+    final candidateImages = [
+      ..._activeRoomModel.images,
+      ...room.images,
+      if (widget.allRooms != null)
+        ...widget.allRooms!
+            .where((r) => r.propertyId == room.propertyId && r.roomNumber == _selectedRoomNumber)
+            .expand((r) => r.images),
+      ...RoomModel.getCategoryDefaultImages(room.category),
+    ].map((img) => ApiEndpoints.resolveImageUrl(img)).where((img) => img.trim().isNotEmpty).toSet().toList();
+
+    if (candidateImages.isEmpty) {
       return _buildFallbackImage(room);
     }
 
     return PageView.builder(
       controller: _pageController,
-      itemCount: room.images.length,
+      itemCount: candidateImages.length,
       onPageChanged: (index) => setState(() => _activeImageIndex = index),
       itemBuilder: (context, index) {
-        final imgUrl = ApiEndpoints.resolveImageUrl(room.images[index]);
+        final imgUrl = candidateImages[index];
         if (imgUrl.startsWith('data:image')) {
           try {
             return Image.memory(
@@ -1637,7 +1692,17 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
           return Image.network(
             imgUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => _buildFallbackImage(room),
+            errorBuilder: (_, _, _) {
+              final nextIndex = (index + 1) % candidateImages.length;
+              if (nextIndex != index && candidateImages[nextIndex].startsWith('http')) {
+                return Image.network(
+                  candidateImages[nextIndex],
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _buildFallbackImage(room),
+                );
+              }
+              return _buildFallbackImage(room);
+            },
           );
         }
         return _buildFallbackImage(room);

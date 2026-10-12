@@ -867,8 +867,17 @@ router.get('/rooms', async (req, res) => {
         }
       }
 
+      const obj = rm.toObject ? rm.toObject() : { ...rm };
+      const amenitiesStr = Array.isArray(obj.amenities) ? obj.amenities.join(', ') : String(obj.amenities || '');
+      const isNonAc = obj.type === 'Non-AC' ||
+                      (obj.category && (obj.category.toLowerCase().includes('non-ac') || obj.category.toLowerCase().includes('non ac'))) ||
+                      (amenitiesStr.toLowerCase().includes('fan') && !amenitiesStr.toLowerCase().includes('air condition')) ||
+                      (!amenitiesStr.toLowerCase().includes('air condition') && Number(obj.baseRate || obj.currentRate) < 2800);
+      const resolvedType = obj.type || (isNonAc ? 'Non-AC' : 'AC');
+
       return {
-        ...rm.toObject(),
+        ...obj,
+        type: resolvedType,
         status: displayStatus,
         operationalStatus: rm.status || 'Available',
         isReserved,
@@ -891,11 +900,15 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
     if (!status) {
       return sendError(res, 400, 'New room status value is required.');
     }
-    const updated = await Room.findOneAndUpdate(
+    // Update all room variants sharing this physical roomNumber (e.g. AC and Non-AC)
+    await Room.updateMany(
       { roomNumber: req.params.roomNumber, propertyId: req.user.propertyId },
-      { status },
-      { new: true }
+      { status }
     );
+    const updated = await Room.findOne({
+      roomNumber: req.params.roomNumber,
+      propertyId: req.user.propertyId
+    });
     if (!updated) {
       return sendError(res, 404, 'Room not found.');
     }
@@ -914,14 +927,38 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
 
 router.post('/rooms', async (req, res) => {
   try {
-    const { roomNumber, category, status, ratePlan, baseRate, currentRate, dailyRate, floor, capacity, bedType, amenities, description, images } = req.body;
+    const { roomNumber, category, type, status, ratePlan, baseRate, currentRate, dailyRate, floor, capacity, bedType, amenities, description, images } = req.body;
     if (!roomNumber || !category) {
       return sendError(res, 400, 'roomNumber and category are required.');
     }
+
+    // Resolve variant type: 'AC' or 'Non-AC'
+    const amenitiesText = Array.isArray(amenities) ? amenities.join(' ') : String(amenities || '');
+    const isNonAc = type === 'Non-AC' || 
+                    category.toLowerCase().includes('non-ac') || 
+                    category.toLowerCase().includes('non ac') || 
+                    amenitiesText.toLowerCase().includes('non-ac');
+    const resolvedType = type || (isNonAc ? 'Non-AC' : 'AC');
+
+    const cleanRoomNum = String(roomNumber).trim();
+    const cleanCategory = String(category).trim();
+
+    // Check if duplicate of exact same roomNumber + category + type exists
+    const existing = await Room.findOne({
+      roomNumber: cleanRoomNum,
+      category: cleanCategory,
+      type: resolvedType,
+      propertyId: req.user.propertyId
+    });
+    if (existing) {
+      return sendError(res, 400, `Room #${cleanRoomNum} with category "${cleanCategory}" (${resolvedType}) is already configured.`);
+    }
+
     const rate = Number(baseRate || currentRate || dailyRate || 3500);
     const newRoom = await Room.create({
-      roomNumber,
-      category,
+      roomNumber: cleanRoomNum,
+      category: cleanCategory,
+      type: resolvedType,
       status: status || 'Available',
       ratePlan: ratePlan || 'Standard Plan',
       baseRate: rate,
@@ -935,6 +972,15 @@ router.post('/rooms', async (req, res) => {
       images: Array.isArray(images) ? images : [],
       propertyId: req.user.propertyId
     });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, req.user.propertyId, 'room_created', { propertyId: req.user.propertyId, room: newRoom, roomNumber: cleanRoomNum });
+      emitRealtimeSync(io, req.user.propertyId, 'room_status_changed', { propertyId: req.user.propertyId, roomNumber: cleanRoomNum, status: newRoom.status });
+      emitRealtimeSync(io, req.user.propertyId, 'availability_changed', { propertyId: req.user.propertyId, roomNumber: cleanRoomNum });
+      emitRealtimeSync(io, req.user.propertyId, 'dashboard_sync', { propertyId: req.user.propertyId, action: 'room_created', roomNumber: cleanRoomNum });
+    }
+
     return sendSuccess(res, 201, newRoom, 'Room created successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -943,9 +989,13 @@ router.post('/rooms', async (req, res) => {
 
 router.put('/rooms/:id', async (req, res) => {
   try {
-    const { roomNumber, category, status, ratePlan, baseRate, currentRate, dailyRate, floor, capacity, bedType, amenities, description, images } = req.body;
+    const { roomNumber, category, type, status, ratePlan, baseRate, currentRate, dailyRate, floor, capacity, bedType, amenities, description, images } = req.body;
     const rate = Number(baseRate || currentRate || dailyRate);
-    const updateData = { roomNumber, category, status };
+    const updateData = {};
+    if (roomNumber) updateData.roomNumber = String(roomNumber).trim();
+    if (category) updateData.category = String(category).trim();
+    if (type) updateData.type = type;
+    if (status) updateData.status = status;
     if (ratePlan) updateData.ratePlan = ratePlan;
     if (rate && !isNaN(rate) && rate > 0) {
       updateData.baseRate = rate;
@@ -955,17 +1005,17 @@ router.put('/rooms/:id', async (req, res) => {
     if (floor) updateData.floor = floor;
     if (capacity) updateData.capacity = capacity;
     if (bedType) updateData.bedType = bedType;
-    if (amenities) updateData.amenities = amenities;
+    if (amenities !== undefined) updateData.amenities = amenities;
     if (description !== undefined) updateData.description = description;
     if (Array.isArray(images)) updateData.images = images;
 
-    const queryOr = [
-      { roomNumber: req.params.id },
-      { id: req.params.id }
-    ];
+    // Prioritize ObjectId match so specific room variant is precisely updated
+    const queryOr = [];
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
       queryOr.push({ _id: req.params.id });
     }
+    queryOr.push({ id: req.params.id });
+    queryOr.push({ roomNumber: req.params.id });
 
     let updated = await Room.findOneAndUpdate(
       { propertyId: req.user.propertyId, $or: queryOr },
@@ -982,6 +1032,15 @@ router.put('/rooms/:id', async (req, res) => {
     }
 
     if (!updated) return sendError(res, 404, 'Room not found.');
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, req.user.propertyId, 'room_updated', { propertyId: req.user.propertyId, room: updated, roomNumber: updated.roomNumber });
+      emitRealtimeSync(io, req.user.propertyId, 'room_status_changed', { propertyId: req.user.propertyId, roomNumber: updated.roomNumber, status: updated.status });
+      emitRealtimeSync(io, req.user.propertyId, 'availability_changed', { propertyId: req.user.propertyId, roomNumber: updated.roomNumber });
+      emitRealtimeSync(io, req.user.propertyId, 'dashboard_sync', { propertyId: req.user.propertyId, action: 'room_updated', roomNumber: updated.roomNumber });
+    }
+
     return sendSuccess(res, 200, updated, 'Room updated successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -990,19 +1049,27 @@ router.put('/rooms/:id', async (req, res) => {
 
 router.delete('/rooms/:id', async (req, res) => {
   try {
-    const queryOr = [
-      { roomNumber: req.params.id },
-      { id: req.params.id }
-    ];
+    // Prioritize ObjectId match so specific room variant is precisely deleted
+    const queryOr = [];
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
       queryOr.push({ _id: req.params.id });
     }
+    queryOr.push({ id: req.params.id });
+    queryOr.push({ roomNumber: req.params.id });
 
     let deleted = await Room.findOneAndDelete({ propertyId: req.user.propertyId, $or: queryOr });
     if (!deleted) {
       deleted = await Room.findOneAndDelete({ $or: queryOr });
     }
     if (!deleted) return sendError(res, 404, 'Room not found.');
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, req.user.propertyId, 'room_deleted', { propertyId: req.user.propertyId, room: deleted, roomNumber: deleted.roomNumber });
+      emitRealtimeSync(io, req.user.propertyId, 'availability_changed', { propertyId: req.user.propertyId, roomNumber: deleted.roomNumber });
+      emitRealtimeSync(io, req.user.propertyId, 'dashboard_sync', { propertyId: req.user.propertyId, action: 'room_deleted', roomNumber: deleted.roomNumber });
+    }
+
     return sendSuccess(res, 200, deleted, 'Room deleted successfully.');
   } catch (err) {
     return sendError(res, 500, err.message);

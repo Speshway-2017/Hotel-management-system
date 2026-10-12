@@ -353,6 +353,7 @@ router.get('/properties/:id/rooms', async (req, res) => {
         roomNumber: rm.roomNumber,
         name: `${rm.category} (Room ${rm.roomNumber})`,
         category: rm.category || "Standard Room",
+        type: rm.type || (amenitiesArr.some(a => a.toLowerCase().includes('fan')) && !amenitiesArr.some(a => a.toLowerCase().includes('air condition') || a.toLowerCase().includes('ac')) ? 'Non-AC' : 'AC'),
         size: capacityStr,
         beds: rm.bedType || "King Bed",
         occupancy: capacityStr.includes("4") ? 4 : capacityStr.includes("6") ? 6 : 2,
@@ -371,9 +372,13 @@ router.get('/properties/:id/rooms', async (req, res) => {
         bookedRanges: availEval.bookedRanges || [],
         amenities: amenitiesArr,
         description: rm.description || `Luxury ${rm.category} located on ${rm.floor || 'Floor 1'}.`,
-        floor: rm.floor || "Floor 1",
-        images: Array.isArray(rm.images) ? rm.images.filter(Boolean) : [],
-        propertyId: rm.propertyId,
+        images: (Array.isArray(rm.images) && rm.images.filter(Boolean).length > 0)
+          ? rm.images.filter(Boolean)
+          : (rm.category && rm.category.toLowerCase().includes('deluxe'))
+              ? ['https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160189/hourstay_hms_assets/win4vnjsb2f6gs8yxz6t.jpg', 'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1000&q=80']
+              : (rm.category && rm.category.toLowerCase().includes('suite'))
+                  ? ['https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160250/hourstay_hms_assets/b04x9vyzbi2n0c80pqru.jpg', 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1000&q=80']
+                  : ['https://res.cloudinary.com/dg9sqvxen/image/upload/v1788160110/hourstay_hms_assets/gcvimdwyma48fdua8fxg.jpg', 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80'],
         inventory: isAvailable ? 1 : 0
       };
     });

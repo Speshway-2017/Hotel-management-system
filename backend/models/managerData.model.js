@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 const roomSchema = new mongoose.Schema({
   roomNumber: { type: String, required: true },
   category: { type: String, required: true },
+  type: { type: String, default: 'AC' }, // 'AC' or 'Non-AC' variant
   status: { type: String, enum: ['Available', 'Occupied', 'Blocked'], default: 'Available' },
   ratePlan: { type: String, default: 'Standard Plan' },
   baseRate: { type: Number, default: 3500 },
@@ -20,8 +21,8 @@ const roomSchema = new mongoose.Schema({
   propertyId: { type: String, required: true }
 }, { timestamps: true });
 
-// Ensure unique index per property
-roomSchema.index({ roomNumber: 1, propertyId: 1 }, { unique: true });
+// Ensure unique index per roomNumber + category + type per property (allows AC & Non-AC variants for room 101)
+roomSchema.index({ roomNumber: 1, category: 1, type: 1, propertyId: 1 }, { unique: true });
 
 export const Room = mongoose.models.Room || mongoose.model('Room', roomSchema);
 
