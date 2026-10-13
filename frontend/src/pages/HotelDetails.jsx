@@ -241,13 +241,13 @@ export function HotelDetailsPage() {
     let resCount = 0;
 
     Object.values(distinctRoomsMap).forEach(variants => {
-      const isOcc = variants.some(v => v.status === 'Occupied');
-      const isRes = variants.some(v => v.status === 'Reserved' || v.isReserved);
-      const isAvail = variants.some(v => v.status === 'Available' || v.isAvailable === true) && !isOcc;
+      const hasAnyAvail = variants.some(v => v.status === 'Available' || v.isAvailable === true);
+      const isAllOcc = variants.length > 0 && variants.every(v => v.status === 'Occupied' || v.isAvailable === false);
+      const isRes = !hasAnyAvail && variants.some(v => v.status === 'Reserved' || v.isReserved);
 
-      if (!isDatesSelected || isAvail) {
+      if (!isDatesSelected || hasAnyAvail) {
         availCount += 1;
-      } else if (isOcc) {
+      } else if (isAllOcc) {
         occCount += 1;
       } else if (isRes) {
         resCount += 1;

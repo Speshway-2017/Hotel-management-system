@@ -18,7 +18,7 @@ import {
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
-import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
+import { extractRoomNumber, extractRoomVariant, syncRoomStatus, isBookingMatchingRoom, reconcileRoomStatuses } from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
 import { isCheckInAllowed, formatISTDateTime, parseDateSafe } from '../utils/dateUtils.js';
 import { processAutoCheckouts } from '../services/autoCheckout.service.js';
@@ -441,6 +441,7 @@ router.post('/reservations', async (req, res) => {
       room: req.body.room || (roomNum ? `${roomNum} · ${req.body.roomType || 'Standard Room'}` : ''),
       roomNumber: roomNum,
       roomType: req.body.roomType || 'Standard Room',
+      roomVariant: req.body.roomVariant || req.body.type || 'AC',
       status: req.body.status || (req.body.source === 'Walk-in' ? 'Checked-in' : 'Confirmed'),
       paymentStatus: req.body.paymentStatus || (req.body.balance === 0 ? 'Paid' : 'Pending')
     };
@@ -459,7 +460,7 @@ router.post('/reservations', async (req, res) => {
     // If room is assigned, update room status
     if (roomNum) {
       const rmStatus = payload.status === 'Checked-in' ? 'Occupied' : 'Reserved';
-      await syncRoomStatus(roomNum, rmStatus, propId);
+      await syncRoomStatus(roomNum, rmStatus, propId, io, payload.roomVariant || 'AC');
     }
 
     const io = req.app.get('socketio');
@@ -675,6 +676,9 @@ router.put('/reservations/:id', async (req, res) => {
     if (!updated) return sendError(res, 404, 'Reservation not found');
 
     // Update Room table accordingly
+    // Realtime broadcast across all dashboards
+    const io = req.app.get('socketio');
+
     if (roomNum) {
       let rmStatus = 'Available';
       if (updated.status === 'Checked-in') rmStatus = 'Occupied';
@@ -682,7 +686,7 @@ router.put('/reservations/:id', async (req, res) => {
       else if (updated.status === 'Checked-out') rmStatus = 'Available';
       else if (updated.status === 'Cancelled' || updated.status === 'No-show') rmStatus = 'Available';
 
-      await syncRoomStatus(roomNum, rmStatus, propId);
+      await syncRoomStatus(roomNum, rmStatus, propId, io, updated.roomVariant || 'AC');
     }
 
     const action = updated.status === 'Checked-in' ? 'checkin' : updated.status === 'Checked-out' ? 'checkout' : updated.status === 'Cancelled' ? 'cancelled' : 'status_change';
@@ -694,8 +698,6 @@ router.put('/reservations/:id', async (req, res) => {
       booking: updated
     });
 
-    // Realtime broadcast across all dashboards
-    const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, propId, {
         action,
@@ -733,7 +735,7 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
     const cleanRoomNum = extractRoomNumber(roomNumber);
     const rmStatus = updated.status === 'Checked-in' ? 'Occupied' : 'Reserved';
     if (cleanRoomNum) {
-      await syncRoomStatus(cleanRoomNum, rmStatus, propId);
+      await syncRoomStatus(cleanRoomNum, rmStatus, propId, req.app.get('socketio'), updated.roomVariant || 'AC');
     }
 
     // Notify guest and dashboards of room assignment
@@ -800,6 +802,9 @@ router.get('/rooms', async (req, res) => {
     );
 
     const propId = req.user?.propertyId || 'HS-9HQ8P';
+
+    await reconcileRoomStatuses(propId);
+
     let rooms = await Room.find({ $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }] }).sort({ roomNumber: 1 });
     if (!rooms || rooms.length === 0) {
       rooms = await Room.find().sort({ roomNumber: 1 });
@@ -822,49 +827,31 @@ router.get('/rooms', async (req, res) => {
     const reqIn = parseTime(checkIn);
     const reqOut = parseTime(checkOut);
 
-    // Pass 1: Explicit room number / roomId matching
-    const roomBookingMap = new Map();
-    const unassignedCategoryBookings = [];
-
-    for (const b of activeBookings) {
-      if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') continue;
-
-      const bIn = parseTime(b.checkIn);
-      const bOut = parseTime(b.checkOut);
-      if (reqIn && reqOut && bIn && bOut && !(reqIn < bOut && reqOut > bIn)) {
-        continue;
-      }
-
-      const bRoomNum = b.roomNumber || (b.roomId && !isNaN(b.roomId) ? String(b.roomId) : null) || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] : null);
-      let matchedRm = null;
-
-      if (b.roomId) {
-        matchedRm = rooms.find(r => String(r._id) === String(b.roomId) || String(r.id) === String(b.roomId) || String(r.roomNumber).trim() === String(b.roomId).trim());
-      }
-      if (!matchedRm && bRoomNum) {
-        matchedRm = rooms.find(r => String(r.roomNumber).trim() === String(bRoomNum).trim());
-      }
-      if (!matchedRm && b.room) {
-        matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber)));
-      }
-
-      if (matchedRm) {
-        roomBookingMap.set(String(matchedRm._id), b);
-        roomBookingMap.set(String(matchedRm.roomNumber), b);
-      }
-    }
-
     const mappedRooms = rooms.map(rm => {
-      const matchedBooking = roomBookingMap.get(String(rm._id)) || roomBookingMap.get(String(rm.roomNumber));
+      // Find active booking strictly matching this specific room and climate variant
+      const matchedBooking = activeBookings.find(b => {
+        if (b.status === 'Cancelled' || b.status === 'Checked-out' || b.status === 'No-show') return false;
+        const bIn = parseTime(b.checkIn);
+        const bOut = parseTime(b.checkOut);
+        if (reqIn && reqOut && bIn && bOut && !(reqIn < bOut && reqOut > bIn)) {
+          return false;
+        }
+        return isBookingMatchingRoom(b, rm);
+      });
+
       const isReserved = !!matchedBooking;
 
-      let displayStatus = rm.status || 'Available';
-      if (rm.status !== 'Blocked' && matchedBooking) {
-        if (matchedBooking.status === 'Checked-in' || matchedBooking.status === 'Checked In' || matchedBooking.status === 'Staying') {
+      let displayStatus = 'Available';
+      if (['Blocked', 'Maintenance', 'Out of Order'].includes(rm.status)) {
+        displayStatus = rm.status;
+      } else if (matchedBooking) {
+        if (['Checked-in', 'Checked In', 'Staying', 'Occupied'].includes(matchedBooking.status)) {
           displayStatus = 'Occupied';
-        } else if (['Confirmed', 'Paid', 'Pending', 'Pre-checked'].includes(matchedBooking.status)) {
+        } else if (['Confirmed', 'Paid', 'Pending', 'Pre-checked', 'Reserved'].includes(matchedBooking.status)) {
           displayStatus = 'Reserved';
         }
+      } else {
+        displayStatus = 'Available';
       }
 
       const obj = rm.toObject ? rm.toObject() : { ...rm };

@@ -15,12 +15,14 @@ import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.j
 import { calculateStayNights, parseDateSafe, formatISTDateTime, formatToYYYYMMDD } from '../utils/dateUtils.js';
 import {
   extractRoomNumber,
+  extractRoomVariant,
   syncRoomStatus,
   isBookingMatchingRoom,
   parseDateToDayUtc,
   isStayDateOverlapping,
   isBookingStatusActive,
-  evaluateRoomAvailabilityForDates
+  evaluateRoomAvailabilityForDates,
+  reconcileRoomStatuses
 } from '../utils/roomHelper.js';
 import {
   validateBookingAadhaarConsistency,
@@ -301,6 +303,8 @@ router.get('/properties/:id/rooms', async (req, res) => {
       if (propDoc.id) propIds.push(String(propDoc.id));
     }
 
+    await reconcileRoomStatuses(propIds[0]);
+
     // Strictly find rooms belonging to this property only
     const dbRooms = await Room.find({
       $or: [
@@ -400,7 +404,7 @@ router.get('/properties/:id/rooms', async (req, res) => {
 router.get('/properties/:id/rooms/:roomNumber/availability', async (req, res) => {
   try {
     const { id, roomNumber } = req.params;
-    const { checkIn, checkOut } = req.query;
+    const { checkIn, checkOut, type, variant } = req.query;
     const targetPropId = id;
 
     let propDoc = null;
@@ -418,7 +422,9 @@ router.get('/properties/:id/rooms/:roomNumber/availability', async (req, res) =>
     }
 
     const cleanNum = extractRoomNumber(roomNumber);
-    const room = await Room.findOne({
+    const targetVariant = extractRoomVariant(variant || type || roomNumber);
+
+    const roomQuery = {
       $and: [
         {
           $or: [
@@ -433,7 +439,17 @@ router.get('/properties/:id/rooms/:roomNumber/availability', async (req, res) =>
           ]
         }
       ]
-    });
+    };
+    if (targetVariant) {
+      roomQuery.$and.push({ type: targetVariant });
+    }
+
+    let room = await Room.findOne(roomQuery);
+    if (!room && targetVariant) {
+      // Fallback without strict variant filter if not found
+      roomQuery.$and = roomQuery.$and.filter(clause => !clause.type);
+      room = await Room.findOne(roomQuery);
+    }
 
     if (!room) {
       return sendError(res, 404, 'Room not found for this property');
@@ -452,7 +468,8 @@ router.get('/properties/:id/rooms/:roomNumber/availability', async (req, res) =>
       checkIn: b.checkIn,
       checkOut: b.checkOut,
       status: b.status,
-      guest: b.guest || b.guestName || ''
+      guest: b.guest || b.guestName || '',
+      roomVariant: b.roomVariant || extractRoomVariant(b) || room.type || 'AC'
     }));
 
     let isAvailable = room.status !== 'Blocked' && room.status !== 'Maintenance';
@@ -608,31 +625,53 @@ router.post('/bookings', async (req, res) => {
 
     // Identify which category rooms are vacant for requested date range
     const availableCategoryRooms = categoryRooms.filter(r => {
-      const isTaken = overlappingActiveBookings.some(b => isBookingMatchingRoom(b, r));
+      const isTaken = overlappingActiveBookings.some(b => {
+        const bVariant = extractRoomVariant(b) || b.roomVariant || 'AC';
+        const rVar = extractRoomVariant(r) || r.type || 'AC';
+        if (bVariant && rVar && bVariant !== rVar) return false;
+        return isBookingMatchingRoom(b, r);
+      });
       const statusStr = String(r.status || 'Available').toLowerCase();
-      const isStatusAvailable = statusStr === 'available' || statusStr === 'vacant clean' || statusStr === 'vacant';
-      return !isTaken && isStatusAvailable;
+      const isBlocked = ['blocked', 'maintenance', 'out of order'].includes(statusStr);
+      return !isTaken && !isBlocked;
     });
 
     let finalAssignedRoom = null;
 
     // If a specific room was requested, strictly check that room's availability
     if (assignedRoomNumber || assignedRoomId) {
-      const requestedRoom = allPropRooms.find(r => 
-        (assignedRoomId && String(r._id) === String(assignedRoomId)) ||
-        (assignedRoomNumber && String(r.roomNumber).trim() === String(assignedRoomNumber).trim())
-      );
+      const requestedVariant = extractRoomVariant(req.body.roomVariant || req.body.type || rType || room);
+      let requestedRoom = null;
+
+      if (assignedRoomId) {
+        requestedRoom = allPropRooms.find(r => String(r._id) === String(assignedRoomId));
+      }
+      if (!requestedRoom && assignedRoomNumber) {
+        requestedRoom = allPropRooms.find(r => {
+          if (String(r.roomNumber).trim() !== String(assignedRoomNumber).trim()) return false;
+          if (requestedVariant) {
+            return extractRoomVariant(r) === requestedVariant;
+          }
+          return true;
+        }) || allPropRooms.find(r => String(r.roomNumber).trim() === String(assignedRoomNumber).trim());
+      }
 
       if (requestedRoom) {
-        const isSpecificRoomTaken = overlappingActiveBookings.some(b => isBookingMatchingRoom(b, requestedRoom));
+        const isSpecificRoomTaken = overlappingActiveBookings.some(b => {
+          const bVariant = extractRoomVariant(b) || b.roomVariant || 'AC';
+          if (requestedVariant && bVariant && requestedVariant !== bVariant) {
+            return false; // Different variants (e.g. Non-AC vs AC) do not conflict
+          }
+          return isBookingMatchingRoom(b, requestedRoom);
+        });
         const statusStr = String(requestedRoom.status || 'Available').toLowerCase();
-        const isStatusAvailable = statusStr === 'available' || statusStr === 'vacant clean' || statusStr === 'vacant';
+        const isBlocked = ['blocked', 'maintenance', 'out of order'].includes(statusStr);
 
-        if (isSpecificRoomTaken || !isStatusAvailable) {
+        if (isSpecificRoomTaken || isBlocked) {
           return sendError(
             res,
             409,
-            `Room ${requestedRoom.roomNumber} is unavailable for selected dates (${cIn} to ${cOut}) due to an existing booking. Please choose different dates.`
+            `Room ${requestedRoom.roomNumber} (${requestedVariant || extractRoomVariant(requestedRoom) || 'AC'}) is unavailable for selected dates (${cIn} to ${cOut}) due to an existing booking. Please choose different dates.`
           );
         }
 
@@ -809,7 +848,8 @@ router.post('/bookings', async (req, res) => {
       }
     }
 
-    const effectiveCoupon = appliedCoupon ? appliedCoupon.code : (requestedCouponCode ? String(requestedCouponCode).trim().toUpperCase() : null);
+    const effectiveCoupon = appliedCoupon ? appliedCoupon.code : (req.body.couponCode ? String(req.body.couponCode).trim().toUpperCase() : null);
+    const requestedVariant = extractRoomVariant(req.body.roomVariant || req.body.type || rType || room) || finalAssignedRoom?.type || 'AC';
 
     const newBooking = await Booking.create({
       bookingId,
@@ -817,6 +857,7 @@ router.post('/bookings', async (req, res) => {
       propertyId: targetPropId,
       roomId: assignedRoomId,
       roomNumber: assignedRoomNumber ? String(assignedRoomNumber) : null,
+      roomVariant: requestedVariant,
       idDocType: finalDocType,
       idDocNumber: finalDocNumber,
       idVerification: hasVerifiedId ? 'Verified' : 'Pending',
@@ -879,13 +920,13 @@ router.post('/bookings', async (req, res) => {
       console.error('Error auto-creating payment ledger for booking:', payErr.message);
     }
 
-    // Mark assigned room as Reserved in MongoDB
-    if (assignedRoomNumber) {
-      await syncRoomStatus(assignedRoomNumber, 'Reserved', targetPropId);
-    }
-
     // Notify Realtime (Socket.io) across all dashboards and guest view
     const io = req.app.get('socketio');
+
+    // Mark assigned room as Reserved in MongoDB
+    if (assignedRoomNumber) {
+      await syncRoomStatus(assignedRoomNumber, 'Reserved', targetPropId, io, requestedVariant);
+    }
     if (io) {
       broadcastCheckinCheckout(io, targetPropId, {
         action: 'booking_created',

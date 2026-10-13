@@ -173,11 +173,11 @@ function RoomStatusPage() {
             No rooms match current rack filter parameters.
           </div>
         ) : (
-          filteredRooms.map((rm) => {
+          filteredRooms.map((rm, idx) => {
             const meta = statusMeta[rm.status] || statusMeta.Available;
             return (
               <div 
-                key={rm.room}
+                key={rm._id || rm.id || `${rm.room}-${rm.roomType || ''}-${idx}`}
                 className="bg-white border border-muted hover:border-muted-foreground/30 hover:shadow-soft rounded-2xl p-4 flex flex-col justify-between min-h-[175px] transition-all relative overflow-hidden text-left"
               >
                 

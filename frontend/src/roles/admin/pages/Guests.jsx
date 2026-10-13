@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, Crumbs, ActionGroup, ViewActionButton, EditActionButton, ExtendActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import { FormField, Input, Select } from "@/components/hs/FormFields";
+import { Input, Select } from "@/components/hs/FormFields";
 import { toast } from "sonner";
 import { 
   Users, UserCheck, CalendarDays, RefreshCw, Star, 
@@ -72,6 +72,67 @@ const getAdditionalNights = (currentOutStr, newOutStr) => {
 
 const defaultGuests = [];
 
+const normalizePhone = (p) => String(p || '').replace(/\D/g, '').slice(-10);
+
+const matchBookingToUser = (b, u) => {
+  const uId = String(u._id || u.id || '').trim();
+  const bGuestId = String(b.guestId || b.user || b.userId || '').trim();
+  if (uId && bGuestId && uId === bGuestId) return true;
+
+  const uEmail = String(u.email || '').trim().toLowerCase();
+  const bEmail = String(b.email || '').trim().toLowerCase();
+  if (uEmail && bEmail && uEmail === bEmail) return true;
+
+  const uPhone10 = normalizePhone(u.phone || u.mobile);
+  const bPhone10 = normalizePhone(b.phone || b.mobile || b.guestPhone);
+  if (uPhone10 && bPhone10 && uPhone10.length >= 10 && uPhone10 === bPhone10) return true;
+
+  const uName = String(u.name || '').trim().toLowerCase();
+  const bName = String(b.guest || b.guestName || b.customerName || b.name || '').trim().toLowerCase();
+  if (uName && bName) {
+    if (uName === bName) return true;
+    if (uName.split(' ')[0] === bName.split(' ')[0] && (uPhone10 || uEmail)) return true;
+  }
+  return false;
+};
+
+const findRelevantStay = (guestBookings) => {
+  if (!guestBookings || guestBookings.length === 0) return null;
+  
+  // 1. In-house / Checked-in is active stay
+  const active = guestBookings.find(b => {
+    const s = String(b.status || '').toLowerCase().trim();
+    return s === 'checked-in' || s === 'checked in' || s === 'staying' || s === 'in-house';
+  });
+  if (active) return active;
+
+  // 2. Upcoming / Confirmed reservation
+  const confirmed = guestBookings.find(b => {
+    const s = String(b.status || '').toLowerCase().trim();
+    return s === 'confirmed' || s === 'expected';
+  });
+  if (confirmed) return confirmed;
+
+  // 3. Most recent stay
+  const sorted = [...guestBookings].sort((x, y) => {
+    const dY = new Date(y.checkIn || y.createdAt || 0).getTime() || 0;
+    const dX = new Date(x.checkIn || x.createdAt || 0).getTime() || 0;
+    return dY - dX;
+  });
+  return sorted[0];
+};
+
+const resolveRoomInfo = (booking) => {
+  if (!booking) {
+    return { rNum: '', roomVariant: 'AC', roomType: 'Standard Room', roomDisplay: '—' };
+  }
+  const rNum = extractRoomNumber(booking) || (booking.roomNumber ? String(booking.roomNumber) : '') || (booking.room && String(booking.room).match(/\b\d{3,4}\b/)?.[0]) || '';
+  const roomVariant = booking.roomVariant || booking.climateType || (String(booking.roomType || '').toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC');
+  const roomType = booking.roomType || (booking.room && String(booking.room).includes('·') ? String(booking.room).split('·')[1]?.trim() : (rNum.startsWith('5') ? 'Penthouse Suite' : rNum.startsWith('4') ? 'Presidential Suite' : rNum.startsWith('3') ? 'Executive Suite' : rNum.startsWith('2') ? 'Deluxe Room' : 'Standard Room'));
+  const roomDisplay = rNum ? `Room ${rNum}` : (booking.room || '—');
+  return { rNum, roomVariant, roomType, roomDisplay };
+};
+
 function GuestsCrmPage() {
   const navigate = useNavigate();
 
@@ -80,7 +141,6 @@ function GuestsCrmPage() {
 
   // Search & Filters state
   const [searchQuery, setSearchQuery] = useState("");
-  const [propertyFilter, setPropertyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
 
@@ -111,17 +171,19 @@ function GuestsCrmPage() {
       const guestUsers = usersRes.success && usersRes.data ? usersRes.data.filter(u => u.role === "guest") : [];
       const bookings = resRes.success && resRes.data ? resRes.data : [];
 
-      const guestUserNames = new Set(guestUsers.map(u => u.name?.toLowerCase()));
+      const matchedBookingIds = new Set();
+
       const compiled = guestUsers.map(u => {
-        const guestBookings = bookings.filter(b => b.guest?.toLowerCase() === u.name?.toLowerCase() || (b.phone && (b.phone === u.mobile || b.phone === u.phone)));
-        const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
-        const latest = sorted[0];
-        const rNum = extractRoomNumber(latest);
-        const roomDisplay = rNum ? `Room ${rNum}` : (latest?.room ? (String(latest.room).startsWith('Room') ? latest.room : `Room ${latest.room}`) : '—');
-        const roomType = latest?.roomType || (latest?.room && String(latest.room).includes('·') ? String(latest.room).split('·')[1]?.trim() : 'Deluxe Room');
-        
-        const guestTariff = latest ? Number(latest.totalAmount || latest.amount || 0) : guestBookings.reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0);
-        
+        const guestBookings = bookings.filter(b => {
+          const isMatch = matchBookingToUser(b, u);
+          if (isMatch) matchedBookingIds.add(b._id || b.id || b.bookingId);
+          return isMatch;
+        });
+
+        const latest = findRelevantStay(guestBookings);
+        const { rNum, roomVariant, roomType, roomDisplay } = resolveRoomInfo(latest);
+        const guestTariff = guestBookings.reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0) || (latest ? Number(latest.totalAmount || latest.amount || 0) : 0);
+
         return {
           ...u,
           id: u._id || u.id,
@@ -130,33 +192,41 @@ function GuestsCrmPage() {
           email: u.email || "—",
           phone: u.mobile || u.phone || "—",
           stays: guestBookings.length,
-          tariff: guestTariff > 0 ? guestTariff : guestBookings.reduce((sum, b) => sum + Number(b.totalAmount || b.amount || 0), 0),
+          tariff: guestTariff,
           balance: guestBookings.reduce((sum, b) => sum + (b.balance || 0), 0),
           room: rNum || '—',
           roomDisplay,
+          roomVariant,
           roomType,
           currentStay: latest ? `${roomDisplay} · ${roomType}` : '—',
           status: (u.status === 'Inactive' || u.isDeleted) ? 'Inactive' : (latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive'),
           accountStatus: (u.status === 'Inactive' || u.isDeleted) ? 'Inactive' : (u.status || 'Active'),
-          latestStay: latest
+          latestStay: latest,
+          history: guestBookings
         };
       });
 
-      // Extract unique guests from bookings that are not registered users
+      // Extract unique guests from remaining bookings that weren't matched to a user
       const extraGuestsMap = {};
       bookings.forEach(b => {
-        if (!b.guest) return;
-        const gNameLower = b.guest.toLowerCase();
-        if (!guestUserNames.has(gNameLower) && !extraGuestsMap[gNameLower]) {
-          const guestBookings = bookings.filter(bk => bk.guest?.toLowerCase() === gNameLower);
-          const sorted = [...guestBookings].sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
-          const latest = sorted[0];
-          const rNum = extractRoomNumber(latest);
-          const roomDisplay = rNum ? `Room ${rNum}` : (latest?.room ? (String(latest.room).startsWith('Room') ? latest.room : `Room ${latest.room}`) : '—');
-          const roomType = latest?.roomType || (latest?.room && String(latest.room).includes('·') ? String(latest.room).split('·')[1]?.trim() : 'Deluxe Room');
-          const guestTariff = latest ? Number(latest.totalAmount || latest.amount || 0) : guestBookings.reduce((sum, bk) => sum + Number(bk.totalAmount || bk.amount || 0), 0);
-          
-          extraGuestsMap[gNameLower] = {
+        const bId = b._id || b.id || b.bookingId;
+        if (!b.guest || matchedBookingIds.has(bId)) return;
+        const gNameLower = b.guest.trim().toLowerCase();
+        const bPhone10 = normalizePhone(b.phone || b.mobile || b.guestPhone);
+        const guestKey = bPhone10 ? `phone_${bPhone10}` : `name_${gNameLower}`;
+
+        if (!extraGuestsMap[guestKey]) {
+          const guestBookings = bookings.filter(bk => {
+            const bkPhone10 = normalizePhone(bk.phone || bk.mobile || bk.guestPhone);
+            if (bPhone10 && bkPhone10 && bPhone10 === bkPhone10) return true;
+            return bk.guest?.trim().toLowerCase() === gNameLower;
+          });
+
+          const latest = findRelevantStay(guestBookings);
+          const { rNum, roomVariant, roomType, roomDisplay } = resolveRoomInfo(latest);
+          const guestTariff = guestBookings.reduce((sum, bk) => sum + Number(bk.totalAmount || bk.amount || 0), 0) || (latest ? Number(latest.totalAmount || latest.amount || 0) : 0);
+
+          extraGuestsMap[guestKey] = {
             id: b._id || b.id || `GST-${Date.now()}`,
             _id: b._id || b.id,
             name: b.guest,
@@ -169,11 +239,12 @@ function GuestsCrmPage() {
             tier: "Regular",
             type: "Regular",
             stays: guestBookings.length,
-            tariff: guestTariff > 0 ? guestTariff : guestBookings.reduce((sum, bk) => sum + Number(bk.totalAmount || bk.amount || 0), 0),
-            spend: guestBookings.reduce((sum, bk) => sum + (bk.amount || 0), 0),
+            tariff: guestTariff,
+            spend: guestTariff,
             balance: guestBookings.reduce((sum, bk) => sum + (bk.balance || 0), 0),
             room: rNum || '—',
             roomDisplay,
+            roomVariant,
             roomType,
             currentStay: latest ? `${roomDisplay} · ${roomType}` : '—',
             status: latest ? (latest.status === 'Checked-in' ? 'Staying-In' : latest.status === 'Confirmed' ? 'Expected' : 'Checked-out') : 'Inactive',
@@ -212,14 +283,13 @@ function GuestsCrmPage() {
   // Filter calculations
   const filteredList = guests.filter(g => {
     const matchesSearch = 
-      g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.phone.includes(searchQuery) ||
-      g.id.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesProperty = 
-      propertyFilter === "all" || 
-      g.currentStay.toLowerCase().includes(propertyFilter.toLowerCase());
+      !searchQuery ||
+      String(g.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(g.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(g.phone || '').includes(searchQuery) ||
+      String(g.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(g.room || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(g.roomType || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = 
       statusFilter === "all" || 
@@ -227,9 +297,10 @@ function GuestsCrmPage() {
 
     const matchesDate = 
       !dateFilter || 
-      g.history.some(h => h.checkIn === dateFilter || h.checkOut === dateFilter);
+      (g.latestStay && (g.latestStay.checkIn?.includes(dateFilter) || g.latestStay.checkOut?.includes(dateFilter))) ||
+      (Array.isArray(g.history) && g.history.some(h => h.checkIn?.includes(dateFilter) || h.checkOut?.includes(dateFilter)));
 
-    return matchesSearch && matchesProperty && matchesStatus && matchesDate;
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   // Sort logic
@@ -321,97 +392,93 @@ function GuestsCrmPage() {
         />
       </div>
 
-      {/* Filters and Query Parameters Section */}
-      <Panel title="Dossier Directories Filters">
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
-          <FormField label="Search Guest Details" id="search">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+      {/* Filter and Search Bar Panel - Single Line Layout */}
+      <div className="bg-white border border-muted rounded-xl p-4 shadow-soft">
+        <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:flex-1 items-center">
+            {/* Search Bar */}
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <Input
                 id="search"
                 type="text"
-                className="pl-9 h-10 text-xs font-bold"
-                placeholder="Name, phone, email, ID..."
+                placeholder="Search guest name, phone, email, room, or guest ID..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
               />
             </div>
-          </FormField>
 
-          <FormField label="Property Location" id="property">
-            <Select
-              id="property"
-              value={propertyFilter}
-              onChange={(e) => { setPropertyFilter(e.target.value); setCurrentPage(1); }}
-              className="h-10 text-xs font-bold"
-            >
-              <option value="all">All Properties</option>
-              <option value="Udaipur">Palace Udaipur</option>
-              <option value="Jaipur">Jaipur Resort</option>
-              <option value="Goa">Goa Beach</option>
-              <option value="Kerala">Kerala Retreat</option>
-            </Select>
-          </FormField>
+            {/* Stay Status Filter (beside right to search bar) */}
+            <div className="w-full sm:w-44 shrink-0">
+              <Select
+                id="status"
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                className="text-xs h-9 font-semibold bg-[#FDFCFA]/10 border-muted w-full"
+              >
+                <option value="all">All Statuses</option>
+                <option value="Staying-In">Staying-In</option>
+                <option value="Expected">Expected</option>
+                <option value="Checked-out">Checked-out</option>
+              </Select>
+            </div>
 
-          <FormField label="Stay Status" id="status">
-            <Select
-              id="status"
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="h-10 text-xs font-bold"
-            >
-              <option value="all">All Statuses</option>
-              <option value="Staying-In">Staying-In</option>
-              <option value="Expected">Expected</option>
-              <option value="Checked-out">Checked-out</option>
-            </Select>
-          </FormField>
+            {/* Stay Date Filter */}
+            <div className="w-full sm:w-44 shrink-0">
+              <Input
+                id="date"
+                type="date"
+                placeholder="Filter by stay date..."
+                value={dateFilter}
+                onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
+              />
+            </div>
+          </div>
 
-          <FormField label="Stay Activity Date" id="date">
-            <Input
-              id="date"
-              type="date"
-              className="h-10 text-xs font-bold"
-              value={dateFilter}
-              onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
-            />
-          </FormField>
-
-          <div className="flex justify-end select-none">
+          {/* Add Guest Button */}
+          <div className="flex items-center gap-3 select-none shrink-0 w-full lg:w-auto justify-end">
             <Button
-              className="bg-navy hover:bg-navy-deep text-white text-xs h-10 px-6 font-bold rounded-full shadow-soft flex items-center gap-1.5 w-full justify-center"
               onClick={() => navigate({ to: "/admin/guests/add" })}
+              className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-8.5 px-4 font-bold rounded-full shrink-0 flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="size-4" /> Add Guest
+              <Plus className="size-3.5" /> Add Guest
             </Button>
           </div>
         </div>
-      </Panel>
+      </div>
 
       {/* Guest Directory listing */}
       <Panel title="Guest Directory Catalog">
         {paginatedList.length === 0 ? (
           <div className="p-8 text-center text-xs text-muted-foreground select-none">No guest profiles match the current query parameters.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-left border-collapse min-w-[1100px] table-auto text-xs">
               <thead>
-                <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("name")}>Guest</th>
-                  <th className="py-3 px-4">Contact</th>
-                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("type")}>Guest Type</th>
-                  <th className="py-3 px-4">Current/Last Stay</th>
-                  <th className="py-3 px-4">Room</th>
-                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("stays")}>Total Stays</th>
-                  <th className="py-3 px-4 cursor-pointer hover:text-navy" onClick={() => toggleSort("tariff")}>Tariff</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
+                <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none">
+                  <th className="py-3.5 pl-4 pr-3 text-left whitespace-nowrap min-w-[180px] cursor-pointer hover:text-navy" onClick={() => toggleSort("name")}>Guest</th>
+                  <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[160px]">Contact</th>
+                  <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[110px] cursor-pointer hover:text-navy" onClick={() => toggleSort("type")}>Guest Type</th>
+                  <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[200px]">Current/Last Stay</th>
+                  <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[140px]">Room</th>
+                  <th className="py-3.5 px-3 text-center whitespace-nowrap min-w-[110px] cursor-pointer hover:text-navy" onClick={() => toggleSort("stays")}>Total Stays</th>
+                  <th className="py-3.5 px-3 text-left whitespace-nowrap min-w-[110px] cursor-pointer hover:text-navy" onClick={() => toggleSort("tariff")}>Tariff</th>
+                  <th className="py-3.5 px-3 text-center whitespace-nowrap min-w-[110px]">Status</th>
+                  <th className="py-3.5 pl-3 pr-4 text-left whitespace-nowrap min-w-[160px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted/30">
                 {paginatedList.map((g) => (
-                  <tr key={g._id} className="hover:bg-muted/5">
-                    <td className="py-3.5 px-4 font-bold text-navy text-left align-middle">
+                  <tr key={g._id} className="hover:bg-muted/5 transition-colors">
+                    <td className="py-3.5 pl-4 pr-3 font-bold text-navy text-left align-middle min-w-[180px]">
                       <div className="flex items-center gap-2.5">
                         <div className="size-8 rounded-full bg-navy/5 text-navy font-bold text-xs grid place-items-center shrink-0 select-none">
                           {g.name.split(" ").map(n => n[0]).join("")}
@@ -422,27 +489,51 @@ function GuestsCrmPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-left align-middle text-muted-foreground space-y-0.5">
+                    <td className="py-3.5 px-3 text-left align-middle text-muted-foreground space-y-0.5 min-w-[160px]">
                       <p className="font-semibold text-navy select-all">{g.phone}</p>
                       <p className="text-[10px] select-all">{g.email}</p>
                     </td>
-                    <td className="py-3.5 px-4 text-left align-middle font-semibold text-navy">{g.type || "Regular"}</td>
-                    <td className="py-3.5 px-4 text-left align-middle font-medium text-navy max-w-[180px]">
-                      <div>{g.currentStay}</div>
-                      {g.latestStay && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5 select-none font-semibold">
-                          Out: {g.latestStay.checkOut}
+                    <td className="py-3.5 px-3 text-left align-middle font-semibold text-navy min-w-[110px] whitespace-nowrap">{g.type || "Regular"}</td>
+                    <td className="py-3.5 px-3 text-left align-middle font-medium text-navy min-w-[200px] whitespace-nowrap">
+                      {g.latestStay ? (
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-navy text-xs flex items-center gap-1.5 whitespace-nowrap">
+                            <Calendar className="size-3 text-muted-foreground shrink-0" />
+                            <span>{g.latestStay.checkIn || '—'} → {g.latestStay.checkOut || '—'}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                            <span className="text-brand font-bold">{g.roomType || 'Standard Room'}</span>
+                            <span>•</span>
+                            <span>{g.latestStay.nights || 1} {(g.latestStay.nights || 1) === 1 ? 'Night' : 'Nights'}</span>
+                          </div>
                         </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-left align-middle font-mono font-bold text-brand">
-                      {g.room && g.room !== '—' ? (String(g.room).startsWith('Room') ? g.room : `Room ${g.room}`) : '—'}
+                    <td className="py-3.5 px-3 text-left align-middle min-w-[140px] whitespace-nowrap">
+                      {g.room && g.room !== '—' ? (
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="font-mono font-bold text-navy text-xs">
+                            {String(g.room).startsWith('Room') ? g.room : `Room #${g.room}`}
+                          </span>
+                          <span className={`text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${
+                            g.roomVariant === 'Non-AC'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-purple/10 text-purple border border-purple/20'
+                          }`}>
+                            {g.roomVariant || 'AC'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground font-mono">—</span>
+                      )}
                     </td>
-                    <td className="py-3.5 px-4 text-center align-middle font-bold">{g.stays} {g.stays === 1 ? 'Stay' : 'Stays'}</td>
-                    <td className="py-3.5 px-4 text-left align-middle font-bold text-navy">
+                    <td className="py-3.5 px-3 text-center align-middle font-bold min-w-[110px] whitespace-nowrap">{g.stays} {g.stays === 1 ? 'Stay' : 'Stays'}</td>
+                    <td className="py-3.5 px-3 text-left align-middle font-bold text-navy min-w-[110px] whitespace-nowrap">
                       ₹{Number(g.tariff !== undefined ? g.tariff : (g.spend || g.balance || 0)).toLocaleString("en-IN")}
                     </td>
-                    <td className="py-3.5 px-4 text-center align-middle">
+                    <td className="py-3.5 px-3 text-center align-middle min-w-[110px] whitespace-nowrap">
                       <Tag tone={
                         (g.status === "Inactive" || g.accountStatus === "Inactive") ? "error" :
                         g.status === "Staying-In" ? "success" : 
@@ -451,7 +542,7 @@ function GuestsCrmPage() {
                         {(g.status === "Inactive" || g.accountStatus === "Inactive") ? "Inactive" : g.status}
                       </Tag>
                     </td>
-                    <td className="py-3 px-4 text-left align-middle min-w-[160px] whitespace-nowrap">
+                    <td className="py-3.5 pl-3 pr-4 text-left align-middle min-w-[160px] whitespace-nowrap">
                       <ActionGroup align="left">
                         {g.status === "Inactive" || g.accountStatus === "Inactive" ? (
                           <ViewActionButton

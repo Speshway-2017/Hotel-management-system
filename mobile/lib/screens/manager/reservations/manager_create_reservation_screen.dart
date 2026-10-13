@@ -41,6 +41,7 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
   String? _selectedPax = '2 Adults';
   String? _selectedCategory = 'Standard Room';
   String? _selectedRoomNumber;
+  String _selectedAcVariant = 'AC'; // 'AC' or 'Non-AC'
   String? _selectedStatus = 'Checked-in'; // Auto checked-in for Walk-in today
   bool _isCorporate = false;
   bool _isGroupBooking = false;
@@ -153,7 +154,11 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
   }
 
   double get _calculatedTariff {
-    final ratePerNight = _getRatePerNightForCategory(_selectedCategory);
+    double ratePerNight = _getRatePerNightForCategory(_selectedCategory);
+    if (_selectedAcVariant == 'Non-AC') {
+      ratePerNight = (ratePerNight * 0.75).roundToDouble();
+      if (ratePerNight < 1500) ratePerNight = 1500;
+    }
     return (_nights > 0 ? _nights : 1) * ratePerNight;
   }
 
@@ -310,9 +315,10 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
       'checkOut': checkOutDt.toIso8601String(),
       'pax': _selectedPax ?? '2 Adults',
       'source': _selectedSource ?? 'Walk-in',
-      'roomType': roomCat,
+      'roomType': '$roomCat ($_selectedAcVariant)',
+      'roomVariant': _selectedAcVariant,
       'roomNumber': roomNum,
-      'room': roomNum.isNotEmpty ? '$roomNum · $roomCat' : roomCat,
+      'room': roomNum.isNotEmpty ? '$roomNum · $roomCat ($_selectedAcVariant)' : '$roomCat ($_selectedAcVariant)',
       'amount': totalAmt,
       'totalAmount': totalAmt,
       'balance': balAmt,
@@ -954,12 +960,132 @@ class _ManagerCreateReservationScreenState extends State<ManagerCreateReservatio
                 onChanged: (val) {
                   setState(() {
                     _selectedRoomNumber = (val == null || val.isEmpty) ? null : val;
+                    if (_selectedRoomNumber != null) {
+                      final rm = categoryFilteredRooms.where((r) => r.roomNumber == _selectedRoomNumber).firstOrNull;
+                      if (rm != null) {
+                        if (rm.isNonAc) {
+                          _selectedAcVariant = 'Non-AC';
+                        } else if (rm.isAc) {
+                          _selectedAcVariant = 'AC';
+                        }
+                      }
+                    }
                   });
                   _updateTariffAndBalance();
                 },
               );
             },
           ),
+          const SizedBox(height: 10),
+
+          // AC / Non-AC Room Variant Toggle
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    setState(() => _selectedAcVariant = 'AC');
+                    _updateTariffAndBalance();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _selectedAcVariant == 'AC' ? purple : white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _selectedAcVariant == 'AC' ? purple : cardBorder,
+                        width: _selectedAcVariant == 'AC' ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.ac_unit_rounded,
+                          size: 16,
+                          color: _selectedAcVariant == 'AC' ? white : navy,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'AC Room',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: _selectedAcVariant == 'AC' ? white : navy,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    setState(() => _selectedAcVariant = 'Non-AC');
+                    _updateTariffAndBalance();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _selectedAcVariant == 'Non-AC' ? navy : white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _selectedAcVariant == 'Non-AC' ? navy : cardBorder,
+                        width: _selectedAcVariant == 'Non-AC' ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.air_rounded,
+                          size: 16,
+                          color: _selectedAcVariant == 'Non-AC' ? white : navy,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Non-AC Room',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: _selectedAcVariant == 'Non-AC' ? white : navy,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_selectedRoomNumber != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: cream,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: gold.withAlpha(100)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, size: 14, color: emerald),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Allotted: Room $_selectedRoomNumber · ${_selectedCategory ?? "Standard"} ($_selectedAcVariant)',
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: navy),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

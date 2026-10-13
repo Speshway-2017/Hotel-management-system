@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { formatDisplayDate, isToday } from "@/utils/dateUtils";
-import { extractRoomNumber } from "@/utils/roomUtils";
+import { extractRoomNumber, extractRoomVariant } from "@/utils/roomUtils";
 import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 import {
   CalendarCheck,
@@ -183,6 +183,8 @@ function ReservationsPage() {
           let checkOutDate = b.checkOut || b.checkOutDate || "";
           if (checkOutDate.includes('T')) checkOutDate = checkOutDate.split('T')[0];
 
+          const variant = b.roomVariant || b.climateType || b.acVariant || extractRoomVariant(b) || (roomType?.toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC');
+
           return {
             _id: b._id || b.id || b.bookingId,
             id: b.bookingId || b.id || b._id,
@@ -192,6 +194,9 @@ function ReservationsPage() {
             room: roomNum,
             roomNumber: roomNum,
             roomType: roomType,
+            roomVariant: variant,
+            climateType: variant,
+            acVariant: variant,
             checkIn: checkInDate,
             checkOut: checkOutDate,
             nights: b.nights || 1,
@@ -438,8 +443,16 @@ function ReservationsPage() {
         const r1 = getSpecificRoomNumber(b1);
         const r2 = getSpecificRoomNumber(b2);
 
-        // Real conflict requires the exact same physical room number
+        // Real conflict requires the exact same physical room number AND same climate variant
         if (r1 && r2 && r1 === r2) {
+          const v1 = b1.roomVariant || extractRoomVariant(b1) || 'AC';
+          const v2 = b2.roomVariant || extractRoomVariant(b2) || 'AC';
+
+          // Different climate variants (e.g. 101 Non-AC vs 101 AC) are distinct physical room inventories and NOT an overbooking!
+          if (v1 && v2 && v1 !== v2) {
+            continue;
+          }
+
           const s1 = parseStayDate(b1.checkIn);
           const e1 = parseStayDate(b1.checkOut);
           const s2 = parseStayDate(b2.checkIn);
@@ -454,7 +467,7 @@ function ReservationsPage() {
                 conflicts.push({
                   b1,
                   b2,
-                  room: r1,
+                  room: `${r1} (${v1})`,
                   stay1: `${b1.checkIn} → ${b1.checkOut}`,
                   stay2: `${b2.checkIn} → ${b2.checkOut}`
                 });
@@ -514,32 +527,17 @@ function ReservationsPage() {
       {/* Filter and Search Bar Panel */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft space-y-3.5">
         <div className="flex flex-col lg:flex-row gap-3 items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:flex-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search guest name, room number, or booking reference..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
-              />
-            </div>
-
-            <div className="w-full sm:w-48">
-              <Input
-                type="text"
-                placeholder="Filter by date (e.g. 21 Aug)..."
-                value={dateFilter}
-                onChange={(e) => {
-                  setDateFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
-              />
-            </div>
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search guest name, room number, or booking reference..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
+            />
           </div>
 
           {/* View Mode Toggle and New Booking button placed on the right of top row */}
@@ -667,8 +665,13 @@ function ReservationsPage() {
                             <div className="text-[11px] text-muted-foreground font-medium truncate">{res.phone}</div>
                           </td>
                           <td className="py-3.5 px-2 align-middle truncate">
-                            <div className="font-mono text-xs font-bold text-navy">
-                              {extractRoomNumber(res) ? `Room ${extractRoomNumber(res)}` : (res.roomNumber ? `Room ${res.roomNumber}` : (res.room && res.room !== "Unassigned" ? res.room : "Unassigned"))}
+                            <div className="font-mono text-xs font-bold text-navy flex items-center gap-1.5">
+                              <span>{extractRoomNumber(res) ? `Room ${extractRoomNumber(res)}` : (res.roomNumber ? `Room ${res.roomNumber}` : (res.room && res.room !== "Unassigned" ? res.room : "Unassigned"))}</span>
+                              {res.roomVariant && (
+                                <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${res.roomVariant === 'Non-AC' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-sky-50 text-sky-700 border border-sky-200'}`}>
+                                  {res.roomVariant}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-muted-foreground font-medium truncate">
                               {res.roomType || (res.room && res.room.includes('·') ? res.room.split('·')[1]?.trim() : "Standard Room")}
@@ -861,8 +864,8 @@ function ReservationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a]">
-                {schedulerRooms.map((room) => (
-                  <tr key={room.num} className="hover:bg-[#fcfcfc]/60">
+                {schedulerRooms.map((room, idx) => (
+                  <tr key={room.id || room._id || `${room.num}-${room.type || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60">
                     <td className="py-4.5 px-4 font-semibold text-navy text-left align-middle w-[160px] min-w-[160px]">
                       <div>#{room.num}</div>
                       <div className="text-[10px] text-muted-foreground font-normal">{room.type}</div>

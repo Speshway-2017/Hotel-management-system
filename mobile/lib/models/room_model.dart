@@ -3,12 +3,14 @@ class BookedRange {
   final String checkOut;
   final String status;
   final String? guest;
+  final String? roomVariant;
 
   BookedRange({
     required this.checkIn,
     required this.checkOut,
     this.status = 'Confirmed',
     this.guest,
+    this.roomVariant,
   });
 
   factory BookedRange.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class BookedRange {
       checkOut: json['checkOut']?.toString() ?? '',
       status: json['status']?.toString() ?? 'Confirmed',
       guest: json['guest']?.toString() ?? json['guestName']?.toString(),
+      roomVariant: json['roomVariant']?.toString() ?? json['type']?.toString(),
     );
   }
 
@@ -25,6 +28,7 @@ class BookedRange {
     'checkOut': checkOut,
     'status': status,
     'guest': guest,
+    'roomVariant': roomVariant,
   };
 }
 

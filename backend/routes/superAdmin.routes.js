@@ -776,6 +776,9 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
     bookingData.idVerification = hasVerifiedId ? 'Verified' : (bookingData.idVerification || 'Pending');
     bookingData.idVerifiedAt = hasVerifiedId ? new Date() : (bookingData.idVerifiedAt || null);
     bookingData.idVerifiedBy = hasVerifiedId ? (req.user?.name || 'Administrator') : (bookingData.idVerifiedBy || '');
+    if (!bookingData.roomVariant) {
+      bookingData.roomVariant = req.body.roomVariant || req.body.type || 'AC';
+    }
 
     const booking = await Booking.create(bookingData);
 
@@ -790,13 +793,13 @@ router.post('/reservations', checkPropertyStatus, async (req, res) => {
     await logAction(req.user, 'Created Booking', `${booking.guest}`, req);
 
     const roomNum = extractRoomNumber(booking);
+    const io = req.app.get('socketio');
 
     if (roomNum) {
       const rmStatus = booking.status === 'Checked-in' ? 'Occupied' : 'Reserved';
-      await syncRoomStatus(roomNum, rmStatus, targetPropId);
+      const variant = booking.roomVariant || req.body.roomVariant || req.body.type || 'AC';
+      await syncRoomStatus(roomNum, rmStatus, targetPropId, io, variant);
     }
-
-    const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, targetPropId, 'booking_created', { booking, propertyId: targetPropId });
       emitRealtimeSync(io, targetPropId, 'booking_updated', { type: 'CREATED', booking, propertyId: targetPropId });
@@ -1007,7 +1010,8 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       else if (booking.status === 'Checked-out') rmStatus = 'Available';
       else if (booking.status === 'Cancelled' || booking.status === 'No-show') rmStatus = 'Available';
 
-      await syncRoomStatus(roomNum, rmStatus, targetPropId);
+      const variant = booking.roomVariant || req.body.roomVariant || req.body.type || 'AC';
+      await syncRoomStatus(roomNum, rmStatus, targetPropId, io, variant);
     }
 
     const action = booking.status === 'Checked-in' ? 'checkin' : booking.status === 'Checked-out' ? 'checkout' : booking.status === 'Cancelled' ? 'cancelled' : 'status_change';
@@ -1149,11 +1153,11 @@ router.delete('/reservations/:id', checkPropertyStatus, async (req, res) => {
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const rNum = extractRoomNumber(booking);
-    if (rNum) {
-      await syncRoomStatus(rNum, 'Available', targetPropId);
-    }
-
     const io = req.app.get('socketio');
+    if (rNum) {
+      const variant = booking.roomVariant || 'AC';
+      await syncRoomStatus(rNum, 'Available', targetPropId, io, variant);
+    }
     if (io) {
       emitRealtimeSync(io, targetPropId, 'booking_deleted', { id, bookingId: booking.bookingId, propertyId: targetPropId });
       emitRealtimeSync(io, targetPropId, 'room_status_changed', { propertyId: targetPropId, status: 'Available' });

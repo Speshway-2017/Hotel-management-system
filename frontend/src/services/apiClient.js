@@ -50,7 +50,20 @@ export async function apiRequest(path, options = {}) {
   const isGet = method === 'GET';
   const bypassCache = options.bypassCache === true;
 
-  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+  let url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+  if (options.params && typeof options.params === 'object') {
+    const searchParams = new URLSearchParams();
+    Object.entries(options.params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        searchParams.append(key, String(val));
+      }
+    });
+    const qs = searchParams.toString();
+    if (qs) {
+      url += (url.includes('?') ? '&' : '?') + qs;
+    }
+  }
+
   const cacheKey = `${method}:${url}:${token || ''}`;
 
   // If mutation, invalidate matching cache entries

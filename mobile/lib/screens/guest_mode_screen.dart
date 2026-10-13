@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../colours.dart';
+import '../providers/auth_provider.dart';
 import '../providers/manager/room_provider.dart';
 import '../widgets/guest_floating_nav_bar.dart';
 import 'auth/login_screen.dart';
+import 'guest/guest_layout.dart';
 import 'guest/home/guest_home_screen.dart';
 import 'guest/search/guest_search_screen.dart';
 
@@ -34,6 +36,11 @@ class _GuestModeScreenState extends State<GuestModeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    if (user != null && user.isGuestRole) {
+      return const GuestLayout();
+    }
+
     final screens = [
       const SizedBox.shrink(), // Index 0: Bookings (Auth-gated)
       GuestSearchScreen(

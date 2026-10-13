@@ -93,7 +93,64 @@ export const isBookingStatusActive = (status) => {
 };
 
 /**
- * Matches a booking to a physical Room model object via ObjectId, roomNumber, or text
+ * Robustly extracts the room variant ('AC' or 'Non-AC') from a room or booking object/string.
+ */
+export const extractRoomVariant = (val) => {
+  if (!val) return null;
+  if (typeof val === 'object') {
+    if (val.roomVariant && typeof val.roomVariant === 'string' && val.roomVariant.trim()) {
+      const v = val.roomVariant.trim().toLowerCase();
+      if (v.includes('non')) return 'Non-AC';
+      if (v.includes('ac')) return 'AC';
+    }
+    if (val.climateType && typeof val.climateType === 'string' && val.climateType.trim()) {
+      const v = val.climateType.trim().toLowerCase();
+      if (v.includes('non')) return 'Non-AC';
+      if (v.includes('ac')) return 'AC';
+    }
+    if (val.type && typeof val.type === 'string' && val.type.trim()) {
+      const v = val.type.trim().toLowerCase();
+      if (v.includes('non')) return 'Non-AC';
+      if (v.includes('ac')) return 'AC';
+    }
+
+    // Check string fields inside the object (e.g. room, roomType, category, name)
+    const strCandidate = [val.room, val.roomType, val.category, val.name, val.assignedRoom].filter(Boolean).join(' ');
+    if (strCandidate) {
+      const res = extractRoomVariant(strCandidate);
+      if (res) return res;
+    }
+
+    // Check amenities array if present
+    if (Array.isArray(val.amenities)) {
+      const hasFan = val.amenities.some(a => String(a).toLowerCase().includes('fan'));
+      const hasAc = val.amenities.some(a => String(a).toLowerCase().includes('air condition') || String(a).toLowerCase().includes('split ac'));
+      if (hasFan && !hasAc) return 'Non-AC';
+      if (hasAc) return 'AC';
+    }
+    return null;
+  }
+
+  const str = String(val).trim().toLowerCase();
+  if (str.includes('non-ac') || str.includes('non ac') || str.includes('nonac')) {
+    return 'Non-AC';
+  }
+  if (
+    !str.includes('non') &&
+    (/\bac\b/i.test(str) ||
+     str.includes('(ac)') ||
+     str.includes(' ac') ||
+     str.includes('air condition') ||
+     str.includes('air-condition'))
+  ) {
+    return 'AC';
+  }
+  return null;
+};
+
+/**
+ * Matches a booking to a physical Room model object via ObjectId, roomNumber, or text,
+ * strictly respecting climate variant (AC vs Non-AC).
  */
 export const isBookingMatchingRoom = (booking, room) => {
   if (!booking || !room) return false;
@@ -104,6 +161,10 @@ export const isBookingMatchingRoom = (booking, room) => {
   // 1. Exact ObjectId match
   if (rmId && bRoomId && rmId === bRoomId) {
     return true;
+  }
+  // If both have 24-character ObjectIds and they differ, they represent different physical rooms
+  if (rmId && bRoomId && /^[0-9a-fA-F]{24}$/.test(rmId) && /^[0-9a-fA-F]{24}$/.test(bRoomId) && rmId !== bRoomId) {
+    return false;
   }
 
   // 2. Room number match
@@ -119,22 +180,35 @@ export const isBookingMatchingRoom = (booking, room) => {
                extractRoomNumber(booking.roomId) ||
                extractRoomNumber(booking);
 
+  let numMatches = false;
   if (bNum && String(bNum).trim() === String(rmNum).trim()) {
-    return true;
-  }
-
-  // 3. Text search match for room number in booking strings
-  const testStrings = [booking.room, booking.roomNumber, booking.roomType, booking.category, booking.assignedRoom, booking.name].filter(Boolean);
-  for (const s of testStrings) {
-    if (typeof s === 'string') {
-      const regex = new RegExp(`\\b${rmNum}\\b`);
-      if (regex.test(s)) {
-        return true;
+    numMatches = true;
+  } else {
+    // 3. Text search match for room number in booking strings
+    const testStrings = [booking.room, booking.roomNumber, booking.roomType, booking.category, booking.assignedRoom, booking.name].filter(Boolean);
+    for (const s of testStrings) {
+      if (typeof s === 'string') {
+        const regex = new RegExp(`\\b${rmNum}\\b`);
+        if (regex.test(s)) {
+          numMatches = true;
+          break;
+        }
       }
     }
   }
 
-  return false;
+  if (!numMatches) return false;
+
+  // 4. Variant match (AC vs Non-AC)
+  // An AC booking must NEVER occupy or block a Non-AC room, and vice versa!
+  const roomVariant = extractRoomVariant(room);
+  const bookingVariant = extractRoomVariant(booking);
+
+  if (roomVariant && bookingVariant && roomVariant !== bookingVariant) {
+    return false;
+  }
+
+  return true;
 };
 
 /**
@@ -166,7 +240,8 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
     checkOut: b.checkOut,
     status: b.status,
     guest: b.guest || b.guestName || '',
-    bookingId: b.bookingId || b.id || b._id
+    bookingId: b.bookingId || b.id || b._id,
+    roomVariant: b.roomVariant || extractRoomVariant(b) || extractRoomVariant(room) || 'AC'
   }));
 
   const reqInDay = parseDateToDayUtc(checkIn);
@@ -187,9 +262,29 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
         }
       }
     }
+  } else {
+    // When no dates are specified, check if the room currently has an in-house checked-in guest today
+    const todayUtc = parseDateToDayUtc(new Date());
+    for (const b of roomBookings) {
+      const bStatus = String(b.status || '').toLowerCase().trim();
+      if (bStatus.includes('checked-in') || bStatus.includes('checked in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup')) {
+        const bIn = parseDateToDayUtc(b.checkIn);
+        const bOut = parseDateToDayUtc(b.checkOut);
+        if (bIn !== null && bOut !== null && todayUtc !== null) {
+          if (todayUtc >= bIn && todayUtc < bOut) {
+            activeCheckIn = b;
+            break;
+          }
+        } else {
+          activeCheckIn = b;
+          break;
+        }
+      }
+    }
   }
 
   const isBlocked = ['blocked', 'maintenance', 'out of order'].includes(String(room.status || '').toLowerCase().trim());
+  const isRoomStatusOccupied = (String(room.status || '').toLowerCase().trim() === 'occupied' || Boolean(activeCheckIn));
   
   let displayStatus = 'Available';
   let isAvailable = true;
@@ -199,7 +294,7 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
     displayStatus = room.status || 'Blocked';
     isAvailable = false;
     isReserved = false;
-  } else if (activeCheckIn) {
+  } else if (activeCheckIn || (reqInDay === null && reqOutDay === null && isRoomStatusOccupied)) {
     displayStatus = 'Occupied';
     isAvailable = false;
     isReserved = false;
@@ -208,8 +303,7 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
     isAvailable = false;
     isReserved = true;
   } else {
-    // Before dates are selected or when dates have no overlapping bookings:
-    // Room is displayed as Available!
+    // When dates have no overlapping bookings:
     displayStatus = 'Available';
     isAvailable = true;
     isReserved = false;
@@ -230,20 +324,25 @@ export const evaluateRoomAvailabilityForDates = (room, activeBookings = [], chec
 
 /**
  * Synchronizes room status in MongoDB for a given room number and property.
- * Automatically handles propertyId fallback queries so status is never missed.
+ * Automatically handles propertyId fallback queries and variant differentiation (AC vs Non-AC).
  */
-export const syncRoomStatus = async (roomNumber, newStatus, propertyId, io = null) => {
+export const syncRoomStatus = async (roomNumber, newStatus, propertyId, io = null, roomVariant = null) => {
   const cleanRoomNum = extractRoomNumber(roomNumber);
   if (!cleanRoomNum) return null;
 
   const validStatuses = ['Available', 'Occupied', 'Reserved', 'Dirty', 'Cleaning', 'Maintenance', 'Out of Order', 'Blocked'];
   const targetStatus = validStatuses.includes(newStatus) ? newStatus : 'Available';
 
+  const variant = roomVariant ? extractRoomVariant(roomVariant) : extractRoomVariant(roomNumber);
+
   const query = {
     roomNumber: cleanRoomNum
   };
   if (propertyId) {
     query.$or = [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }];
+  }
+  if (variant) {
+    query.type = variant;
   }
 
   await Room.updateMany(
@@ -254,33 +353,84 @@ export const syncRoomStatus = async (roomNumber, newStatus, propertyId, io = nul
   let updatedRoom = await Room.findOne(query);
 
   if (!updatedRoom) {
+    const fallbackQuery = { roomNumber: cleanRoomNum };
+    if (variant) fallbackQuery.type = variant;
     await Room.updateMany(
-      { roomNumber: cleanRoomNum },
+      fallbackQuery,
       { status: targetStatus }
     );
-    updatedRoom = await Room.findOne({ roomNumber: cleanRoomNum });
+    updatedRoom = await Room.findOne(fallbackQuery);
   }
 
   if (io && propertyId) {
     emitRealtimeSync(io, propertyId, 'room_status_changed', {
       propertyId,
       roomNumber: cleanRoomNum,
-      status: targetStatus
+      status: targetStatus,
+      roomVariant: variant
     });
     emitRealtimeSync(io, propertyId, 'availability_changed', {
       propertyId,
       roomNumber: cleanRoomNum,
-      status: targetStatus
+      status: targetStatus,
+      roomVariant: variant
     });
     emitRealtimeSync(io, propertyId, 'dashboard_sync', {
       propertyId,
       action: 'room_status_changed',
       roomNumber: cleanRoomNum,
-      status: targetStatus
+      status: targetStatus,
+      roomVariant: variant
     });
   }
 
   return updatedRoom;
+};
+
+/**
+ * Reconciles and synchronizes physical room statuses in MongoDB against live active bookings.
+ * Ensures that if a booking is only for AC, the Non-AC variant document in MongoDB is NOT falsely marked Occupied.
+ */
+export const reconcileRoomStatuses = async (propertyId = null) => {
+  try {
+    const propQuery = propertyId ? { $or: [{ propertyId }, { propertyId: 'HS-JAI' }, { propertyId: 'HS-9HQ8P' }] } : {};
+    const [rooms, bookings] = await Promise.all([
+      Room.find(propQuery),
+      Booking.find(propQuery)
+    ]);
+    const activeBookings = bookings.filter(b => isBookingStatusActive(b.status));
+
+    const todayUtc = parseDateToDayUtc(new Date());
+
+    for (const rm of rooms) {
+      if (['Blocked', 'Maintenance', 'Out of Order'].includes(rm.status)) {
+        continue;
+      }
+
+      // Check if there is an active check-in specifically matching this room and variant
+      const matchingActiveBookings = activeBookings.filter(b => isBookingMatchingRoom(b, rm));
+      let hasLiveCheckIn = false;
+
+      for (const b of matchingActiveBookings) {
+        const bIn = parseDateToDayUtc(b.checkIn);
+        const bOut = parseDateToDayUtc(b.checkOut);
+        const isStayingNow = (bIn !== null && bOut !== null && todayUtc !== null && todayUtc >= bIn && todayUtc < bOut);
+        const bStatus = String(b.status || '').toLowerCase().trim();
+        if ((isStayingNow && ['checked-in', 'checked in', 'staying', 'occupied'].includes(bStatus)) || bStatus === 'checked-in') {
+          hasLiveCheckIn = true;
+          break;
+        }
+      }
+
+      const correctStatus = hasLiveCheckIn ? 'Occupied' : 'Available';
+      if (rm.status !== correctStatus) {
+        rm.status = correctStatus;
+        await rm.save();
+      }
+    }
+  } catch (err) {
+    console.error('Error reconciling room statuses:', err.message);
+  }
 };
 
 /**

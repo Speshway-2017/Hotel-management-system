@@ -13,7 +13,9 @@ import {
   dateSchema,
   optionalDateSchema,
   priceSchema,
+  optionalPriceSchema,
   positiveIntegerSchema,
+  optionalPositiveIntegerSchema,
   nonNegativeNumberSchema
 } from "./primitives.js";
 
@@ -53,11 +55,12 @@ export const walkInBookingSchema = z
     room: optionalTextSchema(100),
     roomNumber: optionalTextSchema(50),
     roomType: optionalTextSchema(100),
+    roomVariant: optionalTextSchema(50),
     checkIn: dateSchema,
     checkOut: dateSchema,
     amount: priceSchema("Booking amount"),
-    balance: priceSchema("Balance amount", { allowZero: true }).optional().default(0),
-    nights: positiveIntegerSchema("Nights", 1).optional().default(1),
+    balance: optionalPriceSchema("Balance amount", { allowZero: true, defaultValue: 0 }),
+    nights: optionalPositiveIntegerSchema("Nights", 1, 999999, 1),
     pax: optionalTextSchema(50),
     paymentMethod: optionalTextSchema(50),
     idProofType: optionalTextSchema(50),
@@ -75,7 +78,7 @@ export const walkInBookingSchema = z
       });
     }
 
-    if (!data.roomType?.trim()) {
+    if (!data.roomType?.trim() && !data.room?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Room category is required",
@@ -122,7 +125,7 @@ export const extendStaySchema = z
     extendDays: z.union([z.number(), z.string()]).optional(),
     days: z.union([z.number(), z.string()]).optional(),
     newCheckOut: optionalDateSchema,
-    additionalAmount: priceSchema("Additional amount", { allowZero: true }),
+    additionalAmount: optionalPriceSchema("Additional amount", { allowZero: true, defaultValue: 0 }),
     reason: optionalTextSchema(500),
     notes: optionalTextSchema(500)
   })

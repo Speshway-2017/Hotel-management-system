@@ -260,10 +260,10 @@ export function Notice({
   );
 }
 
-export function Crumbs({ items }) {
+export function Crumbs({ items, className }) {
   if (!items || !items.length) return null;
   return (
-    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mb-3">
+    <nav aria-label="Breadcrumb" className={cn("flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground pb-2.5 mb-3", className)}>
       {items.map((it, i) => {
         const isLast = i === items.length - 1;
         return (

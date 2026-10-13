@@ -266,8 +266,34 @@ export const optionalAadhaarSchema = z
 export const priceSchema = (fieldName = "Amount", { min = 0.01, allowZero = false } = {}) =>
   z
     .union([z.number(), z.string()])
+    .refine((val) => val !== "" && val !== null && val !== undefined, {
+      message: `${fieldName} is required`
+    })
     .refine((val) => {
-      if (val === "" || val === null || val === undefined) return false;
+      const str = String(val).trim();
+      return /^-?\d+(\.\d+)?$/.test(str);
+    }, {
+      message: `${fieldName} must be a valid number or decimal only; invalid text is not allowed`
+    })
+    .transform((val) => Number(val))
+    .refine((num) => !isNaN(num), {
+      message: `${fieldName} must be a valid number`
+    })
+    .refine((num) => (allowZero ? num >= 0 : num >= min), {
+      message: allowZero
+        ? `${fieldName} cannot be negative`
+        : `${fieldName} must be greater than zero`
+    });
+
+export const optionalPriceSchema = (fieldName = "Amount", { min = 0, allowZero = true, defaultValue = 0 } = {}) =>
+  z
+    .union([z.number(), z.string(), z.null(), z.undefined()])
+    .transform((val) => {
+      if (val === "" || val === null || val === undefined) return defaultValue;
+      return val;
+    })
+    .refine((val) => {
+      if (val === defaultValue) return true;
       const str = String(val).trim();
       return /^-?\d+(\.\d+)?$/.test(str);
     }, {
@@ -290,8 +316,10 @@ export const nonNegativeNumberSchema = (fieldName = "Number") =>
 export const integerOnlySchema = (fieldName = "Value", min = 0, max = 999999) =>
   z
     .union([z.number(), z.string()])
+    .refine((val) => val !== "" && val !== null && val !== undefined, {
+      message: `${fieldName} is required`
+    })
     .refine((val) => {
-      if (val === "" || val === null || val === undefined) return false;
       const str = String(val).trim();
       return /^-?\d+$/.test(str);
     }, {
@@ -310,6 +338,34 @@ export const integerOnlySchema = (fieldName = "Value", min = 0, max = 999999) =>
 
 export const positiveIntegerSchema = (fieldName = "Value", min = 1, max = 999999) =>
   integerOnlySchema(fieldName, min, max);
+
+export const optionalPositiveIntegerSchema = (fieldName = "Value", min = 1, max = 999999, defaultValue = 1) =>
+  z
+    .union([z.number(), z.string(), z.null(), z.undefined()])
+    .transform((val) => {
+      if (val === "" || val === null || val === undefined) return defaultValue;
+      return val;
+    })
+    .refine((val) => {
+      if (val === defaultValue) return true;
+      const str = String(val).trim();
+      return /^-?\d+$/.test(str);
+    }, {
+      message: `${fieldName} must contain whole numbers only; invalid text is not allowed`
+    })
+    .transform((val) => Number(val))
+    .refine((num) => !isNaN(num), {
+      message: `${fieldName} must be a valid number`
+    })
+    .refine((num) => Number.isInteger(num), {
+      message: `${fieldName} must contain whole numbers only`
+    })
+    .refine((num) => num >= min, {
+      message: `${fieldName} must be at least ${min}`
+    })
+    .refine((num) => num <= max, {
+      message: `${fieldName} cannot exceed ${max}`
+    });
 
 // 7. Dates and Times
 export const dateSchema = z

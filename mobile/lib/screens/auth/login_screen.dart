@@ -10,12 +10,20 @@ class LoginScreen extends StatefulWidget {
   final AuthMode initialMode;
   final String? initialEmail;
   final String? initialOtp;
+  final String? title;
+  final String? subtitle;
+  final bool returnOnSuccess;
+  final VoidCallback? onSuccess;
 
   const LoginScreen({
     super.key,
     this.initialMode = AuthMode.login,
     this.initialEmail,
     this.initialOtp,
+    this.title,
+    this.subtitle,
+    this.returnOnSuccess = false,
+    this.onSuccess,
   });
 
   @override
@@ -51,10 +59,16 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception(authProvider.errorMessage ?? 'Invalid email or password');
       }
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const RoleGate()),
-          (route) => false,
-        );
+        if (widget.onSuccess != null) {
+          widget.onSuccess!();
+        } else if (widget.returnOnSuccess) {
+          Navigator.of(context).pop(true);
+        } else {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const RoleGate()),
+            (route) => false,
+          );
+        }
       }
     } else if (_currentMode == AuthMode.register) {
       final success = await authProvider.register(
@@ -67,10 +81,16 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception(authProvider.errorMessage ?? 'Registration failed. Please try again.');
       }
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const RoleGate()),
-          (route) => false,
-        );
+        if (widget.onSuccess != null) {
+          widget.onSuccess!();
+        } else if (widget.returnOnSuccess) {
+          Navigator.of(context).pop(true);
+        } else {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const RoleGate()),
+            (route) => false,
+          );
+        }
       }
     } else if (_currentMode == AuthMode.forgot) {
       final success = await authProvider.forgotPassword(email);
@@ -164,6 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       },
       child: AuthScaffold(
+        showGuestSkip: !widget.returnOnSuccess,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
           switchInCurve: Curves.easeOut,
@@ -177,6 +198,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: AuthCard(
             key: ValueKey(_currentMode),
             mode: _currentMode,
+            title: widget.title,
+            subtitle: widget.subtitle,
             initialEmail: _email,
             initialOtp: _otp,
             onNavigateToRegister: () => _navigateTo(AuthMode.register),
