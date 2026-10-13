@@ -1036,7 +1036,7 @@ export function DashShell({ role, children }) {
             {(() => {
               if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/manager" || pathname === "/guest" || pathname === "/reception" || pathname === "/admin/" || pathname === "/super-admin/" || pathname === "/manager/" || pathname === "/guest/" || pathname === "/reception/") {
                 return (
-                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap mb-1">
+                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none flex-wrap pb-2.5 mb-1">
                     <span className="text-navy font-bold">Dashboard</span>
                   </nav>
                 );
@@ -1047,7 +1047,7 @@ export function DashShell({ role, children }) {
                 const parentUrl = `/${prefix}/notifications`;
                 const roleHome = prefix === "super-admin" ? "/super-admin" : (prefix === "manager" ? "/manager" : (prefix === "reception" ? "/reception" : (prefix === "guest" ? "/guest" : "/admin")));
                 return (
-                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap mb-1">
+                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap pb-2.5 mb-1">
                     <Link 
                       to={roleHome} 
                       style={{ color: '#2563eb' }}
@@ -1343,7 +1343,7 @@ export function DashShell({ role, children }) {
 
               if (segments) {
                 return (
-                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap mb-1">
+                  <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none flex-wrap pb-2.5 mb-1">
                     <Link 
                       to={role === "super-admin" ? "/super-admin" : (role === "manager" ? "/manager" : (role === "reception" ? "/reception" : (role === "guest" ? "/guest" : "/admin")))} 
                       style={{ color: '#2563eb' }}

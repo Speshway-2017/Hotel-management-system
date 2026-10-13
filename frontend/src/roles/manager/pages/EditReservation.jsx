@@ -310,8 +310,8 @@ function ManagerEditReservation() {
                   onChange={(e) => setRoom(e.target.value)}
                 >
                   <option value="">Unassigned</option>
-                  {availableRoomsList.map((rm) => (
-                    <option key={rm.roomNumber || rm.room} value={rm.roomNumber || rm.room}>
+                  {availableRoomsList.map((rm, idx) => (
+                    <option key={`${rm.roomNumber || rm.room}-${rm.category || rm.roomType || ''}-${idx}`} value={rm.roomNumber || rm.room}>
                       Room {rm.roomNumber || rm.room} ({rm.category || rm.roomType || 'Standard'}) - {rm.status}
                     </option>
                   ))}

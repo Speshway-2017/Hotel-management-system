@@ -782,7 +782,7 @@ function RoomsRatesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium">
-                    {paginatedRooms.map((rm) => {
+                    {paginatedRooms.map((rm, idx) => {
                       const meta = statusMeta[rm.status] || statusMeta.Available;
                       const StatusIcon = meta.icon;
                       const amenitiesText = Array.isArray(rm.amenities) ? rm.amenities.join(' ') : String(rm.amenities || '');
@@ -807,7 +807,7 @@ function RoomsRatesPage() {
                       });
 
                       return (
-                        <tr key={rm._id || `${rm.roomNumber}-${rm.category}-${isNonAc ? 'nonac' : 'ac'}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
+                        <tr key={rm._id ? `${rm._id}-${idx}` : `${rm.roomNumber}-${rm.category}-${isNonAc ? 'nonac' : 'ac'}-${idx}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
                           <td className="py-4 px-6 font-bold text-navy-deep text-sm w-[145px] min-w-[145px]">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>Room {rm.roomNumber}</span>
@@ -973,8 +973,8 @@ function RoomsRatesPage() {
                     <div className="pt-2 border-t border-muted/30">
                       <span className="text-[9px] text-muted-foreground block font-bold uppercase mb-1">Assigned Rooms</span>
                       <div className="flex flex-wrap gap-1.5">
-                        {assignedRoomsList.map((num) => (
-                          <span key={num} className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/5 border border-navy/15 text-[10px] font-black text-navy">
+                        {assignedRoomsList.map((num, nIdx) => (
+                          <span key={`${num}-${nIdx}`} className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy/5 border border-navy/15 text-[10px] font-black text-navy">
                             Room #{num}
                           </span>
                         ))}
@@ -1101,8 +1101,8 @@ function RoomsRatesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a]">
-                {roomsList.map((room) => (
-                  <tr key={room._id} className="hover:bg-[#fcfcfc]/60">
+                {roomsList.map((room, idx) => (
+                  <tr key={room._id ? `${room._id}-${idx}` : `${room.roomNumber}-${room.category || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60">
                     <td className="py-3.5 px-4 font-semibold text-navy text-left align-middle w-[140px] min-w-[140px]">
                       <div>Room {room.roomNumber}</div>
                       <div className="text-[9px] text-muted-foreground font-normal">{room.category}</div>

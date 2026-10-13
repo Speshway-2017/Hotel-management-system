@@ -412,8 +412,8 @@ function EditReservation() {
                     onChange={(e) => setRoom(e.target.value)}
                   >
                     <option value="">Select Available Room</option>
-                    {availableRoomsList.map((r) => (
-                      <option key={r.num} value={r.num}>
+                    {availableRoomsList.map((r, idx) => (
+                      <option key={`${r.num}-${r.type || ''}-${idx}`} value={r.num}>
                         Room #{r.num} ({r.type})
                       </option>
                     ))}

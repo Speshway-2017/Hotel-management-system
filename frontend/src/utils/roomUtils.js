@@ -53,6 +53,63 @@ export function extractRoomNumber(val) {
 }
 
 /**
+ * Robustly extracts room climate variant ('AC' or 'Non-AC')
+ */
+export function extractRoomVariant(val) {
+  if (!val) return "AC";
+  if (typeof val === "object") {
+    if (val.roomVariant && typeof val.roomVariant === "string" && val.roomVariant.trim()) {
+      const v = val.roomVariant.trim().toLowerCase();
+      if (v.includes("non")) return "Non-AC";
+      if (v.includes("ac")) return "AC";
+    }
+    if (val.climateType && typeof val.climateType === "string" && val.climateType.trim()) {
+      const v = val.climateType.trim().toLowerCase();
+      if (v.includes("non")) return "Non-AC";
+      if (v.includes("ac")) return "AC";
+    }
+    if (val.acVariant && typeof val.acVariant === "string" && val.acVariant.trim()) {
+      const v = val.acVariant.trim().toLowerCase();
+      if (v.includes("non")) return "Non-AC";
+      if (v.includes("ac")) return "AC";
+    }
+    if (val.type && typeof val.type === "string" && val.type.trim()) {
+      const v = val.type.trim().toLowerCase();
+      if (v.includes("non")) return "Non-AC";
+      if (v.includes("ac")) return "AC";
+    }
+    const strCandidate = [val.room, val.roomType, val.category, val.name, val.assignedRoom, val.notes].filter(Boolean).join(" ");
+    if (strCandidate) {
+      const res = extractRoomVariant(strCandidate);
+      if (res) return res;
+    }
+    if (Array.isArray(val.amenities)) {
+      const hasFan = val.amenities.some(a => String(a).toLowerCase().includes("fan"));
+      const hasAc = val.amenities.some(a => String(a).toLowerCase().includes("air condition") || String(a).toLowerCase().includes("split ac"));
+      if (hasFan && !hasAc) return "Non-AC";
+      if (hasAc) return "AC";
+    }
+    return "AC";
+  }
+
+  const str = String(val).trim().toLowerCase();
+  if (str.includes("non-ac") || str.includes("non ac") || str.includes("nonac") || str.includes("non- ac") || str.includes("non -ac")) {
+    return "Non-AC";
+  }
+  if (
+    !str.includes("non") &&
+    (/\bac\b/i.test(str) ||
+     str.includes("(ac)") ||
+     str.includes(" ac") ||
+     str.includes("air condition") ||
+     str.includes("air-condition"))
+  ) {
+    return "AC";
+  }
+  return "AC";
+}
+
+/**
  * Calculate dynamic live room metrics from rooms array and reservations array
  */
 export function calculateRoomKPIs(rooms = [], reservations = []) {
@@ -60,17 +117,26 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
 
   const occupiedRoomNums = new Set();
   const reservedRoomNums = new Set();
+  const occupiedRoomVariantKeys = new Set();
+  const reservedRoomVariantKeys = new Set();
 
   // 1. Gather status from reservations
   if (Array.isArray(reservations)) {
     reservations.forEach(r => {
       const s = String(r.status || "").toLowerCase().trim();
       const rNum = extractRoomNumber(r);
+      const rVariant = extractRoomVariant(r) || "AC";
 
       if (s === "checked-in" || s === "checked in" || s === "occupied" || s === "staying") {
-        if (rNum) occupiedRoomNums.add(rNum);
+        if (rNum) {
+          occupiedRoomNums.add(rNum);
+          occupiedRoomVariantKeys.add(`${rNum}_${rVariant}`);
+        }
       } else if (s === "confirmed" || s === "pending" || s === "reserved" || s === "booked" || s === "pre-checked" || s === "paid") {
-        if (rNum) reservedRoomNums.add(rNum);
+        if (rNum) {
+          reservedRoomNums.add(rNum);
+          reservedRoomVariantKeys.add(`${rNum}_${rVariant}`);
+        }
       }
     });
   }
@@ -80,10 +146,17 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
     rooms.forEach(r => {
       const s = String(r.status || "").toLowerCase().trim();
       const rNum = extractRoomNumber(r);
+      const rmVariant = extractRoomVariant(r) || r.type || "AC";
       if (s === "occupied" || s === "checked-in" || s === "checkedin") {
-        if (rNum) occupiedRoomNums.add(rNum);
+        if (rNum) {
+          occupiedRoomNums.add(rNum);
+          occupiedRoomVariantKeys.add(`${rNum}_${rmVariant}`);
+        }
       } else if (s === "reserved" || s === "confirmed" || s === "pending") {
-        if (rNum && !occupiedRoomNums.has(rNum)) reservedRoomNums.add(rNum);
+        if (rNum) {
+          reservedRoomNums.add(rNum);
+          reservedRoomVariantKeys.add(`${rNum}_${rmVariant}`);
+        }
       }
     });
   }
@@ -107,7 +180,9 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
     cleaningRooms,
     outOfOrderRooms,
     occupiedRoomNums,
-    reservedRoomNums
+    reservedRoomNums,
+    occupiedRoomVariantKeys,
+    reservedRoomVariantKeys
   };
 }
 
@@ -115,15 +190,22 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
  * Normalizes a list of rooms with actual booking state
  */
 export function normalizeRoomList(rooms = [], reservations = []) {
-  const { occupiedRoomNums, reservedRoomNums } = calculateRoomKPIs(rooms, reservations);
+  const { occupiedRoomNums, reservedRoomNums, occupiedRoomVariantKeys, reservedRoomVariantKeys } = calculateRoomKPIs(rooms, reservations);
 
   return (rooms || []).map(rm => {
     const num = extractRoomNumber(rm);
+    const rmVariant = extractRoomVariant(rm) || rm.type || "AC";
     let status = rm.status || "Available";
 
-    if (occupiedRoomNums.has(num)) {
+    const variantKey = `${num}_${rmVariant}`;
+
+    if (occupiedRoomVariantKeys.has(variantKey)) {
       status = "Occupied";
-    } else if (reservedRoomNums.has(num) || status === "Reserved") {
+    } else if (reservedRoomVariantKeys.has(variantKey) || (status === "Reserved" && !occupiedRoomVariantKeys.has(variantKey))) {
+      status = "Reserved";
+    } else if (occupiedRoomNums.has(num) && !rm.type && !rm.roomVariant) {
+      status = "Occupied";
+    } else if (reservedRoomNums.has(num) && !rm.type && !rm.roomVariant) {
       status = "Reserved";
     } else if (status === "Blocked" || status === "Maintenance" || status === "Out of Order" || status === "Dirty" || status === "Cleaning") {
       // Retain manual maintenance / blocked status

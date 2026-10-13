@@ -6,7 +6,7 @@ import { FormField, Input, Select } from "@/components/hs/FormFields";
 import { receptionistService } from "@/services/receptionist";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
-import { CheckCircle2, AlertCircle, Fingerprint, ShieldCheck } from "lucide-react";
+import { CheckCircle2, AlertCircle, Fingerprint, ShieldCheck, Snowflake, Wind, Check } from "lucide-react";
 
 import { subscribeRealtimeSync } from "@/services/socket";
 import { validateWithZod, walkInBookingSchema } from "@/schemas";
@@ -32,6 +32,7 @@ function ReceptionistNewBooking() {
     idProofNumber: "",
     roomNumber: "",
     roomType: "",
+    roomVariant: "AC",
     checkIn: todayDate,
     checkOut: tomorrowDate,
     nights: 1,
@@ -130,6 +131,7 @@ function ReceptionistNewBooking() {
           num: String(r.roomNumber || r.num || ''),
           type: r.category || r.roomType || 'Standard Room',
           status: r.status || 'Available',
+          roomVariant: r.type || (String(r.category || '').toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC'),
           rate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
         }))
         .filter(r => {
@@ -160,19 +162,19 @@ function ReceptionistNewBooking() {
   useEffect(() => {
     fetchRoomsAndAvailability();
 
-    const handleFocus = () => fetchRoomsAndAvailability();
+    const handleFocus = () => fetchRoomsAndAvailability();
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchRoomsAndAvailability();
     });
 
-    return () => {
+    return () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
-  // Automatic calculation of duration (nights) and amount based on stay dates and room type
-  const calculateTariff = (checkInDate, checkOutDate, selectedCategory) => {
+  // Automatic calculation of duration (nights) and amount based on stay dates, room type, and AC/Non-AC variant
+  const calculateTariff = (checkInDate, checkOutDate, selectedCategory, selectedVariant = form.roomVariant || "AC") => {
     let calculatedNights = 1;
     if (checkInDate && checkOutDate) {
       const d1 = new Date(checkInDate);
@@ -195,6 +197,11 @@ function ReceptionistNewBooking() {
         ratePerNight = Number(matchedRoom.currentRate || matchedRoom.baseRate || matchedRoom.rate || ratePerNight);
       }
 
+      // Non-AC adjustment (25% off) if roomVariant is Non-AC
+      if (selectedVariant === "Non-AC") {
+        ratePerNight = Math.max(1500, Math.round(ratePerNight * 0.75));
+      }
+
       totalAmount = calculatedNights * ratePerNight;
     }
 
@@ -204,7 +211,7 @@ function ReceptionistNewBooking() {
   const handleDateChange = (field, val) => {
     const nextCheckIn = field === "checkIn" ? val : form.checkIn;
     const nextCheckOut = field === "checkOut" ? val : form.checkOut;
-    const { nights, amount } = calculateTariff(nextCheckIn, nextCheckOut, form.roomType);
+    const { nights, amount } = calculateTariff(nextCheckIn, nextCheckOut, form.roomType, form.roomVariant);
 
     const checkInIsToday = isDateToday(nextCheckIn);
     let updatedStatus = form.status;
@@ -223,7 +230,7 @@ function ReceptionistNewBooking() {
   };
 
   const handleRoomTypeChange = (category) => {
-    const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, category);
+    const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, category, form.roomVariant);
 
     // Filter available rooms of selected type if matching
     const matchingRooms = availableRoomsList.filter(r => {
@@ -249,6 +256,49 @@ function ReceptionistNewBooking() {
     }
   };
 
+  const handleRoomNumberChange = (roomNumVal) => {
+    let detectedVariant = form.roomVariant || "AC";
+    let detectedCategory = form.roomType;
+    if (roomNumVal) {
+      const matched = availableRoomsList.find(r => String(r.num) === String(roomNumVal));
+      if (matched) {
+        if (matched.roomVariant === "Non-AC" || matched.type?.toLowerCase().includes("non-ac")) {
+          detectedVariant = "Non-AC";
+        } else if (matched.roomVariant === "AC") {
+          detectedVariant = "AC";
+        }
+        if (!detectedCategory && matched.type) {
+          detectedCategory = matched.type;
+        }
+      }
+    }
+
+    const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, detectedCategory, detectedVariant);
+
+    setForm(prev => ({
+      ...prev,
+      roomNumber: roomNumVal,
+      roomType: detectedCategory || prev.roomType,
+      roomVariant: detectedVariant,
+      nights: nights,
+      amount: amount !== "" ? amount : prev.amount
+    }));
+
+    if (fieldErrors.roomNumber && roomNumVal) {
+      setFieldErrors(prev => ({ ...prev, roomNumber: null }));
+    }
+  };
+
+  const handleVariantToggle = (variant) => {
+    const { nights, amount } = calculateTariff(form.checkIn, form.checkOut, form.roomType, variant);
+    setForm(prev => ({
+      ...prev,
+      roomVariant: variant,
+      nights: nights,
+      amount: amount !== "" ? amount : prev.amount
+    }));
+  };
+
   const handleNightsChange = (val) => {
     const n = Number(val) || 1;
     let totalAmount = "";
@@ -257,6 +307,9 @@ function ReceptionistNewBooking() {
       const matchedRoom = rooms.find(r => (r.category || r.roomType) === form.roomType && (r.currentRate || r.baseRate || r.rate));
       if (matchedRoom) {
         ratePerNight = Number(matchedRoom.currentRate || matchedRoom.baseRate || matchedRoom.rate || ratePerNight);
+      }
+      if (form.roomVariant === "Non-AC") {
+        ratePerNight = Math.max(1500, Math.round(ratePerNight * 0.75));
       }
       totalAmount = n * ratePerNight;
     }
@@ -293,6 +346,9 @@ function ReceptionistNewBooking() {
       return;
     }
 
+    const roomTypeWithVariant = `${form.roomType || 'Standard Room'} (${form.roomVariant || 'AC'})`;
+    const roomString = form.roomNumber ? `Room ${form.roomNumber} · ${roomTypeWithVariant}` : roomTypeWithVariant;
+
     const val = validateWithZod(walkInBookingSchema, {
       guest: form.guest,
       phone: form.phone,
@@ -300,12 +356,14 @@ function ReceptionistNewBooking() {
       idProofType: form.idProofType,
       idProofNumber: isAadhaarType ? cleanAadhaar : form.idProofNumber,
       roomNumber: form.roomNumber,
-      roomType: form.roomType,
+      room: roomString,
+      roomType: roomTypeWithVariant,
+      roomVariant: form.roomVariant || "AC",
       checkIn: form.checkIn,
       checkOut: form.checkOut,
       amount: form.amount,
-      balance: form.balance,
-      nights: form.nights,
+      balance: form.balance === "" ? 0 : form.balance,
+      nights: form.nights === "" ? 1 : form.nights,
       pax: form.pax,
       paymentMethod: form.paymentMethod,
       notes: form.notes
@@ -347,8 +405,9 @@ function ReceptionistNewBooking() {
         idProofType: form.idProofType,
         idProofNumber: isAadhaarType ? cleanAadhaar : form.idProofNumber,
         roomNumber: form.roomNumber || "",
-        room: form.roomNumber ? `${form.roomNumber} · ${form.roomType}` : (form.roomType || ""),
-        roomType: form.roomType,
+        room: roomString,
+        roomType: roomTypeWithVariant,
+        roomVariant: form.roomVariant || "AC",
         checkIn: form.checkIn,
         checkOut: form.checkOut,
         nights: Number(form.nights) || 1,
@@ -597,19 +656,13 @@ function ReceptionistNewBooking() {
                 <Select
                   required
                   value={form.roomNumber}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setForm({ ...form, roomNumber: val });
-                    if (fieldErrors.roomNumber) {
-                      setFieldErrors(p => ({ ...p, roomNumber: null }));
-                    }
-                  }}
+                  onChange={(e) => handleRoomNumberChange(e.target.value)}
                 >
                   <option value="">Select Available Room</option>
                   {displayRooms.length > 0 ? (
-                    displayRooms.map(rm => (
-                      <option key={rm.num} value={rm.num}>
-                        Room #{rm.num} ({rm.type}) - Available
+                    displayRooms.map((rm, idx) => (
+                      <option key={`${rm.num}-${rm.roomVariant || rm.type || ''}-${idx}`} value={rm.num}>
+                        Room #{rm.num} ({rm.type} · {rm.roomVariant || 'AC'}) - Available
                       </option>
                     ))
                   ) : (
@@ -618,6 +671,42 @@ function ReceptionistNewBooking() {
                     </option>
                   )}
                 </Select>
+              </FormField>
+
+              <FormField label="Room Variant (AC / Non-AC)">
+                <div className="grid grid-cols-2 gap-2.5 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleVariantToggle("AC")}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                      form.roomVariant === "AC"
+                        ? "bg-purple text-white border-purple shadow-sm ring-2 ring-purple/20"
+                        : "bg-white text-navy/70 border-muted hover:border-purple/40 hover:bg-purple/5"
+                    }`}
+                  >
+                    <Snowflake className="size-3.5" />
+                    <span>AC Room</span>
+                    {form.roomVariant === "AC" && <Check className="size-3 ml-1" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleVariantToggle("Non-AC")}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                      form.roomVariant === "Non-AC"
+                        ? "bg-navy text-white border-navy shadow-sm ring-2 ring-navy/20"
+                        : "bg-white text-navy/70 border-muted hover:border-navy/40 hover:bg-navy/5"
+                    }`}
+                  >
+                    <Wind className="size-3.5" />
+                    <span>Non-AC Room</span>
+                    {form.roomVariant === "Non-AC" && <Check className="size-3 ml-1" />}
+                  </button>
+                </div>
+                {form.roomNumber && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1 font-medium bg-slate-50 border border-slate-200/60 rounded-md px-2 py-1">
+                    <span className="font-semibold text-navy">Assigned:</span> Room #{form.roomNumber} · {form.roomType || 'Standard Room'} ({form.roomVariant})
+                  </p>
+                )}
               </FormField>
 
               <FormField label="Booking Source / Channel">

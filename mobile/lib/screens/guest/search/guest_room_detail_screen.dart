@@ -165,13 +165,31 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
   double get _totalPayable => _basePrice + _gstTax;
 
   // Live Date-Based Room Availability Status Checkers
-  bool get _isStayOccupied {
+  bool get _isStayOccupied => _isVariantOccupied(_selectedAcVariant);
+
+  bool _isVariantOccupied(String variant) {
     if (!_hasSelectedDates) return false;
     final selIn = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
     final selOut = DateTime(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
 
-    if (widget.room.bookedRanges.isNotEmpty) {
-      for (final range in widget.room.bookedRanges) {
+    final targetModel = variant == 'Non-AC'
+        ? (_nonAcVariantRoom ?? widget.room)
+        : (_acVariantRoom ?? widget.room);
+
+    final rangesToCheck = targetModel.bookedRanges.isNotEmpty
+        ? targetModel.bookedRanges
+        : widget.room.bookedRanges;
+
+    if (rangesToCheck.isNotEmpty) {
+      for (final range in rangesToCheck) {
+        if (range.roomVariant != null && range.roomVariant!.isNotEmpty) {
+          final rangeVar = range.roomVariant!.toLowerCase();
+          final isRangeNonAc = rangeVar.contains('non');
+          final isTargetNonAc = variant == 'Non-AC';
+          if (isRangeNonAc != isTargetNonAc) {
+            continue;
+          }
+        }
         final rIn = Formatters.parseDateSafe(range.checkIn);
         final rOut = Formatters.parseDateSafe(range.checkOut);
         if (rIn != null && rOut != null) {
@@ -188,33 +206,48 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
       }
     }
 
-    if (widget.room.checkIn != null && widget.room.checkOut != null && widget.room.checkIn!.isNotEmpty && widget.room.checkOut!.isNotEmpty) {
-      final rIn = Formatters.parseDateSafe(widget.room.checkIn);
-      final rOut = Formatters.parseDateSafe(widget.room.checkOut);
+    if (targetModel.checkIn != null && targetModel.checkOut != null && targetModel.checkIn!.isNotEmpty && targetModel.checkOut!.isNotEmpty) {
+      final rIn = Formatters.parseDateSafe(targetModel.checkIn);
+      final rOut = Formatters.parseDateSafe(targetModel.checkOut);
       if (rIn != null && rOut != null) {
         final rInDate = DateTime(rIn.year, rIn.month, rIn.day);
         final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
-        // Overlap exists only if: selIn < rOutDate AND selOut > rInDate
-        // On check-out day, selIn == rOutDate is NOT an overlap!
         final overlaps = selIn.isBefore(rOutDate) && selOut.isAfter(rInDate);
         if (overlaps) {
-          return widget.room.isOccupied;
+          return targetModel.isOccupied;
         }
-        return false;
       }
     }
 
     return false;
   }
 
-  bool get _isStayReserved {
+  bool get _isStayReserved => _isVariantReserved(_selectedAcVariant);
+
+  bool _isVariantReserved(String variant) {
     if (!_hasSelectedDates) return false;
-    if (_isStayOccupied) return false;
+    if (_isVariantOccupied(variant)) return false;
     final selIn = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
     final selOut = DateTime(_checkOutDate!.year, _checkOutDate!.month, _checkOutDate!.day);
 
-    if (widget.room.bookedRanges.isNotEmpty) {
-      for (final range in widget.room.bookedRanges) {
+    final targetModel = variant == 'Non-AC'
+        ? (_nonAcVariantRoom ?? widget.room)
+        : (_acVariantRoom ?? widget.room);
+
+    final rangesToCheck = targetModel.bookedRanges.isNotEmpty
+        ? targetModel.bookedRanges
+        : widget.room.bookedRanges;
+
+    if (rangesToCheck.isNotEmpty) {
+      for (final range in rangesToCheck) {
+        if (range.roomVariant != null && range.roomVariant!.isNotEmpty) {
+          final rangeVar = range.roomVariant!.toLowerCase();
+          final isRangeNonAc = rangeVar.contains('non');
+          final isTargetNonAc = variant == 'Non-AC';
+          if (isRangeNonAc != isTargetNonAc) {
+            continue;
+          }
+        }
         final rIn = Formatters.parseDateSafe(range.checkIn);
         final rOut = Formatters.parseDateSafe(range.checkOut);
         if (rIn != null && rOut != null) {
@@ -231,9 +264,9 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
       }
     }
 
-    if (widget.room.checkIn != null && widget.room.checkOut != null && widget.room.checkIn!.isNotEmpty && widget.room.checkOut!.isNotEmpty) {
-      final rIn = Formatters.parseDateSafe(widget.room.checkIn);
-      final rOut = Formatters.parseDateSafe(widget.room.checkOut);
+    if (targetModel.checkIn != null && targetModel.checkOut != null && targetModel.checkIn!.isNotEmpty && targetModel.checkOut!.isNotEmpty) {
+      final rIn = Formatters.parseDateSafe(targetModel.checkIn);
+      final rOut = Formatters.parseDateSafe(targetModel.checkOut);
       if (rIn != null && rOut != null) {
         final rInDate = DateTime(rIn.year, rIn.month, rIn.day);
         final rOutDate = DateTime(rOut.year, rOut.month, rOut.day);
@@ -410,6 +443,10 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     if (picked != null) {
       setState(() {
         _checkOutDate = picked;
+        if (_checkInDate == null) {
+          final candidateIn = picked.subtract(const Duration(days: 1));
+          _checkInDate = candidateIn.isBefore(today) ? today : candidateIn;
+        }
       });
     }
   }
@@ -701,14 +738,17 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
             const SizedBox(width: 12),
             () {
               final isAvailable = _isStayAvailable;
-              final buttonLabel = (_isStayOccupied && _hasSelectedDates)
-                  ? 'Dates Occupied'
-                  : ((_isStayReserved && _hasSelectedDates)
-                      ? 'Dates Reserved'
-                      : 'Book Now');
+              final canBook = _hasSelectedDates && isAvailable;
+              final buttonLabel = !_hasSelectedDates
+                  ? 'Book Stay'
+                  : (_isStayOccupied
+                      ? 'Dates Occupied'
+                      : (_isStayReserved
+                          ? 'Dates Reserved'
+                          : 'Book Stay'));
 
               return ElevatedButton.icon(
-                onPressed: isAvailable
+                onPressed: canBook
                     ? () {
                         widget.onBookStay(
                           _activeRoomModel,
@@ -723,20 +763,27 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                       }
                     : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: navy,
-                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                  backgroundColor: canBook ? navy : const Color(0xFFE2E8F0),
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
                   foregroundColor: white,
-                  disabledForegroundColor: const Color(0xFF64748B),
+                  disabledForegroundColor: const Color(0xFF94A3B8),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
-                    side: BorderSide(color: isAvailable ? gold : Colors.transparent, width: 1.2),
+                    side: BorderSide(
+                      color: canBook ? gold : const Color(0xFFCBD5E1),
+                      width: 1.2,
+                    ),
                   ),
                 ),
                 icon: Icon(
-                  isAvailable ? Icons.bolt_rounded : Icons.calendar_today_rounded,
-                  color: isAvailable ? gold : const Color(0xFF94A3B8),
+                  canBook
+                      ? Icons.bolt_rounded
+                      : (!_hasSelectedDates
+                          ? Icons.lock_outline_rounded
+                          : Icons.block_rounded),
+                  color: canBook ? gold : const Color(0xFF94A3B8),
                   size: 18,
                 ),
                 label: Text(
@@ -744,7 +791,7 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: isAvailable ? white : const Color(0xFF64748B),
+                    color: canBook ? white : const Color(0xFF94A3B8),
                   ),
                 ),
               );
@@ -782,15 +829,20 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     final acRate = _acNightlyRate;
     final nonAcRate = _nonAcNightlyRate;
 
+    final isAcOcc = _isVariantOccupied('AC');
+    final isNonAcOcc = _isVariantOccupied('Non-AC');
+
     return Row(
       children: [
         Expanded(
           child: _buildVariantCard(
             title: 'Air Conditioned (AC)',
-            subtitle: 'Climate Controlled Luxury',
+            subtitle: _hasSelectedDates && isAcOcc ? 'Occupied for dates' : 'Climate Controlled Luxury',
             priceTag: '₹${acRate.toStringAsFixed(0)} / night',
             icon: Icons.ac_unit_rounded,
             isSelected: _selectedAcVariant == 'AC',
+            statusText: _hasSelectedDates ? (isAcOcc ? 'OCCUPIED' : 'AVAILABLE') : null,
+            statusColor: isAcOcc ? const Color(0xFFDC2626) : const Color(0xFF059669),
             onTap: () => setState(() => _selectedAcVariant = 'AC'),
           ),
         ),
@@ -798,10 +850,12 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
         Expanded(
           child: _buildVariantCard(
             title: 'Non-AC Room',
-            subtitle: 'Naturally Ventilated',
+            subtitle: _hasSelectedDates && isNonAcOcc ? 'Occupied for dates' : 'Naturally Ventilated',
             priceTag: '₹${nonAcRate.toStringAsFixed(0)} / night',
             icon: Icons.air_rounded,
             isSelected: _selectedAcVariant == 'Non-AC',
+            statusText: _hasSelectedDates ? (isNonAcOcc ? 'OCCUPIED' : 'AVAILABLE') : null,
+            statusColor: isNonAcOcc ? const Color(0xFFDC2626) : const Color(0xFF059669),
             onTap: () => setState(() => _selectedAcVariant = 'Non-AC'),
           ),
         ),
@@ -815,6 +869,8 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
     required String priceTag,
     required IconData icon,
     required bool isSelected,
+    String? statusText,
+    Color? statusColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -847,7 +903,24 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Icon(icon, size: 20, color: isSelected ? purple : muted),
-                if (isSelected)
+                if (statusText != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (statusColor ?? emerald).withAlpha(25),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: (statusColor ?? emerald).withAlpha(80)),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: statusColor ?? emerald,
+                      ),
+                    ),
+                  )
+                else if (isSelected)
                   const Icon(Icons.check_circle_rounded, size: 18, color: purple)
                 else
                   Container(
@@ -1174,23 +1247,23 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         )
-                      : const Row(
+                      : Row(
                           children: [
                             Text(
-                              'dd-mm-yyyy',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF94A3B8),
+                              title == 'Check-In' ? 'Select Check-in' : 'Select Check-out',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF64748B),
                               ),
                             ),
-                            SizedBox(width: 4),
-                            Icon(Icons.touch_app_rounded, size: 11, color: Color(0xFFD97706)),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.touch_app_rounded, size: 12, color: Color(0xFFD97706)),
                           ],
                         ),
                   const SizedBox(height: 1.5),
                   Text(
-                    isSelected ? DateFormat('EEEE').format(date) : 'Tap to select',
+                    isSelected ? DateFormat('EEEE').format(date) : 'Tap to choose date',
                     style: TextStyle(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w600,
@@ -1574,7 +1647,9 @@ class _GuestRoomDetailScreenState extends State<GuestRoomDetailScreen> {
       child: Column(
         children: [
           _buildPriceRow(
-            'Room Rate ($_nightsCount ${_nightsCount == 1 ? "Night" : "Nights"} × $_roomsCount Room • $_selectedAcVariant)',
+            _hasSelectedDates
+                ? 'Room Rate ($_nightsCount ${_nightsCount == 1 ? "Night" : "Nights"} × $_roomsCount Room • $_selectedAcVariant)'
+                : 'Nightly Rate (1 Night × $_roomsCount Room • $_selectedAcVariant)',
             '₹${_basePrice.toStringAsFixed(0)}',
           ),
           if (_extraGuestTariffPerNight > 0) ...[

@@ -391,13 +391,13 @@ function ManagerRoomsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
-                {paginatedRooms.map((rm) => {
+                {paginatedRooms.map((rm, idx) => {
                   const meta = statusMeta[rm.status] || statusMeta.Available;
                   const StatusIcon = meta.icon;
                   const active = rm.activeBooking;
 
                   return (
-                    <tr key={rm.room} className="hover:bg-[#fcfcfc]/60 transition-colors group">
+                    <tr key={rm._id || rm.id || `${rm.room}-${rm.roomType || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
                       <td className="py-4 px-6 text-left font-bold text-navy-deep text-sm">
                         Room {rm.room}
                       </td>

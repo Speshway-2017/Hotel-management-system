@@ -85,9 +85,9 @@ export function RoomGrid({ compact = false }) {
           
             {list.
           filter((r) => r.floor === f).
-          map((r) =>
+          map((r, idx) =>
           <button
-            key={r.number}
+            key={r.id || r._id || `${r.number}-${r.type || ''}-${idx}`}
             onClick={() => setSelected(r)}
             className={cn(
               "min-h-24 rounded-lg border p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft",

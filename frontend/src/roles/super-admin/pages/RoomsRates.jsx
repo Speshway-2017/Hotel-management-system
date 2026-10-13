@@ -275,8 +275,8 @@ function SuperAdminRoomsRates() {
                 </tr>
               </thead>
               <tbody className="divide-y font-sans">
-                {filteredRooms.map((r) => (
-                  <tr key={r.id} className="hover:bg-muted/15 transition-colors">
+                {filteredRooms.map((r, idx) => (
+                  <tr key={r.id || r._id || `${r.propertyName}-${r.roomType}-${idx}`} className="hover:bg-muted/15 transition-colors">
                     <td className="p-4 text-left">
                       <div className="flex items-center gap-1.5 font-semibold text-navy truncate" title={r.propertyName}>
                         <Building className="size-3.5 text-purple shrink-0" />

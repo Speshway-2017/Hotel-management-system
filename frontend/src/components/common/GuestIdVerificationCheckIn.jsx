@@ -544,8 +544,8 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
               onChange={(e) => setAssignedRoom(e.target.value)}
               className="w-full h-11 px-3 bg-[#fcfcfc] border border-muted rounded-xl text-xs font-bold text-navy focus:outline-none focus:ring-2 focus:ring-purple/30 cursor-pointer"
             >
-              {availableRooms.map((rm) => (
-                <option key={rm.roomNumber || rm._id} value={rm.roomNumber}>
+              {availableRooms.map((rm, idx) => (
+                <option key={rm._id || `${rm.roomNumber}-${rm.category || ''}-${idx}`} value={rm.roomNumber}>
                   Room #{rm.roomNumber} ({rm.category || "Standard Room"}) — {rm.status || "Available"}
                 </option>
               ))}

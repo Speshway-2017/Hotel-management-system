@@ -19,11 +19,13 @@ import { runAutoCheckoutSweep, processAutoCheckouts } from '../services/autoChec
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import {
   extractRoomNumber,
+  extractRoomVariant,
   syncRoomStatus,
   isBookingMatchingRoom,
   parseDateToDayUtc,
   isStayDateOverlapping,
-  isBookingStatusActive
+  isBookingStatusActive,
+  reconcileRoomStatuses
 } from '../utils/roomHelper.js';
 import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
 import {
@@ -571,6 +573,9 @@ router.get('/rooms', async (req, res) => {
   try {
     const propertyId = req.user.propertyId || req.headers['x-property-id'] || 'HS-9HQ8P';
     const { checkIn, checkOut } = req.query;
+
+    await reconcileRoomStatuses(propertyId);
+
     let rooms = await Room.find({ $or: [{ propertyId }, { hotelId: propertyId }] }).sort({ roomNumber: 1 });
     if (!rooms || rooms.length === 0) {
       rooms = await Room.find().sort({ roomNumber: 1 });
@@ -592,7 +597,8 @@ router.get('/rooms', async (req, res) => {
         checkIn: b.checkIn,
         checkOut: b.checkOut,
         status: b.status,
-        guest: b.guest || b.guestName || ''
+        guest: b.guest || b.guestName || '',
+        roomVariant: b.roomVariant || extractRoomVariant(b) || r.type || 'AC'
       }));
 
       let activeCheckIn = null;
@@ -629,16 +635,16 @@ router.get('/rooms', async (req, res) => {
 
       const isReservedForDates = reservedBooking !== null && activeCheckIn === null;
 
-      // Compute display status
-      let displayStatus = r.status || 'Available';
-      if (r.status !== 'Blocked' && r.status !== 'Maintenance') {
-        if (activeCheckIn || r.status === 'Occupied') {
-          displayStatus = 'Occupied';
-        } else if (isReservedForDates || r.status === 'Reserved') {
-          displayStatus = 'Reserved';
-        } else {
-          displayStatus = 'Available';
-        }
+      // Compute display status accurately based on active booking for this variant
+      let displayStatus = 'Available';
+      if (['Blocked', 'Maintenance', 'Dirty'].includes(r.status)) {
+        displayStatus = r.status;
+      } else if (activeCheckIn) {
+        displayStatus = 'Occupied';
+      } else if (isReservedForDates) {
+        displayStatus = 'Reserved';
+      } else {
+        displayStatus = 'Available';
       }
 
       const amenitiesStr = Array.isArray(r.amenities) ? r.amenities.join(', ') : String(r.amenities || '');
@@ -934,6 +940,13 @@ router.post('/reservations', async (req, res) => {
         const sameRoom = (roomNum && bRoomNum === roomNum) || (assignedRoomId && b.roomId === assignedRoomId);
         if (!sameRoom) return false;
 
+        // Check variant: if one is AC and the other is Non-AC, they do NOT conflict!
+        const reqVariant = extractRoomVariant(req.body.roomVariant || req.body.type || roomType || room);
+        const bVariant = extractRoomVariant(b);
+        if (reqVariant && bVariant && reqVariant !== bVariant) {
+          return false;
+        }
+
         const bIn = parseDateToMs(b.checkIn);
         const bOut = parseDateToMs(b.checkOut);
         if (isNaN(bIn) || isNaN(bOut)) return false;
@@ -958,6 +971,7 @@ router.post('/reservations', async (req, res) => {
       room: roomString,
       roomNumber: roomNum,
       roomType: roomType,
+      roomVariant: req.body.roomVariant || req.body.type || 'AC',
       roomId: assignedRoomId,
       checkIn,
       checkOut,
@@ -982,7 +996,7 @@ router.post('/reservations', async (req, res) => {
     // Update assigned room status in MongoDB
     if (roomNum) {
       const rmStatus = (bookingStatus === 'Checked-in' || bookingStatus === 'Checked In') ? 'Occupied' : 'Reserved';
-      await syncRoomStatus(roomNum, rmStatus, propertyId);
+      await syncRoomStatus(roomNum, rmStatus, propertyId, io, req.body.roomVariant || req.body.type || 'AC');
     }
 
     // Notify Realtime (Socket.io)
@@ -1212,7 +1226,7 @@ router.put('/reservations/:id/status', async (req, res) => {
       else if (status === 'Checked-out') rmStatus = 'Available';
       else if (status === 'Cancelled' || status === 'No-show') rmStatus = 'Available';
 
-      await syncRoomStatus(roomNum, rmStatus, propertyId);
+      await syncRoomStatus(roomNum, rmStatus, propertyId, req.app.get('socketio'), updated.roomVariant || 'AC');
     }
 
     const action = status === 'Checked-in' ? 'checkin' : status === 'Checked-out' ? 'checkout' : status === 'Cancelled' ? 'cancelled' : 'status_change';

@@ -19,6 +19,7 @@ const bookingSchema = new mongoose.Schema({
   roomId: { type: String },
   roomNumber: { type: String },
   roomType: { type: String },
+  roomVariant: { type: String, default: 'AC' },
   checkIn: { type: String, required: true },
   checkOut: { type: String, required: true },
   nights: { type: Number, default: 1 },

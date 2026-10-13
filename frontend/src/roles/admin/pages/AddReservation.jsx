@@ -6,12 +6,15 @@ import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select, Checkbox } from "@/components/hs/FormFields";
 import { toast } from "sonner";
-import { extractRoomNumber } from "@/utils/roomUtils";
+import { Snowflake, Wind, Check } from "lucide-react";
+import { extractRoomNumber, extractRoomVariant } from "@/utils/roomUtils";
 import { validateWithZod, walkInBookingSchema } from "@/schemas";
 
 function AddReservation() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [allDbRooms, setAllDbRooms] = useState([]);
+  const [allReservations, setAllReservations] = useState([]);
   const [availableRoomsList, setAvailableRoomsList] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -23,6 +26,7 @@ function AddReservation() {
   const [idProofType, setIdProofType] = useState(searchParams.get("idProofType") || "Aadhaar Card");
   const [idProofNumber, setIdProofNumber] = useState(searchParams.get("idProofNumber") || "");
   const [room, setRoom] = useState(searchParams.get("room") || "");
+  const [roomVariant, setRoomVariant] = useState(searchParams.get("variant") || "AC");
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [nights, setNights] = useState(1);
@@ -31,6 +35,7 @@ function AddReservation() {
   const [status, setStatus] = useState(searchParams.get("status") || "Pending");
   const [amount, setAmount] = useState("");
   const [balance, setBalance] = useState("");
+  const [notes, setNotes] = useState(searchParams.get("notes") || "");
   const [isGroupBooking, setIsGroupBooking] = useState(false);
   const [existingGuestAadhaar, setExistingGuestAadhaar] = useState(null);
 
@@ -121,52 +126,9 @@ function AddReservation() {
           });
         });
 
-        // Helper to extract all 3-4 digit room numbers from any reservation object
-        const extractNums = (resObj) => {
-          const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
-          const matches = combined.match(/\b\d{3,4}\b/g);
-          return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
-        };
-
-        // Determine occupied / reserved / confirmed rooms from live reservations
-        const occupied = new Set();
-        if (resRes && resRes.success && Array.isArray(resRes.data)) {
-          resRes.data.forEach(r => {
-            const s = String(r.status || '').toLowerCase().trim();
-            const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
-            if (!isInactive) {
-              const nums = extractNums(r);
-              nums.forEach(n => occupied.add(n));
-            }
-          });
-        }
-
-        // Filter out occupied, reserved, confirmed, or blocked rooms
-        const availableRooms = dbRooms
-          .map(r => ({
-            num: String(r.roomNumber || r.num || ''),
-            type: r.category || 'Standard Room',
-            status: r.status || 'Available'
-          }))
-          .filter(r => {
-            if (!r.num) return false;
-            if (occupied.has(r.num)) return false; // Reserved / Confirmed / Occupied by reservation
-            const roomStat = String(r.status || 'Available').toLowerCase().trim();
-            return roomStat === 'available' || roomStat === 'vacant';
-          });
-
-        // Deduplicate by room number & sort ascending
-        const uniqueAvailable = [];
-        const seen = new Set();
-        availableRooms.forEach(r => {
-          if (!seen.has(r.num)) {
-            seen.add(r.num);
-            uniqueAvailable.push(r);
-          }
-        });
-
-        uniqueAvailable.sort((a, b) => Number(a.num) - Number(b.num));
-        setAvailableRoomsList(uniqueAvailable);
+        setAllDbRooms(dbRooms);
+        const liveRes = (resRes && resRes.success && Array.isArray(resRes.data)) ? resRes.data : [];
+        setAllReservations(liveRes);
       } catch (err) {
         console.error("Failed to load real available rooms:", err);
       }
@@ -174,7 +136,85 @@ function AddReservation() {
     fetchRealAvailableRooms();
   }, []);
 
-  // Auto-calculate nights and total amount whenever room designation, checkIn, or checkOut changes
+  // Dynamically compute available rooms based on selected variant (AC vs Non-AC) and stay dates
+  useEffect(() => {
+    // Helper to check stay date overlap: reqIn < resOut AND reqOut > resIn
+    const isDateOverlap = (s1Str, e1Str, s2Str, e2Str) => {
+      if (!s1Str || !e1Str || !s2Str || !e2Str) return true;
+      const s1 = new Date(s1Str).getTime();
+      const e1 = new Date(e1Str).getTime();
+      const s2 = new Date(s2Str).getTime();
+      const e2 = new Date(e2Str).getTime();
+      if (isNaN(s1) || isNaN(e1) || isNaN(s2) || isNaN(e2)) return true;
+      return (s1 < e2 && s2 < e1);
+    };
+
+    const extractNums = (resObj) => {
+      const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
+      const matches = combined.match(/\b\d{3,4}\b/g);
+      return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
+    };
+
+    const currentVariant = roomVariant || 'AC';
+    const occupiedKeys = new Set();
+
+    allReservations.forEach(r => {
+      const s = String(r.status || '').toLowerCase().trim();
+      const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
+      if (!isInactive) {
+        const overlap = isDateOverlap(checkIn, checkOut, r.checkIn, r.checkOut);
+        if (overlap) {
+          const nums = extractNums(r);
+          const rVar = r.roomVariant || extractRoomVariant(r) || 'AC';
+          nums.forEach(n => occupiedKeys.add(`${n}_${rVar}`));
+        }
+      }
+    });
+
+    const available = allDbRooms
+      .map(r => ({
+        num: String(r.roomNumber || r.num || ''),
+        type: r.category || 'Standard Room',
+        status: r.status || 'Available',
+        roomVariant: currentVariant,
+        baseRate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
+      }))
+      .filter(r => {
+        if (!r.num) return false;
+        // Check if THIS specific room and variant is already taken
+        if (occupiedKeys.has(`${r.num}_${currentVariant}`)) return false;
+        const roomStat = String(r.status || 'Available').toLowerCase().trim();
+        return roomStat === 'available' || roomStat === 'vacant';
+      });
+
+    const unique = [];
+    const seen = new Set();
+    available.forEach(r => {
+      if (!seen.has(r.num)) {
+        seen.add(r.num);
+        unique.push(r);
+      }
+    });
+    unique.sort((a, b) => Number(a.num) - Number(b.num));
+    setAvailableRoomsList(unique);
+  }, [allDbRooms, allReservations, roomVariant, checkIn, checkOut]);
+
+  const handleRoomChange = (selectedNum) => {
+    setRoom(selectedNum);
+    if (selectedNum) {
+      const matched = availableRoomsList.find(r => String(r.num) === String(selectedNum));
+      if (matched && matched.roomVariant) {
+        setRoomVariant(matched.roomVariant);
+      }
+    }
+    if (fieldErrors.room) setFieldErrors(p => ({ ...p, room: null }));
+  };
+
+  const handleVariantChange = (variant) => {
+    setRoomVariant(variant);
+  };
+
+  // Auto-calculate nights and total amount whenever room designation, variant, checkIn, or checkOut changes
   useEffect(() => {
     if (checkIn && checkOut) {
       const d1 = new Date(checkIn);
@@ -195,11 +235,17 @@ function AddReservation() {
             else if (selectedObj.rate || selectedObj.baseRate) ratePerNight = Number(selectedObj.rate || selectedObj.baseRate);
           }
         }
+
+        // Apply Non-AC adjustment (25% off) if roomVariant is Non-AC
+        if (roomVariant === "Non-AC") {
+          ratePerNight = Math.max(1500, Math.round(ratePerNight * 0.75));
+        }
+
         const totalTariff = ratePerNight * calculatedNights;
         setAmount(totalTariff);
       }
     }
-  }, [checkIn, checkOut, room, availableRoomsList]);
+  }, [checkIn, checkOut, room, roomVariant, availableRoomsList]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -209,14 +255,25 @@ function AddReservation() {
       return;
     }
 
+    const roomNum = extractRoomNumber(room);
+    const selectedObj = availableRoomsList.find(r => String(r.num) === String(roomNum));
+    const baseCategory = selectedObj?.type || (room && room.includes('·') ? room.split('·')[1]?.trim() : (room || "Standard Room"));
+    const roomTypeWithVariant = `${baseCategory} (${roomVariant})`;
+    const formattedRoomString = roomNum ? `Room ${roomNum} · ${roomTypeWithVariant}` : room;
+
     const val = validateWithZod(walkInBookingSchema, {
       guest,
       phone,
       email,
-      room,
+      room: formattedRoomString,
+      roomNumber: roomNum,
+      roomType: roomTypeWithVariant,
+      roomVariant,
       checkIn,
       checkOut,
       amount,
+      balance: balance === "" ? 0 : balance,
+      nights: nights === "" ? 1 : nights,
       pax,
       status,
       notes
@@ -235,25 +292,25 @@ function AddReservation() {
     }
     setLoading(true);
     try {
-      const roomNum = extractRoomNumber(room);
-      const roomType = room && room.includes('·') ? room.split('·')[1]?.trim() : (room || "Standard Room");
       const payload = {
         guest,
         phone,
         email,
         idProofType,
         idProofNumber,
-        room: roomNum ? `${roomNum} · ${roomType}` : room,
+        room: formattedRoomString,
         roomNumber: roomNum,
-        roomType: roomType,
+        roomType: roomTypeWithVariant,
+        roomVariant,
         checkIn,
         checkOut,
-        nights: Number(nights),
+        nights: Number(nights || 1),
         pax,
         source,
         status,
         amount: Number(amount),
         balance: Number(balance || 0),
+        notes,
         isGroupBooking
       };
       const res = await superAdminService.createReservation(payload);
@@ -377,15 +434,51 @@ function AddReservation() {
                   id="room"
                   required
                   value={room}
-                  onChange={(e) => setRoom(e.target.value)}
+                  onChange={(e) => handleRoomChange(e.target.value)}
                 >
                   <option value="">Select Available Room</option>
-                  {availableRoomsList.map((r) => (
-                    <option key={r.num} value={r.num}>
-                      Room #{r.num} ({r.type})
+                  {availableRoomsList.map((r, idx) => (
+                    <option key={`${r.num}-${r.type || r.roomVariant || ''}-${idx}`} value={r.num}>
+                      Room #{r.num} ({r.type} · {r.roomVariant || 'AC'})
                     </option>
                   ))}
                 </Select>
+              </FormField>
+
+              <FormField label="Room Variant (AC / Non-AC)" id="roomVariant">
+                <div className="grid grid-cols-2 gap-2.5 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleVariantChange("AC")}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                      roomVariant === "AC"
+                        ? "bg-purple text-white border-purple shadow-sm ring-2 ring-purple/20"
+                        : "bg-white text-navy/70 border-muted hover:border-purple/40 hover:bg-purple/5"
+                    }`}
+                  >
+                    <Snowflake className="size-3.5" />
+                    <span>AC Room</span>
+                    {roomVariant === "AC" && <Check className="size-3 ml-1" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleVariantChange("Non-AC")}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                      roomVariant === "Non-AC"
+                        ? "bg-navy text-white border-navy shadow-sm ring-2 ring-navy/20"
+                        : "bg-white text-navy/70 border-muted hover:border-navy/40 hover:bg-navy/5"
+                    }`}
+                  >
+                    <Wind className="size-3.5" />
+                    <span>Non-AC Room</span>
+                    {roomVariant === "Non-AC" && <Check className="size-3 ml-1" />}
+                  </button>
+                </div>
+                {room && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1 font-medium bg-slate-50 border border-slate-200/60 rounded-md px-2 py-1">
+                    <span className="font-semibold text-navy">Assigned:</span> Room #{room} · {availableRoomsList.find(r => String(r.num) === String(room))?.type || 'Standard Room'} ({roomVariant})
+                  </p>
+                )}
               </FormField>
 
               <FormField label="Check-In Date" required id="checkIn">
@@ -480,6 +573,17 @@ function AddReservation() {
                   suffix="₹"
                 />
               </FormField>
+
+              <div className="col-span-2">
+                <FormField label="Special Requests / Front Desk Notes" id="notes">
+                  <Input
+                    id="notes"
+                    placeholder="Enter special requests, arrival notes, or instructions..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </FormField>
+              </div>
 
               <div className="col-span-2 flex items-center gap-2 pt-2.5">
                 <Checkbox

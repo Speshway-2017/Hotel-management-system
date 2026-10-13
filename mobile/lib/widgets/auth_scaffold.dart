@@ -67,31 +67,51 @@ class AuthScaffold extends StatelessWidget {
           SafeArea(
             child: Column(
               children: [
-                // Top Header Bar: Skip only
-                if (showGuestSkip)
+                // Top Header Bar: Back and/or Skip
+                if (showGuestSkip || Navigator.of(context).canPop())
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: TextButton(
-                        onPressed: () => _handleSkip(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                          backgroundColor: Colors.black.withAlpha(90),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(color: gold.withAlpha(90), width: 1),
-                          ),
-                        ),
-                        child: Text(
-                          'Skip',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: cream,
-                          ),
-                        ),
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (Navigator.of(context).canPop())
+                          IconButton(
+                            icon: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withAlpha(90),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: gold.withAlpha(90), width: 1),
+                              ),
+                              child: const Icon(Icons.arrow_back_ios_new_rounded, color: cream, size: 16),
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                          )
+                        else
+                          const SizedBox.shrink(),
+                        if (showGuestSkip)
+                          TextButton(
+                            onPressed: () => _handleSkip(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              backgroundColor: Colors.black.withAlpha(90),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(color: gold.withAlpha(90), width: 1),
+                              ),
+                            ),
+                            child: Text(
+                              'Skip',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: cream,
+                              ),
+                            ),
+                          )
+                        else
+                          const SizedBox.shrink(),
+                      ],
                     ),
                   ),
 

@@ -11,6 +11,8 @@ import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_folio_provider.dart';
 import 'package:hour_stay_mobile/screens/guest/bookings/guest_booking_detail_screen.dart';
 import 'package:hour_stay_mobile/screens/auth/login_screen.dart';
+import 'package:hour_stay_mobile/screens/role_gate.dart';
+import 'package:hour_stay_mobile/services/notification_service.dart';
 import 'guest_room_detail_screen.dart';
 import 'package:hour_stay_mobile/services/api_service.dart';
 import 'package:hour_stay_mobile/widgets/empty_state.dart';
@@ -284,10 +286,14 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
       if (!uniqueMap.containsKey(key)) {
         uniqueMap[key] = roomWithImages;
       } else {
-        // Keep starting rate variant or prefer AC as primary, while retaining all images
+        // Keep available variant over occupied variant, or starting rate variant, while retaining all images
         final existing = uniqueMap[key]!;
         final mergedImages = {...roomWithImages.images, ...existing.images}.where((img) => img.trim().isNotEmpty).toList();
-        if (_calculateRoomPrice(room) < _calculateRoomPrice(existing)) {
+        if (!existing.isAvailable && roomWithImages.isAvailable) {
+          uniqueMap[key] = roomWithImages.copyWith(images: mergedImages);
+        } else if (existing.isAvailable && !roomWithImages.isAvailable) {
+          uniqueMap[key] = existing.copyWith(images: mergedImages);
+        } else if (_calculateRoomPrice(room) < _calculateRoomPrice(existing)) {
           uniqueMap[key] = roomWithImages.copyWith(images: mergedImages);
         } else {
           uniqueMap[key] = existing.copyWith(images: mergedImages);
@@ -1244,18 +1250,36 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
             int? roomsCount,
             String? acVariant,
             double? customPrice,
-          }) {
-            Navigator.of(context).pop();
-            _openRoomBookingFlow(
-              r,
-              checkInDate: checkInDate,
-              checkOutDate: checkOutDate,
-              adultsCount: adultsCount,
-              childrenCount: childrenCount,
-              roomsCount: roomsCount,
-              acVariant: acVariant,
-              customPrice: customPrice,
-            );
+          }) async {
+            final authProvider = context.read<AuthProvider>();
+            if (authProvider.user == null) {
+              final loggedIn = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => const LoginScreen(
+                    returnOnSuccess: true,
+                    subtitle: 'Sign in to complete your room booking',
+                  ),
+                ),
+              );
+              if (loggedIn != true || !mounted) return;
+            }
+            if (mounted) {
+              Navigator.of(context).pop();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  _openRoomBookingFlow(
+                    r,
+                    checkInDate: checkInDate,
+                    checkOutDate: checkOutDate,
+                    adultsCount: adultsCount,
+                    childrenCount: childrenCount,
+                    roomsCount: roomsCount,
+                    acVariant: acVariant,
+                    customPrice: customPrice,
+                  );
+                }
+              });
+            }
           },
         ),
       ),
@@ -1379,7 +1403,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
   // ==========================================
   // 4. ROOM DETAILS & INSTANT BOOKING FLOW
   // ==========================================
-  void _openRoomBookingFlow(
+  Future<void> _openRoomBookingFlow(
     RoomModel room, {
     DateTime? checkInDate,
     DateTime? checkOutDate,
@@ -1388,16 +1412,25 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
     int? roomsCount,
     String? acVariant,
     double? customPrice,
-  }) {
+  }) async {
     final authProvider = context.read<AuthProvider>();
-    final user = authProvider.user;
+    var authUser = authProvider.user;
 
-    if (user == null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+    if (authUser == null) {
+      final loggedIn = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(
+            returnOnSuccess: true,
+            subtitle: 'Sign in to complete your room booking',
+          ),
+        ),
       );
-      return;
+      if (loggedIn != true || !mounted) return;
+      authUser = context.read<AuthProvider>().user;
+      if (authUser == null) return;
     }
+
+    final user = authUser;
 
     final effectiveCheckIn = checkInDate ?? _checkInDate;
     final effectiveCheckOut = checkOutDate ?? _checkOutDate;
@@ -1671,15 +1704,13 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                                   }
 
                                   ReservationModel? createdRes;
-                                  if (res.data != null) {
-                                    final dataMap = res.data is Map<String, dynamic>
-                                        ? (res.data['booking'] is Map<String, dynamic>
-                                            ? res.data['booking']
-                                            : (res.data['data'] is Map<String, dynamic> ? res.data['data'] : res.data))
-                                        : null;
-                                    if (dataMap != null) {
+                                  if (res.data != null && res.data is Map) {
+                                    final rawMap = res.data as Map;
+                                    final rawBooking = rawMap['booking'] ?? rawMap['data'] ?? rawMap;
+                                    if (rawBooking is Map) {
                                       try {
-                                        createdRes = ReservationModel.fromJson(dataMap as Map<String, dynamic>);
+                                        final safeMap = Map<String, dynamic>.from(rawBooking);
+                                        createdRes = ReservationModel.fromJson(safeMap);
                                       } catch (_) {}
                                     }
                                   }
@@ -1846,8 +1877,13 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
                 height: 44,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).push(
+                    Navigator.of(ctx).pop();
+                    final nav = rootNavigatorKey.currentState ?? Navigator.of(context, rootNavigator: true);
+                    nav.pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const RoleGate()),
+                      (route) => false,
+                    );
+                    nav.push(
                       MaterialPageRoute(
                         builder: (_) => GuestBookingDetailScreen(booking: booking),
                       ),

@@ -29,7 +29,8 @@ export function RoomDetailsPage() {
   }
 
   const decodedParam = routeRoomId ? decodeURIComponent(routeRoomId) : "Standard Room";
-  const targetPropId = localStorage.getItem('selected_property_id') || 'HS-9HQ8P';
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const targetPropId = searchParams.get('propertyId') || localStorage.getItem('selected_property_id') || localStorage.getItem('guest_target_property_id') || 'HS-9HQ8P';
 
   const [property, setProperty] = useState(null);
   const [allPropertyRooms, setAllPropertyRooms] = useState([]);
@@ -49,8 +50,24 @@ export function RoomDetailsPage() {
   const [loading, setLoading] = useState(true);
 
   // Reservation Date Selectors
-  const [checkInDate, setCheckInDate] = useState(() => localStorage.getItem('booking_check_in') || new Date().toISOString().split('T')[0]);
-  const [checkOutDate, setCheckOutDate] = useState(() => localStorage.getItem('booking_check_out') || new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [checkInDate, setCheckInDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('checkIn')) return sp.get('checkIn');
+      const stored = localStorage.getItem('booking_check_in');
+      if (stored) return stored;
+    }
+    return new Date().toISOString().split('T')[0];
+  });
+  const [checkOutDate, setCheckOutDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('checkOut')) return sp.get('checkOut');
+      const stored = localStorage.getItem('booking_check_out');
+      if (stored) return stored;
+    }
+    return new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  });
 
   const loadRoomDetailsData = (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -184,8 +201,8 @@ export function RoomDetailsPage() {
       baseRate: acRate,
       currentRate: acRate,
       dailyRate: acRate,
-      status: refRoom.status || 'Available',
-      isAvailable: refRoom.isAvailable !== false,
+      status: refRoom.status === 'Occupied' ? 'Occupied' : (refRoom.status || 'Available'),
+      isAvailable: refRoom.status === 'Occupied' ? false : (refRoom.isAvailable !== false),
       amenities: Array.isArray(refRoom.amenities)
         ? [...refRoom.amenities.filter(a => !a.toLowerCase().includes('fan')), 'Air Conditioning']
         : ['Air Conditioning', 'High-Speed Wi-Fi', 'Smart TV', 'Room Service']
@@ -201,8 +218,8 @@ export function RoomDetailsPage() {
       baseRate: nonAcRate,
       currentRate: nonAcRate,
       dailyRate: nonAcRate,
-      status: refRoom.status || 'Available',
-      isAvailable: refRoom.isAvailable !== false,
+      status: refRoom.status === 'Occupied' ? 'Occupied' : (refRoom.status || 'Available'),
+      isAvailable: refRoom.status === 'Occupied' ? false : (refRoom.isAvailable !== false),
       amenities: Array.isArray(refRoom.amenities)
         ? [...refRoom.amenities.filter(a => !a.toLowerCase().includes('air condition') && !a.toLowerCase().includes('ac')), 'Ceiling Fan']
         : ['Ceiling Fan', 'High-Speed Wi-Fi', 'Flat Screen TV', 'Room Service']
@@ -211,8 +228,23 @@ export function RoomDetailsPage() {
     return { acVariant: resolvedAc, nonAcVariant: resolvedNonAc };
   }, [activeVariants, activeRoomNum]);
 
+  // Variant availability flags
+  const acIsAvail = Boolean(
+    acVariant &&
+    (acVariant.status === 'Available' || acVariant.isAvailable === true) &&
+    acVariant.status !== 'Occupied' &&
+    acVariant.isAvailable !== false
+  );
+  const nonAcIsAvail = Boolean(
+    nonAcVariant &&
+    (nonAcVariant.status === 'Available' || nonAcVariant.isAvailable === true) &&
+    nonAcVariant.status !== 'Occupied' &&
+    nonAcVariant.isAvailable !== false
+  );
+
   // The active selected room variant object
   const activeSelectedRoom = selectedVariant === 'Non-AC' ? nonAcVariant : acVariant;
+  const isAvailable = selectedVariant === 'Non-AC' ? nonAcIsAvail : acIsAvail;
 
   const s = property?.settings || {};
   let hotelName = s.hotelName || s.name || property?.name || "Speshway Luxury Hotel";
@@ -246,8 +278,6 @@ export function RoomDetailsPage() {
   const baseTariffTotal = nightlyTariff * nightsCount;
   const gstTax = Math.round(baseTariffTotal * 0.18);
   const totalPayable = baseTariffTotal + gstTax;
-
-  const isAvailable = activeSelectedRoom?.status === 'Available' || activeSelectedRoom?.isAvailable === true;
 
   // Resolve room images
   const roomImages = getRoomImages(activeSelectedRoom, property);
@@ -390,9 +420,9 @@ export function RoomDetailsPage() {
 
               <div className="flex items-center gap-3">
                 <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
-                  isAvailable ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-700 border border-gray-200"
+                  isAvailable ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-red-100 text-red-700 border border-red-200"
                 }`}>
-                  {activeSelectedRoom?.status || (isAvailable ? "Available" : "Occupied")}
+                  {isAvailable ? "Available" : (activeSelectedRoom?.status || "Occupied")}
                 </span>
               </div>
             </div>
@@ -437,14 +467,14 @@ export function RoomDetailsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {distinctRoomNumbers.map((num) => {
+                  {distinctRoomNumbers.map((num, idx) => {
                     const isSelectedNum = String(activeRoomNum).trim() === String(num).trim();
                     const variants = roomsByNumber[num] || [];
-                    const isNumAvail = variants.some(r => r.status === 'Available' || r.isAvailable === true);
+                    const isNumAvail = variants.some(r => (r.status === 'Available' || r.isAvailable === true) && r.status !== 'Occupied' && r.isAvailable !== false);
 
                     return (
                       <button
-                        key={num}
+                        key={`${num}-${idx}`}
                         type="button"
                         onClick={() => setSelectedRoomNumber(num)}
                         className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
@@ -457,12 +487,12 @@ export function RoomDetailsPage() {
                           <span className="font-mono text-base font-bold">Room {num}</span>
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                             isSelectedNum
-                              ? "bg-white/20 text-white"
+                              ? (isNumAvail ? "bg-white/20 text-white" : "bg-red-500/80 text-white")
                               : isNumAvail
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-gray-100 text-gray-500"
+                                ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                : "bg-red-100 text-red-700 border border-red-200"
                           }`}>
-                            {isNumAvail ? "Active" : "Occupied"}
+                            {isNumAvail ? "Available" : "Occupied"}
                           </span>
                         </div>
                         <span className={`text-[10px] ${isSelectedNum ? "text-white/70" : "text-gray-400"}`}>
@@ -487,9 +517,23 @@ export function RoomDetailsPage() {
                       Room {activeRoomNum} is available in two climate configurations. Select your preferred category:
                     </p>
                   </div>
-                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 w-fit">
-                    AC & Non-AC Available
-                  </span>
+                  {acIsAvail && nonAcIsAvail ? (
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 w-fit">
+                      AC & Non-AC Available
+                    </span>
+                  ) : acIsAvail && !nonAcIsAvail ? (
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 w-fit">
+                      AC Available · Non-AC Occupied
+                    </span>
+                  ) : !acIsAvail && nonAcIsAvail ? (
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 w-fit">
+                      Non-AC Available · AC Occupied
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 w-fit">
+                      Room #{activeRoomNum} Occupied for Selected Dates
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -546,16 +590,20 @@ export function RoomDetailsPage() {
                     </div>
 
                     <div className="pt-3 border-t border-navy/10 flex justify-between items-center">
-                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                        <span className="size-2 rounded-full bg-emerald-500 inline-block" /> Available
+                      <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                        acIsAvail ? "text-emerald-600" : "text-red-500"
+                      }`}>
+                        <span className={`size-2 rounded-full inline-block ${
+                          acIsAvail ? "bg-emerald-500" : "bg-red-500"
+                        }`} /> {acIsAvail ? "Available" : (acVariant.status || "Occupied")}
                       </span>
 
                       <span className={`text-xs font-bold px-3 py-1 rounded-full transition-all ${
                         selectedVariant === "AC"
-                          ? "bg-purple text-white shadow-sm"
+                          ? (acIsAvail ? "bg-purple text-white shadow-sm" : "bg-red-600 text-white shadow-sm")
                           : "bg-navy/5 text-navy hover:bg-navy/10"
                       }`}>
-                        {selectedVariant === "AC" ? "✓ Selected (AC)" : "Select AC"}
+                        {selectedVariant === "AC" ? (acIsAvail ? "✓ Selected (AC)" : "Selected (AC - Occupied)") : "Select AC"}
                       </span>
                     </div>
                   </div>
@@ -613,16 +661,20 @@ export function RoomDetailsPage() {
                     </div>
 
                     <div className="pt-3 border-t border-navy/10 flex justify-between items-center">
-                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                        <span className="size-2 rounded-full bg-emerald-500 inline-block" /> Available
+                      <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                        nonAcIsAvail ? "text-emerald-600" : "text-red-500"
+                      }`}>
+                        <span className={`size-2 rounded-full inline-block ${
+                          nonAcIsAvail ? "bg-emerald-500" : "bg-red-500"
+                        }`} /> {nonAcIsAvail ? "Available" : (nonAcVariant.status || "Occupied")}
                       </span>
 
                       <span className={`text-xs font-bold px-3 py-1 rounded-full transition-all ${
                         selectedVariant === "Non-AC"
-                          ? "bg-emerald-600 text-white shadow-sm"
+                          ? (nonAcIsAvail ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm")
                           : "bg-navy/5 text-navy hover:bg-navy/10"
                       }`}>
-                        {selectedVariant === "Non-AC" ? "✓ Selected (Non-AC)" : "Select Non-AC"}
+                        {selectedVariant === "Non-AC" ? (nonAcIsAvail ? "✓ Selected (Non-AC)" : "Selected (Non-AC - Occupied)") : "Select Non-AC"}
                       </span>
                     </div>
                   </div>
@@ -749,7 +801,10 @@ export function RoomDetailsPage() {
                       id="checkin"
                       type="date"
                       value={checkInDate}
-                      onChange={(e) => setCheckInDate(e.target.value)}
+                      onChange={(e) => {
+                        setCheckInDate(e.target.value);
+                        localStorage.setItem('booking_check_in', e.target.value);
+                      }}
                       className="w-full h-10 px-3 rounded-xl border border-navy/15 text-xs font-bold text-navy bg-white focus:outline-none focus:border-purple"
                     />
                   </div>
@@ -763,7 +818,10 @@ export function RoomDetailsPage() {
                       id="checkout"
                       type="date"
                       value={checkOutDate}
-                      onChange={(e) => setCheckOutDate(e.target.value)}
+                      onChange={(e) => {
+                        setCheckOutDate(e.target.value);
+                        localStorage.setItem('booking_check_out', e.target.value);
+                      }}
                       className="w-full h-10 px-3 rounded-xl border border-navy/15 text-xs font-bold text-navy bg-white focus:outline-none focus:border-purple"
                     />
                   </div>
@@ -791,9 +849,13 @@ export function RoomDetailsPage() {
                   disabled={!isAvailable}
                   variant="hero"
                   size="touch"
-                  className="w-full h-11 text-xs font-bold cursor-pointer disabled:opacity-50 mt-2"
+                  className="w-full h-11 text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
                 >
-                  {isAvailable ? `Book ${selectedVariant} — Instant Confirmation` : activeSelectedRoom?.status === "Reserved" ? "Dates Reserved" : "Room Unavailable"}
+                  {isAvailable
+                    ? `Book ${selectedVariant} — Instant Confirmation`
+                    : activeSelectedRoom?.status === "Reserved"
+                      ? `Room ${activeRoomNum} (${selectedVariant}) Reserved`
+                      : `Room ${activeRoomNum} (${selectedVariant}) Occupied`}
                 </Button>
 
                 <div className="p-3 bg-purple/5 rounded-xl border border-purple/10 text-[10px] text-gray-500 space-y-1">
