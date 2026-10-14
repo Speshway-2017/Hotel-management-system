@@ -10,6 +10,7 @@ import { CheckCircle2, AlertCircle, Fingerprint, ShieldCheck, Snowflake, Wind, C
 
 import { subscribeRealtimeSync } from "@/services/socket";
 import { validateWithZod, walkInBookingSchema } from "@/schemas";
+import { extractRoomVariant, isBookingMatchingRoom } from "@/utils/roomUtils";
 
 function ReceptionistNewBooking() {
   const navigate = useNavigate();
@@ -105,48 +106,40 @@ function ReceptionistNewBooking() {
       const dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
       setRooms(dbRooms);
 
-      // Helper to extract all 3-4 digit room numbers from any reservation object
-      const extractNums = (resObj) => {
-        const combined = `${resObj.room || ''} ${resObj.roomNumber || ''} ${resObj.assignedRoom || ''} ${resObj.num || ''}`;
-        const matches = combined.match(/\b\d{3,4}\b/g);
-        return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
-      };
-
-      // Determine occupied / reserved rooms from live reservations
-      const occupied = new Set();
-      if (resRes && resRes.success && Array.isArray(resRes.data)) {
-        resRes.data.forEach(r => {
-          const s = String(r.status || '').toLowerCase().trim();
-          const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
-          if (!isInactive) {
-            const nums = extractNums(r);
-            nums.forEach(n => occupied.add(n));
-          }
-        });
-      }
+      // Determine active bookings to exclude only the specific occupied variant
+      const activeBookings = (resRes && resRes.success && Array.isArray(resRes.data))
+        ? resRes.data.filter(r => {
+            const s = String(r.status || '').toLowerCase().trim();
+            return s !== 'checked-out' && s !== 'checked out' && s !== 'checkout' && s !== 'completed' && s !== 'cancelled' && s !== 'canceled';
+          })
+        : [];
 
       // Filter ONLY available/vacant rooms (not occupied or reserved)
       const availableRooms = dbRooms
         .map(r => ({
+          _id: r._id || r.id,
           num: String(r.roomNumber || r.num || ''),
           type: r.category || r.roomType || 'Standard Room',
           status: r.status || 'Available',
-          roomVariant: r.type || (String(r.category || '').toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC'),
+          roomVariant: r.type || extractRoomVariant(r) || (String(r.category || '').toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC'),
           rate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
         }))
         .filter(r => {
           if (!r.num) return false;
-          if (occupied.has(r.num)) return false; // Exclude occupied / reserved rooms
+          // Check if there is an active booking strictly matching this room and variant
+          const hasActiveBooking = activeBookings.some(b => isBookingMatchingRoom(b, r));
+          if (hasActiveBooking) return false;
           const roomStat = String(r.status || 'Available').toLowerCase().trim();
           return roomStat === 'available' || roomStat === 'vacant';
         });
 
-      // Deduplicate & sort
+      // Deduplicate & sort by room number + variant
       const uniqueAvailable = [];
       const seen = new Set();
       availableRooms.forEach(r => {
-        if (!seen.has(r.num)) {
-          seen.add(r.num);
+        const key = `${r.num}_${r.roomVariant}`;
+        if (!seen.has(key)) {
+          seen.add(key);
           uniqueAvailable.push(r);
         }
       });
@@ -442,16 +435,20 @@ function ReceptionistNewBooking() {
     }
   };
 
-  // Filter available rooms in dropdown based on selected room category if category is chosen
-  const filteredAvailableRooms = form.roomType
-    ? availableRoomsList.filter(r => {
-        const rType = String(r.type || '').trim().toLowerCase();
-        const fType = String(form.roomType || '').trim().toLowerCase();
-        return rType === fType || rType.includes(fType) || fType.includes(rType);
-      })
-    : availableRoomsList;
+  // Filter available rooms in dropdown based on selected room category and variant if chosen
+  const filteredAvailableRooms = availableRoomsList.filter(r => {
+    if (form.roomType) {
+      const rType = String(r.type || '').trim().toLowerCase();
+      const fType = String(form.roomType || '').trim().toLowerCase();
+      if (rType !== fType && !rType.includes(fType) && !fType.includes(rType)) return false;
+    }
+    if (form.roomVariant) {
+      if (r.roomVariant !== form.roomVariant) return false;
+    }
+    return true;
+  });
 
-  const displayRooms = form.roomType ? filteredAvailableRooms : availableRoomsList;
+  const displayRooms = (form.roomType || form.roomVariant) ? filteredAvailableRooms : availableRoomsList;
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans pb-12">

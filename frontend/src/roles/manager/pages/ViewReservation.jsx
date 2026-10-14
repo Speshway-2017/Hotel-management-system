@@ -10,6 +10,7 @@ import { Calendar, User, Home, CreditCard, ShieldAlert, CheckCircle, Edit2, LogO
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { formatDisplayDate } from "@/utils/dateUtils";
 
 function ManagerViewReservation() {
   const { id } = useParams();
@@ -178,11 +179,11 @@ function ManagerViewReservation() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Check-In</span>
-                  <p className="font-semibold mt-0.5">{booking.checkIn}</p>
+                  <p className="font-semibold mt-0.5">{formatDisplayDate(booking.checkIn)}</p>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">Check-Out</span>
-                  <p className="font-semibold mt-0.5">{booking.checkOut}</p>
+                  <p className="font-semibold mt-0.5">{formatDisplayDate(booking.checkOut)}</p>
                 </div>
               </div>
               <div>

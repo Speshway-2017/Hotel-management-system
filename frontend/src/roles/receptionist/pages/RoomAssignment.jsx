@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { formatDisplayDate } from "@/utils/dateUtils";
 import { receptionCache } from "@/services/receptionCache";
+import { extractRoomVariant, isBookingMatchingRoom } from "@/utils/roomUtils";
 
 export const Route = createFileRoute("/reception/room-assignment")({
   head: () => ({
@@ -29,17 +30,53 @@ function RoomStatusPage() {
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [variantFilter, setVariantFilter] = useState("all");
 
   const [loading, setLoading] = useState(() => !cachedRooms);
   const [rooms, setRooms] = useState(() => cachedRooms || []);
 
   const loadRooms = (isSilent = false) => {
     if (!isSilent && rooms.length === 0) setLoading(true);
-    receptionistService.getRooms()
-      .then(res => {
-        if (res.success && res.data) {
-          setRooms(res.data);
-          receptionCache.set('rooms', res.data);
+    Promise.all([
+      receptionistService.getRooms(),
+      receptionistService.getReservations().catch(() => ({}))
+    ])
+      .then(([roomsRes, resRes]) => {
+        if (roomsRes?.success && Array.isArray(roomsRes.data)) {
+          const rawRooms = roomsRes.data;
+          const bookings = (resRes?.success && Array.isArray(resRes.data)) ? resRes.data : [];
+          const activeBookings = bookings.filter(b => 
+            b.status !== 'Cancelled' && b.status !== 'Checked-out' && b.status !== 'No-show'
+          );
+
+          const mapped = rawRooms.map(rm => {
+            const matchedBooking = activeBookings.find(b => isBookingMatchingRoom(b, rm));
+            let currentStatus = rm.status || "Available";
+
+            if (['Blocked', 'Maintenance', 'Dirty', 'Out of Order', 'Out of Service'].includes(rm.status)) {
+              currentStatus = rm.status;
+            } else if (matchedBooking) {
+              const bStatus = String(matchedBooking.status || '').toLowerCase().trim();
+              if (bStatus.includes('checked-in') || bStatus.includes('checked in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup')) {
+                currentStatus = "Occupied";
+              } else {
+                currentStatus = "Reserved";
+              }
+            } else {
+              currentStatus = "Available";
+            }
+
+            return {
+              ...rm,
+              status: currentStatus,
+              guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : (currentStatus === 'Available' ? '' : (rm.guest || '')),
+              checkIn: matchedBooking ? (matchedBooking.checkIn || matchedBooking.checkInDate || '') : (currentStatus === 'Available' ? '' : (rm.checkIn || '')),
+              checkOut: matchedBooking ? (matchedBooking.checkOut || matchedBooking.checkOutDate || '') : (currentStatus === 'Available' ? '' : (rm.checkOut || ''))
+            };
+          });
+
+          setRooms(mapped);
+          receptionCache.set('rooms', mapped);
         }
       })
       .catch(err => console.error("Failed to load property rooms status:", err))
@@ -81,13 +118,15 @@ function RoomStatusPage() {
     const typeStr = String(rm.roomType || rm.category || "").toLowerCase();
     const guestStr = String(rm.guest || "").toLowerCase();
     const query = searchQuery.toLowerCase();
+    const rmVariant = rm.type || extractRoomVariant(rm) || "AC";
 
     const matchesSearch = roomStr.includes(query) || typeStr.includes(query) || guestStr.includes(query);
     const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
     const matchesType = typeFilter === "all" || rm.roomType === typeFilter || rm.category === typeFilter;
     const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
+    const matchesVariant = variantFilter === "all" || rmVariant === variantFilter;
 
-    return matchesSearch && matchesFloor && matchesType && matchesStatus;
+    return matchesSearch && matchesFloor && matchesType && matchesStatus && matchesVariant;
   });
 
   return (
@@ -111,7 +150,7 @@ function RoomStatusPage() {
         </div>
 
         {/* Row 2: Select Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-muted/50">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-muted/50">
           
           <div className="flex flex-col gap-1.5">
             <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Floor</span>
@@ -140,6 +179,19 @@ function RoomStatusPage() {
               <option value="Deluxe King">Deluxe King</option>
               <option value="Executive Room">Executive Room</option>
               <option value="Villa Suite">Villa Suite</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Climate</span>
+            <select
+              value={variantFilter}
+              onChange={(e) => setVariantFilter(e.target.value)}
+              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
+            >
+              <option value="all">All (AC & Non-AC)</option>
+              <option value="AC">AC Only</option>
+              <option value="Non-AC">Non-AC Only</option>
             </select>
           </div>
 
@@ -184,7 +236,16 @@ function RoomStatusPage() {
                 {/* Room title row */}
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-display font-black text-navy text-base leading-none">Room {rm.room}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-display font-black text-navy text-base leading-none">Room {rm.room}</h3>
+                      <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                        (rm.type || extractRoomVariant(rm)) === 'Non-AC'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-sky-50 text-sky-700 border border-sky-200'
+                      }`}>
+                        {(rm.type || extractRoomVariant(rm)) === 'Non-AC' ? 'Non-AC' : 'AC'}
+                      </span>
+                    </div>
                     <span className="text-[9px] text-muted-foreground font-bold mt-1 block uppercase tracking-wider">{rm.floor} · {rm.roomType}</span>
                   </div>
                   <Tag tone={meta.tone} className="text-[9px] font-black uppercase select-none px-1.5 py-0.5 rounded">
@@ -228,11 +289,11 @@ function RoomStatusPage() {
                 <div className="pt-2.5 border-t border-muted/30 flex items-center justify-between mt-auto">
                   <ActionGroup align="left">
                     <ViewActionButton
-                      onClick={() => navigate(`/reception/room-assignment/${rm.room || rm.roomNumber}`)}
+                      onClick={() => navigate(`/reception/room-assignment/${rm._id || rm.id || rm.room}?variant=${encodeURIComponent(rm.type || extractRoomVariant(rm) || 'AC')}`)}
                       title="View Room Details"
                     />
                     <EditActionButton
-                      onClick={() => navigate(`/reception/room-assignment/${rm.room || rm.roomNumber}`)}
+                      onClick={() => navigate(`/reception/room-assignment/${rm._id || rm.id || rm.room}?variant=${encodeURIComponent(rm.type || extractRoomVariant(rm) || 'AC')}`)}
                       title="Edit Room Status"
                     />
                   </ActionGroup>

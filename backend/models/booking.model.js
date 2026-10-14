@@ -103,8 +103,9 @@ bookingSchema.pre('validate', function(next) {
   if (!this.hotelId) {
     this.hotelId = this.propertyId || 'HS-9HQ8P';
   }
-  if (!this.dates && this.checkIn && this.checkOut) {
+  if (this.checkIn && this.checkOut) {
     this.dates = `${this.checkIn} → ${this.checkOut}`;
+    this.nights = calculateStayNights(this.checkIn, this.checkOut);
   }
   if (this.balance === 0 || this.status === 'Checked-in' || this.status === 'Checked-out') {
     if (!this.paymentStatus) this.paymentStatus = 'Paid';
@@ -646,7 +647,7 @@ const Booking = {
     cleanData.guest = cleanData.guest || cleanData.guestName || 'Guest';
     cleanData.checkIn = formatToYYYYMMDD(cleanData.checkIn || cleanData.checkInDate) || cleanData.checkIn || cleanData.checkInDate;
     cleanData.checkOut = formatToYYYYMMDD(cleanData.checkOut || cleanData.checkOutDate) || cleanData.checkOut || cleanData.checkOutDate;
-    cleanData.nights = Number(cleanData.nights) || calculateStayNights(cleanData.checkIn, cleanData.checkOut);
+    cleanData.nights = calculateStayNights(cleanData.checkIn, cleanData.checkOut);
     cleanData.dates = `${cleanData.checkIn} → ${cleanData.checkOut}`;
     cleanData.propertyId = cleanData.propertyId || 'HS-9HQ8P';
     cleanData.city = cleanData.city || cleanData.hotelCity || 'Hyderabad';

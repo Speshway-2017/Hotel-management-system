@@ -1014,11 +1014,11 @@ function ReservationsPage() {
                 <div className="grid grid-cols-2 gap-3 pt-1 border-t border-muted/30">
                   <div>
                     <span className="text-[10px] text-muted-foreground">Check-in Date:</span>
-                    <strong className="text-navy block mt-0.5">{selectedRes.checkIn}</strong>
+                    <strong className="text-navy block mt-0.5">{formatDisplayDate(selectedRes.checkIn)}</strong>
                   </div>
                   <div>
                     <span className="text-[10px] text-muted-foreground">Check-out Date:</span>
-                    <strong className="text-navy block mt-0.5">{selectedRes.checkOut}</strong>
+                    <strong className="text-navy block mt-0.5">{formatDisplayDate(selectedRes.checkOut)} ({selectedRes.nights || 1} Night{selectedRes.nights > 1 ? 's' : ''})</strong>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-2 border-t border-muted/20">

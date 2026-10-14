@@ -1001,6 +1001,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const roomNum = extractRoomNumber(booking);
+    const io = req.app.get('socketio');
 
     // Sync Room operational status on check-in, check-out, or cancellation
     if (roomNum) {
@@ -1019,12 +1020,12 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
     // Broadcast notifications to all stakeholders including Guest
     await notifyBookingEvent({
       req,
+      io,
       action,
       booking
     });
 
     // Realtime broadcast across all dashboards
-    const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, targetPropId, {
         action,

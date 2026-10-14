@@ -646,7 +646,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
       {/* 2. KPI Summary Cards Grid */}
       <div className="dashboard-stats-grid grid grid-cols-2 lg:grid-cols-4 gap-3">
         <PremiumStatCard
-          label="Total Collected"
+          label="Total Revenue"
           value={`₹${totalCollected.toLocaleString("en-IN")}`}
           hint="All settled guest collections"
           icon={CheckCircle2}

@@ -17,7 +17,7 @@ import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
-import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
+import { extractRoomNumber, extractRoomVariant, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 import {
   Bed,
   Users,
@@ -811,10 +811,10 @@ function RoomsRatesPage() {
                           <td className="py-4 px-6 font-bold text-navy-deep text-sm w-[145px] min-w-[145px]">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span>Room {rm.roomNumber}</span>
-                              <span className={`text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
                                 isNonAc
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : 'bg-purple/10 text-purple border border-purple/20'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-sky-50 text-sky-700 border border-sky-200'
                               }`}>
                                 {isNonAc ? 'Non-AC' : 'AC'}
                               </span>
@@ -1104,7 +1104,16 @@ function RoomsRatesPage() {
                 {roomsList.map((room, idx) => (
                   <tr key={room._id ? `${room._id}-${idx}` : `${room.roomNumber}-${room.category || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60">
                     <td className="py-3.5 px-4 font-semibold text-navy text-left align-middle w-[140px] min-w-[140px]">
-                      <div>Room {room.roomNumber}</div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>Room {room.roomNumber}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          (room.type === 'Non-AC' || extractRoomVariant(room) === 'Non-AC')
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-sky-50 text-sky-700 border border-sky-200'
+                        }`}>
+                          {(room.type === 'Non-AC' || extractRoomVariant(room) === 'Non-AC') ? 'Non-AC' : 'AC'}
+                        </span>
+                      </div>
                       <div className="text-[9px] text-muted-foreground font-normal">{room.category}</div>
                     </td>
                     
