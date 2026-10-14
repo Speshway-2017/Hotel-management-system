@@ -64,13 +64,23 @@ function FrontDeskDashboard() {
   const [loading, setLoading] = useState(() => !cachedDash);
   const [arrivals, setArrivals] = useState(() => cachedDash?.arrivals || []);
   const [departures, setDepartures] = useState(() => cachedDash?.departures || []);
-  const [stats, setStats] = useState(() => cachedDash?.stats || {
-    available: 0,
-    occupied: 0,
-    dirty: 0,
-    cleaning: 0,
-    ooo: 0,
-    blocked: 0
+  const [stats, setStats] = useState(() => {
+    if (cachedDash?.stats) return cachedDash.stats;
+    const cachedPayments = receptionCache.get('payments');
+    let initialRev = 0;
+    if (Array.isArray(cachedPayments) && cachedPayments.length > 0) {
+      const settled = cachedPayments.filter(p => p.status === 'Settled' || p.status === 'Paid' || p.status === 'Success');
+      initialRev = settled.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    }
+    return {
+      available: 0,
+      occupied: 0,
+      dirty: 0,
+      cleaning: 0,
+      ooo: 0,
+      blocked: 0,
+      totalRevenue: initialRev
+    };
   });
 
   const [propName, setPropName] = useState(() => cachedDash?.propName || "Assigned Hotel");
@@ -84,11 +94,19 @@ function FrontDeskDashboard() {
       receptionistService.getDashboard().catch(() => ({})),
       receptionistService.getReservations().catch(() => ({})),
       receptionistService.getRooms().catch(() => ({})),
-      receptionistService.getFeedback().catch(() => ({}))
-    ]).then(([dashRes, resRes, roomsRes, fbRes]) => {
+      receptionistService.getFeedback().catch(() => ({})),
+      receptionistService.getPayments().catch(() => ({}))
+    ]).then(([dashRes, resRes, roomsRes, fbRes, payRes]) => {
       const allBookings = resRes?.success && Array.isArray(resRes.data) ? resRes.data : [];
       const allRooms = roomsRes?.success && Array.isArray(roomsRes.data) ? roomsRes.data : [];
       const feedbacks = fbRes?.success && Array.isArray(fbRes.data) ? fbRes.data : [];
+      const rawPayments = (payRes && payRes.data && Array.isArray(payRes.data))
+        ? payRes.data
+        : (Array.isArray(payRes) ? payRes : (receptionCache.get('payments') || []));
+
+      if (Array.isArray(rawPayments) && rawPayments.length > 0) {
+        receptionCache.set('payments', rawPayments);
+      }
 
       if (feedbacks.length > 0) {
         const avg = (feedbacks.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbacks.length).toFixed(1);
@@ -153,10 +171,12 @@ function FrontDeskDashboard() {
       // Dynamic Room metrics using shared helper
       const roomKPIs = calculateRoomKPIs(allRooms, allBookings);
 
-      // Dynamic Total Revenue
-      const revenue = allBookings
-        .filter(b => b.status !== 'Cancelled')
-        .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0) || dashRes?.data?.stats?.totalRevenue || 0;
+      // Dynamic Total Revenue matching payments ledger
+      const settledPayments = rawPayments.filter(p => p.status === "Settled" || p.status === "Paid" || p.status === "Success");
+      const paymentsRevenue = settledPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const revenue = paymentsRevenue > 0
+        ? paymentsRevenue
+        : (dashRes?.data?.stats?.totalRevenue || 0);
 
       setArrivals(finalArrivals);
       setDepartures(finalDepartures);
@@ -292,7 +312,7 @@ function FrontDeskDashboard() {
       <div className="grid gap-4 grid-cols-2 md:grid-cols-6 dashboard-stats-grid">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked' || a.status === 'Confirmed').length} Expected, ${arrivals.filter(a => a.status === 'Checked-In' || a.status === 'Checked-in').length} Checked In`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
-        <PremiumStatCard label="In-Stay" value={stats.inStay || 0} hint={`${stats.occupied || 0} Room occupied`} icon={Users} accentColor="#10b981" />
+        <PremiumStatCard label="Occupied Rooms" value={(stats.occupied || stats.inStay || 0).toString()} hint={`${stats.occupied || stats.inStay || 0} Rooms occupied`} icon={Users} accentColor="#10b981" />
         <PremiumStatCard label="Available Rooms" value={stats.available || 0} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
         <PremiumStatCard label="Total Revenue" value={`₹${Number(stats.totalRevenue || 0).toLocaleString('en-IN')}`} hint="Real-time ledger collection" icon={IndianRupee} accentColor="#10b981" />
         <PremiumStatCard label="Guest Feedback" value={`${feedbackStats.average} ★`} hint={`${feedbackStats.count} stay records logged`} icon={MessageSquareHeart} accentColor="#f59e0b" />

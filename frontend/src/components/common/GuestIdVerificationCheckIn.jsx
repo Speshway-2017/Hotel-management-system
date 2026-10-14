@@ -601,14 +601,18 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-navy block mb-1.5">
-                    ID Document Type <span className="text-red-600 font-bold ml-1">*</span>
-                  </label>
+                <div className="flex flex-col">
+                  <div className="h-6 flex items-center justify-between mb-1.5">
+                    <label htmlFor="idDocType" className="text-xs font-bold text-navy">
+                      ID Document Type <span className="text-red-600 font-bold ml-0.5">*</span>
+                    </label>
+                    <span className="text-[10px] font-medium text-muted-foreground">Government Photo ID</span>
+                  </div>
                   <select
+                    id="idDocType"
                     value={idDocType}
                     onChange={handleDocTypeChange}
-                    className="w-full h-11 px-3 bg-[#fcfcfc] border border-muted rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-2 focus:ring-purple/30 cursor-pointer"
+                    className="w-full h-11 px-3 bg-[#fcfcfc] border border-muted rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-2 focus:ring-purple/30 cursor-pointer transition-all"
                   >
                     <option value="Aadhaar Card">Aadhaar Card (UIDAI)</option>
                     <option value="Passport">Passport</option>
@@ -617,20 +621,30 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                     <option value="PAN Card">PAN Card</option>
                     <option value="National Identity Card">National Identity Card</option>
                   </select>
+                  <div className="min-h-[22px] mt-1.5 flex items-center">
+                    <p className="text-[10px] text-muted-foreground">
+                      {isAadhaarDoc ? "UIDAI identity proof for domestic guests" : `${idDocType} accepted for guest check-in verification`}
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-navy block">
-                      ID Document Number <span className="text-red-600 font-bold ml-1">*</span>
+                <div className="flex flex-col">
+                  <div className="h-6 flex items-center justify-between mb-1.5">
+                    <label htmlFor="idDocNumber" className="text-xs font-bold text-navy">
+                      ID Document Number <span className="text-red-600 font-bold ml-0.5">*</span>
                     </label>
-                    {isAadhaarDoc && aadhaarStatus?.hasExistingAadhaar && (
+                    {isAadhaarDoc && aadhaarStatus?.hasExistingAadhaar ? (
                       <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
                         On File: {aadhaarStatus.maskedAadhaar}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {isAadhaarDoc ? "12-digit UID" : "Official Identifier"}
                       </span>
                     )}
                   </div>
                   <Input
+                    id="idDocNumber"
                     type="text"
                     required
                     placeholder={isAadhaarDoc ? "e.g. 5489 1234 8901" : "e.g. Z1234567"}
@@ -640,23 +654,22 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                       if (fieldErrors.idDocNumber) setFieldErrors(prev => ({ ...prev, idDocNumber: null }));
                     }}
                     maxLength={isAadhaarDoc ? 14 : 30}
-                    className={`h-11 text-xs font-semibold ${
+                    className={`h-11 text-xs font-semibold bg-[#fcfcfc] rounded-xl transition-all ${
                       isAadhaarMismatch || fieldErrors.idDocNumber
                         ? "border-rose-500 focus-visible:ring-rose-400 bg-rose-50/30"
                         : isAadhaarDoc && cleanAadhaar.length === 12 && aadhaarStatus?.hasExistingAadhaar && cleanAadhaar.endsWith(aadhaarStatus.last4)
                         ? "border-emerald-500 focus-visible:ring-emerald-400 bg-emerald-50/30"
-                        : ""
+                        : "border-muted"
                     }`}
                   />
-                  {fieldErrors.idDocNumber && (
-                    <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.idDocNumber}</p>
-                  )}
-                  {isAadhaarDoc && (
-                    <div className="mt-1.5">
-                      {isAadhaarMismatch ? (
+                  <div className="min-h-[22px] mt-1.5">
+                    {fieldErrors.idDocNumber ? (
+                      <p className="text-[11px] font-bold text-rose-600">{fieldErrors.idDocNumber}</p>
+                    ) : isAadhaarDoc ? (
+                      isAadhaarMismatch ? (
                         <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
                           <AlertCircle className="size-3.5 shrink-0" />
-                          Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is {aadhaarStatus.maskedAadhaar}. Verification blocked.
+                          Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is {aadhaarStatus.maskedAadhaar}.
                         </p>
                       ) : cleanAadhaar.length === 12 && aadhaarStatus?.hasExistingAadhaar && cleanAadhaar.endsWith(aadhaarStatus.last4) ? (
                         <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
@@ -666,23 +679,49 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                       ) : cleanAadhaar.length === 12 && !aadhaarStatus?.hasExistingAadhaar ? (
                         <p className="text-[11px] font-bold text-purple flex items-center gap-1">
                           <Sparkles className="size-3.5 shrink-0" />
-                          Valid 12-digit Aadhaar. Will be saved to guest profile upon verification.
+                          Valid 12-digit Aadhaar. Will be saved to guest profile.
                         </p>
                       ) : cleanAadhaar.length > 0 && cleanAadhaar.length < 12 ? (
                         <p className="text-[10px] text-muted-foreground">
                           {12 - cleanAadhaar.length} digit(s) remaining (12 digits required)
                         </p>
-                      ) : null}
-                    </div>
-                  )}
+                      ) : null
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground">Enter unique document serial or alphanumeric ID number</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Verification Notes & Remarks */}
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center justify-between mb-1.5">
+                  <label htmlFor="verificationNotes" className="text-xs font-bold text-navy">
+                    Verification Notes & Remarks <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-medium">Front Desk Audit</span>
+                </div>
+                <Input
+                  id="verificationNotes"
+                  type="text"
+                  placeholder="e.g. Original physical ID card inspected and verified at front desk"
+                  value={verificationNotes}
+                  onChange={(e) => setVerificationNotes(e.target.value)}
+                  className="h-11 text-xs font-medium bg-[#fcfcfc] border border-muted rounded-xl text-navy focus-visible:ring-purple/30"
+                />
+                <div className="min-h-[18px] mt-1 text-[10px] text-muted-foreground">
+                  Internal notes saved to the guest folio for compliance and security audit.
                 </div>
               </div>
 
               {/* Document Image Upload / Preview */}
               <div>
-                <label className="text-xs font-bold text-navy block mb-1.5">
-                  ID Proof Photo / Document Scan (Optional / Front Desk Camera)
-                </label>
+                <div className="h-6 flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-navy">
+                    ID Proof Photo / Document Scan <span className="text-muted-foreground font-normal">(Optional)</span>
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-medium">PNG, JPG, PDF up to 5MB</span>
+                </div>
                 <div className="border-2 border-dashed border-muted rounded-2xl p-4 text-center hover:border-purple/40 transition-colors bg-[#fafafa]">
                   {uploadPreview ? (
                     <div className="space-y-3">
@@ -690,17 +729,28 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                         <img src={uploadPreview} alt="ID Proof Preview" className="max-h-48 object-contain rounded-xl" />
                       </div>
                       <div className="flex justify-center gap-2">
-                        <label className="text-[11px] font-bold text-purple hover:underline cursor-pointer bg-purple/10 px-3 py-1.5 rounded-lg">
+                        <label className="text-[11px] font-bold text-purple hover:underline cursor-pointer bg-purple/10 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                          <Upload className="size-3.5" />
                           Replace Document
                           <input type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
                         </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadPreview("");
+                            setIdDocImage("");
+                          }}
+                          className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer bg-rose-50 px-3 py-1.5 rounded-lg"
+                        >
+                          Remove
+                        </button>
                       </div>
                     </div>
                   ) : (
                     <label className="cursor-pointer block py-4">
                       <Upload className="size-8 text-muted-foreground mx-auto mb-2" />
                       <p className="text-xs font-bold text-navy">Click or Drag & Drop ID Proof Photo</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">PNG, JPG, or PDF up to 5MB</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Physical card photo or scanned PDF copy</p>
                       <input type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
                     </label>
                   )}
@@ -714,7 +764,7 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                   id="attest"
                   checked={staffAttestation}
                   onChange={(e) => setStaffAttestation(e.target.checked)}
-                  className="mt-0.5 size-4 rounded text-purple focus:ring-purple cursor-pointer"
+                  className="mt-0.5 size-4 rounded text-purple focus:ring-purple cursor-pointer accent-purple"
                 />
                 <label htmlFor="attest" className="text-xs text-navy font-semibold cursor-pointer select-none leading-relaxed">
                   I attest that the presented government ID document belongs to the primary guest (<strong>{guestName}</strong>) and matches hotel compliance guidelines.
@@ -722,7 +772,16 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
               </div>
 
               {/* Step 1 Submit Button */}
-              <div className="flex justify-end pt-2">
+              <div className="flex items-center justify-between pt-2 border-t border-navy/5">
+                <div className="text-[11px] text-muted-foreground">
+                  {isVerified ? (
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="size-3.5" /> Identity verified and compliant
+                    </span>
+                  ) : (
+                    <span>* Mandatory government verification prior to room allocation</span>
+                  )}
+                </div>
                 <Button
                   type="submit"
                   disabled={submittingVerification || isAadhaarMismatch}

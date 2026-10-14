@@ -47,7 +47,7 @@ import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { isToday, formatDisplayDate } from "@/utils/dateUtils";
-import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
+import { extractRoomNumber, extractRoomVariant, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 
 const AdminDashboardRoute = {
   head: () => ({
@@ -164,18 +164,20 @@ function AdminDashboard() {
       }
 
       const allTypes = [...settingsTypes, ...savedTypes];
-      const existingNums = new Set(dbRooms.map(r => String(r.roomNumber || r.num)));
+      const existingKeys = new Set(dbRooms.map(r => `${r.roomNumber || r.num}_${r.category || ''}`));
 
       allTypes.forEach(t => {
         const assigned = Array.isArray(t.rooms) ? t.rooms : [];
         assigned.forEach(num => {
-          if (num && !existingNums.has(String(num))) {
-            existingNums.add(String(num));
+          const key = `${num}_${t.category || ''}`;
+          if (num && !existingKeys.has(key)) {
+            existingKeys.add(key);
             dbRooms.push({
-              _id: `R-${num}`,
+              _id: `R-${num}-${t.category}`,
               roomNumber: String(num),
               num: String(num),
               category: t.category,
+              type: t.category.toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC',
               status: "Available"
             });
           }
@@ -183,12 +185,14 @@ function AdminDashboard() {
       });
 
       const uniqueRooms = [];
-      const seenNums = new Set();
+      const seenKeys = new Set();
       dbRooms.forEach(rm => {
         const num = String(rm.roomNumber || rm.num || '');
-        if (num && !seenNums.has(num)) {
-          seenNums.add(num);
-          uniqueRooms.push({ ...rm, num, roomNumber: num });
+        const variant = extractRoomVariant(rm) || rm.type || 'AC';
+        const key = rm._id ? String(rm._id) : `${num}_${variant}_${rm.category || ''}`;
+        if (key && !seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueRooms.push({ ...rm, num, roomNumber: num, type: variant });
         }
       });
 

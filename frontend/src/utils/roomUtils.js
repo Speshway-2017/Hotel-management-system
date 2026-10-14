@@ -110,18 +110,82 @@ export function extractRoomVariant(val) {
 }
 
 /**
+ * Matches a booking to a physical Room object strictly respecting climate variant (AC vs Non-AC).
+ */
+export function isBookingMatchingRoom(booking, room) {
+  if (!booking || !room) return false;
+
+  const rmId = room._id ? String(room._id) : (room.id ? String(room.id) : null);
+  const bRoomId = booking.roomId ? String(booking.roomId) : null;
+
+  // 1. Exact ObjectId match
+  if (rmId && bRoomId && rmId === bRoomId) {
+    return true;
+  }
+  // If both have 24-character ObjectIds and they differ, they represent different physical rooms
+  if (rmId && bRoomId && /^[0-9a-fA-F]{24}$/.test(rmId) && /^[0-9a-fA-F]{24}$/.test(bRoomId) && rmId !== bRoomId) {
+    return false;
+  }
+
+  // 2. Room number match
+  const rmNum = extractRoomNumber(room.roomNumber || room.room || room.num || room);
+  if (!rmNum) return false;
+
+  const bNum = extractRoomNumber(booking.roomNumber) ||
+               extractRoomNumber(booking.room) ||
+               extractRoomNumber(booking.num) ||
+               extractRoomNumber(booking.roomType) ||
+               extractRoomNumber(booking.category) ||
+               extractRoomNumber(booking.assignedRoom) ||
+               extractRoomNumber(booking.roomId) ||
+               extractRoomNumber(booking);
+
+  let numMatches = false;
+  if (bNum && String(bNum).trim() === String(rmNum).trim()) {
+    numMatches = true;
+  } else {
+    // 3. Text search match for room number in booking strings
+    const testStrings = [booking.room, booking.roomNumber, booking.roomType, booking.category, booking.assignedRoom, booking.name].filter(Boolean);
+    for (const s of testStrings) {
+      if (typeof s === 'string') {
+        const regex = new RegExp(`\\b${rmNum}\\b`);
+        if (regex.test(s)) {
+          numMatches = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!numMatches) return false;
+
+  // 4. Variant match (AC vs Non-AC)
+  // An AC booking must NEVER occupy or block a Non-AC room, and vice versa!
+  const roomVariant = extractRoomVariant(room);
+  const bookingVariant = extractRoomVariant(booking);
+
+  if (roomVariant && bookingVariant && roomVariant !== bookingVariant) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Calculate dynamic live room metrics from rooms array and reservations array
  */
 export function calculateRoomKPIs(rooms = [], reservations = []) {
   const totalRooms = Array.isArray(rooms) && rooms.length > 0 ? rooms.length : 14;
 
-  const occupiedRoomNums = new Set();
-  const reservedRoomNums = new Set();
   const occupiedRoomVariantKeys = new Set();
   const reservedRoomVariantKeys = new Set();
+  const occupiedRoomNums = new Set();
+  const reservedRoomNums = new Set();
+
+  const hasReservations = Array.isArray(reservations) && reservations.length > 0;
 
   // 1. Gather status from reservations
-  if (Array.isArray(reservations)) {
+  if (hasReservations) {
     reservations.forEach(r => {
       const s = String(r.status || "").toLowerCase().trim();
       const rNum = extractRoomNumber(r);
@@ -147,22 +211,30 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
       const s = String(r.status || "").toLowerCase().trim();
       const rNum = extractRoomNumber(r);
       const rmVariant = extractRoomVariant(r) || r.type || "AC";
-      if (s === "occupied" || s === "checked-in" || s === "checkedin") {
-        if (rNum) {
-          occupiedRoomNums.add(rNum);
-          occupiedRoomVariantKeys.add(`${rNum}_${rmVariant}`);
-        }
-      } else if (s === "reserved" || s === "confirmed" || s === "pending") {
-        if (rNum) {
-          reservedRoomNums.add(rNum);
-          reservedRoomVariantKeys.add(`${rNum}_${rmVariant}`);
+      const variantKey = `${rNum}_${rmVariant}`;
+
+      // Only trust raw room status if reservations array was not provided
+      if (!hasReservations) {
+        if (s === "occupied" || s === "checked-in" || s === "checkedin") {
+          if (rNum) {
+            occupiedRoomNums.add(rNum);
+            occupiedRoomVariantKeys.add(variantKey);
+          }
+        } else if (s === "reserved" || s === "confirmed" || s === "pending") {
+          if (rNum) {
+            reservedRoomNums.add(rNum);
+            reservedRoomVariantKeys.add(variantKey);
+          }
         }
       }
     });
   }
 
-  const occupiedRooms = occupiedRoomNums.size;
-  const reservedRooms = reservedRoomNums.size;
+  const occupiedRooms = occupiedRoomVariantKeys.size;
+  const uniqueReservedKeys = new Set(
+    [...reservedRoomVariantKeys].filter(k => !occupiedRoomVariantKeys.has(k))
+  );
+  const reservedRooms = uniqueReservedKeys.size;
   const availableRooms = Math.max(0, totalRooms - occupiedRooms - reservedRooms);
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 
@@ -190,6 +262,7 @@ export function calculateRoomKPIs(rooms = [], reservations = []) {
  * Normalizes a list of rooms with actual booking state
  */
 export function normalizeRoomList(rooms = [], reservations = []) {
+  const hasReservations = Array.isArray(reservations) && reservations.length > 0;
   const { occupiedRoomNums, reservedRoomNums, occupiedRoomVariantKeys, reservedRoomVariantKeys } = calculateRoomKPIs(rooms, reservations);
 
   return (rooms || []).map(rm => {
@@ -201,14 +274,14 @@ export function normalizeRoomList(rooms = [], reservations = []) {
 
     if (occupiedRoomVariantKeys.has(variantKey)) {
       status = "Occupied";
-    } else if (reservedRoomVariantKeys.has(variantKey) || (status === "Reserved" && !occupiedRoomVariantKeys.has(variantKey))) {
-      status = "Reserved";
-    } else if (occupiedRoomNums.has(num) && !rm.type && !rm.roomVariant) {
-      status = "Occupied";
-    } else if (reservedRoomNums.has(num) && !rm.type && !rm.roomVariant) {
+    } else if (reservedRoomVariantKeys.has(variantKey)) {
       status = "Reserved";
     } else if (status === "Blocked" || status === "Maintenance" || status === "Out of Order" || status === "Dirty" || status === "Cleaning") {
       // Retain manual maintenance / blocked status
+    } else if (!hasReservations && rm.status === "Occupied") {
+      status = "Occupied";
+    } else if (!hasReservations && rm.status === "Reserved") {
+      status = "Reserved";
     } else {
       status = "Available";
     }

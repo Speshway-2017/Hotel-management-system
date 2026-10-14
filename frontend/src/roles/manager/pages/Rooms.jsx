@@ -7,7 +7,7 @@ import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
-import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
+import { extractRoomNumber, extractRoomVariant, calculateRoomKPIs, normalizeRoomList, isBookingMatchingRoom } from "@/utils/roomUtils";
 import {
   Bed,
   CheckCircle,
@@ -56,11 +56,11 @@ function ManagerRoomsPage() {
   const [error, setError] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
 
-  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [variantFilter, setVariantFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -155,11 +155,11 @@ function ManagerRoomsPage() {
   }, []);
 
   // Set manual operational status override via backend API
-  const handleOverrideStatus = async (roomNumber, newStatus) => {
+  const handleOverrideStatus = async (roomNumber, newStatus, roomVariant = null) => {
     try {
-      const res = await managerService.updateRoomStatus(roomNumber, newStatus);
+      const res = await managerService.updateRoomStatus(roomNumber, newStatus, roomVariant);
       if (res.success) {
-        toast.success(`Room ${roomNumber} operational status changed to ${newStatus}`);
+        toast.success(`Room ${roomNumber}${roomVariant ? ` (${roomVariant})` : ''} operational status changed to ${newStatus}`);
         loadData();
       }
     } catch (err) {
@@ -168,52 +168,32 @@ function ManagerRoomsPage() {
   };
 
   // Compile full Rooms array with dynamic MongoDB status and booking data
-  const roomBookingMap = new Map();
-
-  for (const b of bookings) {
-    if (b.status === "Cancelled" || b.status === "Checked-out" || b.status === "No-show") continue;
-    const bRoomNum = extractRoomNumber(b);
-    let matchedRm = null;
-
-    if (b.roomId) {
-      matchedRm = rooms.find(r => String(r._id || r.id) === String(b.roomId) || String(r.roomNumber || r.room).trim() === String(b.roomId).trim());
-    }
-    if (!matchedRm && bRoomNum) {
-      matchedRm = rooms.find(r => extractRoomNumber(r) === bRoomNum || String(r.roomNumber || r.room).trim() === bRoomNum);
-    }
-    if (!matchedRm && b.room) {
-      matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber || r.room)));
-    }
-
-    if (matchedRm) {
-      const k1 = String(matchedRm._id || matchedRm.id || '');
-      const k2 = String(matchedRm.roomNumber || matchedRm.room || '');
-      const k3 = extractRoomNumber(matchedRm);
-      if (k1) roomBookingMap.set(k1, b);
-      if (k2) roomBookingMap.set(k2, b);
-      if (k3) roomBookingMap.set(k3, b);
-    }
-  }
-
   const normalizedRooms = normalizeRoomList(rooms, bookings);
 
+  const activeBookings = (bookings || []).filter(b => 
+    b.status !== "Cancelled" && b.status !== "Checked-out" && b.status !== "No-show"
+  );
+
   const compiledRooms = normalizedRooms.map(r => {
-    const k1 = String(r._id || r.id || '');
-    const k2 = String(r.roomNumber || r.room || '');
-    const k3 = extractRoomNumber(r);
-    const activeBooking = roomBookingMap.get(k1) || roomBookingMap.get(k2) || roomBookingMap.get(k3);
+    // Strictly find active booking matching THIS room and variant
+    const activeBooking = activeBookings.find(b => isBookingMatchingRoom(b, r));
 
     let currentStatus = r.status || "Available";
-    if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying")) {
+    if (['Blocked', 'Maintenance', 'Out of Order', 'Dirty', 'Cleaning'].includes(r.status)) {
+      currentStatus = r.status;
+    } else if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying" || activeBooking.status === "Occupied")) {
       currentStatus = "Occupied";
-    } else if (activeBooking && (activeBooking.status === "Confirmed" || activeBooking.status === "Paid" || activeBooking.status === "Pending" || activeBooking.status === "Pre-checked")) {
+    } else if (activeBooking && (activeBooking.status === "Confirmed" || activeBooking.status === "Paid" || activeBooking.status === "Pending" || activeBooking.status === "Pre-checked" || activeBooking.status === "Reserved")) {
       currentStatus = "Reserved";
+    } else {
+      currentStatus = "Available";
     }
 
     return {
       _id: r._id || r.id,
       room: extractRoomNumber(r) || r.roomNumber || r.room,
       roomType: r.category || r.roomType || "Standard Room",
+      variant: extractRoomVariant(r) || r.type || "AC",
       floor: r.floor || `Floor ${String(r.roomNumber || r.room || '1')[0]}`,
       activeBooking: activeBooking ? {
         id: activeBooking.bookingId || activeBooking._id || activeBooking.id,
@@ -247,8 +227,9 @@ function ManagerRoomsPage() {
     const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
     const matchesType = typeFilter === "all" || rm.roomType === typeFilter;
     const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
+    const matchesVariant = variantFilter === "all" || rm.variant === variantFilter;
 
-    return matchesSearch && matchesFloor && matchesType && matchesStatus;
+    return matchesSearch && matchesFloor && matchesType && matchesStatus && matchesVariant;
   });
 
   // Pagination computations
@@ -316,7 +297,7 @@ function ManagerRoomsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5 border-t border-muted/50">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-3.5 border-t border-muted/50">
           <div className="flex flex-col gap-1.5 text-left">
             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Floor Designation</span>
             <Select
@@ -344,6 +325,19 @@ function ManagerRoomsPage() {
               <option value="Executive Room">Executive Room</option>
               <option value="Villa Suite">Villa Suite</option>
               <option value="Presidential Suite">Presidential Suite</option>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Climate</span>
+            <Select
+              value={variantFilter}
+              onChange={(e) => { setVariantFilter(e.target.value); setCurrentPage(1); }}
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
+            >
+              <option value="all">All (AC & Non-AC)</option>
+              <option value="AC">AC Only</option>
+              <option value="Non-AC">Non-AC Only</option>
             </Select>
           </div>
 
@@ -399,7 +393,16 @@ function ManagerRoomsPage() {
                   return (
                     <tr key={rm._id || rm.id || `${rm.room}-${rm.roomType || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
                       <td className="py-4 px-6 text-left font-bold text-navy-deep text-sm">
-                        Room {rm.room}
+                        <div className="flex items-center gap-1.5">
+                          <span>Room {rm.room}</span>
+                          <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                            rm.variant === 'Non-AC'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-sky-50 text-sky-700 border border-sky-200'
+                          }`}>
+                            {rm.variant}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 px-4 text-left font-bold text-brand">
                         {rm.roomType}

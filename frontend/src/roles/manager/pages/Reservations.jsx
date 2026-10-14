@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { formatDisplayDate } from "@/utils/dateUtils";
 import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 import {
   Search,
@@ -450,8 +451,11 @@ function ManagerReservationsPage() {
                         <div className="font-bold text-brand">{getRoomDisplay(res)}</div>
                         <div className="text-[9px] text-muted-foreground mt-0.5">{getRoomCategoryDisplay(res)}</div>
                       </td>
-                      <td className="py-3.5 px-3 text-left align-middle text-muted-foreground">{res.checkIn}</td>
-                      <td className="py-3.5 px-3 text-left align-middle text-muted-foreground">{res.checkOut}</td>
+                      <td className="py-3.5 px-3 text-left align-middle font-semibold text-navy">{formatDisplayDate(res.checkIn)}</td>
+                      <td className="py-3.5 px-3 text-left align-middle font-semibold text-navy">
+                        <div>{formatDisplayDate(res.checkOut)}</div>
+                        <div className="text-[10px] text-muted-foreground font-normal">{res.nights || 1} Night(s)</div>
+                      </td>
                       <td className="py-3.5 px-2 text-center align-middle text-muted-foreground font-bold">{res.pax || "2 Guests"}</td>
                       <td className="py-3.5 px-3 text-left align-middle">
                         <span className="text-[10px] bg-muted/40 font-bold px-2 py-0.5 rounded-full text-navy-deep">

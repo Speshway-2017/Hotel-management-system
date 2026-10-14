@@ -457,13 +457,14 @@ router.post('/reservations', async (req, res) => {
       });
     }
 
+    const io = req.app.get('socketio');
+
     // If room is assigned, update room status
     if (roomNum) {
       const rmStatus = payload.status === 'Checked-in' ? 'Occupied' : 'Reserved';
       await syncRoomStatus(roomNum, rmStatus, propId, io, payload.roomVariant || 'AC');
     }
 
-    const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, propId, 'booking_created', { booking: newBooking, propertyId: propId });
       emitRealtimeSync(io, propId, 'booking_updated', { type: 'CREATED', booking: newBooking, propertyId: propId });
@@ -734,18 +735,19 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
 
     const cleanRoomNum = extractRoomNumber(roomNumber);
     const rmStatus = updated.status === 'Checked-in' ? 'Occupied' : 'Reserved';
+    const io = req.app.get('socketio');
     if (cleanRoomNum) {
-      await syncRoomStatus(cleanRoomNum, rmStatus, propId, req.app.get('socketio'), updated.roomVariant || 'AC');
+      await syncRoomStatus(cleanRoomNum, rmStatus, propId, io, updated.roomVariant || 'AC');
     }
 
     // Notify guest and dashboards of room assignment
     await notifyBookingEvent({
       req,
-      action: 'room_assigned',
+      io,
+      action,
       booking: updated
     });
 
-    const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, propId, {
         action: 'room_assigned',
@@ -850,6 +852,8 @@ router.get('/rooms', async (req, res) => {
         } else if (['Confirmed', 'Paid', 'Pending', 'Pre-checked', 'Reserved'].includes(matchedBooking.status)) {
           displayStatus = 'Reserved';
         }
+      } else if (rm.status === 'Occupied' && matchedBooking) {
+        displayStatus = 'Occupied';
       } else {
         displayStatus = 'Available';
       }
@@ -883,19 +887,17 @@ router.get('/rooms', async (req, res) => {
 
 router.put('/rooms/:roomNumber/status', async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, type, roomVariant } = req.body;
     if (!status) {
       return sendError(res, 400, 'New room status value is required.');
     }
-    // Update all room variants sharing this physical roomNumber (e.g. AC and Non-AC)
-    await Room.updateMany(
-      { roomNumber: req.params.roomNumber, propertyId: req.user.propertyId },
-      { status }
-    );
-    const updated = await Room.findOne({
-      roomNumber: req.params.roomNumber,
-      propertyId: req.user.propertyId
-    });
+    const variant = roomVariant || type;
+    const query = { roomNumber: req.params.roomNumber, propertyId: req.user.propertyId };
+    if (variant) {
+      query.type = variant;
+    }
+    await Room.updateMany(query, { status });
+    const updated = await Room.findOne(query);
     if (!updated) {
       return sendError(res, 404, 'Room not found.');
     }

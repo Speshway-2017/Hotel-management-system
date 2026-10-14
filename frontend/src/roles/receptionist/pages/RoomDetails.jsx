@@ -22,6 +22,7 @@ export const Route = createFileRoute("/reception/room-assignment/$id")({
 import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync } from "@/services/socket";
+import { extractRoomVariant, isBookingMatchingRoom } from "@/utils/roomUtils";
 
 function ReceptionRoomDetailsPage() {
   const { id } = useParams();
@@ -32,17 +33,57 @@ function ReceptionRoomDetailsPage() {
 
   const loadRoomDetails = (isSilent = false) => {
     if (!isSilent) setLoading(true);
-    receptionistService.getRooms()
-      .then(res => {
-        if (res.success && res.data) {
-          const found = res.data.find(r => 
-            String(r.room) === String(id) || 
-            String(r.roomNumber) === String(id) ||
-            String(r._id) === String(id) ||
-            String(r.id) === String(id)
+    const searchParams = new URLSearchParams(window.location.search);
+    const variantParam = searchParams.get('variant');
+
+    Promise.all([
+      receptionistService.getRooms(),
+      receptionistService.getReservations().catch(() => ({}))
+    ])
+      .then(([roomsRes, resRes]) => {
+        if (roomsRes?.success && Array.isArray(roomsRes.data)) {
+          const bookings = (resRes?.success && Array.isArray(resRes.data)) ? resRes.data : [];
+          const activeBookings = bookings.filter(b => 
+            b.status !== 'Cancelled' && b.status !== 'Checked-out' && b.status !== 'No-show'
           );
+
+          const found = roomsRes.data.find(r => {
+            const idMatch = String(r._id) === String(id) || String(r.id) === String(id);
+            if (idMatch) return true;
+            const numMatch = String(r.room) === String(id) || String(r.roomNumber) === String(id);
+            if (numMatch) {
+              if (variantParam) {
+                return (r.type || extractRoomVariant(r)) === variantParam;
+              }
+              return true;
+            }
+            return false;
+          });
+
           if (found) {
-            setRoomObj(found);
+            const matchedBooking = activeBookings.find(b => isBookingMatchingRoom(b, found));
+            let currentStatus = found.status || "Available";
+
+            if (['Blocked', 'Maintenance', 'Dirty', 'Out of Order', 'Out of Service'].includes(found.status)) {
+              currentStatus = found.status;
+            } else if (matchedBooking) {
+              const bStatus = String(matchedBooking.status || '').toLowerCase().trim();
+              if (bStatus.includes('checked-in') || bStatus.includes('checked in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup')) {
+                currentStatus = "Occupied";
+              } else {
+                currentStatus = "Reserved";
+              }
+            } else {
+              currentStatus = "Available";
+            }
+
+            setRoomObj({
+              ...found,
+              status: currentStatus,
+              guest: matchedBooking ? (matchedBooking.guest || matchedBooking.guestName || '') : (currentStatus === 'Available' ? '' : (found.guest || '')),
+              checkIn: matchedBooking ? (matchedBooking.checkIn || matchedBooking.checkInDate || '') : (currentStatus === 'Available' ? '' : (found.checkIn || '')),
+              checkOut: matchedBooking ? (matchedBooking.checkOut || matchedBooking.checkOutDate || '') : (currentStatus === 'Available' ? '' : (found.checkOut || ''))
+            });
           } else if (!isSilent) {
             toast.error("Room details not found in property inventory.");
           }
@@ -66,10 +107,11 @@ function ReceptionRoomDetailsPage() {
 
   const handleUpdateHousekeeping = (status) => {
     const roomNum = roomObj.roomNumber || roomObj.room;
-    receptionistService.updateRoomStatus(roomNum, undefined, status)
+    const variant = roomObj.type || extractRoomVariant(roomObj) || "AC";
+    receptionistService.updateRoomStatus(roomNum, undefined, status, variant)
       .then(res => {
         if (res.success) {
-          toast.success(`Housekeeping status for Room #${roomNum} updated to ${status}!`);
+          toast.success(`Housekeeping status for Room #${roomNum} (${variant}) updated to ${status}!`);
           loadRoomDetails();
         } else {
           toast.error(res.message || "Failed to update housekeeping status.");
@@ -83,10 +125,11 @@ function ReceptionRoomDetailsPage() {
 
   const handleUpdateStatus = (status) => {
     const roomNum = roomObj.roomNumber || roomObj.room;
-    receptionistService.updateRoomStatus(roomNum, status, undefined)
+    const variant = roomObj.type || extractRoomVariant(roomObj) || "AC";
+    receptionistService.updateRoomStatus(roomNum, status, undefined, variant)
       .then(res => {
         if (res.success) {
-          toast.success(`Operational status for Room #${roomNum} updated to ${status}!`);
+          toast.success(`Operational status for Room #${roomNum} (${variant}) updated to ${status}!`);
           loadRoomDetails();
         } else {
           toast.error(res.message || "Failed to update room status.");
@@ -139,11 +182,20 @@ function ReceptionRoomDetailsPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Room Reference ID</p>
-                  <p className="font-semibold text-sm text-navy">Room #{roomObj.room}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm text-navy">Room #{roomObj.room || roomObj.roomNumber}</p>
+                    <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                      (roomObj.type || extractRoomVariant(roomObj)) === 'Non-AC'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : 'bg-sky-50 text-sky-700 border border-sky-200'
+                    }`}>
+                      {(roomObj.type || extractRoomVariant(roomObj)) === 'Non-AC' ? 'Non-AC' : 'AC'}
+                    </span>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Room Category</p>
-                  <p className="font-semibold text-sm text-navy">{roomObj.type}</p>
+                  <p className="font-semibold text-sm text-navy">{roomObj.roomType || roomObj.category || roomObj.type}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Floor Level</p>

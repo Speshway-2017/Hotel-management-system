@@ -33,8 +33,8 @@ export const receptionistService = {
   getRooms: async () => {
     return await apiClient.get('/receptionist/rooms');
   },
-  updateRoomStatus: async (roomNumber, status, housekeeping) => {
-    return await apiClient.put(`/receptionist/rooms/${roomNumber}/status`, { status, housekeeping });
+  updateRoomStatus: async (roomNumber, status, housekeeping, roomVariant) => {
+    return await apiClient.put(`/receptionist/rooms/${roomNumber}/status`, { status, housekeeping, roomVariant });
   },
   getReservations: async () => {
     return await apiClient.get('/receptionist/reservations');

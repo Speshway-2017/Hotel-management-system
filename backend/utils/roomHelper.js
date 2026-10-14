@@ -446,32 +446,60 @@ export const calculatePropertyStats = async (propertyId) => {
 
   const totalRooms = rooms.length || 14;
   
-  // Find occupied room numbers from active checked-in bookings
+  // Find occupied room numbers and climate variant keys from active checked-in bookings
   const occupiedRoomNums = new Set();
   const reservedRoomNums = new Set();
+  const occupiedRoomVariantKeys = new Set();
+  const reservedRoomVariantKeys = new Set();
 
   bookings.forEach(b => {
     const s = String(b.status || '').toLowerCase().trim();
     const rNum = extractRoomNumber(b);
+    const rVariant = extractRoomVariant(b) || 'AC';
     if (s === 'checked-in' || s === 'checked in' || s === 'occupied' || s === 'staying') {
-      if (rNum) occupiedRoomNums.add(rNum);
+      if (rNum) {
+        occupiedRoomNums.add(rNum);
+        occupiedRoomVariantKeys.add(`${rNum}_${rVariant}`);
+      }
     } else if (s === 'confirmed' || s === 'pending' || s === 'reserved' || s === 'booked' || s === 'pre-checked' || s === 'paid') {
-      if (rNum) reservedRoomNums.add(rNum);
+      if (rNum) {
+        reservedRoomNums.add(rNum);
+        reservedRoomVariantKeys.add(`${rNum}_${rVariant}`);
+      }
     }
   });
 
   rooms.forEach(r => {
     const s = String(r.status || '').toLowerCase().trim();
     const rNum = String(r.roomNumber || '');
+    const rmVariant = extractRoomVariant(r) || r.type || 'AC';
     if (s === 'occupied') {
-      if (rNum) occupiedRoomNums.add(rNum);
+      if (rNum) {
+        occupiedRoomNums.add(rNum);
+        occupiedRoomVariantKeys.add(`${rNum}_${rmVariant}`);
+      }
     } else if (s === 'reserved') {
-      if (rNum && !occupiedRoomNums.has(rNum)) reservedRoomNums.add(rNum);
+      if (rNum) {
+        reservedRoomNums.add(rNum);
+        reservedRoomVariantKeys.add(`${rNum}_${rmVariant}`);
+      }
     }
   });
 
-  const occupiedRooms = occupiedRoomNums.size;
-  const reservedRooms = reservedRoomNums.size;
+  const checkedInBookingsCount = bookings.filter(b => {
+    const s = String(b.status || '').toLowerCase().trim();
+    return s === 'checked-in' || s === 'checked in' || s === 'occupied' || s === 'staying';
+  }).length;
+  const occupiedRoomsCount = rooms.filter(r => String(r.status || '').toLowerCase().trim() === 'occupied').length;
+
+  const occupiedRooms = Math.max(
+    occupiedRoomVariantKeys.size,
+    occupiedRoomsCount,
+    checkedInBookingsCount,
+    occupiedRoomNums.size
+  );
+  const finalReservedKeys = new Set([...reservedRoomVariantKeys].filter(k => !occupiedRoomVariantKeys.has(k)));
+  const reservedRooms = Math.max(finalReservedKeys.size, [...reservedRoomNums].filter(num => !occupiedRoomNums.has(num)).length);
   const availableRooms = Math.max(0, totalRooms - occupiedRooms);
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 

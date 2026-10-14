@@ -15,8 +15,7 @@ import {
   Clock,
   UserCheck,
   UserX,
-  FileSpreadsheet,
-  AlertTriangle
+  FileSpreadsheet
 } from "lucide-react";
 
 // Premium stat card component
@@ -201,17 +200,6 @@ function ManagerAttendancePage() {
         <PremiumStatCard label="Absent" value={absentCount.toString()} hint="No-show roster entries" accentColor="#ef4444" />
         <PremiumStatCard label="Late Arrivals" value={lateCount.toString()} hint="Checked-in past start" accentColor="#f59e0b" />
         <PremiumStatCard label="On Leave" value={onLeaveCount.toString()} hint="Authorized time-off logs" accentColor="#8b5cf6" />
-      </div>
-
-      {/* Audit warning banner */}
-      <div className="bg-[#fdfaf2] border border-[#f5d0a9] rounded-xl p-4 flex items-start gap-3 shadow-soft">
-        <AlertTriangle className="size-5 text-warning shrink-0 mt-0.5" />
-        <div className="text-xs text-navy font-sans">
-          <strong className="block text-navy-deep font-bold">Review Mode Only</strong>
-          <p className="text-muted-foreground mt-0.5 leading-relaxed">
-            Attendance logging is automatically captured by terminal card swipes and biometric front-office terminals. Managers can monitor and view rosters, but direct modifications to historical punch timings require HR auditor credentials.
-          </p>
-        </div>
       </div>
 
       {/* Date Selector & Search Filters */}
