@@ -729,8 +729,8 @@ class _AuthCardState extends State<AuthCard> {
                           setState(() {
                             if (RegExp(r'[a-zA-Z]').hasMatch(val)) {
                               _mobileError = 'Phone number must contain numbers only; letters are not allowed';
-                            } else if (val.replaceAll(RegExp(r'\D'), '').length > 15) {
-                              _mobileError = 'Phone number must be at most 15 digits';
+                            } else if (val.replaceAll(RegExp(r'\D'), '').length > 10) {
+                              _mobileError = 'Mobile/Phone number must be 10 digits only';
                             } else {
                               _mobileError = null;
                             }

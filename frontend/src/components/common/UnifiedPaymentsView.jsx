@@ -10,7 +10,7 @@ import { subscribeRealtimeSync } from "@/services/socket";
 import { invalidateApiCache } from "@/services/apiClient";
 import {
   CreditCard, Search, CheckCircle2, ArrowUpRight,
-  Undo2, RefreshCw, Plus, Wallet, Landmark,
+  Undo2, Plus, Wallet, Landmark,
   IndianRupee, Download, Check, ArrowLeft, User
 } from "lucide-react";
 import { validateWithZod, paymentSchema } from "@/schemas";
@@ -675,48 +675,27 @@ export function UnifiedPaymentsView({ role = "admin" }) {
         />
       </div>
 
-      {/* 3. Filters & Search Panel */}
-      <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft space-y-4">
-        
-        {/* Row 1: Search, Export & Record Button */}
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search by Guest Name, Booking ID, Transaction ID, Room..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
-            />
-          </div>
+      {/* 3. Filters & Search Panel (Aligned in One Line) */}
+      <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft">
+        <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center justify-between">
+          
+          {/* One-Line Filters: Search Bar + Payment Methods + Status */}
+          <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center flex-1">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by Guest Name, Booking ID, Transaction ID, Room..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="w-full h-9.5 pl-10 pr-4 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+              />
+            </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            <Button
-              onClick={handleExportAllCSV}
-              variant="outline"
-              size="sm"
-              className="h-9 px-3.5 text-xs font-bold rounded-xl border-muted hover:bg-muted/50 cursor-pointer flex items-center gap-1.5"
-            >
-              <Download className="size-3.5 text-navy" /> Export CSV
-            </Button>
-            <Button
-              onClick={() => setIsRecordPageActive(true)}
-              className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-4 text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Plus className="size-4" /> Record Payment
-            </Button>
-          </div>
-        </div>
-
-        {/* Row 2: Dropdown Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-muted/50">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Payment Method</span>
             <select
               value={methodFilter}
               onChange={(e) => { setMethodFilter(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
+              className="h-9.5 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer w-full sm:w-[170px] shrink-0"
             >
               <option value="all">All Payment Methods</option>
               <option value="UPI">UPI</option>
@@ -725,14 +704,11 @@ export function UnifiedPaymentsView({ role = "admin" }) {
               <option value="Net Banking">Net Banking</option>
               <option value="Bank Transfer">Bank Transfer</option>
             </select>
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Status</span>
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
+              className="h-9.5 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer w-full sm:w-[150px] shrink-0"
             >
               <option value="all">All Statuses</option>
               <option value="Settled">Settled / Paid</option>
@@ -741,23 +717,25 @@ export function UnifiedPaymentsView({ role = "admin" }) {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5 justify-end">
+          {/* Action Buttons: Export CSV & Record Payment */}
+          <div className="flex items-center gap-2 shrink-0 justify-end">
             <Button
+              onClick={handleExportAllCSV}
               variant="outline"
               size="sm"
-              onClick={() => {
-                setSearchQuery("");
-                setMethodFilter("all");
-                setStatusFilter("all");
-                setCurrentPage(1);
-              }}
-              className="h-8 text-xs font-bold border-muted text-muted-foreground hover:text-navy cursor-pointer"
+              className="h-9.5 px-3.5 text-xs font-bold rounded-xl border-muted hover:bg-muted/50 cursor-pointer flex items-center gap-1.5"
             >
-              <RefreshCw className="size-3 mr-1.5" /> Reset Filters
+              <Download className="size-3.5 text-navy" /> Export CSV
+            </Button>
+            <Button
+              onClick={() => setIsRecordPageActive(true)}
+              className="bg-navy hover:bg-navy-deep text-white font-bold h-9.5 px-4 text-xs rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Plus className="size-4" /> Record Payment
             </Button>
           </div>
-        </div>
 
+        </div>
       </div>
 
       {/* 4. Unified Table Ledger */}

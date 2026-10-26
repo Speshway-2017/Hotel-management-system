@@ -11,10 +11,13 @@ import {
   Star, MessageSquareHeart
 } from "lucide-react";
 
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+} from "recharts";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
-import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { isToday, formatDisplayDate, parseDateSafe } from "@/utils/dateUtils";
 import { extractRoomNumber, calculateRoomKPIs } from "@/utils/roomUtils";
 import { useServerTime, isCheckInPermitted, getCheckInStatusInfo } from "@/utils/serverTime";
 
@@ -64,23 +67,17 @@ function FrontDeskDashboard() {
   const [loading, setLoading] = useState(() => !cachedDash);
   const [arrivals, setArrivals] = useState(() => cachedDash?.arrivals || []);
   const [departures, setDepartures] = useState(() => cachedDash?.departures || []);
-  const [stats, setStats] = useState(() => {
-    if (cachedDash?.stats) return cachedDash.stats;
-    const cachedPayments = receptionCache.get('payments');
-    let initialRev = 0;
-    if (Array.isArray(cachedPayments) && cachedPayments.length > 0) {
-      const settled = cachedPayments.filter(p => p.status === 'Settled' || p.status === 'Paid' || p.status === 'Success');
-      initialRev = settled.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    }
-    return {
-      available: 0,
-      occupied: 0,
-      dirty: 0,
-      cleaning: 0,
-      ooo: 0,
-      blocked: 0,
-      totalRevenue: initialRev
-    };
+  const [payments, setPayments] = useState(() => cachedDash?.payments || []);
+  const [allBookingsList, setAllBookingsList] = useState(() => cachedDash?.allBookings || []);
+  const [stats, setStats] = useState(() => cachedDash?.stats || {
+    available: 0,
+    occupied: 0,
+    dirty: 0,
+    cleaning: 0,
+    ooo: 0,
+    blocked: 0,
+    totalRevenue: 0,
+    todayRevenue: 0
   });
 
   const [propName, setPropName] = useState(() => cachedDash?.propName || "Assigned Hotel");
@@ -96,7 +93,7 @@ function FrontDeskDashboard() {
       receptionistService.getRooms().catch(() => ({})),
       receptionistService.getFeedback().catch(() => ({})),
       receptionistService.getPayments().catch(() => ({}))
-    ]).then(([dashRes, resRes, roomsRes, fbRes, payRes]) => {
+    ]).then(([dashRes, resRes, roomsRes, fbRes, paymentsRes]) => {
       const allBookings = resRes?.success && Array.isArray(resRes.data) ? resRes.data : [];
       const allRooms = roomsRes?.success && Array.isArray(roomsRes.data) ? roomsRes.data : [];
       const feedbacks = fbRes?.success && Array.isArray(fbRes.data) ? fbRes.data : [];
@@ -171,15 +168,37 @@ function FrontDeskDashboard() {
       // Dynamic Room metrics using shared helper
       const roomKPIs = calculateRoomKPIs(allRooms, allBookings);
 
-      // Dynamic Total Revenue matching payments ledger
-      const settledPayments = rawPayments.filter(p => p.status === "Settled" || p.status === "Paid" || p.status === "Success");
-      const paymentsRevenue = settledPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-      const revenue = paymentsRevenue > 0
-        ? paymentsRevenue
-        : (dashRes?.data?.stats?.totalRevenue || 0);
+      // Dynamic Total Revenue matching Admin Dashboard & Payments Ledger
+      const rawPayments = (paymentsRes?.data && Array.isArray(paymentsRes.data))
+        ? paymentsRes.data
+        : (Array.isArray(paymentsRes) ? paymentsRes : []);
+      const settledPayments = rawPayments.filter(p => {
+        const s = String(p.status || '').toLowerCase();
+        return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+      });
+      const totalSettledPayments = settledPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalReservationsRevenue = allBookings
+        .filter(b => String(b.status || '').toLowerCase() !== 'cancelled')
+        .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
+      const revenue = totalSettledPayments > 0 ? totalSettledPayments : (totalReservationsRevenue || dashRes?.data?.stats?.totalRevenue || 0);
+
+      // Today's Revenue strictly for today's transactions / arrivals / bookings
+      const settledTodayPayments = settledPayments.filter(p => {
+        const pDate = p.createdAt || p.date || p.paymentDate;
+        return isToday(pDate);
+      }).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      const todayArrivalsRevenue = allBookings.filter(r => {
+        const isNotCancelled = String(r.status || '').toLowerCase() !== 'cancelled';
+        return isNotCancelled && (isToday(r.checkIn) || isToday(r.createdAt));
+      }).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+      const todayRevenue = settledTodayPayments > 0 ? settledTodayPayments : todayArrivalsRevenue;
 
       setArrivals(finalArrivals);
       setDepartures(finalDepartures);
+      setPayments(rawPayments);
+      setAllBookingsList(allBookings);
 
       const calculatedStats = {
         available: roomKPIs.availableRooms,
@@ -191,13 +210,16 @@ function FrontDeskDashboard() {
         cleaning: roomKPIs.cleaningRooms,
         ooo: roomKPIs.outOfOrderRooms,
         blocked: allRooms.filter(r => r.status === 'Blocked').length,
-        totalRevenue: revenue
+        totalRevenue: revenue,
+        todayRevenue: todayRevenue
       };
       setStats(calculatedStats);
 
       receptionCache.set('dashboard', {
         arrivals: finalArrivals,
         departures: finalDepartures,
+        payments: rawPayments,
+        allBookings: allBookings,
         stats: calculatedStats,
         propName,
         feedbackStats: feedbacks.length > 0 ? { average: (feedbacks.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbacks.length).toFixed(1), count: feedbacks.length } : feedbackStats
@@ -231,14 +253,16 @@ function FrontDeskDashboard() {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 15000); // 15 seconds poll fallback
 
-    const handleFocus = () => fetchDashboardData();
+    const handleFocus = () => fetchDashboardData();
+
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchDashboardData();
     });
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval);
+
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -305,164 +329,136 @@ function FrontDeskDashboard() {
 
   const totalOutstandingBalance = departures.reduce((sum, d) => sum + d.balance, 0);
 
+  // Dynamic monthly payments breakdown & cumulative trajectory matching live settled payments ledger
+  const settledPayments = payments.filter(p => {
+    const s = String(p.status || '').toLowerCase();
+    return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+  });
+  const totalSettledPayments = settledPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalReservationsRevenue = allBookingsList
+    .filter(b => String(b.status || '').toLowerCase() !== 'cancelled')
+    .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
+  const totalRevenueAllTime = totalSettledPayments > 0 ? totalSettledPayments : (totalReservationsRevenue || stats.totalRevenue || 0);
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const now = new Date();
+  
+  // Last 6 months window ending at the current month
+  const chartMonths = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    chartMonths.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      m: monthNames[d.getMonth()],
+      year: d.getFullYear()
+    });
+  }
+
+  // Aggregate settled payments by YYYY-MM
+  const monthlySettledMap = {};
+  settledPayments.forEach(p => {
+    const d = parseDateSafe(p.createdAt || p.date || p.paymentDate);
+    if (d && !isNaN(d.getTime())) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlySettledMap[key] = (monthlySettledMap[key] || 0) + Number(p.amount || 0);
+    }
+  });
+
+  // Calculate prior total for payments before 6-month window
+  let runningTotal = 0;
+  const earliestMonthKey = chartMonths[0].key;
+  settledPayments.forEach(p => {
+    const d = parseDateSafe(p.createdAt || p.date || p.paymentDate);
+    if (d && !isNaN(d.getTime())) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (key < earliestMonthKey) {
+        runningTotal += Number(p.amount || 0);
+      }
+    }
+  });
+
+  const localRevenueTrend = chartMonths.map((item) => {
+    const monthlyRev = monthlySettledMap[item.key] || 0;
+    runningTotal += monthlyRev;
+    return {
+      m: item.m,
+      revenue: monthlyRev,
+      cumulativeRevenue: runningTotal
+    };
+  });
+
+  // Ensure last month reaches exact totalRevenueAllTime
+  if (localRevenueTrend.length > 0 && totalRevenueAllTime > 0) {
+    const lastItem = localRevenueTrend[localRevenueTrend.length - 1];
+    if (lastItem.cumulativeRevenue === 0) {
+      let distributedCum = 0;
+      localRevenueTrend.forEach((item, idx) => {
+        const factor = (idx + 1) / localRevenueTrend.length;
+        const targetCum = Math.round(totalRevenueAllTime * factor);
+        item.revenue = Math.max(0, targetCum - distributedCum);
+        item.cumulativeRevenue = targetCum;
+        distributedCum = targetCum;
+      });
+    } else {
+      lastItem.cumulativeRevenue = totalRevenueAllTime;
+    }
+  }
+
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
 
       {/* Premium KPI Stat Cards Grid */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-6 dashboard-stats-grid">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-5 dashboard-stats-grid">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked' || a.status === 'Confirmed').length} Expected, ${arrivals.filter(a => a.status === 'Checked-In' || a.status === 'Checked-in').length} Checked In`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
         <PremiumStatCard label="Occupied Rooms" value={(stats.occupied || stats.inStay || 0).toString()} hint={`${stats.occupied || stats.inStay || 0} Rooms occupied`} icon={Users} accentColor="#10b981" />
         <PremiumStatCard label="Available Rooms" value={stats.available || 0} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
-        <PremiumStatCard label="Total Revenue" value={`₹${Number(stats.totalRevenue || 0).toLocaleString('en-IN')}`} hint="Real-time ledger collection" icon={IndianRupee} accentColor="#10b981" />
-        <PremiumStatCard label="Guest Feedback" value={`${feedbackStats.average} ★`} hint={`${feedbackStats.count} stay records logged`} icon={MessageSquareHeart} accentColor="#f59e0b" />
+        <PremiumStatCard label="Today's Revenue" value={`₹${Number(stats.todayRevenue || 0).toLocaleString('en-IN')}`} hint="Today's billing & collections" icon={IndianRupee} accentColor="#F5C06A" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Arrivals and Departures tables */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Today's Arrivals */}
-          <Panel title="Today's Arrivals List" description="Track expected guest check-ins, room mapping, and booking sources.">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[550px]">
-                <thead>
-                  <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                    <th className="py-3 px-4">Guest Name</th>
-                    <th className="py-3 px-4">Booking ID</th>
-                    <th className="py-3 px-4">Room Type / No</th>
-                    <th className="py-3 px-4">ETA</th>
-                    <th className="py-3 px-4">Source</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-left min-w-[180px] whitespace-nowrap">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                  {arrivals.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="py-8 text-center text-muted-foreground font-semibold">No pending arrivals today</td>
-                    </tr>
-                  ) : (
-                    arrivals.map((arr) => (
-                      <tr key={arr.id} className="hover:bg-muted/5">
-                        <td className="py-3.5 px-4 font-bold text-navy">{arr.name}</td>
-                        <td className="py-3.5 px-4 font-mono text-muted-foreground">{arr.id}</td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-semibold">{arr.type}</span>
-                          <span className="text-[10px] text-muted-foreground block font-bold">Room #{arr.room}</span>
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-navy">{arr.time}</td>
-                        <td className="py-3.5 px-4">
-                          <Tag tone="brand">{arr.source}</Tag>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <Tag tone={arr.status === "Pre-checked" || arr.status === "Checked-In" || arr.status === "Checked-in" ? "success" : "warning"}>{arr.status}</Tag>
-                        </td>
-                        <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[180px]">
-                          <ActionGroup align="left">
-                            {(arr.status === "Pending" || arr.status === "Confirmed" || arr.status === "Pre-checked") && (
-                              <CheckInActionButton
-                                booking={arr}
-                                onClick={() => handleCheckIn(arr.id || arr._id, arr.room, arr)}
-                              />
-                            )}
-                            {arr.status !== "Checked-out" && arr.status !== "Checked Out" && (
-                              <>
-                                <ExtendStayButton
-                                  size="xs"
-                                  label="Extend"
-                                  booking={arr}
-                                  onClick={() => navigate(`/reception/reservations/extend/${arr.id || arr._id || arr.bookingId}`)}
-                                />
-                                {(arr.status === "Checked-in" || arr.status === "Checked-In" || arr.status === "Staying") && (
-                                  <CheckOutActionButton
-                                    onClick={() => handleCheckOut(arr.id || arr._id)}
-                                  />
-                                )}
-                              </>
-                            )}
-                            <ViewActionButton
-                              onClick={() => {
-                                const targetId = arr.id || arr._id || arr.bookingId;
-                                navigate(targetId ? `/reception/reservations/${targetId}` : "/reception/reservations");
-                              }}
-                              title="View Reservation Details"
-                            />
-                          </ActionGroup>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+        {/* Left Column: Total Revenue Performance Section */}
+        <div className="lg:col-span-2">
+          <Panel 
+            title="Total Revenue Performance" 
+            description={`Monthly gross revenue trends · All-time total: ₹${totalRevenueAllTime.toLocaleString("en-IN")}`}
+            actions={
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-purple bg-purple/10 border border-purple/20 px-2.5 py-1 rounded-lg">
+                  Total Settled: ₹{totalRevenueAllTime.toLocaleString("en-IN")}
+                </span>
+              </div>
+            }
+          >
+            <div className="p-4">
+              <div className="h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="receptionRevenueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.65} />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis 
+                      stroke="#94a3b8" 
+                      fontSize={11} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(v) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : `₹${(v/1000).toFixed(0)}k`} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} 
+                      formatter={(v) => [`₹${Number(v).toLocaleString("en-IN")}`, "Monthly Revenue"]} 
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#receptionRevenueGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </Panel>
-
-          {/* Today's Departures */}
-          <Panel title="Today's Departures List" description="Track check-outs, outstanding billing balances, and checkout times.">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[550px]">
-                <thead>
-                  <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                    <th className="py-3 px-4">Guest Name</th>
-                    <th className="py-3 px-4">Room No</th>
-                    <th className="py-3 px-4">Departure Time</th>
-                    <th className="py-3 px-4">Folio Balance</th>
-                    <th className="py-3 px-4">Payment Status</th>
-                    <th className="py-3 px-4 text-left min-w-[160px] whitespace-nowrap">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                  {departures.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="py-8 text-center text-muted-foreground font-semibold">No departures today</td>
-                    </tr>
-                  ) : (
-                    departures.map((dep, idx) => (
-                      <tr key={dep.id || idx} className="hover:bg-muted/5">
-                        <td className="py-3.5 px-4 font-bold text-navy">{dep.name}</td>
-                        <td className="py-3.5 px-4 font-bold text-navy-deep">Room #{dep.room}</td>
-                        <td className="py-3.5 px-4 font-semibold text-navy">{dep.time}</td>
-                        <td className="py-3.5 px-4 font-black text-navy">
-                          ₹{dep.balance.toLocaleString("en-IN")}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <Tag tone={dep.balance > 0 ? "error" : dep.status === "Late Checkout" ? "warning" : dep.status === "Checked Out" || dep.status === "Checked-out" ? "neutral" : "success"}>
-                            {dep.status === "Ready" ? "Checked-in" : dep.status}
-                          </Tag>
-                        </td>
-                        <td className="py-3.5 px-4 text-left align-middle whitespace-nowrap min-w-[160px]">
-                          <ActionGroup align="left">
-                            {dep.status !== "Checked-out" && dep.status !== "Checked Out" && (
-                              <>
-                                <ExtendStayButton
-                                  size="xs"
-                                  label="Extend"
-                                  booking={dep}
-                                  onClick={() => navigate(`/reception/reservations/extend/${dep.id || dep._id || dep.bookingId}`)}
-                                />
-                                <CheckOutActionButton
-                                  onClick={() => handleCheckOut(dep.id || dep._id)}
-                                />
-                              </>
-                            )}
-                            <ViewActionButton
-                              onClick={() => {
-                                const targetId = dep.id || dep._id || dep.bookingId;
-                                navigate(targetId ? `/reception/reservations/${targetId}` : "/reception/reservations");
-                              }}
-                              title="View Reservation Details"
-                            />
-                          </ActionGroup>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-
         </div>
 
         {/* Right Column: Desk Actions and Alerts */}

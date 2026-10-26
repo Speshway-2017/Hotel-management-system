@@ -75,14 +75,23 @@ const phoneWithLetters = phoneSchema.safeParse('98765abcde');
 console.assert(!phoneWithLetters.success, 'Phone with letters must fail');
 
 const phoneShort = phoneSchema.safeParse('98765');
-console.assert(!phoneShort.success, 'Phone below min boundary must fail');
+console.assert(!phoneShort.success, 'Phone below 10 digits must fail');
+
+const phoneNineDigits = phoneSchema.safeParse('987654321');
+console.assert(!phoneNineDigits.success, 'Phone with 9 digits must fail');
+
+const phoneElevenDigits = phoneSchema.safeParse('98765432101');
+console.assert(!phoneElevenDigits.success, 'Phone with 11 digits must fail');
+
+const phoneTwelveDigits = phoneSchema.safeParse('987654321012');
+console.assert(!phoneTwelveDigits.success, 'Phone with 12 digits must fail');
 
 const goodPhone = phoneSchema.safeParse('9876543210');
 console.assert(goodPhone.success, 'Valid 10-digit mobile must pass');
 
 const goodPhoneWithCountryCode = phoneSchema.safeParse('+91 9876543210');
 console.assert(goodPhoneWithCountryCode.success, 'Phone with +91 country code must pass');
-console.log('✅ Phone fields enforce numbers only, valid boundaries, and reject repeating dummy digits');
+console.log('✅ Phone fields strictly enforce exactly 10 digits, numbers only, and reject repeating dummy digits');
 
 // 4. Aadhaar Fields: exactly 12 digits, no 12 identical digits
 console.log('--- 4. Testing Aadhaar Validation ---');

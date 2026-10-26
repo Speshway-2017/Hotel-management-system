@@ -255,7 +255,11 @@ function GuestsCrmPage() {
         }
       });
 
-      const fullList = [...compiled, ...Object.values(extraGuestsMap)];
+      const fullList = [...compiled, ...Object.values(extraGuestsMap)].sort((a, b) => {
+        const nameA = String(a.name || "").trim();
+        const nameB = String(b.name || "").trim();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+      });
       setGuests(fullList);
     } catch (err) {
       toast.error("Failed to load guests from database.");
@@ -303,8 +307,14 @@ function GuestsCrmPage() {
     return matchesSearch && matchesStatus && matchesDate;
   });
 
-  // Sort logic
+  // Sort logic - aligned alphabetically A-Z by default
   const sortedList = [...filteredList].sort((a, b) => {
+    if (sortField === "name") {
+      const nameA = String(a.name || "").trim();
+      const nameB = String(b.name || "").trim();
+      const cmp = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+      return sortOrder === "asc" ? cmp : -cmp;
+    }
     let valA = a[sortField];
     let valB = b[sortField];
     if (typeof valA === "string") {

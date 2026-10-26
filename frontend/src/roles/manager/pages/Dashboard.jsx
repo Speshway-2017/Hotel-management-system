@@ -17,7 +17,7 @@ import {
 
 import { subscribeRealtimeSync } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
-import { isToday, formatDisplayDate } from "@/utils/dateUtils";
+import { isToday, formatDisplayDate, parseDateSafe } from "@/utils/dateUtils";
 import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 
 // Premium stat card component
@@ -66,9 +66,7 @@ function ManagerDashboard() {
   const [staff, setStaff] = useState([]);
   const [pendingApprovalsList, setPendingApprovalsList] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
-  
-  // Operational tabs
-  const [chartTab, setChartTab] = useState("revenue");
+  const [payments, setPayments] = useState([]);
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
 
@@ -102,13 +100,14 @@ function ManagerDashboard() {
       }
 
       // Fetch all required resources
-      const [propRes, bookingsRes, roomsRes, staffRes, approvalsRes, feedbackRes] = await Promise.all([
+      const [propRes, bookingsRes, roomsRes, staffRes, approvalsRes, feedbackRes, paymentsRes] = await Promise.all([
         managerService.getProperty().catch(() => ({ success: true, data: null })),
         managerService.getReservations().catch(() => ({ success: true, data: [] })),
         managerService.getRooms().catch(() => ({ success: true, data: [] })),
         managerService.getStaff().catch(() => ({ success: true, data: [] })),
         managerService.getApprovals().catch(() => ({ success: true, data: [] })),
-        managerService.getFeedback().catch(() => ({ success: true, data: [] }))
+        managerService.getFeedback().catch(() => ({ success: true, data: [] })),
+        managerService.getPayments().catch(() => ({ success: true, data: [] }))
       ]);
 
       if (propRes && propRes.success && propRes.data) {
@@ -133,6 +132,10 @@ function ManagerDashboard() {
       if (feedbackRes && feedbackRes.success && Array.isArray(feedbackRes.data)) {
         setFeedbackList(feedbackRes.data);
       }
+      const rawPayments = (paymentsRes && paymentsRes.data && Array.isArray(paymentsRes.data))
+        ? paymentsRes.data
+        : (Array.isArray(paymentsRes) ? paymentsRes : []);
+      setPayments(rawPayments);
     } catch (err) {
       if (isInitial) setError(err.message || "Failed to load dashboard data.");
     } finally {
@@ -210,7 +213,7 @@ function ManagerDashboard() {
   const pendingCheckins = activeBookings.filter(b => isToday(b.checkIn) && (b.status === "Confirmed" || b.status === "Pending" || b.status === "Pre-checked"));
   const pendingCheckouts = activeBookings.filter(b => isToday(b.checkOut) && (b.status === "Checked-in" || b.status === "Checked In" || b.status === "Staying"));
 
-  // Dynamic Occupancy, ADR, RevPAR computations using shared KPI helper
+  // Dynamic Occupancy computations using shared KPI helper
   const roomKPIs = calculateRoomKPIs(rooms, bookings);
   const totalRooms = roomKPIs.totalRooms;
   const occupancyPercent = roomKPIs.occupancyRate;
@@ -222,8 +225,6 @@ function ManagerDashboard() {
   }).reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
   const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
-  const adrValue = activeBookings.length > 0 ? Math.round((todayRevenue > 0 ? todayRevenue : totalRevenue) / Math.max(1, activeBookings.reduce((sum, b) => sum + (b.nights || 1), 0))) : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0);
-  const revparValue = Math.round(adrValue * (occupancyPercent / 100));
 
   // Dynamic Room Counts from MongoDB
   const housekeepingClean = rooms.filter(r => r.status === 'Available' || r.housekeeping === 'Clean').length;
@@ -235,39 +236,85 @@ function ManagerDashboard() {
   const pendingApprovals = pendingApprovalsList.filter(a => a.status === "Pending");
   const recentFeedback = feedbackList.slice(0, 5);
 
-  // Dynamic Trends for charts
-  const baseRevenue = totalRevenue > 0 ? totalRevenue : (totalRooms * 1.5 * adrValue) || 450000;
-  const revenueTrendData = [
-    { date: "15 Aug", revenue: Math.round(baseRevenue * 0.12) || 45000, occupancy: Math.max(10, occupancyPercent - 5), adr: adrValue - 100, revpar: revparValue - 80 },
-    { date: "16 Aug", revenue: Math.round(baseRevenue * 0.15) || 56000, occupancy: Math.max(10, occupancyPercent - 2), adr: adrValue - 50, revpar: revparValue - 40 },
-    { date: "17 Aug", revenue: Math.round(baseRevenue * 0.14) || 52000, occupancy: Math.max(10, occupancyPercent + 3), adr: adrValue + 200, revpar: revparValue + 150 },
-    { date: "18 Aug", revenue: Math.round(baseRevenue * 0.18) || 68000, occupancy: Math.max(10, occupancyPercent + 5), adr: adrValue + 100, revpar: revparValue + 90 },
-    { date: "19 Aug", revenue: Math.round(baseRevenue * 0.20) || 75000, occupancy: Math.max(10, occupancyPercent + 8), adr: adrValue + 300, revpar: revparValue + 250 },
-    { date: "20 Aug", revenue: Math.round(baseRevenue * 0.21) || 82000, occupancy: occupancyPercent || 75, adr: adrValue, revpar: revparValue }
-  ];
+  // Settled Payments & Total Revenue strictly matching payment ledger
+  const settledPayments = payments.filter(p => {
+    const s = String(p.status || '').toLowerCase();
+    return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+  });
+  const totalSettledPayments = settledPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalReservationsRevenue = activeBookings.reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
+  const totalRevenueAllTime = totalSettledPayments > 0 ? totalSettledPayments : totalReservationsRevenue;
 
-  // Dynamic Booking sources breakdown
-  const sourcePerformanceData = [
-    { name: "Direct", value: activeBookings.filter(b => b.source === "Direct" || b.source === "Walk-in").length || 4, color: "#8b5cf6" },
-    { name: "MakeMyTrip", value: activeBookings.filter(b => b.source === "MakeMyTrip").length || 3, color: "#f5c06a" },
-    { name: "Booking.com", value: activeBookings.filter(b => b.source === "Booking.com").length || 2, color: "#3b82f6" },
-    { name: "Agoda", value: activeBookings.filter(b => b.source === "Agoda").length || 1, color: "#ef4444" }
-  ];
+  // Dynamic monthly payments breakdown & cumulative trajectory matching live settled payments ledger
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const now = new Date();
+  
+  // Last 6 months window ending at the current month
+  const chartMonths = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    chartMonths.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      m: monthNames[d.getMonth()],
+      year: d.getFullYear()
+    });
+  }
 
-  const occupiedCount = Math.max(roomKPIs.occupiedRooms, currentStays.length);
-  const vacantCleanCount = Math.max(0, totalRooms - occupiedCount - housekeepingDirty - cleaningCount - oooCount);
+  // Aggregate settled payments by YYYY-MM
+  const monthlySettledMap = {};
+  settledPayments.forEach(p => {
+    const d = parseDateSafe(p.createdAt || p.date || p.paymentDate);
+    if (d && !isNaN(d.getTime())) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlySettledMap[key] = (monthlySettledMap[key] || 0) + Number(p.amount || 0);
+    }
+  });
 
-  const vacantPct = totalRooms > 0 ? (vacantCleanCount / totalRooms) * 100 : 0;
-  const occupiedPct = totalRooms > 0 ? (occupiedCount / totalRooms) * 100 : 0;
-  const dirtyPct = totalRooms > 0 ? (housekeepingDirty / totalRooms) * 100 : 0;
-  const cleaningPct = totalRooms > 0 ? (cleaningCount / totalRooms) * 100 : 0;
-  const oooPct = totalRooms > 0 ? (oooCount / totalRooms) * 100 : 0;
+  // Calculate prior total for payments before 6-month window
+  let runningTotal = 0;
+  const earliestMonthKey = chartMonths[0].key;
+  settledPayments.forEach(p => {
+    const d = parseDateSafe(p.createdAt || p.date || p.paymentDate);
+    if (d && !isNaN(d.getTime())) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (key < earliestMonthKey) {
+        runningTotal += Number(p.amount || 0);
+      }
+    }
+  });
+
+  const localRevenueTrend = chartMonths.map((item) => {
+    const monthlyRev = monthlySettledMap[item.key] || 0;
+    runningTotal += monthlyRev;
+    return {
+      m: item.m,
+      revenue: monthlyRev,
+      cumulativeRevenue: runningTotal
+    };
+  });
+
+  // Ensure last month reaches exact totalRevenueAllTime
+  if (localRevenueTrend.length > 0 && totalRevenueAllTime > 0) {
+    const lastItem = localRevenueTrend[localRevenueTrend.length - 1];
+    if (lastItem.cumulativeRevenue === 0) {
+      let distributedCum = 0;
+      localRevenueTrend.forEach((item, idx) => {
+        const factor = (idx + 1) / localRevenueTrend.length;
+        const targetCum = Math.round(totalRevenueAllTime * factor);
+        item.revenue = Math.max(0, targetCum - distributedCum);
+        item.cumulativeRevenue = targetCum;
+        distributedCum = targetCum;
+      });
+    } else {
+      lastItem.cumulativeRevenue = totalRevenueAllTime;
+    }
+  }
 
   return (
     <div className="space-y-6 text-left">
 
       {/* KPI Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6 dashboard-stats-grid">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 dashboard-stats-grid">
         <div>
           <PremiumStatCard label="Arrivals" value={arrivalsToday.length.toString()} hint="Today's bookings" icon={Calendar} accentColor="#FF7A59" />
         </div>
@@ -283,138 +330,52 @@ function ManagerDashboard() {
         <div>
           <PremiumStatCard label="Occupancy Rate" value={`${occupancyPercent}%`} hint={`Stays: ${occupiedCount}/${totalRooms} rms`} icon={Percent} accentColor="#FF6B8B" />
         </div>
-        <div>
-          <PremiumStatCard
-            label="Guest Feedback"
-            value={`${feedbackList.length > 0 ? (feedbackList.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbackList.length).toFixed(1) : "5.0"} ★`}
-            hint={`${feedbackList.length} feedback records`}
-            icon={MessageSquare}
-            accentColor="#10B981"
-          />
-        </div>
       </div>
 
       {/* Main Row: Operations Overview & Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Side: Charts Control */}
+        {/* Left Side: Total Revenue Performance Section */}
         <div className="lg:col-span-2">
           <Panel 
-            title="Operational Performance Trends" 
-            description="Historical analysis of room metrics, occupancy, and distribution channels"
+            title="Total Revenue Performance" 
+            description={`Monthly gross revenue trends · All-time total: ₹${totalRevenueAllTime.toLocaleString("en-IN")}`}
             actions={
-              <div className="flex rounded-lg border border-muted bg-[#fcfcfc] p-1 gap-1">
-                {["revenue", "occupancy", "adr", "revpar", "channels"].map((t) => (
-                  <Button
-                    key={t}
-                    size="sm"
-                    variant={chartTab === t ? "secondary" : "ghost"}
-                    className="h-7 text-[10px] font-bold px-2.5 capitalize"
-                    onClick={() => setChartTab(t)}
-                  >
-                    {t === "adr" || t === "revpar" ? t.toUpperCase() : t}
-                  </Button>
-                ))}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-purple bg-purple/10 border border-purple/20 px-2.5 py-1 rounded-lg">
+                  Total Settled: ₹{totalRevenueAllTime.toLocaleString("en-IN")}
+                </span>
               </div>
             }
           >
-            {chartTab === "revenue" && (
+            <div className="p-4">
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="managerRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.6} />
+                      <linearGradient id="managerMonthlyRevGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.65} />
                         <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "Revenue"]} />
-                    <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2} fill="url(#managerRev)" />
+                    <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis 
+                      stroke="#94a3b8" 
+                      fontSize={11} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(v) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : `₹${(v/1000).toFixed(0)}k`} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} 
+                      formatter={(v) => [`₹${Number(v).toLocaleString("en-IN")}`, "Monthly Revenue"]} 
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#managerMonthlyRevGrad)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            )}
-
-            {chartTab === "occupancy" && (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} unit="%" />
-                    <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v}%`, "Occupancy"]} />
-                    <Line type="monotone" dataKey="occupancy" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {chartTab === "adr" && (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
-                    <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "ADR"]} />
-                    <Line type="monotone" dataKey="adr" stroke="#f5c06a" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {chartTab === "revpar" && (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={revenueTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
-                    <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "RevPAR"]} />
-                    <Line type="monotone" dataKey="revpar" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {chartTab === "channels" && (
-              <div className="h-[280px] flex flex-col md:flex-row items-center justify-center gap-8">
-                <div className="w-full md:w-1/2">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={sourcePerformanceData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius="55%"
-                        outerRadius="85%"
-                        paddingAngle={3}
-                        stroke="none"
-                      >
-                        {sourcePerformanceData.map((s, idx) => (
-                          <Cell key={idx} fill={s.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <ul className="w-full md:w-1/2 space-y-2 text-xs font-semibold">
-                  {sourcePerformanceData.map((s, idx) => (
-                    <li key={idx} className="flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <span className="size-3 rounded-full" style={{ background: s.color }} />
-                        {s.name}
-                      </span>
-                      <span>{s.value} stay(s)</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            </div>
           </Panel>
         </div>
 
@@ -515,66 +476,7 @@ function ManagerDashboard() {
 
       </div>
 
-      {/* In-House Guests & Stay Extension Desk */}
-      <Panel 
-        title="In-House Stays & Extension Controls" 
-        description="Active guests currently checked-in with instant stay extension facilities."
-        actions={
-          <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 rounded-lg">
-            {currentStays.length} Active Stay(s)
-          </span>
-        }
-      >
-        <div className="overflow-x-auto bg-white rounded-b-xl">
-          {currentStays.length === 0 ? (
-            <div className="p-8 text-center text-xs text-muted-foreground font-semibold select-none">
-              No guests currently checked-in.
-            </div>
-          ) : (
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase select-none">
-                  <th className="py-3 px-4">Guest Name</th>
-                  <th className="py-3 px-4">Assigned Room</th>
-                  <th className="py-3 px-4">Check-In Date</th>
-                  <th className="py-3 px-4">Current Checkout</th>
-                  <th className="py-3 px-4">Stay Duration</th>
-                  <th className="py-3 px-4">Folio Total</th>
-                  <th className="py-3 px-4 text-left">Extension Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-muted/30 whitespace-nowrap">
-                {currentStays.map((booking) => (
-                  <tr key={booking._id || booking.id} className="hover:bg-muted/5 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-navy">
-                      {booking.guest || booking.guestName || "Guest"}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-navy-deep">
-                      Room #{extractRoomNumber(booking) || booking.roomNumber || "—"}
-                    </td>
-                    <td className="py-3.5 px-4 text-muted-foreground">{booking.checkIn}</td>
-                    <td className="py-3.5 px-4 font-semibold text-navy">{booking.checkOut}</td>
-                    <td className="py-3.5 px-4">{booking.nights || 1} Nights</td>
-                    <td className="py-3.5 px-4 font-bold text-navy">
-                      ₹{(booking.amount || booking.totalAmount || 0).toLocaleString()}
-                    </td>
-                    <td className="py-3.5 px-4 text-left">
-                      <ActionGroup align="left">
-                        <ExtendStayButton
-                          size="xs"
-                          label="Extend Stay"
-                          booking={booking}
-                          role="manager"
-                        />
-                      </ActionGroup>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </Panel>
+
 
       {/* Guest Feedback Ledger */}
       <Panel

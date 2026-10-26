@@ -181,7 +181,7 @@ function GuestNotificationsPage() {
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => !n.read).length;h;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="space-y-6 text-left font-ui animate-fade-in">

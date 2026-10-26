@@ -16,6 +16,7 @@ function AddReservation() {
   const [allDbRooms, setAllDbRooms] = useState([]);
   const [allReservations, setAllReservations] = useState([]);
   const [availableRoomsList, setAvailableRoomsList] = useState([]);
+  const [occupiedVariants, setOccupiedVariants] = useState(new Set());
   const [fieldErrors, setFieldErrors] = useState({});
 
   // Form states
@@ -136,16 +137,15 @@ function AddReservation() {
     fetchRealAvailableRooms();
   }, []);
 
-  // Dynamically compute available rooms based on selected variant (AC vs Non-AC) and stay dates
+  // Dynamically compute available rooms and variant occupancy based on stay dates
   useEffect(() => {
-    // Helper to check stay date overlap: reqIn < resOut AND reqOut > resIn
     const isDateOverlap = (s1Str, e1Str, s2Str, e2Str) => {
-      if (!s1Str || !e1Str || !s2Str || !e2Str) return true;
+      if (!s1Str || !e1Str || !s2Str || !e2Str) return false;
       const s1 = new Date(s1Str).getTime();
       const e1 = new Date(e1Str).getTime();
       const s2 = new Date(s2Str).getTime();
       const e2 = new Date(e2Str).getTime();
-      if (isNaN(s1) || isNaN(e1) || isNaN(s2) || isNaN(e2)) return true;
+      if (isNaN(s1) || isNaN(e1) || isNaN(s2) || isNaN(e2)) return false;
       return (s1 < e2 && s2 < e1);
     };
 
@@ -155,62 +155,147 @@ function AddReservation() {
       return matches ? Array.from(new Set(matches.map(m => m.trim()))) : [];
     };
 
-    const currentVariant = roomVariant || 'AC';
-    const occupiedKeys = new Set();
+    const extractCleanNum = (val) => {
+      if (!val) return null;
+      const str = typeof val === 'object' 
+        ? [val.roomNumber, val.num, val.room, val.assignedRoom].filter(Boolean).join(' ')
+        : String(val);
+      const match = str.match(/\b\d{3,4}\b/);
+      return match ? match[0] : null;
+    };
 
+    const getVariant = (obj) => {
+      if (!obj) return 'AC';
+      const str = typeof obj === 'object'
+        ? [obj.roomVariant, obj.type, obj.climateType, obj.room, obj.roomType, obj.category, obj.assignedRoom].filter(Boolean).join(' ')
+        : String(obj);
+      return /non[- ]?ac/i.test(str) ? 'Non-AC' : 'AC';
+    };
+
+    const variantOccupied = new Set();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Check reservations for variant occupancy
     allReservations.forEach(r => {
       const s = String(r.status || '').toLowerCase().trim();
-      const isInactive = s === 'checked-out' || s === 'checked out' || s === 'checkout' || s === 'completed' || s === 'cancelled' || s === 'canceled';
-      if (!isInactive) {
-        const overlap = isDateOverlap(checkIn, checkOut, r.checkIn, r.checkOut);
-        if (overlap) {
-          const nums = extractNums(r);
-          const rVar = r.roomVariant || extractRoomVariant(r) || 'AC';
-          nums.forEach(n => occupiedKeys.add(`${n}_${rVar}`));
+      const isInactive = ['checked-out', 'checked out', 'checkout', 'completed', 'cancelled', 'canceled'].includes(s);
+      if (isInactive) return;
+
+      let isOccupying = false;
+      if (checkIn && checkOut) {
+        isOccupying = isDateOverlap(checkIn, checkOut, r.checkIn, r.checkOut);
+      } else {
+        const inHouseStatuses = ['checked-in', 'checked in', 'staying', 'occupied', 'in-house'];
+        isOccupying = inHouseStatuses.includes(s);
+      }
+
+      if (isOccupying) {
+        const nums = extractNums(r);
+        const variant = getVariant(r);
+        nums.forEach(n => {
+          variantOccupied.add(`${n}_${variant}`);
+        });
+      }
+    });
+
+    // Check allDbRooms for live status or maintenance
+    allDbRooms.forEach(r => {
+      const cleanNum = extractCleanNum(r);
+      if (!cleanNum) return;
+      const roomStat = String(r.status || 'Available').toLowerCase().trim();
+      const variant = getVariant(r);
+
+      // Blocked, maintenance, out of order, dirty, cleaning disables this variant
+      if (['maintenance', 'out of order', 'blocked', 'dirty', 'cleaning'].includes(roomStat)) {
+        variantOccupied.add(`${cleanNum}_${variant}`);
+        return;
+      }
+
+      // If room status in DB is Occupied or Checked-in:
+      if (roomStat === 'occupied' || roomStat === 'checked-in') {
+        if (!checkIn || !checkOut) {
+          variantOccupied.add(`${cleanNum}_${variant}`);
+        } else {
+          const includesToday = (checkIn <= todayStr && todayStr < checkOut) || checkIn === todayStr;
+          if (includesToday) {
+            variantOccupied.add(`${cleanNum}_${variant}`);
+          }
         }
       }
     });
 
-    const available = allDbRooms
-      .map(r => ({
-        num: String(r.roomNumber || r.num || ''),
-        type: r.category || 'Standard Room',
-        status: r.status || 'Available',
-        roomVariant: currentVariant,
-        baseRate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
-      }))
-      .filter(r => {
-        if (!r.num) return false;
-        // Check if THIS specific room and variant is already taken
-        if (occupiedKeys.has(`${r.num}_${currentVariant}`)) return false;
-        const roomStat = String(r.status || 'Available').toLowerCase().trim();
-        return roomStat === 'available' || roomStat === 'vacant';
-      });
+    setOccupiedVariants(variantOccupied);
 
-    const unique = [];
-    const seen = new Set();
-    available.forEach(r => {
-      if (!seen.has(r.num)) {
-        seen.add(r.num);
-        unique.push(r);
+    // Build availableRoomsList (show room if at least one variant is available)
+    const list = [];
+    const addedRoomNums = new Set();
+
+    allDbRooms.forEach(r => {
+      const cleanNum = extractCleanNum(r);
+      if (!cleanNum || addedRoomNums.has(cleanNum)) return;
+
+      const isAcOccupied = variantOccupied.has(`${cleanNum}_AC`);
+      const isNonAcOccupied = variantOccupied.has(`${cleanNum}_Non-AC`);
+
+      // Exclude room from dropdown only if BOTH AC and Non-AC are occupied
+      if (isAcOccupied && isNonAcOccupied) {
+        addedRoomNums.add(cleanNum);
+        return;
       }
-    });
-    unique.sort((a, b) => Number(a.num) - Number(b.num));
-    setAvailableRoomsList(unique);
-  }, [allDbRooms, allReservations, roomVariant, checkIn, checkOut]);
 
-  const handleRoomChange = (selectedNum) => {
-    setRoom(selectedNum);
-    if (selectedNum) {
-      const matched = availableRoomsList.find(r => String(r.num) === String(selectedNum));
-      if (matched && matched.roomVariant) {
-        setRoomVariant(matched.roomVariant);
+      addedRoomNums.add(cleanNum);
+      const cat = r.category || 'Standard Room';
+      const baseRate = r.currentRate || r.baseRate || r.rate || (cat === 'Executive Suite' ? 6500 : cat === 'Deluxe Room' ? 4500 : 3000);
+
+      list.push({
+        num: cleanNum,
+        type: cat,
+        status: 'Available',
+        baseRate
+      });
+    });
+
+    list.sort((a, b) => Number(a.num) - Number(b.num));
+    setAvailableRoomsList(list);
+
+    // If currently selected room has both variants occupied, clear it
+    if (room && variantOccupied.has(`${room}_AC`) && variantOccupied.has(`${room}_Non-AC`)) {
+      setRoom("");
+    } else if (room) {
+      // Auto-switch variant if selected variant is occupied
+      if (roomVariant === "AC" && variantOccupied.has(`${room}_AC`)) {
+        setRoomVariant("Non-AC");
+      } else if (roomVariant === "Non-AC" && variantOccupied.has(`${room}_Non-AC`)) {
+        setRoomVariant("AC");
       }
     }
+  }, [allDbRooms, allReservations, checkIn, checkOut, room]);
+
+  const handleRoomChange = (selectedVal) => {
+    if (!selectedVal) {
+      setRoom("");
+      if (fieldErrors.room) setFieldErrors(p => ({ ...p, room: null }));
+      return;
+    }
+    const cleanNum = extractRoomNumber(selectedVal) || selectedVal.trim();
+    setRoom(cleanNum);
+
+    // Auto-switch to available variant if current variant is occupied for the newly selected room
+    if (roomVariant === "AC" && occupiedVariants.has(`${cleanNum}_AC`)) {
+      setRoomVariant("Non-AC");
+    } else if (roomVariant === "Non-AC" && occupiedVariants.has(`${cleanNum}_Non-AC`)) {
+      setRoomVariant("AC");
+    }
+
     if (fieldErrors.room) setFieldErrors(p => ({ ...p, room: null }));
   };
 
+  const isAcDisabled = Boolean(room && occupiedVariants.has(`${room}_AC`));
+  const isNonAcDisabled = Boolean(room && occupiedVariants.has(`${room}_Non-AC`));
+
   const handleVariantChange = (variant) => {
+    if (variant === "AC" && isAcDisabled) return;
+    if (variant === "Non-AC" && isNonAcDisabled) return;
     setRoomVariant(variant);
   };
 
@@ -225,7 +310,8 @@ function AddReservation() {
 
         let ratePerNight = 3500;
         if (room) {
-          const selectedObj = availableRoomsList.find(r => String(r.num) === String(room));
+          const selectedObj = availableRoomsList.find(r => String(r.num) === String(room) && r.roomVariant === roomVariant) ||
+                              availableRoomsList.find(r => String(r.num) === String(room));
           if (selectedObj) {
             const typeStr = String(selectedObj.type || '').toLowerCase();
             if (typeStr.includes('executive')) ratePerNight = 6500;
@@ -256,7 +342,8 @@ function AddReservation() {
     }
 
     const roomNum = extractRoomNumber(room);
-    const selectedObj = availableRoomsList.find(r => String(r.num) === String(roomNum));
+    const selectedObj = availableRoomsList.find(r => String(r.num) === String(roomNum) && r.roomVariant === roomVariant) ||
+                        availableRoomsList.find(r => String(r.num) === String(roomNum));
     const baseCategory = selectedObj?.type || (room && room.includes('·') ? room.split('·')[1]?.trim() : (room || "Standard Room"));
     const roomTypeWithVariant = `${baseCategory} (${roomVariant})`;
     const formattedRoomString = roomNum ? `Room ${roomNum} · ${roomTypeWithVariant}` : room;
@@ -429,58 +516,6 @@ function AddReservation() {
                 )}
               </FormField>
 
-              <FormField label="Room Designation" required id="room">
-                <Select
-                  id="room"
-                  required
-                  value={room}
-                  onChange={(e) => handleRoomChange(e.target.value)}
-                >
-                  <option value="">Select Available Room</option>
-                  {availableRoomsList.map((r, idx) => (
-                    <option key={`${r.num}-${r.type || r.roomVariant || ''}-${idx}`} value={r.num}>
-                      Room #{r.num} ({r.type} · {r.roomVariant || 'AC'})
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField label="Room Variant (AC / Non-AC)" id="roomVariant">
-                <div className="grid grid-cols-2 gap-2.5 mt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => handleVariantChange("AC")}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                      roomVariant === "AC"
-                        ? "bg-purple text-white border-purple shadow-sm ring-2 ring-purple/20"
-                        : "bg-white text-navy/70 border-muted hover:border-purple/40 hover:bg-purple/5"
-                    }`}
-                  >
-                    <Snowflake className="size-3.5" />
-                    <span>AC Room</span>
-                    {roomVariant === "AC" && <Check className="size-3 ml-1" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleVariantChange("Non-AC")}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                      roomVariant === "Non-AC"
-                        ? "bg-navy text-white border-navy shadow-sm ring-2 ring-navy/20"
-                        : "bg-white text-navy/70 border-muted hover:border-navy/40 hover:bg-navy/5"
-                    }`}
-                  >
-                    <Wind className="size-3.5" />
-                    <span>Non-AC Room</span>
-                    {roomVariant === "Non-AC" && <Check className="size-3 ml-1" />}
-                  </button>
-                </div>
-                {room && (
-                  <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1 font-medium bg-slate-50 border border-slate-200/60 rounded-md px-2 py-1">
-                    <span className="font-semibold text-navy">Assigned:</span> Room #{room} · {availableRoomsList.find(r => String(r.num) === String(room))?.type || 'Standard Room'} ({roomVariant})
-                  </p>
-                )}
-              </FormField>
-
               <FormField label="Check-In Date" required id="checkIn">
                 <Input
                   id="checkIn"
@@ -499,6 +534,67 @@ function AddReservation() {
                   value={checkOut}
                   onChange={(e) => setCheckOut(e.target.value)}
                 />
+              </FormField>
+
+              <FormField label="Room Designation" required id="room">
+                <Select
+                  id="room"
+                  required
+                  value={room || ""}
+                  onChange={(e) => handleRoomChange(e.target.value)}
+                >
+                  <option value="">Select Available Room</option>
+                  {availableRoomsList
+                    .filter((r, idx, arr) => arr.findIndex(x => String(x.num) === String(r.num)) === idx)
+                    .map((r, idx) => (
+                      <option key={`room_${r.num}_${idx}`} value={r.num}>
+                        Room #{r.num} ({r.type})
+                      </option>
+                    ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Room Variant (AC / Non-AC)" id="roomVariant">
+                <div className="grid grid-cols-2 gap-2 w-full h-10">
+                  <button
+                    type="button"
+                    disabled={isAcDisabled}
+                    onClick={() => handleVariantChange("AC")}
+                    className={`h-10 w-full px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all select-none ${
+                      isAcDisabled
+                        ? "bg-[#f8fafc] text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+                        : roomVariant === "AC"
+                        ? "bg-purple text-white border-purple shadow-sm ring-2 ring-purple/20 cursor-pointer"
+                        : "bg-white text-navy/80 border-[#E7E9EE] hover:border-purple/40 hover:bg-purple/5 hover:text-purple cursor-pointer"
+                    }`}
+                  >
+                    <span>AC Room</span>
+                    {isAcDisabled && (
+                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded leading-none shrink-0 ml-1">
+                        Occupied
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isNonAcDisabled}
+                    onClick={() => handleVariantChange("Non-AC")}
+                    className={`h-10 w-full px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all select-none ${
+                      isNonAcDisabled
+                        ? "bg-[#f8fafc] text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+                        : roomVariant === "Non-AC"
+                        ? "bg-navy text-white border-navy shadow-sm ring-2 ring-navy/20 cursor-pointer"
+                        : "bg-white text-navy/80 border-[#E7E9EE] hover:border-navy/40 hover:bg-navy/5 hover:text-navy cursor-pointer"
+                    }`}
+                  >
+                    <span>Non-AC Room</span>
+                    {isNonAcDisabled && (
+                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded leading-none shrink-0 ml-1">
+                        Occupied
+                      </span>
+                    )}
+                  </button>
+                </div>
               </FormField>
 
               <FormField label="Nights Count" required id="nights">

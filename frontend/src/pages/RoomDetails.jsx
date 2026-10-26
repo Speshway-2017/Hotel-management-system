@@ -191,7 +191,30 @@ export function RoomDetailsPage() {
     const acRate = Number(acFound?.currentRate || acFound?.baseRate || refRate || 3000);
     const nonAcRate = Number(nonAcFound?.currentRate || nonAcFound?.baseRate || (acFound ? Math.round(refRate * 0.74) : 2200));
 
-    const resolvedAc = acFound || {
+    const defaultAcAmenities = [
+      'Air Conditioning (Split AC)',
+      'Individual Digital Climate Control',
+      'High-Speed Wi-Fi',
+      '43" Smart TV with OTT Apps',
+      'Ensuite Marble Bathroom & Shower',
+      '24/7 Room Service'
+    ];
+
+    const defaultNonAcAmenities = [
+      'High-Speed Ceiling Fan',
+      'Naturally Ventilated Windows',
+      'High-Speed Wi-Fi',
+      '43" Flat Screen TV',
+      'Ensuite Bathroom & Shower',
+      '24/7 Room Service'
+    ];
+
+    const resolvedAc = acFound ? {
+      ...acFound,
+      amenities: (Array.isArray(acFound.amenities) && acFound.amenities.length >= 4)
+        ? acFound.amenities
+        : defaultAcAmenities
+    } : {
       ...refRoom,
       _id: `${refRoom._id || refRoom.id || 'RM'}-ac`,
       id: `${refRoom._id || refRoom.id || 'RM'}-ac`,
@@ -203,12 +226,15 @@ export function RoomDetailsPage() {
       dailyRate: acRate,
       status: refRoom.status === 'Occupied' ? 'Occupied' : (refRoom.status || 'Available'),
       isAvailable: refRoom.status === 'Occupied' ? false : (refRoom.isAvailable !== false),
-      amenities: Array.isArray(refRoom.amenities)
-        ? [...refRoom.amenities.filter(a => !a.toLowerCase().includes('fan')), 'Air Conditioning']
-        : ['Air Conditioning', 'High-Speed Wi-Fi', 'Smart TV', 'Room Service']
+      amenities: defaultAcAmenities
     };
 
-    const resolvedNonAc = nonAcFound || {
+    const resolvedNonAc = nonAcFound ? {
+      ...nonAcFound,
+      amenities: (Array.isArray(nonAcFound.amenities) && nonAcFound.amenities.length >= 4)
+        ? nonAcFound.amenities
+        : defaultNonAcAmenities
+    } : {
       ...refRoom,
       _id: `${refRoom._id || refRoom.id || 'RM'}-nonac`,
       id: `${refRoom._id || refRoom.id || 'RM'}-nonac`,
@@ -220,9 +246,7 @@ export function RoomDetailsPage() {
       dailyRate: nonAcRate,
       status: refRoom.status === 'Occupied' ? 'Occupied' : (refRoom.status || 'Available'),
       isAvailable: refRoom.status === 'Occupied' ? false : (refRoom.isAvailable !== false),
-      amenities: Array.isArray(refRoom.amenities)
-        ? [...refRoom.amenities.filter(a => !a.toLowerCase().includes('air condition') && !a.toLowerCase().includes('ac')), 'Ceiling Fan']
-        : ['Ceiling Fan', 'High-Speed Wi-Fi', 'Flat Screen TV', 'Room Service']
+      amenities: defaultNonAcAmenities
     };
 
     return { acVariant: resolvedAc, nonAcVariant: resolvedNonAc };
@@ -285,7 +309,7 @@ export function RoomDetailsPage() {
   const sideImg1 = roomImages[1] || roomImages[0];
   const sideImg2 = roomImages[2] || roomImages[0];
 
-  // Resolve amenities matching selected variant
+  // Resolve amenities matching selected variant (strictly 5 to 6 important amenities)
   const roomAmenities = useMemo(() => {
     let list = [];
     if (Array.isArray(activeSelectedRoom?.amenities) && activeSelectedRoom.amenities.length > 0) {
@@ -294,24 +318,74 @@ export function RoomDetailsPage() {
       list = activeSelectedRoom.amenities.split(',').map(a => a.trim()).filter(Boolean);
     }
 
+    // Top 6 important amenities for AC configuration
+    const defaultAcList = [
+      "Air Conditioning (Split AC)",
+      "Individual Digital Climate Control",
+      "High-Speed Wi-Fi",
+      "43\" Smart TV with OTT Apps",
+      "Ensuite Marble Bathroom & Shower",
+      "24/7 Room Service"
+    ];
+
+    // Top 6 important amenities for Non-AC configuration
+    const defaultNonAcList = [
+      "High-Speed Ceiling Fan",
+      "Naturally Ventilated Windows",
+      "High-Speed Wi-Fi",
+      "43\" Flat Screen TV",
+      "Ensuite Bathroom & Shower",
+      "24/7 Room Service"
+    ];
+
     if (selectedVariant === 'Non-AC') {
-      list = list.filter(a => !a.toLowerCase().includes('air condition') && !a.toLowerCase().includes(' ac'));
+      // Filter out AC-specific features
+      list = list.filter(a => {
+        const lower = a.toLowerCase();
+        return !lower.includes('air condition') && !lower.includes(' ac') && !lower.includes('climate') && !lower.includes('safe') && !lower.includes('soundproof');
+      });
+
+      // Ensure ceiling fan is present
       if (!list.some(a => a.toLowerCase().includes('fan'))) {
-        list.unshift('Ceiling Fan');
+        list.unshift('High-Speed Ceiling Fan');
       }
+
+      // Populate up to 6 distinct Non-AC amenities
+      defaultNonAcList.forEach(item => {
+        const key = item.toLowerCase().slice(0, 6);
+        if (!list.some(existing => existing.toLowerCase().includes(key))) {
+          list.push(item);
+        }
+      });
     } else {
-      list = list.filter(a => !a.toLowerCase().includes('fan') || a.toLowerCase().includes('exhaust'));
+      // Filter out fan/airflow features
+      list = list.filter(a => {
+        const lower = a.toLowerCase();
+        return !lower.includes('fan') && !lower.includes('ventilat') && !lower.includes('airflow');
+      });
+
+      // Ensure air conditioning is present
       if (!list.some(a => a.toLowerCase().includes('air condition'))) {
-        list.unshift('Air Conditioning');
+        list.unshift('Air Conditioning (Split AC)');
       }
+
+      // Populate up to 6 distinct AC amenities
+      defaultAcList.forEach(item => {
+        const key = item.toLowerCase().slice(0, 6);
+        if (!list.some(existing => existing.toLowerCase().includes(key))) {
+          list.push(item);
+        }
+      });
     }
 
-    if (list.length === 0) {
-      list = selectedVariant === 'Non-AC'
-        ? ["Ceiling Fan", "Free High-Speed WiFi", "Flat Screen Smart TV", "24/7 Room Service", "Ensuite Marble Bathroom"]
-        : ["Air Conditioning", "Free High-Speed WiFi", "Flat Screen Smart TV", "24/7 Room Service", "Ensuite Marble Bathroom"];
-    }
-    return list;
+    // Explicitly hide tea & coffee maker
+    list = list.filter(a => {
+      const lower = a.toLowerCase();
+      return !lower.includes('tea') && !lower.includes('coffee');
+    });
+
+    // Enforce strictly 5 to 6 important amenities max
+    return list.slice(0, 6);
   }, [activeSelectedRoom, selectedVariant]);
 
   const handleBookNow = () => {
@@ -329,7 +403,8 @@ export function RoomDetailsPage() {
       currentRate: nightlyTariff,
       baseRate: nightlyTariff,
       dailyRate: nightlyTariff,
-      category: `${roomCategoryBase} (${selectedVariant})`
+      category: `${roomCategoryBase} (${selectedVariant})`,
+      amenities: roomAmenities
     };
 
     localStorage.setItem('selected_room_data', JSON.stringify(bookingPayload));
@@ -399,7 +474,7 @@ export function RoomDetailsPage() {
                   <span className="bg-purple/10 text-purple text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border border-purple/20">
                     {classification}
                   </span>
-                  <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
                     selectedVariant === "Non-AC"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : "bg-purple/10 text-purple border-purple/20"
@@ -518,92 +593,97 @@ export function RoomDetailsPage() {
                     </p>
                   </div>
                   {acIsAvail && nonAcIsAvail ? (
-                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 w-fit">
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 w-fit shrink-0">
                       AC & Non-AC Available
                     </span>
                   ) : acIsAvail && !nonAcIsAvail ? (
-                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 w-fit">
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 w-fit shrink-0">
                       AC Available · Non-AC Occupied
                     </span>
                   ) : !acIsAvail && nonAcIsAvail ? (
-                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 w-fit">
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 w-fit shrink-0">
                       Non-AC Available · AC Occupied
                     </span>
                   ) : (
-                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 w-fit">
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 w-fit shrink-0">
                       Room #{activeRoomNum} Occupied for Selected Dates
                     </span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
                   {/* Category 1: Air Conditioned (AC) */}
                   <div
                     onClick={() => setSelectedVariant("AC")}
-                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between gap-4 ${
+                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between h-full ${
                       selectedVariant === "AC"
                         ? "bg-purple/[0.04] border-purple shadow-md ring-2 ring-purple/20"
                         : "bg-white border-navy/15 hover:border-purple/40 shadow-soft"
                     }`}
                   >
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`p-2.5 rounded-xl ${selectedVariant === "AC" ? "bg-purple text-white shadow-sm" : "bg-purple/10 text-purple"}`}>
+                    <div className="space-y-3.5 flex-1 flex flex-col">
+                      <div className="flex items-start justify-between gap-3 min-h-[52px]">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+                            selectedVariant === "AC" ? "bg-purple text-white shadow-sm" : "bg-purple/10 text-purple"
+                          }`}>
                             <Snowflake className="size-5" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-display text-base sm:text-lg font-bold text-navy">Air Conditioned</h3>
-                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-purple/10 text-purple border border-purple/20">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-display text-base sm:text-lg font-bold text-navy leading-snug">Air Conditioned</h3>
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-purple/10 text-purple border border-purple/20 shrink-0">
                                 AC
                               </span>
                             </div>
-                            <p className="text-[11px] text-gray-500">Premium climate-controlled stay</p>
+                            <p className="text-[11px] text-gray-500 mt-0.5 truncate">Premium climate-controlled stay</p>
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-right shrink-0 pl-1">
                           <span className="font-price text-xl font-bold text-navy block leading-none">
                             {inr(acVariant.currentRate || acVariant.baseRate || 3000)}
                           </span>
-                          <span className="text-[10px] text-gray-400 font-medium block mt-0.5">/ night</span>
+                          <span className="text-[10px] text-gray-400 font-medium block mt-1">/ night</span>
                         </div>
                       </div>
 
-                      <p className="text-xs text-gray-600 leading-relaxed font-ui">
+                      <p className="text-xs text-gray-600 leading-relaxed font-ui min-h-[36px] line-clamp-2">
                         Full individual temperature control with split air conditioning, King Bed bedding, high-speed Wi-Fi & Smart TV.
                       </p>
 
                       {/* Feature Badges */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple/10 text-purple">
-                          <CheckCircle2 className="size-3" /> Air Conditioning
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 min-h-[56px] content-start">
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg bg-purple/10 text-purple border border-purple/20">
+                          <CheckCircle2 className="size-3 shrink-0" /> Air Conditioning
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
-                          <CheckCircle2 className="size-3 text-purple" /> High-Speed Wi-Fi
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg bg-cream/80 text-navy/70 border border-navy/10">
+                          <CheckCircle2 className="size-3 text-purple shrink-0" /> High-Speed Wi-Fi
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
-                          <CheckCircle2 className="size-3 text-purple" /> Smart TV
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg bg-cream/80 text-navy/70 border border-navy/10">
+                          <CheckCircle2 className="size-3 text-purple shrink-0" /> Smart TV
                         </span>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-navy/10 flex justify-between items-center">
-                      <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                    <div className="pt-3.5 border-t border-navy/10 flex items-center justify-between gap-2 mt-4">
+                      <div className={`text-[11px] font-bold flex items-center gap-1.5 shrink-0 ${
                         acIsAvail ? "text-emerald-600" : "text-red-500"
                       }`}>
-                        <span className={`size-2 rounded-full inline-block ${
+                        <span className={`size-2 rounded-full shrink-0 ${
                           acIsAvail ? "bg-emerald-500" : "bg-red-500"
-                        }`} /> {acIsAvail ? "Available" : (acVariant.status || "Occupied")}
-                      </span>
+                        }`} />
+                        <span>{acIsAvail ? "Available" : (acVariant.status || "Occupied")}</span>
+                      </div>
 
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full transition-all ${
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all shrink-0 ${
                         selectedVariant === "AC"
                           ? (acIsAvail ? "bg-purple text-white shadow-sm" : "bg-red-600 text-white shadow-sm")
                           : "bg-navy/5 text-navy hover:bg-navy/10"
                       }`}>
-                        {selectedVariant === "AC" ? (acIsAvail ? "✓ Selected (AC)" : "Selected (AC - Occupied)") : "Select AC"}
+                        {selectedVariant === "AC" 
+                          ? (acIsAvail ? "✓ Selected (AC)" : "Occupied (AC)") 
+                          : "Select AC"}
                       </span>
                     </div>
                   </div>
@@ -611,70 +691,75 @@ export function RoomDetailsPage() {
                   {/* Category 2: Non-Air Conditioned (Non-AC) */}
                   <div
                     onClick={() => setSelectedVariant("Non-AC")}
-                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between gap-4 ${
+                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between h-full ${
                       selectedVariant === "Non-AC"
                         ? "bg-emerald-50/60 border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
                         : "bg-white border-navy/15 hover:border-emerald-400 shadow-soft"
                     }`}
                   >
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`p-2.5 rounded-xl ${selectedVariant === "Non-AC" ? "bg-emerald-600 text-white shadow-sm" : "bg-emerald-50 text-emerald-700"}`}>
+                    <div className="space-y-3.5 flex-1 flex flex-col">
+                      <div className="flex items-start justify-between gap-3 min-h-[52px]">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+                            selectedVariant === "Non-AC" ? "bg-emerald-600 text-white shadow-sm" : "bg-emerald-50 text-emerald-700"
+                          }`}>
                             <Wind className="size-5" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-display text-base sm:text-lg font-bold text-navy">Non-Air Conditioned</h3>
-                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-display text-base sm:text-lg font-bold text-navy leading-snug">Non-Air Conditioned</h3>
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                                 Non-AC
                               </span>
                             </div>
-                            <p className="text-[11px] text-gray-500">Naturally aerated economical stay</p>
+                            <p className="text-[11px] text-gray-500 mt-0.5 truncate">Naturally aerated economical stay</p>
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-right shrink-0 pl-1">
                           <span className="font-price text-xl font-bold text-navy block leading-none">
                             {inr(nonAcVariant.currentRate || nonAcVariant.baseRate || 2200)}
                           </span>
-                          <span className="text-[10px] text-gray-400 font-medium block mt-0.5">/ night</span>
+                          <span className="text-[10px] text-gray-400 font-medium block mt-1">/ night</span>
                         </div>
                       </div>
 
-                      <p className="text-xs text-gray-600 leading-relaxed font-ui">
+                      <p className="text-xs text-gray-600 leading-relaxed font-ui min-h-[36px] line-clamp-2">
                         Naturally ventilated room with powerful high-speed ceiling fan, fresh airflow, large windows, Wi-Fi & TV.
                       </p>
 
                       {/* Feature Badges */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                          <CheckCircle2 className="size-3" /> Ceiling Fan
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 min-h-[56px] content-start">
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="size-3 shrink-0" /> Ceiling Fan
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
-                          <CheckCircle2 className="size-3 text-emerald-600" /> High-Speed Wi-Fi
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg bg-cream/80 text-navy/70 border border-navy/10">
+                          <CheckCircle2 className="size-3 text-emerald-600 shrink-0" /> High-Speed Wi-Fi
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-cream text-navy/70 border border-navy/5">
-                          <CheckCircle2 className="size-3 text-emerald-600" /> Flat Screen TV
+                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-1 rounded-lg bg-cream/80 text-navy/70 border border-navy/10">
+                          <CheckCircle2 className="size-3 text-emerald-600 shrink-0" /> Flat Screen TV
                         </span>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-navy/10 flex justify-between items-center">
-                      <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                    <div className="pt-3.5 border-t border-navy/10 flex items-center justify-between gap-2 mt-4">
+                      <div className={`text-[11px] font-bold flex items-center gap-1.5 shrink-0 ${
                         nonAcIsAvail ? "text-emerald-600" : "text-red-500"
                       }`}>
-                        <span className={`size-2 rounded-full inline-block ${
+                        <span className={`size-2 rounded-full shrink-0 ${
                           nonAcIsAvail ? "bg-emerald-500" : "bg-red-500"
-                        }`} /> {nonAcIsAvail ? "Available" : (nonAcVariant.status || "Occupied")}
-                      </span>
+                        }`} />
+                        <span>{nonAcIsAvail ? "Available" : (nonAcVariant.status || "Occupied")}</span>
+                      </div>
 
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full transition-all ${
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all shrink-0 ${
                         selectedVariant === "Non-AC"
                           ? (nonAcIsAvail ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm")
                           : "bg-navy/5 text-navy hover:bg-navy/10"
                       }`}>
-                        {selectedVariant === "Non-AC" ? (nonAcIsAvail ? "✓ Selected (Non-AC)" : "Selected (Non-AC - Occupied)") : "Select Non-AC"}
+                        {selectedVariant === "Non-AC" 
+                          ? (nonAcIsAvail ? "✓ Selected (Non-AC)" : "Occupied (Non-AC)") 
+                          : "Select Non-AC"}
                       </span>
                     </div>
                   </div>
@@ -722,24 +807,72 @@ export function RoomDetailsPage() {
               </div>
 
               {/* 7. Room Amenities */}
-              <div className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-4">
-                <div className="flex justify-between items-center border-b border-navy/5 pb-3">
-                  <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">Room Amenities</h2>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+              <div key={selectedVariant} className="bg-white rounded-2xl p-6 sm:p-8 border border-navy/5 shadow-soft space-y-5 transition-all">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-navy/5 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-display text-xl sm:text-2xl font-bold text-navy">Room Amenities</h2>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${
+                        selectedVariant === 'Non-AC'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-purple/10 text-purple border-purple/20'
+                      }`}>
+                        {selectedVariant}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {selectedVariant === 'Non-AC'
+                        ? 'Naturally aerated room features with high-speed ceiling fan, fresh airflow, and hospitality comforts.'
+                        : 'Climate-controlled room features with split air conditioning, individual digital thermostat, and sealed soundproofing.'}
+                    </p>
+                  </div>
+                  <span className={`text-[11px] font-bold px-3 py-1.5 rounded-full border shrink-0 w-fit ${
                     selectedVariant === 'Non-AC'
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-purple/10 text-purple border border-purple/20'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-xs'
+                      : 'bg-purple/10 text-purple border-purple/20 shadow-xs'
                   }`}>
-                    {selectedVariant} Package
+                    {selectedVariant} Package ({roomAmenities.length} Amenities)
                   </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {roomAmenities.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2.5 p-3 rounded-xl bg-cream/40 border border-navy/5 text-xs text-navy font-semibold">
-                      <Check className="size-4 text-purple shrink-0" />
-                      <span>{a}</span>
-                    </div>
-                  ))}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                  {roomAmenities.map((a, i) => {
+                    const lower = a.toLowerCase();
+                    const isClimate = lower.includes('air condition') || lower.includes('climate') || lower.includes('inverter');
+                    const isFan = lower.includes('fan') || lower.includes('airflow') || lower.includes('ventilat');
+                    const isSafe = lower.includes('safe') || lower.includes('locker');
+                    const isBed = lower.includes('bed') || lower.includes('linen');
+                    const isTv = lower.includes('tv');
+                    const isService = lower.includes('service') || lower.includes('dining');
+
+                    return (
+                      <div
+                        key={`${selectedVariant}-${i}-${a}`}
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border text-xs font-semibold transition-all ${
+                          selectedVariant === 'Non-AC'
+                            ? (isFan ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950 font-bold' : 'bg-cream/40 border-navy/5 text-navy hover:border-emerald-300')
+                            : (isClimate ? 'bg-purple/[0.06] border-purple/25 text-navy font-bold' : 'bg-cream/40 border-navy/5 text-navy hover:border-purple/30')
+                        }`}
+                      >
+                        {isClimate ? (
+                          <Snowflake className="size-4 shrink-0 text-purple" />
+                        ) : isFan ? (
+                          <Wind className="size-4 shrink-0 text-emerald-600" />
+                        ) : isSafe ? (
+                          <ShieldCheck className="size-4 shrink-0 text-purple" />
+                        ) : isBed ? (
+                          <Bed className="size-4 shrink-0 text-navy/70" />
+                        ) : isTv ? (
+                          <Sparkles className="size-4 shrink-0 text-gold" />
+                        ) : isService ? (
+                          <Clock className="size-4 shrink-0 text-navy/60" />
+                        ) : (
+                          <CheckCircle2 className={`size-4 shrink-0 ${selectedVariant === 'Non-AC' ? 'text-emerald-600' : 'text-purple'}`} />
+                        )}
+                        <span className="leading-tight">{a}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

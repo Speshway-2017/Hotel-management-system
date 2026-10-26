@@ -276,7 +276,6 @@ function ManagerReservationsPage() {
   if (loading) {
     return (
       <div className="space-y-6 text-left">
-        <PageHeader title="Reservations" subtitle="Loading scoped property reservation dataset..." />
         <LoadingRows rows={5} />
       </div>
     );
@@ -284,20 +283,6 @@ function ManagerReservationsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
-      {/* Top Header with Redesigned Solid Add Reservation Button */}
-      <PageHeader
-        title="Reservations"
-        subtitle="Manage in-house bookings, walk-ins, OTA synchronizations, and guest folios."
-        actions={
-          <button
-            onClick={() => navigate({ to: "/manager/reservations/add" })}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold bg-[#0d1b2a] text-white hover:bg-[#1a2e40] active:scale-[0.98] cursor-pointer shadow-md hover:shadow-lg transition-all rounded-lg border border-navy/30"
-          >
-            <Plus className="size-4 text-white" />
-            <span>Add Reservation</span>
-          </button>
-        }
-      />
 
       {error && (
         <Notice tone="error" title="Synchronization Error">
@@ -331,17 +316,26 @@ function ManagerReservationsPage() {
             />
           </div>
 
-          <div className="w-full md:w-56">
-            <Input
-              type="text"
-              placeholder="Filter by date (e.g. 2026-09)..."
-              value={dateFilter}
-              onChange={(e) => {
-                setDateFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="h-9 text-xs font-semibold bg-cream/10 border-muted w-full"
-            />
+          <div className="flex flex-col sm:flex-row gap-2.5 items-center w-full md:w-auto">
+            <div className="w-full sm:w-56">
+              <Input
+                type="text"
+                placeholder="Filter by date (e.g. 2026-09)..."
+                value={dateFilter}
+                onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-9 text-xs font-semibold bg-cream/10 border-muted w-full"
+              />
+            </div>
+            <button
+              onClick={() => navigate({ to: "/manager/reservations/add" })}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 h-9 text-xs font-bold bg-[#0d1b2a] text-white hover:bg-[#1a2e40] active:scale-[0.98] cursor-pointer shadow-sm hover:shadow transition-all rounded-lg border border-navy/30 whitespace-nowrap shrink-0 w-full sm:w-auto"
+            >
+              <Plus className="size-3.5 text-white" />
+              <span>Add Reservation</span>
+            </button>
           </div>
         </div>
 

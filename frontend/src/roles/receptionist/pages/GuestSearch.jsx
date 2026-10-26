@@ -97,8 +97,13 @@ function InHouseGuestsPage() {
             ]
           };
         });
-        setGuests(mapped);
-        receptionCache.set('guests', mapped);
+        const sortedMapped = [...mapped].sort((a, b) => {
+          const nameA = String(a.name || a.guest || "").trim();
+          const nameB = String(b.name || b.guest || "").trim();
+          return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+        });
+        setGuests(sortedMapped);
+        receptionCache.set('guests', sortedMapped);
       })
       .catch(err => console.error("Failed to load in-house guests:", err))
       .finally(() => {
@@ -150,6 +155,13 @@ function InHouseGuestsPage() {
     const matchesType = filterRoomType === "all" || g.roomType === filterRoomType;
 
     return matchesSearch && matchesStatus && matchesType;
+  });
+
+  // Align guest list in alphabetical order A-Z
+  const sortedGuests = [...filteredGuests].sort((a, b) => {
+    const nameA = String(a.name || a.guest || "").trim();
+    const nameB = String(b.name || b.guest || "").trim();
+    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
   });
 
   // Action methods
@@ -317,14 +329,14 @@ function InHouseGuestsPage() {
                     Loading in-house guests directory...
                   </td>
                 </tr>
-              ) : filteredGuests.length === 0 ? (
+              ) : sortedGuests.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="py-10 text-center font-bold text-muted-foreground select-none">
                     No matching in-house guests found.
                   </td>
                 </tr>
               ) : (
-                filteredGuests.map((g) => (
+                sortedGuests.map((g) => (
                   <tr key={g.id} className="hover:bg-muted/5">
                     <td className="py-3.5 px-4 font-bold text-navy">
                       <div className="flex items-center gap-2.5">

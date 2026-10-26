@@ -613,6 +613,12 @@ export function DashShell({ role, children }) {
 
           {(role === "super-admin" || role === "admin" || role === "manager" || role === "reception" || role === "guest") && (() => {
             const getHeaderContent = (path) => {
+              if (path.includes("/check-in")) {
+                return {
+                  title: "Guest Verification & Check-In",
+                  subtitle: "Mandatory government ID proof capture and check-in clearance for online reservations"
+                };
+              }
               if (role === "super-admin") {
                 if (path === "/super-admin" || path === "/super-admin/") {
                   return {

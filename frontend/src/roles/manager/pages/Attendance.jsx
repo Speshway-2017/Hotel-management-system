@@ -132,13 +132,15 @@ function ManagerAttendancePage() {
   useEffect(() => {
     loadRoster(false);
 
-    const handleFocus = () => loadRoster(true);
+    const handleFocus = () => loadRoster(true);
+
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadRoster(true);
     });
 
-    return () => {
+    return () => {
+
       if (unsubscribe) unsubscribe();
     };
   }, [selectedDate]);
@@ -202,21 +204,9 @@ function ManagerAttendancePage() {
         <PremiumStatCard label="On Leave" value={onLeaveCount.toString()} hint="Authorized time-off logs" accentColor="#8b5cf6" />
       </div>
 
-      {/* Date Selector & Search Filters */}
+      {/* Search Filters */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft space-y-4">
         <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-          
-          {/* Date Picker */}
-          <div className="flex items-center gap-2 w-full md:w-64">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Target Date</span>
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
-              className="h-9 text-xs font-semibold bg-cream/10 border-muted w-full"
-            />
-          </div>
-
           <div className="relative w-full md:flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input

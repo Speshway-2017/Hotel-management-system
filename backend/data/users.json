@@ -56,7 +56,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:40:50.570Z",
-    "updatedAt": "2026-10-14T11:52:26.630Z"
+    "updatedAt": "2026-10-26T06:25:05.067Z"
   },
   {
     "id": "igylcsmirjj",
@@ -78,7 +78,7 @@
     "type": "Regular",
     "preferences": "",
     "idDocType": "Aadhaar Card",
-    "idDocNumber": "4654 6864 9765",
+    "idDocNumber": "",
     "loyaltyPoints": 0,
     "notes": "",
     "fcmToken": "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM",
@@ -86,7 +86,7 @@
       "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM"
     ],
     "createdAt": "2026-09-07T05:58:33.215Z",
-    "updatedAt": "2026-10-13T11:23:26.601Z"
+    "updatedAt": "2026-10-26T06:21:55.855Z"
   },
   {
     "id": "lfir6yhyu3b",
@@ -114,7 +114,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-21T05:45:42.890Z",
-    "updatedAt": "2026-10-14T11:37:59.189Z"
+    "updatedAt": "2026-10-26T11:59:40.244Z"
   },
   {
     "id": "l5fxexamfef",
@@ -200,7 +200,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-09-07T04:34:56.758Z",
-    "updatedAt": "2026-10-13T08:48:30.802Z"
+    "updatedAt": "2026-10-26T08:30:45.800Z"
   },
   {
     "id": "6ab365b638033a726fe4e7b3",
@@ -397,6 +397,62 @@
     "updatedAt": "2026-10-13T08:34:48.098Z"
   },
   {
+    "id": "4044drz30u18tdq683z0rl",
+    "_id": "4044drz30u18tdq683z0rl",
+    "name": "Ravi",
+    "email": "superadmin@hourstay.com",
+    "password": "$2a$10$peagazuTpFqOBCHMY8g9hup6KFPWRJ6w.9H4E2GaJZyBGFs/.V7/y",
+    "role": "super-admin",
+    "mobile": "9876543210",
+    "propertyId": null,
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1787659317/hourstay_hms_assets/hd2w8kste7va2xvesusw.png",
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-08-21T05:30:53.485Z",
+    "updatedAt": "2026-10-26T08:32:17.835Z"
+  },
+  {
+    "id": "irmwng6rtb",
+    "_id": "irmwng6rtb",
+    "name": "Anjali",
+    "email": "anjali@gmail.com",
+    "password": "$2a$10$duAwCOJD0i9LmsCRdyZx/.Z.eJcXFynQo2CLEfAUW3R/h8lEH/8.W",
+    "role": "guest",
+    "mobile": "6456456456",
+    "propertyId": null,
+    "status": "Active",
+    "dept": "Front Desk",
+    "shift": "Morning (06:00 - 14:00)",
+    "avatar": null,
+    "city": "",
+    "state": "",
+    "country": "India",
+    "address": "",
+    "type": "Regular",
+    "preferences": "",
+    "idDocType": "Aadhaar Card",
+    "idDocNumber": "5264 6524 7654",
+    "loyaltyPoints": 0,
+    "notes": "",
+    "fcmToken": null,
+    "fcmTokens": [],
+    "createdAt": "2026-10-26T10:09:52.778Z",
+    "updatedAt": "2026-10-26T10:09:53.063Z"
+  },
+  {
     "id": "83emngc4opx",
     "_id": "83emngc4opx",
     "name": "Poojitha",
@@ -422,6 +478,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-08-24T11:47:56.630Z",
+    "updatedAt": "2026-10-26T11:59:58.473Z"
     "updatedAt": "2026-10-14T11:38:28.231Z"
   }
 ]

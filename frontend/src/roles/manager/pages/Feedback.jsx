@@ -229,40 +229,11 @@ function ManagerFeedbackPage() {
       </div>
 
       {/* Filters Toolbar */}
-      <div className="bg-white border border-navy/10 rounded-2xl p-5 shadow-soft space-y-4">
-        
-        {/* Status Tab Chips */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy/5 pb-3">
-          <div className="flex rounded-xl border border-navy/10 bg-cream/30 p-1 gap-1 flex-wrap">
-            {[
-              { id: "all", label: "All Reviews" },
-              { id: "Pending", label: "Pending" },
-              { id: "Published", label: "Published" },
-              { id: "Resolved", label: "Resolved" },
-              { id: "Archived", label: "Archived" }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => { setStatusFilter(tab.id); setCurrentPage(1); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
-                  statusFilter === tab.id
-                    ? "bg-navy text-cream shadow-sm"
-                    : "text-navy/70 hover:text-navy hover:bg-cream/50"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <span className="text-xs font-bold text-navy/60">
-            Showing <strong className="text-purple">{filteredFeedback.length}</strong> of {totalCount} records
-          </span>
-        </div>
-
+      <div className="bg-white border border-navy/10 rounded-2xl p-4 sm:p-5 shadow-soft space-y-3">
         {/* Search & Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="relative sm:col-span-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+          {/* Search bar */}
+          <div className="relative md:col-span-6">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-navy/40" />
             <input
               placeholder="Search by guest name, room, booking ref, or review comments..."
@@ -272,7 +243,23 @@ function ManagerFeedbackPage() {
             />
           </div>
 
-          <div className="sm:col-span-4">
+          {/* Status Dropdown Filter beside search bar */}
+          <div className="md:col-span-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full h-10 px-3 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer"
+            >
+              <option value="all">All Feedback</option>
+              <option value="Pending">Pending</option>
+              <option value="Published">Published</option>
+              <option value="Resolved">Resolved</option>
+              <option value="Archived">Archived</option>
+            </select>
+          </div>
+
+          {/* Star Rating Filter */}
+          <div className="md:col-span-3">
             <select
               value={ratingFilter}
               onChange={(e) => { setRatingFilter(e.target.value); setCurrentPage(1); }}
@@ -287,6 +274,16 @@ function ManagerFeedbackPage() {
           </div>
         </div>
 
+        {(searchQuery || statusFilter !== "all" || ratingFilter !== "all") && (
+          <div className="flex justify-end pt-2 border-t border-navy/5">
+            <button
+              onClick={() => { setSearchQuery(""); setStatusFilter("all"); setRatingFilter("all"); setCurrentPage(1); }}
+              className="text-[11px] text-purple hover:underline font-bold bg-transparent border-none cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Feedback Data Table */}

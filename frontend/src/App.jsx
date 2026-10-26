@@ -285,6 +285,7 @@ export default function App() {
           <Route path="/search" element={<RouteWrapper routeObj={Search} />} />
           <Route path="/hotels" element={<RouteWrapper routeObj={Search} />} />
           <Route path="/hotels/:propertyId" element={<RouteWrapper routeObj={HotelDetails} />} />
+          <Route path="/rooms" element={<RouteWrapper routeObj={RoomDetails} />} />
           <Route path="/rooms/:roomId" element={<RouteWrapper routeObj={RoomDetails} />} />
           <Route path="/blog" element={<RouteWrapper routeObj={BlogIndex} />} />
           <Route path="/blog/:slug" element={<RouteWrapper routeObj={BlogPost} />} />

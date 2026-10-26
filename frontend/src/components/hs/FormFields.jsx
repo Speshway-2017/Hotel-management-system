@@ -117,12 +117,13 @@ export const Input = React.forwardRef(
       if (textOnly) return "text-only";
       if (type === "email") return "email";
       if (type === "tel") return "tel";
+      if (props.name && (props.name.toLowerCase().includes("phone") || props.name.toLowerCase().includes("mobile"))) return "tel";
       if (type === "number") {
         if (props.step === "0.01" || props.step === "any") return "amount";
         return "number";
       }
       return type;
-    }, [dataType, nameOnly, textOnly, type, props.step]);
+    }, [dataType, nameOnly, textOnly, type, props.step, props.name]);
 
     const isNumberField =
       validationType === "number" ||
@@ -137,7 +138,11 @@ export const Input = React.forwardRef(
       nameOnly ||
       textOnly;
 
-    const isPhoneField = validationType === "tel" || type === "tel";
+    const isPhoneField =
+      validationType === "tel" ||
+      validationType === "phone" ||
+      type === "tel" ||
+      Boolean(props.name && (props.name.toLowerCase().includes("phone") || props.name.toLowerCase().includes("mobile")));
 
     const updateError = (err) => {
       setLocalError(err);
@@ -192,13 +197,28 @@ export const Input = React.forwardRef(
         }
       }
 
-      // 3. Letters entered on Phone Field
+      // 3. Letters entered or exceeding 10 digits on Phone Field
       if (isPhoneField) {
         if (/[a-zA-Z]/.test(e.key)) {
           e.preventDefault();
           updateError("Phone number must contain numbers only.");
           if (onKeyDown) onKeyDown(e);
           return;
+        }
+        if (/^[0-9]$/.test(e.key)) {
+          const target = e.target;
+          const selStart = target.selectionStart ?? 0;
+          const selEnd = target.selectionEnd ?? 0;
+          if (selEnd === selStart) {
+            const currentVal = target.value || "";
+            const cleanDigits = currentVal.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
+            if (cleanDigits.length >= 10) {
+              e.preventDefault();
+              updateError("Mobile/Phone number must be 10 digits only.");
+              if (onKeyDown) onKeyDown(e);
+              return;
+            }
+          }
         }
       }
 
@@ -234,6 +254,26 @@ export const Input = React.forwardRef(
         if (/[a-zA-Z]/.test(pasteText)) {
           e.preventDefault();
           updateError("Phone number must contain numbers only.");
+          if (onPaste) onPaste(e);
+          return;
+        }
+        const cleanPasteDigits = pasteText.replace(/^(\+91|0)/, "").replace(/\D/g, "");
+        const target = e.target;
+        const selStart = target.selectionStart ?? 0;
+        const selEnd = target.selectionEnd ?? 0;
+        const currentVal = target.value || "";
+        const before = currentVal.slice(0, selStart);
+        const after = currentVal.slice(selEnd);
+        const combinedDigits = (before + cleanPasteDigits + after).replace(/^(\+91|0)/, "").replace(/\D/g, "");
+        if (combinedDigits.length > 10) {
+          e.preventDefault();
+          const allowedLen = Math.max(0, 10 - (before + after).replace(/^(\+91|0)/, "").replace(/\D/g, "").length);
+          const textToInsert = cleanPasteDigits.slice(0, allowedLen);
+          const newValue = before + textToInsert + after;
+          target.value = newValue;
+          const event = new Event("input", { bubbles: true });
+          target.dispatchEvent(event);
+          updateError("Mobile/Phone number must be 10 digits only.");
           if (onPaste) onPaste(e);
           return;
         }
@@ -278,10 +318,13 @@ export const Input = React.forwardRef(
           updateError(null);
         }
       } else if (isPhoneField) {
+        const digitsOnly = val.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
         if (/[a-zA-Z]/.test(val)) {
           updateError("Phone number must contain numbers only.");
-        } else if (val.replace(/\D/g, "").length > 15) {
-          updateError("Phone number must be at most 15 digits.");
+        } else if (digitsOnly.length > 10) {
+          updateError("Mobile/Phone number must be 10 digits only.");
+        } else if (touched && digitsOnly.length > 0 && digitsOnly.length < 10) {
+          updateError("Mobile/Phone number must be exactly 10 digits.");
         } else {
           updateError(null);
         }

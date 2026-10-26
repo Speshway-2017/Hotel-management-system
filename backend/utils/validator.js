@@ -68,7 +68,7 @@ export const validateEmail = (email, required = true) => {
 };
 
 /**
- * Validates phone numbers (10-15 digits, numbers only, no repeating dummy sequences)
+ * Validates phone numbers (10 digits only, numbers only, no repeating dummy sequences)
  */
 export const validatePhone = (phone, required = true) => {
   if (!phone || typeof phone !== 'string') {
@@ -83,8 +83,8 @@ export const validatePhone = (phone, required = true) => {
   if (!/^\d+$/.test(digitsOnly)) {
     return { valid: false, message: 'Phone number must contain numbers only; letters are not allowed' };
   }
-  if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-    return { valid: false, message: 'Phone number must be between 10 and 15 digits' };
+  if (digitsOnly.length !== 10) {
+    return { valid: false, message: 'Mobile/Phone number must be exactly 10 digits' };
   }
   if (isAllSameChar(digitsOnly)) {
     return { valid: false, message: 'Please enter a valid phone number (cannot be all identical digits)' };

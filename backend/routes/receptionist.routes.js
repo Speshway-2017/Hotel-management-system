@@ -1243,6 +1243,9 @@ router.put('/reservations/:id/status', async (req, res) => {
     const io = req.app.get('socketio');
 
     // Sync operational room status on check-in, check-out, cancel, or no-show
+    const io = req.app.get('socketio');
+
+    // Sync operational room status on check-in, check-out, cancel, or no-show
     if (roomNum) {
       let rmStatus = 'Available';
       if (status === 'Checked-in') rmStatus = 'Occupied';

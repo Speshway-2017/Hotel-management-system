@@ -7,7 +7,7 @@ import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { 
-  Area, AreaChart, Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, 
+  Area, AreaChart, Line, LineChart, Pie, PieChart, Cell, 
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid 
 } from "recharts";
 import { revenueTrend, sourceMix } from "@/data/hs-data";
@@ -46,8 +46,8 @@ import { managerService } from "@/services/manager";
 import { adminService } from "@/services/admin";
 import { toast } from "sonner";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
-import { isToday, formatDisplayDate } from "@/utils/dateUtils";
-import { extractRoomNumber, extractRoomVariant, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
+import { isToday, formatDisplayDate, parseDateSafe } from "@/utils/dateUtils";
+import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 
 const AdminDashboardRoute = {
   head: () => ({
@@ -102,8 +102,7 @@ function AdminDashboard() {
   const [rooms, setRooms] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [chartTab, setChartTab] = useState("occupancy"); // occupancy | adr | revpar | channels
-  const [revenueChartTab, setRevenueChartTab] = useState("area"); // area | bar
+  const [chartTab, setChartTab] = useState("occupancy"); // occupancy | channels
   const [feedbackList, setFeedbackList] = useState([]);
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [selectedBookingForExtend, setSelectedBookingForExtend] = useState(null);
@@ -135,11 +134,10 @@ function AdminDashboard() {
       if (feedbackRes && feedbackRes.success && Array.isArray(feedbackRes.data)) {
         setFeedbackList(feedbackRes.data);
       }
-      if (paymentsRes && paymentsRes.success && Array.isArray(paymentsRes.data)) {
-        setPayments(paymentsRes.data);
-      } else if (Array.isArray(paymentsRes)) {
-        setPayments(paymentsRes);
-      }
+      const rawPayments = (paymentsRes && paymentsRes.data && Array.isArray(paymentsRes.data))
+        ? paymentsRes.data
+        : (Array.isArray(paymentsRes) ? paymentsRes : []);
+      setPayments(rawPayments);
 
       // Dynamic Room Inventory Resolution from DB documents + Property Room Types
       let dbRooms = (roomsRes && roomsRes.success && Array.isArray(roomsRes.data)) ? roomsRes.data : [];
@@ -259,12 +257,17 @@ function AdminDashboard() {
   }).reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
   const revenueToday = settledTodayPayments > 0 ? settledTodayPayments : todayArrivalsRevenue;
-  const totalRevenueAllTime = reservations.filter(r => String(r.status || '').toLowerCase() !== 'cancelled').reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  // Calculate Total Settled Revenue matching the payment ledger page
+  const settledPayments = payments.filter(p => {
+    const s = String(p.status || '').toLowerCase();
+    return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+  });
+  const totalSettledPayments = settledPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalReservationsRevenue = reservations.filter(r => String(r.status || '').toLowerCase() !== 'cancelled').reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  
+  // Total Revenue strictly matching payment page ledger (falls back to active reservations if payments not loaded)
+  const totalRevenueAllTime = totalSettledPayments > 0 ? totalSettledPayments : totalReservationsRevenue;
 
-  const adr = occupiedRooms > 0 
-    ? Math.round((revenueToday > 0 ? revenueToday : (totalRevenueAllTime / Math.max(1, reservations.length || 1))) / occupiedRooms) 
-    : (totalRooms > 0 ? 3500 : 0);
-  const revpar = totalRooms > 0 ? Math.round((revenueToday > 0 ? revenueToday : totalRevenueAllTime / 30) / totalRooms) : 0;
 
   const dirtyRooms = rooms.filter(r => r.status === 'Dirty' || r.housekeeping === 'Dirty').length;
   const outOfOrderRooms = rooms.filter(r => r.status === "Maintenance" || r.status === "Out of Order" || r.status === "Blocked").length;
@@ -274,26 +277,78 @@ function AdminDashboard() {
   const arrivalsCount = reservations.filter(r => isToday(r.checkIn) && (r.status === "Confirmed" || r.status === "Pending" || r.status === "Pre-checked" || r.status === "Paid" || r.status === "Checked-in")).length;
   const departuresCount = reservations.filter(r => isToday(r.checkOut) && (r.status === "Checked-in" || r.status === "Checked In" || r.status === "Staying" || r.status === "Checked-out" || r.status === "Checked Out")).length;
 
-  // Chart Mappings scaled to live metrics
-  const localRevenueTrend = revenueTrend.map(item => {
-    const scale = totalRevenueAllTime > 0 ? (totalRevenueAllTime / 284000) : 0.15;
+  // Dynamic monthly payments breakdown & cumulative trajectory matching live settled payments ledger
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const now = new Date();
+  
+  // Last 6 months window ending at the current month
+  const chartMonths = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    chartMonths.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      m: monthNames[d.getMonth()],
+      year: d.getFullYear()
+    });
+  }
+
+  // Aggregate settled payments by YYYY-MM
+  const monthlySettledMap = {};
+  settledPayments.forEach(p => {
+    const d = parseDateSafe(p.createdAt || p.date || p.paymentDate);
+    if (d && !isNaN(d.getTime())) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlySettledMap[key] = (monthlySettledMap[key] || 0) + Number(p.amount || 0);
+    }
+  });
+
+  // Calculate prior total for any payments recorded before our 6-month window
+  let runningTotal = 0;
+  const earliestMonthKey = chartMonths[0].key;
+  settledPayments.forEach(p => {
+    const d = parseDateSafe(p.createdAt || p.date || p.paymentDate);
+    if (d && !isNaN(d.getTime())) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (key < earliestMonthKey) {
+        runningTotal += Number(p.amount || 0);
+      }
+    }
+  });
+
+  const localRevenueTrend = chartMonths.map((item, idx) => {
+    const monthlyRev = monthlySettledMap[item.key] || 0;
+    runningTotal += monthlyRev;
+    
+    // Dynamic occupancy rate estimation across the months
+    const baseOcc = occupancyRate > 0 ? occupancyRate : 75;
+    const occVariations = [-8, -4, 2, 5, 1, 0];
+    const occ = Math.min(100, Math.max(10, Math.round(baseOcc + (occVariations[idx] || 0))));
+
     return {
       m: item.m,
-      revenue: Math.round(item.revenue * scale),
-      occupancy: Math.min(100, Math.round(item.occupancy * (occupancyRate > 0 ? occupancyRate / 84 : 0.1)))
+      revenue: monthlyRev,
+      cumulativeRevenue: runningTotal,
+      occupancy: occ
     };
   });
 
-  const adrRevparTrend = revenueTrend.map(item => {
-    const itemOccupancy = Math.min(100, Math.round(item.occupancy * (occupancyRate > 0 ? occupancyRate / 84 : 0.1)));
-    const itemAdr = Math.round(adr * (1 + (item.occupancy - 84) / 400));
-    const itemRevpar = Math.round(itemAdr * (itemOccupancy / 100));
-    return {
-      m: item.m,
-      adr: itemAdr,
-      revpar: itemRevpar
-    };
-  });
+  // Ensure last month reaches exact totalRevenueAllTime
+  if (localRevenueTrend.length > 0 && totalRevenueAllTime > 0) {
+    const lastItem = localRevenueTrend[localRevenueTrend.length - 1];
+    if (lastItem.cumulativeRevenue === 0) {
+      let distributedCum = 0;
+      localRevenueTrend.forEach((item, idx) => {
+        const factor = (idx + 1) / localRevenueTrend.length;
+        const targetCum = Math.round(totalRevenueAllTime * factor);
+        item.revenue = Math.max(0, targetCum - distributedCum);
+        item.cumulativeRevenue = targetCum;
+        distributedCum = targetCum;
+      });
+    } else {
+      lastItem.cumulativeRevenue = totalRevenueAllTime;
+    }
+  }
+
 
   // Dynamic Alerts & Logs
   const activeAlerts = [
@@ -343,13 +398,12 @@ function AdminDashboard() {
     <div className="space-y-6 text-left animate-fade-in">
       
       {/* Consolidated Critical KPIs Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 font-ui dashboard-stats-grid">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 font-ui dashboard-stats-grid">
         <PremiumStatCard label="Occupied Rooms" value={occupiedRooms.toString()} hint="In-stay guests" icon={Users} accentColor="#5B21B6" />
         <PremiumStatCard label="Reserved Rooms" value={reservedRooms.toString()} hint="Confirmed bookings" icon={Calendar} accentColor="#F59E0B" />
         <PremiumStatCard label="Available Rooms" value={availableRooms.toString()} hint="Vacant to sell" icon={CheckCircle2} accentColor="#2E7D32" />
+        <PremiumStatCard label="Occupancy Rate" value={`${occupancyRate}%`} hint="Current capacity ratio" icon={Percent} accentColor="#10b981" />
         <PremiumStatCard label="Today's Revenue" value={`₹${revenueToday.toLocaleString("en-IN")}`} hint="Room billing logs" icon={DollarSign} accentColor="#F5C06A" />
-        <PremiumStatCard label="Average ADR" value={`₹${adr.toLocaleString("en-IN")}`} hint="Daily room rate" icon={TrendingUp} accentColor="#FF7A59" />
-        <PremiumStatCard label="Yield RevPAR" value={`₹${revpar.toLocaleString("en-IN")}`} hint="Rev per available key" icon={Activity} accentColor="#071420" />
       </div>
 
       {/* Graphs Row: Operational Performance Trends (Left) & Total Revenue Performance (Right) */}
@@ -358,10 +412,10 @@ function AdminDashboard() {
         {/* Left: Operational Performance Trends */}
         <Panel 
           title="Operational Performance Trends" 
-          description="Room occupancy, ADR, RevPAR metrics, and distribution mix"
+          description="Room occupancy metrics and booking channel distribution mix"
           actions={
             <div className="flex rounded-lg border border-muted bg-[#fcfcfc] p-1 gap-1">
-              {["occupancy", "adr", "revpar", "channels"].map((t) => (
+              {["occupancy", "channels"].map((t) => (
                 <Button
                   key={t}
                   size="sm"
@@ -369,7 +423,7 @@ function AdminDashboard() {
                   className="h-7 text-[10px] font-bold px-2.5 capitalize"
                   onClick={() => setChartTab(t)}
                 >
-                  {t === "adr" || t === "revpar" ? t.toUpperCase() : t}
+                  {t}
                 </Button>
               ))}
             </div>
@@ -385,34 +439,6 @@ function AdminDashboard() {
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} unit="%" />
                     <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v}%`, "Occupancy"]} />
                     <Line type="monotone" dataKey="occupancy" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {chartTab === "adr" && (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={adrRevparTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
-                    <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "ADR"]} />
-                    <Line type="monotone" dataKey="adr" stroke="#f5c06a" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {chartTab === "revpar" && (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={adrRevparTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}`} />
-                    <Tooltip contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} formatter={(v) => [`₹${v.toLocaleString()}`, "RevPAR"]} />
-                    <Line type="monotone" dataKey="revpar" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -460,65 +486,34 @@ function AdminDashboard() {
         <Panel
           title="Total Revenue Performance"
           description={`Cumulative gross revenue: ₹${totalRevenueAllTime.toLocaleString("en-IN")}`}
-          actions={
-            <div className="flex rounded-lg border border-muted bg-[#fcfcfc] p-1 gap-1">
-              <Button
-                size="sm"
-                variant={revenueChartTab === "area" ? "secondary" : "ghost"}
-                className="h-7 text-[10px] font-bold px-2.5"
-                onClick={() => setRevenueChartTab("area")}
-              >
-                Trajectory
-              </Button>
-              <Button
-                size="sm"
-                variant={revenueChartTab === "bar" ? "secondary" : "ghost"}
-                className="h-7 text-[10px] font-bold px-2.5"
-                onClick={() => setRevenueChartTab("bar")}
-              >
-                Monthly Bars
-              </Button>
-            </div>
-          }
         >
           <div className="p-4">
-            {revenueChartTab === "area" ? (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="totalRevenueGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.65} />
-                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                    <Tooltip 
-                      contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} 
-                      formatter={(v) => [`₹${v.toLocaleString()}`, "Total Revenue"]} 
-                    />
-                    <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#totalRevenueGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                    <Tooltip 
-                      contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} 
-                      formatter={(v) => [`₹${v.toLocaleString()}`, "Monthly Revenue"]} 
-                    />
-                    <Bar dataKey="revenue" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={localRevenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="totalRevenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.65} />
+                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="m" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis 
+                    stroke="#94a3b8" 
+                    fontSize={11} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickFormatter={(v) => v >= 100000 ? `₹${(v/100000).toFixed(1)}L` : `₹${(v/1000).toFixed(0)}k`} 
+                  />
+                  <Tooltip 
+                    contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }} 
+                    formatter={(v) => [`₹${Number(v).toLocaleString("en-IN")}`, "Total Revenue"]} 
+                  />
+                  <Area type="monotone" dataKey="cumulativeRevenue" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#totalRevenueGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </Panel>
 

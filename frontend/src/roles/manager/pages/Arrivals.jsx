@@ -88,7 +88,7 @@ function ManagerOperationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
-  const [activeTab, setActiveTab] = useState("arrivals"); // 'arrivals' | 'departures' | 'stays' | 'pending-in' | 'pending-out'
+  const [activeTab, setActiveTab] = useState("all"); // 'all' | 'arrivals' | 'departures' | 'stays' | 'pending-in' | 'pending-out'
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -248,7 +248,7 @@ function ManagerOperationsPage() {
     return "Standard Room";
   };
 
-  // Tab Filtering logic
+  // Movement Filtering logic
   const getTabFilteredData = () => {
     switch (activeTab) {
       case "arrivals":
@@ -261,10 +261,20 @@ function ManagerOperationsPage() {
         return pendingCheckins;
       case "pending-out":
         return pendingCheckouts;
+      case "all":
       default:
         return reservations;
     }
   };
+
+  const activeTabLabel = {
+    all: "All Operations",
+    arrivals: "Arrivals",
+    departures: "Departures",
+    stays: "In-House Stays",
+    "pending-in": "Pending Check-Ins",
+    "pending-out": "Pending Check-Outs"
+  }[activeTab] || "All Operations";
 
   // Search & Secondary Filtering
   const getSearchedAndFilteredData = () => {
@@ -324,40 +334,11 @@ function ManagerOperationsPage() {
         </div>
       </div>
 
-      {/* Advanced Full Width Search & Filter Toolbar */}
-      <div className="flex flex-col gap-4 bg-white border border-muted p-4 rounded-2xl shadow-soft">
-        <div className="flex flex-col md:flex-row items-center justify-start gap-3">
-          {/* Tabs */}
-          <div className="flex gap-1 bg-muted/30 p-1 rounded-full border border-muted/50 select-none overflow-x-auto scrollbar-none w-full md:w-auto">
-            {[
-              { label: "Arrivals", key: "arrivals", count: arrivalsToday.length },
-              { label: "Departures", key: "departures", count: departuresToday.length },
-              { label: "In-House", key: "stays", count: currentStays.length },
-              { label: "Pending In", key: "pending-in", count: pendingCheckins.length },
-              { label: "Pending Out", key: "pending-out", count: pendingCheckouts.length }
-            ].map((t) => (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setActiveTab(t.key);
-                  setCurrentPage(1);
-                }}
-                className={`px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap flex-1 md:flex-none ${
-                  activeTab === t.key
-                    ? "bg-navy text-white shadow-sm"
-                    : "text-muted-foreground hover:text-navy hover:bg-white/50"
-                }`}
-              >
-                {t.label} ({t.count})
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Sub filters */}
-        <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-muted/50 text-[10px] font-semibold text-muted-foreground">
+      {/* Full Width Search & Filter Toolbar */}
+      <div className="bg-white border border-muted p-4 rounded-2xl shadow-soft">
+        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
           {/* Search bar */}
-          <div className="relative w-full md:w-80">
+          <div className="relative w-full sm:w-72 md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input
               placeholder="Search guest name, room number, or booking reference..."
@@ -366,45 +347,73 @@ function ManagerOperationsPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="pl-9 h-8 text-[10px] font-semibold bg-cream/10 border-muted w-full"
+              className="pl-9 h-9 text-xs font-semibold bg-cream/10 border-muted w-full"
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span>Payment Status:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="bg-muted/40 border border-muted/50 rounded-md py-1 px-2.5 text-[10px] text-navy font-bold focus:outline-none cursor-pointer"
-            >
-              <option value="all">All statuses</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="Checked-in">Checked-in</option>
-              <option value="Checked-out">Checked-out</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
-          </div>
+          {/* Operation Movement Type Filter (right beside search bar) */}
+          <select
+            value={activeTab}
+            onChange={(e) => {
+              setActiveTab(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-9 bg-cream/10 border border-muted rounded-xl px-3 text-xs text-navy font-bold focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Operations ({reservations.length})</option>
+            <option value="arrivals">Arrivals ({arrivalsToday.length})</option>
+            <option value="departures">Departures ({departuresToday.length})</option>
+            <option value="stays">In-House Stays ({currentStays.length})</option>
+            <option value="pending-in">Pending Check-Ins ({pendingCheckins.length})</option>
+            <option value="pending-out">Pending Check-Outs ({pendingCheckouts.length})</option>
+          </select>
 
-          <div className="flex items-center gap-1.5">
-            <span>Booking Source:</span>
-            <select
-              value={sourceFilter}
-              onChange={(e) => { setSourceFilter(e.target.value); setCurrentPage(1); }}
-              className="bg-muted/40 border border-muted/50 rounded-md py-1 px-2.5 text-[10px] text-navy font-bold focus:outline-none cursor-pointer"
+          {/* Payment Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="h-9 bg-cream/10 border border-muted rounded-xl px-3 text-xs text-navy font-bold focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Checked-in">Checked-in</option>
+            <option value="Checked-out">Checked-out</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+
+          {/* Booking Source Filter */}
+          <select
+            value={sourceFilter}
+            onChange={(e) => { setSourceFilter(e.target.value); setCurrentPage(1); }}
+            className="h-9 bg-cream/10 border border-muted rounded-xl px-3 text-xs text-navy font-bold focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Sources</option>
+            <option value="Direct">Direct</option>
+            <option value="Walk-in">Walk-in</option>
+            <option value="Booking.com">Booking.com</option>
+            <option value="MakeMyTrip">MakeMyTrip</option>
+            <option value="Agoda">Agoda</option>
+          </select>
+
+          {(searchQuery || statusFilter !== "all" || sourceFilter !== "all" || activeTab !== "all") && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("all");
+                setSourceFilter("all");
+                setActiveTab("all");
+                setCurrentPage(1);
+              }}
+              className="text-[11px] text-purple hover:underline font-bold bg-transparent border-none cursor-pointer ml-auto"
             >
-              <option value="all">All Sources</option>
-              <option value="Direct">Direct</option>
-              <option value="Walk-in">Walk-in</option>
-              <option value="Booking.com">Booking.com</option>
-              <option value="MakeMyTrip">MakeMyTrip</option>
-              <option value="Agoda">Agoda</option>
-            </select>
-          </div>
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
       {/* Operational Ledger Table */}
-      <Panel title="Operations Movement Log" description={`Displaying movement matching tab ${activeTab.toUpperCase()}`}>
+      <Panel title="Operations Movement Log" description={`Displaying operational movement: ${activeTabLabel}`}>
         {loading ? (
           <div className="text-center py-12 text-muted-foreground p-6">
             Synchronizing operational datasets...

@@ -15,6 +15,7 @@ import {
   sendRegistrationOtpEmail, 
   sendGenericOtpEmail 
 } from '../services/email.service.js';
+import { validatePhone } from '../utils/validator.js';
 
 const router = express.Router();
 
@@ -34,6 +35,13 @@ router.post('/register', async (req, res) => {
   const { name, email, password, mobile, role } = req.body;
 
   try {
+    if (mobile) {
+      const pVal = validatePhone(mobile, true);
+      if (!pVal.valid) {
+        return sendError(res, 400, pVal.message);
+      }
+    }
+
     const userExists = await User.findOne({ email });
     if (userExists) {
       return sendError(res, 400, 'User with this email already exists');
@@ -313,7 +321,13 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
   const updateData = {};
   if (name !== undefined) updateData.name = name;
   const effectiveMobile = mobile !== undefined ? mobile : phone;
-  if (effectiveMobile !== undefined) updateData.mobile = effectiveMobile;
+  if (effectiveMobile !== undefined && effectiveMobile !== '') {
+    const pVal = validatePhone(effectiveMobile, true);
+    if (!pVal.valid) {
+      return sendError(res, 400, pVal.message);
+    }
+    updateData.mobile = pVal.value;
+  }
   if (address !== undefined) updateData.address = address;
   if (city !== undefined) updateData.city = city;
   if (state !== undefined) updateData.state = state;

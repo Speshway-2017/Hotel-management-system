@@ -5,8 +5,8 @@ import { GuestIdVerificationCheckIn } from "@/components/common/GuestIdVerificat
 export const Route = createFileRoute("/admin/check-in/$id")({
   head: () => ({
     meta: [
-      { title: "Admin Guest ID Verification & Check-In — Hour Stay" },
-      { name: "description", content: "Verify government ID proof and clear online bookings for check-in." }
+      { title: "Guest Verification & Check-In — Speshway Luxury Hotel" },
+      { name: "description", content: "Mandatory government ID proof capture and check-in clearance for online reservations." }
     ]
   }),
   component: AdminCheckInDetailsPage
