@@ -20,7 +20,7 @@ export const Route = createFileRoute("/admin/reports")({
   head: () => ({
     meta: [
       { title: "Business Performance Analytics — Speshway Luxury Hotel" },
-      { name: "description", content: "Property-level RevPAR, ADR, GST tax slabs, occupancy, payments, and revenue trends reports." }
+      { name: "description", content: "Property-level GST tax slabs, occupancy, payments, and revenue trends reports." }
     ]
   }),
   component: AdminReportsDashboard
@@ -146,8 +146,6 @@ function AdminReportsDashboard() {
   const checkedInCount = filteredData.filter(b => b.status === "Checked-in" || b.status === "Occupied").length;
   const totalReservationsCount = filteredData.length;
   const occupancyPercentage = totalReservationsCount > 0 ? Math.min(100, Math.round((checkedInCount / totalReservationsCount) * 100)) : 0;
-  const adr = Math.round(roomRevenue / Math.max(1, totalReservationsCount));
-  const revpar = Math.round(roomRevenue / Math.max(1, totalReservationsCount));
   const totalPaymentsCollected = filteredData.filter(b => b.payment === "Paid").reduce((acc, curr) => acc + curr.amount, 0);
 
   // Revenue chart data over dates
@@ -230,12 +228,10 @@ function AdminReportsDashboard() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard label="Total Revenue" value={`₹${roomRevenue.toLocaleString()}`} delta={6} hint="Gross checks volume" icon={DollarSign} accentColor="#6366f1" />
         <PremiumStatCard label="Occupancy Rate" value={`${occupancyPercentage}%`} delta={4} hint="Rooms occupied ratio" icon={Percent} accentColor="#10b981" />
         <PremiumStatCard label="Total Reservations" value={totalReservationsCount.toString()} delta={3} hint="Bookings logged" icon={KeyRound} accentColor="#3b82f6" />
-        <PremiumStatCard label="Average Daily Rate" value={`₹${adr.toLocaleString()}`} delta={2} hint="ADR room average" icon={TrendingUp} accentColor="#ec4899" />
-        <PremiumStatCard label="RevPAR" value={`₹${revpar.toLocaleString()}`} delta={5} hint="Per available room" icon={Compass} accentColor="#a855f7" />
         <PremiumStatCard label="Total Payments" value={`₹${totalPaymentsCollected.toLocaleString()}`} delta={7} hint="Cleared cash/card volume" icon={CreditCard} accentColor="#0d1b2a" />
       </div>
 

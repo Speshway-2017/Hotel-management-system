@@ -203,32 +203,9 @@ function ManagerAttendancePage() {
         <PremiumStatCard label="On Leave" value={onLeaveCount.toString()} hint="Authorized time-off logs" accentColor="#8b5cf6" />
       </div>
 
-      {/* Audit warning banner */}
-      <div className="bg-[#fdfaf2] border border-[#f5d0a9] rounded-xl p-4 flex items-start gap-3 shadow-soft">
-        <AlertTriangle className="size-5 text-warning shrink-0 mt-0.5" />
-        <div className="text-xs text-navy font-sans">
-          <strong className="block text-navy-deep font-bold">Review Mode Only</strong>
-          <p className="text-muted-foreground mt-0.5 leading-relaxed">
-            Attendance logging is automatically captured by terminal card swipes and biometric front-office terminals. Managers can monitor and view rosters, but direct modifications to historical punch timings require HR auditor credentials.
-          </p>
-        </div>
-      </div>
-
-      {/* Date Selector & Search Filters */}
+      {/* Search Filters */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft space-y-4">
         <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-          
-          {/* Date Picker */}
-          <div className="flex items-center gap-2 w-full md:w-64">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Target Date</span>
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
-              className="h-9 text-xs font-semibold bg-cream/10 border-muted w-full"
-            />
-          </div>
-
           <div className="relative w-full md:flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input

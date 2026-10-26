@@ -141,7 +141,8 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
           const isAadhaar = (found.idDocType || "Aadhaar Card") === "Aadhaar Card";
           setIdDocType(found.idDocType || "Aadhaar Card");
           if (found.idDocNumber) {
-            setIdDocNumber(isAadhaar ? formatAadhaarInput(found.idDocNumber) : found.idDocNumber);
+            const rawDoc = String(found.idDocNumber || "").trim();
+            setIdDocNumber(isAadhaar ? formatAadhaarInput(rawDoc) : rawDoc);
           }
           if (found.idDocImage) {
             setIdDocImage(found.idDocImage);
@@ -414,26 +415,30 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
   const balanceRemaining = Number(booking.balance || 0);
   const paidAmount = totalTariff - balanceRemaining;
 
+  const isAdminCheckIn = role === "admin" || (typeof window !== "undefined" && window.location?.pathname?.includes("/admin/check-in"));
+
   return (
     <div className="space-y-6 text-left font-ui animate-fade-in max-w-6xl mx-auto pb-12">
-      {/* Header & Title */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-navy/10 pb-4">
-        <div className="space-y-2">
-          <h1 className="font-display text-2xl font-black text-navy flex items-center gap-2.5">
-            <ShieldCheck className="size-6 text-emerald-600 shrink-0" />
-            Guest Verification & Check-In
-          </h1>
-          <p className="text-xs text-navy/70 mt-0.5">
-            Mandatory government ID proof capture and check-in clearance for online reservations
-          </p>
-        </div>
+      {/* Header & Title - Hidden on admin check-in page since it is displayed in the top navbar */}
+      {!isAdminCheckIn && (
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-navy/10 pb-4">
+          <div className="space-y-2">
+            <h1 className="font-display text-2xl font-black text-navy flex items-center gap-2.5">
+              <ShieldCheck className="size-6 text-emerald-600 shrink-0" />
+              Guest Verification & Check-In
+            </h1>
+            <p className="text-xs text-navy/70 mt-0.5">
+              Mandatory government ID proof capture and check-in clearance for online reservations
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <Tag tone={isVerified ? "success" : "warning"} className="px-3 py-1 text-xs font-bold uppercase tracking-wider">
-            {isVerified ? "✓ ID Verified" : "⚠ ID Verification Pending"}
-          </Tag>
+          <div className="flex items-center gap-2">
+            <Tag tone={isVerified ? "success" : "warning"} className="px-3 py-1 text-xs font-bold uppercase tracking-wider">
+              {isVerified ? "✓ ID Verified" : "⚠ ID Verification Pending"}
+            </Tag>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Guest & Reservation Metadata (5 cols) */}
@@ -535,21 +540,21 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
 
           {/* Room Allocation Selector */}
           <div className="bg-white rounded-2xl border border-navy/10 p-5 shadow-soft space-y-3">
-            <label className="text-xs font-bold text-navy block flex items-center gap-1.5">
+            <label className="text-xs font-bold text-navy flex items-center gap-1.5">
               <Building2 className="size-4 text-purple shrink-0" />
               Assign / Confirm Physical Room Number <span className="text-red-600 font-bold ml-1">*</span>
             </label>
-            <select
+            <Select
               value={assignedRoom}
               onChange={(e) => setAssignedRoom(e.target.value)}
-              className="w-full h-11 px-3 bg-[#fcfcfc] border border-muted rounded-xl text-xs font-bold text-navy focus:outline-none focus:ring-2 focus:ring-purple/30 cursor-pointer"
+              className="h-11 text-xs font-bold text-navy rounded-xl bg-[#fcfcfc] border-muted"
             >
               {availableRooms.map((rm, idx) => (
                 <option key={rm._id || `${rm.roomNumber}-${rm.category || ''}-${idx}`} value={rm.roomNumber}>
                   Room #{rm.roomNumber} ({rm.category || "Standard Room"}) — {rm.status || "Available"}
                 </option>
               ))}
-            </select>
+            </Select>
             <p className="text-[10px] text-muted-foreground">
               Physical key and operational room assignment for this active guest folio.
             </p>
@@ -600,15 +605,15 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-navy block mb-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
+                <div className="w-full">
+                  <label className="text-xs font-bold text-navy block mb-2 h-5 leading-5">
                     ID Document Type <span className="text-red-600 font-bold ml-1">*</span>
                   </label>
-                  <select
+                  <Select
                     value={idDocType}
                     onChange={handleDocTypeChange}
-                    className="w-full h-11 px-3 bg-[#fcfcfc] border border-muted rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-2 focus:ring-purple/30 cursor-pointer"
+                    className="h-11 text-xs font-semibold bg-[#fcfcfc] border-muted rounded-xl text-navy w-full"
                   >
                     <option value="Aadhaar Card">Aadhaar Card (UIDAI)</option>
                     <option value="Passport">Passport</option>
@@ -616,20 +621,13 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                     <option value="Voter ID Card">Voter ID Card (EPIC)</option>
                     <option value="PAN Card">PAN Card</option>
                     <option value="National Identity Card">National Identity Card</option>
-                  </select>
+                  </Select>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-navy block">
-                      ID Document Number <span className="text-red-600 font-bold ml-1">*</span>
-                    </label>
-                    {isAadhaarDoc && aadhaarStatus?.hasExistingAadhaar && (
-                      <span className="text-[10px] font-mono font-bold text-purple bg-purple/10 px-1.5 py-0.5 rounded">
-                        On File: {aadhaarStatus.maskedAadhaar}
-                      </span>
-                    )}
-                  </div>
+                <div className="w-full">
+                  <label className="text-xs font-bold text-navy block mb-2 h-5 leading-5">
+                    ID Document Number <span className="text-red-600 font-bold ml-1">*</span>
+                  </label>
                   <Input
                     type="text"
                     required
@@ -640,7 +638,7 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                       if (fieldErrors.idDocNumber) setFieldErrors(prev => ({ ...prev, idDocNumber: null }));
                     }}
                     maxLength={isAadhaarDoc ? 14 : 30}
-                    className={`h-11 text-xs font-semibold ${
+                    className={`h-11 text-xs font-semibold rounded-xl bg-[#fcfcfc] border-muted w-full ${
                       isAadhaarMismatch || fieldErrors.idDocNumber
                         ? "border-rose-500 focus-visible:ring-rose-400 bg-rose-50/30"
                         : isAadhaarDoc && cleanAadhaar.length === 12 && aadhaarStatus?.hasExistingAadhaar && cleanAadhaar.endsWith(aadhaarStatus.last4)
@@ -652,16 +650,16 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                     <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.idDocNumber}</p>
                   )}
                   {isAadhaarDoc && (
-                    <div className="mt-1.5">
+                    <div className="mt-1.5 min-h-[20px]">
                       {isAadhaarMismatch ? (
                         <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
                           <AlertCircle className="size-3.5 shrink-0" />
-                          Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is {aadhaarStatus.maskedAadhaar}. Verification blocked.
+                          Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is on file. Verification blocked.
                         </p>
                       ) : cleanAadhaar.length === 12 && aadhaarStatus?.hasExistingAadhaar && cleanAadhaar.endsWith(aadhaarStatus.last4) ? (
                         <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
                           <CheckCircle2 className="size-3.5 shrink-0" />
-                          Matches verified guest record on file ({aadhaarStatus.maskedAadhaar}).
+                          Matches verified guest record on file.
                         </p>
                       ) : cleanAadhaar.length === 12 && !aadhaarStatus?.hasExistingAadhaar ? (
                         <p className="text-[11px] font-bold text-purple flex items-center gap-1">

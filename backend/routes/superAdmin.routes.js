@@ -1002,6 +1002,9 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const roomNum = extractRoomNumber(booking);
 
+    // Realtime broadcast socket instance
+    const io = req.app.get('socketio');
+
     // Sync Room operational status on check-in, check-out, or cancellation
     if (roomNum) {
       let rmStatus = 'Available';
@@ -1023,8 +1026,6 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       booking
     });
 
-    // Realtime broadcast across all dashboards
-    const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, targetPropId, {
         action,

@@ -332,12 +332,12 @@ function GuestSettingsPage() {
                     value={profile.name}
                     onChange={(e) => {
                       setProfile({ ...profile, name: e.target.value });
-                      const err = validateFieldValue("name", e.target.value, { required: true });
-                      setProfileErrors(prev => ({ ...prev, name: err }));
+                      const res = validateFieldValue("name", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, name: res.isValid ? null : res.error }));
                     }}
                     onBlur={(e) => {
-                      const err = validateFieldValue("name", e.target.value, { required: true });
-                      setProfileErrors(prev => ({ ...prev, name: err }));
+                      const res = validateFieldValue("name", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, name: res.isValid ? null : res.error }));
                     }}
                     required
                     placeholder="Guest Full Name"
@@ -363,13 +363,13 @@ function GuestSettingsPage() {
                     onChange={(e) => {
                       setProfile({ ...profile, email: e.target.value });
                       if (profileErrors.email) {
-                        const err = validateFieldValue("email", e.target.value, { required: true });
-                        setProfileErrors(prev => ({ ...prev, email: err }));
+                        const res = validateFieldValue("email", e.target.value, { required: true });
+                        setProfileErrors(prev => ({ ...prev, email: res.isValid ? null : res.error }));
                       }
                     }}
                     onBlur={(e) => {
-                      const err = validateFieldValue("email", e.target.value, { required: true });
-                      setProfileErrors(prev => ({ ...prev, email: err }));
+                      const res = validateFieldValue("email", e.target.value, { required: true });
+                      setProfileErrors(prev => ({ ...prev, email: res.isValid ? null : res.error }));
                     }}
                     required
                     placeholder="guest@example.com"
@@ -394,11 +394,13 @@ function GuestSettingsPage() {
                     value={profile.mobile}
                     onChange={(e) => {
                       setProfile({ ...profile, mobile: e.target.value });
-                      const err = validateFieldValue("tel", e.target.value, { required: true });
+                      const res = validateFieldValue("tel", e.target.value, { required: true });
+                      const err = res.isValid ? null : res.error;
                       setProfileErrors(prev => ({ ...prev, mobile: err, phone: err }));
                     }}
                     onBlur={(e) => {
-                      const err = validateFieldValue("tel", e.target.value, { required: true });
+                      const res = validateFieldValue("tel", e.target.value, { required: true });
+                      const err = res.isValid ? null : res.error;
                       setProfileErrors(prev => ({ ...prev, mobile: err, phone: err }));
                     }}
                     required
@@ -422,12 +424,12 @@ function GuestSettingsPage() {
                     value={profile.city}
                     onChange={(e) => {
                       setProfile({ ...profile, city: e.target.value });
-                      const err = validateFieldValue("city", e.target.value, { required: false });
-                      setProfileErrors(prev => ({ ...prev, city: err }));
+                      const res = validateFieldValue("city", e.target.value, { required: false });
+                      setProfileErrors(prev => ({ ...prev, city: res.isValid ? null : res.error }));
                     }}
                     onBlur={(e) => {
-                      const err = validateFieldValue("city", e.target.value, { required: false });
-                      setProfileErrors(prev => ({ ...prev, city: err }));
+                      const res = validateFieldValue("city", e.target.value, { required: false });
+                      setProfileErrors(prev => ({ ...prev, city: res.isValid ? null : res.error }));
                     }}
                     placeholder="Hyderabad"
                     className={`w-full rounded-xl border bg-cream/10 pl-10 pr-3.5 py-2.5 text-xs font-semibold text-navy focus:border-purple focus:outline-none ${

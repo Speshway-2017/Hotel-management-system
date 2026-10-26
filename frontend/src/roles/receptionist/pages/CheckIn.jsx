@@ -150,6 +150,13 @@ function ArrivalsPage() {
     return matchesSearch && matchesStatus && matchesSource;
   });
 
+  // Sort arrivals in alphabetical order A-Z by guest name
+  const sortedArrivals = [...filteredArrivals].sort((a, b) => {
+    const nameA = String(a.name || a.guest || "").trim();
+    const nameB = String(b.name || b.guest || "").trim();
+    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+  });
+
   // Action methods
   const handleCheckIn = async (id, roomNum) => {
     const target = arrivals.find(a => a.id === id || a._id === id || a.bookingId === id);
@@ -316,14 +323,14 @@ function ArrivalsPage() {
                     Loading today's arrivals...
                   </td>
                 </tr>
-              ) : filteredArrivals.length === 0 ? (
+              ) : sortedArrivals.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="py-10 text-center font-bold text-muted-foreground select-none">
                     No matching arrivals found today.
                   </td>
                 </tr>
               ) : (
-                filteredArrivals.map((guest) => (
+                sortedArrivals.map((guest) => (
                   <tr key={guest.id} className="hover:bg-muted/5">
                     <td className="py-3.5 px-4 font-bold text-navy">
                       <div>

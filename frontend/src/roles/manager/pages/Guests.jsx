@@ -178,7 +178,11 @@ function ManagerGuestsPage() {
       guestMap[key].stays.push(b);
     });
 
-    return Object.values(guestMap);
+    return Object.values(guestMap).sort((a, b) => {
+      const nameA = String(a.name || "").trim();
+      const nameB = String(b.name || "").trim();
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
   })();
 
   // Active bookings filter
@@ -224,26 +228,34 @@ function ManagerGuestsPage() {
       latestStay
     };
   }).filter(g => {
-    const s = searchQuery.toLowerCase();
+    const s = (searchQuery || "").toLowerCase();
     const matchesSearch =
-      g.name.toLowerCase().includes(s) ||
-      g.phone.includes(s) ||
-      g.email.toLowerCase().includes(s) ||
-      g.latestStay.room.toLowerCase().includes(s) ||
-      (g.latestStay._id || g.latestStay.id || "").toLowerCase().includes(s);
+      !s ||
+      String(g.name || "").toLowerCase().includes(s) ||
+      String(g.phone || "").includes(s) ||
+      String(g.email || "").toLowerCase().includes(s) ||
+      String(g.latestStay?.room || "").toLowerCase().includes(s) ||
+      String(g.latestStay?._id || g.latestStay?.id || "").toLowerCase().includes(s);
 
-    const matchesStatus = statusFilter === "all" || g.latestStay.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || g.latestStay?.status === statusFilter;
 
     const matchesDate = !dateFilter ||
-      g.latestStay.checkIn.includes(dateFilter) ||
-      g.latestStay.checkOut.includes(dateFilter);
+      String(g.latestStay?.checkIn || "").includes(dateFilter) ||
+      String(g.latestStay?.checkOut || "").includes(dateFilter);
 
     return matchesSearch && matchesStatus && matchesDate;
   });
 
+  // Sort logic - aligned alphabetically A-Z
+  const sortedGuests = [...filteredGuests].sort((a, b) => {
+    const nameA = String(a.name || "").trim();
+    const nameB = String(b.name || "").trim();
+    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+  });
+
   // Pagination computations
-  const totalPages = Math.ceil(filteredGuests.length / itemsPerPage) || 1;
-  const paginatedGuests = filteredGuests.slice(
+  const totalPages = Math.ceil(sortedGuests.length / itemsPerPage) || 1;
+  const paginatedGuests = sortedGuests.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );

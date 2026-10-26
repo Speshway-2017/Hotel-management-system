@@ -993,14 +993,14 @@ router.post('/reservations', async (req, res) => {
       });
     }
 
+    // Notify Realtime (Socket.io)
+    const io = req.app.get('socketio');
+
     // Update assigned room status in MongoDB
     if (roomNum) {
       const rmStatus = (bookingStatus === 'Checked-in' || bookingStatus === 'Checked In') ? 'Occupied' : 'Reserved';
       await syncRoomStatus(roomNum, rmStatus, propertyId, io, req.body.roomVariant || req.body.type || 'AC');
     }
-
-    // Notify Realtime (Socket.io)
-    const io = req.app.get('socketio');
 
     // Trigger Unified Notifications across Web & Mobile consoles
     await notifyBookingEvent({
@@ -1219,6 +1219,9 @@ router.put('/reservations/:id/status', async (req, res) => {
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, updateData, { new: true });
 
     // Sync operational room status on check-in, check-out, cancel, or no-show
+    const io = req.app.get('socketio');
+
+    // Sync operational room status on check-in, check-out, cancel, or no-show
     if (roomNum) {
       let rmStatus = 'Available';
       if (status === 'Checked-in') rmStatus = 'Occupied';
@@ -1226,7 +1229,7 @@ router.put('/reservations/:id/status', async (req, res) => {
       else if (status === 'Checked-out') rmStatus = 'Available';
       else if (status === 'Cancelled' || status === 'No-show') rmStatus = 'Available';
 
-      await syncRoomStatus(roomNum, rmStatus, propertyId, req.app.get('socketio'), updated.roomVariant || 'AC');
+      await syncRoomStatus(roomNum, rmStatus, propertyId, io, updated.roomVariant || 'AC');
     }
 
     const action = status === 'Checked-in' ? 'checkin' : status === 'Checked-out' ? 'checkout' : status === 'Cancelled' ? 'cancelled' : 'status_change';
@@ -1238,8 +1241,6 @@ router.put('/reservations/:id/status', async (req, res) => {
       booking: updated
     });
 
-    // Notify Realtime (Socket.io) across all dashboards
-    const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, propertyId, {
         action,

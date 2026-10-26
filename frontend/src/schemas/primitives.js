@@ -5,7 +5,7 @@ import { z } from "zod";
  * - Text fields -> allow text only; show validation error for invalid numbers or dummy repeated characters.
  * - Number fields -> allow numbers only; show validation error for invalid text.
  * - Email fields -> allow valid email format only; reject repeating dummy usernames.
- * - Phone fields -> numbers only with proper length validation (10 to 15 digits); reject repeating digits.
+ * - Phone fields -> numbers only with proper length validation (10 digits only); reject repeating digits.
  * - Amount/price fields -> valid numbers/decimals only within positive/non-negative ranges.
  * - Vehicle / Driver / Organization specific validators.
  */
@@ -181,7 +181,7 @@ export const optionalEmailSchema = z
   .optional()
   .or(z.literal(""));
 
-// 3. Phone validation: Numbers only with proper length validation (10 to 15 digits), no dummy repeating digits
+// 3. Phone validation: Numbers only with proper length validation (10 digits only), no dummy repeating digits
 export const phoneSchema = z
   .string()
   .trim()
@@ -194,9 +194,9 @@ export const phoneSchema = z
   })
   .refine((val) => {
     const digitsOnly = val.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
-    return digitsOnly.length >= 10 && digitsOnly.length <= 15;
+    return digitsOnly.length === 10;
   }, {
-    message: "Phone number must be between 10 and 15 digits"
+    message: "Mobile/Phone number must be exactly 10 digits"
   })
   .refine((val) => {
     const digitsOnly = val.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
@@ -218,9 +218,9 @@ export const optionalPhoneSchema = z
   .refine((val) => {
     if (!val) return true;
     const digitsOnly = val.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
-    return digitsOnly.length >= 10 && digitsOnly.length <= 15;
+    return digitsOnly.length === 10;
   }, {
-    message: "Phone number must be between 10 and 15 digits"
+    message: "Mobile/Phone number must be exactly 10 digits"
   })
   .refine((val) => {
     if (!val) return true;
@@ -558,10 +558,10 @@ export function validateFieldValue(type, value, options = {}) {
           error: "Phone number must contain numbers only; letters are not allowed"
         };
       }
-      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+      if (digitsOnly.length !== 10) {
         return {
           isValid: false,
-          error: "Phone number must be between 10 and 15 digits"
+          error: "Mobile/Phone number must be exactly 10 digits"
         };
       }
       if (isAllSameChar(digitsOnly)) {

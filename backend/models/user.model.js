@@ -545,6 +545,12 @@ const User = {
     }
     return await MockUser.findOneAndUpdate(query, update, options);
   },
+  updateMany: async (query, update, options = {}) => {
+    if (mongoose.connection.readyState === 1) {
+      return await MongooseUser.updateMany(query, update, options);
+    }
+    return { acknowledged: true, modifiedCount: 0 };
+  },
   deleteOne: async (query) => {
     if (mongoose.connection.readyState === 1) {
       return await MongooseUser.deleteOne(query);

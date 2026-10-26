@@ -21,8 +21,8 @@ import {
 import { sendSuccess, sendError } from '../utils/response.js';
 import { findPropertySafely } from '../utils/propertyCache.js';
 import { processAutoCheckouts } from '../services/autoCheckout.service.js';
-import { clearUserCache } from '../middleware/auth.middleware.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
+import { validatePhone } from '../utils/validator.js';
 
 const router = express.Router();
 
@@ -725,7 +725,13 @@ router.put('/profile', async (req, res) => {
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
-    if (effectiveMobile !== undefined) updateData.mobile = effectiveMobile;
+    if (effectiveMobile !== undefined && effectiveMobile !== '') {
+      const pVal = validatePhone(effectiveMobile, true);
+      if (!pVal.valid) {
+        return sendError(res, 400, pVal.message);
+      }
+      updateData.mobile = pVal.value;
+    }
     if (city !== undefined) updateData.city = city;
     if (address !== undefined) updateData.address = address;
     if (state !== undefined) updateData.state = state;

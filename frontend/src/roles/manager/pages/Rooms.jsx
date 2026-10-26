@@ -7,7 +7,7 @@ import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
-import { extractRoomNumber, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
+import { extractRoomNumber, extractRoomVariant, calculateRoomKPIs, normalizeRoomList } from "@/utils/roomUtils";
 import {
   Bed,
   CheckCircle,
@@ -60,6 +60,7 @@ function ManagerRoomsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [variantFilter, setVariantFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -167,41 +168,35 @@ function ManagerRoomsPage() {
     }
   };
 
-  // Compile full Rooms array with dynamic MongoDB status and booking data
-  const roomBookingMap = new Map();
-
-  for (const b of bookings) {
-    if (b.status === "Cancelled" || b.status === "Checked-out" || b.status === "No-show") continue;
-    const bRoomNum = extractRoomNumber(b);
-    let matchedRm = null;
-
-    if (b.roomId) {
-      matchedRm = rooms.find(r => String(r._id || r.id) === String(b.roomId) || String(r.roomNumber || r.room).trim() === String(b.roomId).trim());
-    }
-    if (!matchedRm && bRoomNum) {
-      matchedRm = rooms.find(r => extractRoomNumber(r) === bRoomNum || String(r.roomNumber || r.room).trim() === bRoomNum);
-    }
-    if (!matchedRm && b.room) {
-      matchedRm = rooms.find(r => String(b.room).includes(String(r.roomNumber || r.room)));
-    }
-
-    if (matchedRm) {
-      const k1 = String(matchedRm._id || matchedRm.id || '');
-      const k2 = String(matchedRm.roomNumber || matchedRm.room || '');
-      const k3 = extractRoomNumber(matchedRm);
-      if (k1) roomBookingMap.set(k1, b);
-      if (k2) roomBookingMap.set(k2, b);
-      if (k3) roomBookingMap.set(k3, b);
-    }
-  }
-
+  // Compile full Rooms array with dynamic MongoDB status and variant-specific booking data
   const normalizedRooms = normalizeRoomList(rooms, bookings);
 
   const compiledRooms = normalizedRooms.map(r => {
-    const k1 = String(r._id || r.id || '');
-    const k2 = String(r.roomNumber || r.room || '');
-    const k3 = extractRoomNumber(r);
-    const activeBooking = roomBookingMap.get(k1) || roomBookingMap.get(k2) || roomBookingMap.get(k3);
+    const rawNum = extractRoomNumber(r) || r.roomNumber || r.room || "";
+    const num = String(rawNum).trim();
+    const amenitiesText = Array.isArray(r.amenities) ? r.amenities.join(' ') : String(r.amenities || '');
+    const isNonAc = r.type === 'Non-AC' ||
+      r.category?.toLowerCase().includes('non-ac') ||
+      r.category?.toLowerCase().includes('non ac') ||
+      amenitiesText.toLowerCase().includes('non-ac') ||
+      (amenitiesText.toLowerCase().includes('fan') && !amenitiesText.toLowerCase().includes('air condition')) ||
+      (!amenitiesText.toLowerCase().includes('air condition') && Number(r.baseRate || r.currentRate) < 2800);
+    const resolvedType = r.type || (isNonAc ? 'Non-AC' : 'AC');
+
+    // Find active booking specifically for this room document and variant
+    const activeBooking = bookings.find(b => {
+      if (b.status === "Cancelled" || b.status === "Checked-out" || b.status === "No-show") return false;
+      const rId = String(r._id || r.id || '').trim();
+      const bRoomId = String(b.roomId || '').trim();
+      if (rId && bRoomId && rId === bRoomId) return true;
+
+      const bRoomNum = extractRoomNumber(b);
+      if (bRoomNum && String(bRoomNum) === String(num)) {
+        const bVariant = extractRoomVariant(b);
+        return bVariant === resolvedType;
+      }
+      return false;
+    });
 
     let currentStatus = r.status || "Available";
     if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying")) {
@@ -212,9 +207,14 @@ function ManagerRoomsPage() {
 
     return {
       _id: r._id || r.id,
-      room: extractRoomNumber(r) || r.roomNumber || r.room,
+      room: num,
+      roomNumber: num,
+      type: resolvedType,
+      isNonAc: resolvedType === 'Non-AC',
       roomType: r.category || r.roomType || "Standard Room",
-      floor: r.floor || `Floor ${String(r.roomNumber || r.room || '1')[0]}`,
+      floor: r.floor || `Floor ${num[0] || '1'}`,
+      baseRate: Number(r.baseRate || r.currentRate || 3000),
+      currentRate: Number(r.currentRate || r.baseRate || 3000),
       activeBooking: activeBooking ? {
         id: activeBooking.bookingId || activeBooking._id || activeBooking.id,
         _id: activeBooking._id || activeBooking.id || activeBooking.bookingId,
@@ -229,9 +229,10 @@ function ManagerRoomsPage() {
 
   // Statistics Computations
   const roomKPIs = calculateRoomKPIs(compiledRooms, bookings);
-  const totalCount = roomKPIs.totalRooms;
-  const availableCount = roomKPIs.availableRooms;
-  const occupiedCount = roomKPIs.occupiedRooms;
+  const totalCount = compiledRooms.length;
+  const availableCount = compiledRooms.filter(r => r.status === "Available").length;
+  const occupiedCount = compiledRooms.filter(r => r.status === "Occupied").length;
+  const reservedCount = compiledRooms.filter(r => r.status === "Reserved").length;
   const dirtyCount = roomKPIs.dirtyRooms;
   const cleaningCount = roomKPIs.cleaningRooms;
   const oooCount = roomKPIs.outOfOrderRooms;
@@ -239,16 +240,20 @@ function ManagerRoomsPage() {
 
   // Filter Computations
   const filteredRooms = compiledRooms.filter(rm => {
+    const q = (searchQuery || "").trim().toLowerCase();
     const matchesSearch =
-      rm.room.includes(searchQuery) ||
-      rm.roomType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (rm.activeBooking?.guest || "").toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      String(rm.room || "").toLowerCase().includes(q) ||
+      String(rm.roomType || "").toLowerCase().includes(q) ||
+      String(rm.type || "").toLowerCase().includes(q) ||
+      (rm.activeBooking?.guest || "").toLowerCase().includes(q);
 
     const matchesFloor = floorFilter === "all" || rm.floor === floorFilter;
     const matchesType = typeFilter === "all" || rm.roomType === typeFilter;
     const matchesStatus = statusFilter === "all" || rm.status === statusFilter;
+    const matchesVariant = variantFilter === "all" || rm.type === variantFilter;
 
-    return matchesSearch && matchesFloor && matchesType && matchesStatus;
+    return matchesSearch && matchesFloor && matchesType && matchesStatus && matchesVariant;
   });
 
   // Pagination computations
@@ -316,7 +321,7 @@ function ManagerRoomsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3.5 border-t border-muted/50">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3.5 border-t border-muted/50">
           <div className="flex flex-col gap-1.5 text-left">
             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Floor Designation</span>
             <Select
@@ -344,6 +349,19 @@ function ManagerRoomsPage() {
               <option value="Executive Room">Executive Room</option>
               <option value="Villa Suite">Villa Suite</option>
               <option value="Presidential Suite">Presidential Suite</option>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Room Variant</span>
+            <Select
+              value={variantFilter}
+              onChange={(e) => { setVariantFilter(e.target.value); setCurrentPage(1); }}
+              className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
+            >
+              <option value="all">All Variants (AC & Non-AC)</option>
+              <option value="AC">AC Rooms</option>
+              <option value="Non-AC">Non-AC Rooms</option>
             </Select>
           </div>
 
@@ -381,6 +399,7 @@ function ManagerRoomsPage() {
                 <tr className="border-b border-muted bg-[#fcfcfc] text-[10px] font-bold uppercase tracking-widest text-muted-foreground select-none whitespace-nowrap">
                   <th className="py-4.5 px-6 text-left">Room Number</th>
                   <th className="py-4.5 px-4 text-left">Room Type</th>
+                  <th className="py-4.5 px-4 text-left">Variant</th>
                   <th className="py-4.5 px-4 text-left">Floor</th>
                   <th className="py-4.5 px-4 text-left">Current Status</th>
                   <th className="py-4.5 px-4 text-left">Guest Name</th>
@@ -393,16 +412,27 @@ function ManagerRoomsPage() {
               <tbody className="divide-y divide-muted text-sm text-[#2a2a2a] bg-white font-medium whitespace-nowrap">
                 {paginatedRooms.map((rm, idx) => {
                   const meta = statusMeta[rm.status] || statusMeta.Available;
-                  const StatusIcon = meta.icon;
+                  const StatusIcon = meta?.icon || Bed;
                   const active = rm.activeBooking;
 
                   return (
-                    <tr key={rm._id || rm.id || `${rm.room}-${rm.roomType || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
+                    <tr key={rm._id || rm.id || `${rm.room}-${rm.type || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
                       <td className="py-4 px-6 text-left font-bold text-navy-deep text-sm">
                         Room {rm.room}
                       </td>
                       <td className="py-4 px-4 text-left font-bold text-brand">
                         {rm.roomType}
+                      </td>
+                      <td className="py-4 px-4 text-left">
+                        <span
+                          className={`inline-flex items-center gap-1 font-bold text-xs px-2 py-0.5 rounded-md border select-none ${
+                            rm.type === "Non-AC"
+                              ? "bg-slate-50 text-slate-700 border-slate-200"
+                              : "bg-purple/5 text-purple border-purple/20"
+                          }`}
+                        >
+                          {rm.type === "Non-AC" ? "Non-AC" : "AC"}
+                        </span>
                       </td>
                       <td className="py-4 px-4 text-left text-muted-foreground">
                         {rm.floor}
@@ -495,5 +525,15 @@ function ManagerRoomsPage() {
 }
 
 export const Route = createFileRoute("/manager/rooms")({
-  component: ManagerRoomsPage
+  component: ManagerRoomsPage,
+  errorComponent: ({ error, reset }) => (
+    <div className="p-6 space-y-4">
+      <Notice tone="error" title="Rooms Console Error">
+        {error?.message || "An unexpected error occurred while rendering the rooms page."}
+      </Notice>
+      <Button variant="outline" size="sm" onClick={() => reset()}>
+        Retry
+      </Button>
+    </div>
+  )
 });

@@ -34,8 +34,6 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
-  Calendar,
-  List,
   Briefcase,
   Layers,
   ChevronLeft,
@@ -353,7 +351,23 @@ function ReservationsPage() {
       (res.checkOut && res.checkOut.toLowerCase().includes(dateFilter.toLowerCase()));
 
     const matchesStatus = statusFilter === "all" || res.status === statusFilter;
-    const matchesSource = sourceFilter === "all" || res.source === sourceFilter;
+
+    let matchesSource = true;
+    if (sourceFilter !== "all") {
+      const src = (res.source || "").toLowerCase().trim();
+      const filter = sourceFilter.toLowerCase().trim();
+      if (filter === "ota") {
+        matchesSource = src.includes("ota") || src.includes("makemytrip") || src.includes("booking.com") || src.includes("agoda") || src.includes("goibibo") || src.includes("expedia");
+      } else if (filter === "website") {
+        matchesSource = src.includes("web") || src.includes("website") || src.includes("online") || src.includes("app");
+      } else if (filter === "walkin" || filter === "walk-in") {
+        matchesSource = src.includes("walk");
+      } else if (filter === "direct") {
+        matchesSource = src.includes("direct") && !src.includes("walk");
+      } else {
+        matchesSource = src.includes(filter);
+      }
+    }
 
     let matchesPayment = true;
     if (paymentFilter !== "all") {
@@ -540,26 +554,8 @@ function ReservationsPage() {
             />
           </div>
 
-          {/* View Mode Toggle and New Booking button placed on the right of top row */}
-          <div className="flex items-center gap-3 select-none shrink-0 w-full lg:w-auto justify-between lg:justify-end">
-            <div className="flex rounded-lg border border-muted bg-[#fcfcfc] p-1 gap-1">
-              <Button
-                size="sm"
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                className="h-8 text-xs font-bold px-3"
-                onClick={() => setViewMode("list")}
-              >
-                <List className="size-3.5 mr-1" /> List
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === "calendar" ? "secondary" : "ghost"}
-                className="h-8 text-xs font-bold px-3"
-                onClick={() => setViewMode("calendar")}
-              >
-                <Calendar className="size-3.5 mr-1" /> Calendar
-              </Button>
-            </div>
+          {/* Action button placed on the right of top row */}
+          <div className="flex items-center gap-3 select-none shrink-0 w-full lg:w-auto justify-end">
             <Button
               onClick={() => navigate({ to: "/admin/reservations/add" })}
               className="bg-navy hover:bg-navy/90 text-white shadow-soft text-xs h-8.5 px-4 font-bold rounded-full shrink-0"
@@ -607,13 +603,11 @@ function ReservationsPage() {
               onChange={(e) => { setSourceFilter(e.target.value); setCurrentPage(1); }}
               className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
             >
-              <option value="all">All Channels</option>
+              <option value="all">All</option>
               <option value="Direct">Direct</option>
-              <option value="MakeMyTrip">OTA (MMT)</option>
-              <option value="Booking.com">OTA (Booking.com)</option>
-              <option value="Agoda">OTA (Agoda)</option>
-              <option value="Corporate">Corporate / GDS</option>
+              <option value="Website">Website</option>
               <option value="Walk-in">Walk-in</option>
+              <option value="OTA">OTA</option>
             </Select>
           </div>
         </div>

@@ -106,7 +106,7 @@ class InputValidators {
     return null;
   }
 
-  /// Phone validator - numbers only, 10 to 15 digits
+  /// Phone validator - numbers only, exactly 10 digits
   static String? validatePhone(
     String? value, {
     bool required = true,
@@ -119,8 +119,13 @@ class InputValidators {
       return 'Phone number must contain numbers only; letters are not allowed';
     }
     final digitsOnly = trimmed.replaceAll(RegExp(r'\D'), '');
-    if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-      return 'Phone number must be between 10 and 15 digits';
+    final cleanDigits = digitsOnly.startsWith('91') && digitsOnly.length == 12
+        ? digitsOnly.substring(2)
+        : (digitsOnly.startsWith('0') && digitsOnly.length == 11
+            ? digitsOnly.substring(1)
+            : digitsOnly);
+    if (cleanDigits.length != 10) {
+      return 'Mobile/Phone number must be exactly 10 digits';
     }
     return null;
   }

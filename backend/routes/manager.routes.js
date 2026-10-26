@@ -457,13 +457,14 @@ router.post('/reservations', async (req, res) => {
       });
     }
 
+    const io = req.app.get('socketio');
+
     // If room is assigned, update room status
     if (roomNum) {
       const rmStatus = payload.status === 'Checked-in' ? 'Occupied' : 'Reserved';
       await syncRoomStatus(roomNum, rmStatus, propId, io, payload.roomVariant || 'AC');
     }
 
-    const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, propId, 'booking_created', { booking: newBooking, propertyId: propId });
       emitRealtimeSync(io, propId, 'booking_updated', { type: 'CREATED', booking: newBooking, propertyId: propId });
@@ -734,8 +735,9 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
 
     const cleanRoomNum = extractRoomNumber(roomNumber);
     const rmStatus = updated.status === 'Checked-in' ? 'Occupied' : 'Reserved';
+    const io = req.app.get('socketio');
     if (cleanRoomNum) {
-      await syncRoomStatus(cleanRoomNum, rmStatus, propId, req.app.get('socketio'), updated.roomVariant || 'AC');
+      await syncRoomStatus(cleanRoomNum, rmStatus, propId, io, updated.roomVariant || 'AC');
     }
 
     // Notify guest and dashboards of room assignment
@@ -745,7 +747,6 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
       booking: updated
     });
 
-    const io = req.app.get('socketio');
     if (io) {
       broadcastCheckinCheckout(io, propId, {
         action: 'room_assigned',
