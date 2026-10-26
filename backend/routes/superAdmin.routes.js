@@ -1001,6 +1001,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const roomNum = extractRoomNumber(booking);
+    const io = req.app.get('socketio');
 
     // Realtime broadcast socket instance
     const io = req.app.get('socketio');
@@ -1022,6 +1023,7 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
     // Broadcast notifications to all stakeholders including Guest
     await notifyBookingEvent({
       req,
+      io,
       action,
       booking
     });

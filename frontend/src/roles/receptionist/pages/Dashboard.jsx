@@ -97,6 +97,13 @@ function FrontDeskDashboard() {
       const allBookings = resRes?.success && Array.isArray(resRes.data) ? resRes.data : [];
       const allRooms = roomsRes?.success && Array.isArray(roomsRes.data) ? roomsRes.data : [];
       const feedbacks = fbRes?.success && Array.isArray(fbRes.data) ? fbRes.data : [];
+      const rawPayments = (payRes && payRes.data && Array.isArray(payRes.data))
+        ? payRes.data
+        : (Array.isArray(payRes) ? payRes : (receptionCache.get('payments') || []));
+
+      if (Array.isArray(rawPayments) && rawPayments.length > 0) {
+        receptionCache.set('payments', rawPayments);
+      }
 
       if (feedbacks.length > 0) {
         const avg = (feedbacks.reduce((sum, f) => sum + (Number(f.rating) || 5), 0) / feedbacks.length).toFixed(1);
@@ -246,14 +253,16 @@ function FrontDeskDashboard() {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 15000); // 15 seconds poll fallback
 
-    const handleFocus = () => fetchDashboardData();
+    const handleFocus = () => fetchDashboardData();
+
 
     const unsubscribe = subscribeRealtimeSync(() => {
       fetchDashboardData();
     });
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval);
+
       if (unsubscribe) unsubscribe();
     };
   }, []);
@@ -402,7 +411,7 @@ function FrontDeskDashboard() {
       <div className="grid gap-4 grid-cols-2 md:grid-cols-5 dashboard-stats-grid">
         <PremiumStatCard label="Arrivals" value={arrivals.length} hint={`${arrivals.filter(a => a.status === 'Pre-checked' || a.status === 'Confirmed').length} Expected, ${arrivals.filter(a => a.status === 'Checked-In' || a.status === 'Checked-in').length} Checked In`} icon={LogIn} accentColor="#6366f1" />
         <PremiumStatCard label="Departures" value={departures.length} hint={`${departures.filter(d => d.balance === 0).length} Paid, ${departures.filter(d => d.balance > 0).length} Pending Balance`} icon={LogOut} accentColor="#ec4899" />
-        <PremiumStatCard label="In-Stay" value={stats.inStay || 0} hint={`${stats.occupied || 0} Room occupied`} icon={Users} accentColor="#10b981" />
+        <PremiumStatCard label="Occupied Rooms" value={(stats.occupied || stats.inStay || 0).toString()} hint={`${stats.occupied || stats.inStay || 0} Rooms occupied`} icon={Users} accentColor="#10b981" />
         <PremiumStatCard label="Available Rooms" value={stats.available || 0} hint="Ready to sell" icon={Home} accentColor="#0ea5e9" />
         <PremiumStatCard label="Today's Revenue" value={`₹${Number(stats.todayRevenue || 0).toLocaleString('en-IN')}`} hint="Today's billing & collections" icon={IndianRupee} accentColor="#F5C06A" />
       </div>

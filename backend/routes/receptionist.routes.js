@@ -176,9 +176,19 @@ router.get('/dashboard', async (req, res) => {
     // 2. Fetch arrivals and departures from bookings
     const bookings = await Booking.find(propFilter).sort({ createdAt: -1 });
 
-    const totalRevenue = bookings
+    await ensureRealPayments(propertyId);
+    let payments = await Payment.find({
+      $or: [{ propertyId }, { propertyId: 'HS-9HQ8P' }, { propertyId: { $exists: false } }]
+    }).sort({ createdAt: -1 });
+    if (!payments || payments.length === 0) {
+      payments = await Payment.find({}).sort({ createdAt: -1 });
+    }
+    const settledPayments = payments.filter(p => p.status === 'Settled' || p.status === 'Paid' || p.status === 'Success');
+    const paymentsRevenue = settledPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const bookingsRevenue = bookings
       .filter(b => b.status !== 'Cancelled')
       .reduce((sum, b) => sum + (Number(b.amount) || Number(b.totalAmount) || 0), 0);
+    const totalRevenue = paymentsRevenue > 0 ? paymentsRevenue : bookingsRevenue;
 
     // Arrivals: Incoming stays for today / arriving today (excluding Cancelled and previous Checked-out)
     const arrivals = bookings.filter(b => isToday(b.checkIn) && b.status !== 'Cancelled' && b.status !== 'Checked-out' && b.status !== 'Checked Out');
@@ -619,16 +629,18 @@ router.get('/rooms', async (req, res) => {
       } else {
         const todayUtc = parseDateToDayUtc(new Date());
         for (const b of roomBookings) {
+          const bStatus = String(b.status || '').toLowerCase();
+          const isCheckInStatus = bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('occup');
+          if (isCheckInStatus) {
+            activeCheckIn = b;
+            break;
+          }
           const bIn = parseDateToDayUtc(b.checkIn);
           const bOut = parseDateToDayUtc(b.checkOut);
           if (bIn !== null && bOut !== null && todayUtc >= bIn && todayUtc < bOut) {
-            const bStatus = String(b.status || '').toLowerCase();
-            if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house')) {
-              activeCheckIn = b;
-              break;
-            } else {
-              if (!reservedBooking) reservedBooking = b;
-            }
+            if (!reservedBooking) reservedBooking = b;
+          } else if (!reservedBooking) {
+            reservedBooking = b;
           }
         }
       }
@@ -643,6 +655,8 @@ router.get('/rooms', async (req, res) => {
         displayStatus = 'Occupied';
       } else if (isReservedForDates) {
         displayStatus = 'Reserved';
+      } else if (r.status === 'Occupied' && activeCheckIn) {
+        displayStatus = 'Occupied';
       } else {
         displayStatus = 'Available';
       }
@@ -701,13 +715,19 @@ router.put('/rooms/:roomNumber/status', async (req, res) => {
       else if (housekeeping === 'Inspected') updateData.status = 'Available';
     }
 
+    const variant = req.body.roomVariant || req.body.type;
+    const query = { roomNumber: req.params.roomNumber, propertyId };
+    if (variant) {
+      query.type = variant;
+    }
+
     await Room.updateMany(
-      { roomNumber: req.params.roomNumber, propertyId },
+      query,
       updateData
     );
 
     const updated = await Room.findOne(
-      { roomNumber: req.params.roomNumber, propertyId }
+      query
     );
 
     if (!updated) {
@@ -796,6 +816,7 @@ router.get('/reservations', async (req, res) => {
         room: rmNum ? `Room ${rmNum}` : (b.room || 'TBD'),
         roomNumber: rmNum,
         roomType: rmType,
+        roomVariant: b.roomVariant || extractRoomVariant(b) || 'AC',
         checkIn: b.checkIn,
         checkOut: b.checkOut,
         dates: b.dates || (b.checkIn && b.checkOut ? `${b.checkIn} → ${b.checkOut}` : ''),
@@ -1218,6 +1239,9 @@ router.put('/reservations/:id/status', async (req, res) => {
 
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, updateData, { new: true });
 
+    // Realtime Socket.io instance
+    const io = req.app.get('socketio');
+
     // Sync operational room status on check-in, check-out, cancel, or no-show
     const io = req.app.get('socketio');
 
@@ -1237,10 +1261,12 @@ router.put('/reservations/:id/status', async (req, res) => {
     // Broadcast notifications to all stakeholders including Guest
     await notifyBookingEvent({
       req,
+      io,
       action,
       booking: updated
     });
 
+    // Notify Realtime (Socket.io) across all dashboards
     if (io) {
       broadcastCheckinCheckout(io, propertyId, {
         action,
@@ -1464,7 +1490,7 @@ router.post('/folios/:id/payments', async (req, res) => {
 // ==========================================
 // 6. PAYMENTS LEDGER
 // ==========================================
-const ensureRealPayments = async (propId) => {
+async function ensureRealPayments(propId) {
   try {
     const bookings = await Booking.find({});
     for (const b of bookings) {

@@ -22,12 +22,13 @@
     "idDocNumber": "6353 7576 4646",
     "loyaltyPoints": 0,
     "notes": "",
-    "fcmToken": null,
+    "fcmToken": "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM",
     "fcmTokens": [
-      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU"
+      "eG1Rd14IRyef0H0q9ZXffY:APA91bEwQxipuwwp26Z2DD2DM6v1gRTHNdbvn4uKe25BtUsVoutA5zHsXIjSKSdVZ3cD5Wmd6WEvtDzlFrhVlY7ne8oOsofonZ7ZdpocWNy83AqB4XjPMMU",
+      "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM"
     ],
     "createdAt": "2026-09-04T04:49:58.712Z",
-    "updatedAt": "2026-10-13T09:24:13.880Z"
+    "updatedAt": "2026-10-14T09:06:08.271Z"
   },
   {
     "id": "usr-adm-dileep",
@@ -253,7 +254,7 @@
     "fcmToken": null,
     "fcmTokens": [],
     "createdAt": "2026-09-03T08:52:55.268Z",
-    "updatedAt": "2026-10-13T07:01:07.150Z"
+    "updatedAt": "2026-10-14T11:47:09.809Z"
   },
   {
     "id": "6497xu7o6g3",
@@ -478,5 +479,6 @@
     "fcmTokens": [],
     "createdAt": "2026-08-24T11:47:56.630Z",
     "updatedAt": "2026-10-26T11:59:58.473Z"
+    "updatedAt": "2026-10-14T11:38:28.231Z"
   }
 ]

@@ -56,12 +56,12 @@ function ManagerRoomsPage() {
   const [error, setError] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(true);
 
-  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [floorFilter, setFloorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [variantFilter, setVariantFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [variantFilter, setVariantFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -156,11 +156,11 @@ function ManagerRoomsPage() {
   }, []);
 
   // Set manual operational status override via backend API
-  const handleOverrideStatus = async (roomNumber, newStatus) => {
+  const handleOverrideStatus = async (roomNumber, newStatus, roomVariant = null) => {
     try {
-      const res = await managerService.updateRoomStatus(roomNumber, newStatus);
+      const res = await managerService.updateRoomStatus(roomNumber, newStatus, roomVariant);
       if (res.success) {
-        toast.success(`Room ${roomNumber} operational status changed to ${newStatus}`);
+        toast.success(`Room ${roomNumber}${roomVariant ? ` (${roomVariant})` : ''} operational status changed to ${newStatus}`);
         loadData();
       }
     } catch (err) {
@@ -170,6 +170,10 @@ function ManagerRoomsPage() {
 
   // Compile full Rooms array with dynamic MongoDB status and variant-specific booking data
   const normalizedRooms = normalizeRoomList(rooms, bookings);
+
+  const activeBookings = (bookings || []).filter(b => 
+    b.status !== "Cancelled" && b.status !== "Checked-out" && b.status !== "No-show"
+  );
 
   const compiledRooms = normalizedRooms.map(r => {
     const rawNum = extractRoomNumber(r) || r.roomNumber || r.room || "";
@@ -199,10 +203,14 @@ function ManagerRoomsPage() {
     });
 
     let currentStatus = r.status || "Available";
-    if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying")) {
+    if (['Blocked', 'Maintenance', 'Out of Order', 'Dirty', 'Cleaning'].includes(r.status)) {
+      currentStatus = r.status;
+    } else if (activeBooking && (activeBooking.status === "Checked-in" || activeBooking.status === "Checked In" || activeBooking.status === "Staying" || activeBooking.status === "Occupied")) {
       currentStatus = "Occupied";
-    } else if (activeBooking && (activeBooking.status === "Confirmed" || activeBooking.status === "Paid" || activeBooking.status === "Pending" || activeBooking.status === "Pre-checked")) {
+    } else if (activeBooking && (activeBooking.status === "Confirmed" || activeBooking.status === "Paid" || activeBooking.status === "Pending" || activeBooking.status === "Pre-checked" || activeBooking.status === "Reserved")) {
       currentStatus = "Reserved";
+    } else {
+      currentStatus = "Available";
     }
 
     return {
@@ -418,7 +426,16 @@ function ManagerRoomsPage() {
                   return (
                     <tr key={rm._id || rm.id || `${rm.room}-${rm.type || ''}-${idx}`} className="hover:bg-[#fcfcfc]/60 transition-colors group">
                       <td className="py-4 px-6 text-left font-bold text-navy-deep text-sm">
-                        Room {rm.room}
+                        <div className="flex items-center gap-1.5">
+                          <span>Room {rm.room}</span>
+                          <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${
+                            rm.variant === 'Non-AC'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-sky-50 text-sky-700 border border-sky-200'
+                          }`}>
+                            {rm.variant}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 px-4 text-left font-bold text-brand">
                         {rm.roomType}

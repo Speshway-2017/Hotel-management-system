@@ -24,6 +24,7 @@ import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { formatDisplayDate } from "@/utils/dateUtils";
 import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 
 function ReceptionReservationDetailsPage() {
@@ -169,7 +170,7 @@ function ReceptionReservationDetailsPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Stay Dates</p>
-                  <p className="font-semibold text-sm text-navy">{booking.checkIn} - {booking.checkOut} ({booking.nights || 1} {Number(booking.nights) === 1 ? 'Night' : 'Nights'})</p>
+                  <p className="font-semibold text-sm text-navy">{formatDisplayDate(booking.checkIn)} → {formatDisplayDate(booking.checkOut)} ({booking.nights || 1} {Number(booking.nights) === 1 ? 'Night' : 'Nights'})</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">Booking Source Channel</p>

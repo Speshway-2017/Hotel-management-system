@@ -34,8 +34,8 @@ export const managerService = {
   getRooms: async () => {
     return await apiClient.get('/manager/rooms');
   },
-  updateRoomStatus: async (roomNumber, status) => {
-    return await apiClient.put(`/manager/rooms/${roomNumber}/status`, { status });
+  updateRoomStatus: async (roomNumber, status, roomVariant) => {
+    return await apiClient.put(`/manager/rooms/${roomNumber}/status`, { status, roomVariant });
   },
   getGuests: async () => {
     return await apiClient.get('/manager/guests');

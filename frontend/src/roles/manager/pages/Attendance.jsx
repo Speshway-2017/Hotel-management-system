@@ -15,8 +15,7 @@ import {
   Clock,
   UserCheck,
   UserX,
-  FileSpreadsheet,
-  AlertTriangle
+  FileSpreadsheet
 } from "lucide-react";
 
 // Premium stat card component
@@ -133,13 +132,15 @@ function ManagerAttendancePage() {
   useEffect(() => {
     loadRoster(false);
 
-    const handleFocus = () => loadRoster(true);
+    const handleFocus = () => loadRoster(true);
+
 
     const unsubscribe = subscribeRealtimeSync(() => {
       loadRoster(true);
     });
 
-    return () => {
+    return () => {
+
       if (unsubscribe) unsubscribe();
     };
   }, [selectedDate]);

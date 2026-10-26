@@ -322,13 +322,13 @@ function ManagerDashboard() {
           <PremiumStatCard label="Departures" value={departuresToday.length.toString()} hint="Today's check-outs" icon={Calendar} accentColor="#5B21B6" />
         </div>
         <div>
-          <PremiumStatCard label="In-House" value={currentStays.length.toString()} hint="Checked-in guests" icon={Users} accentColor="#2E7D32" />
+          <PremiumStatCard label="Occupied Rooms" value={occupiedCount.toString()} hint="In-stay guests" icon={Users} accentColor="#2E7D32" />
         </div>
         <div>
           <PremiumStatCard label="Today's Revenue" value={`₹${todayRevenue.toLocaleString("en-IN")}`} hint="Today's confirmed stays revenue" icon={DollarSign} accentColor="#F5C06A" />
         </div>
         <div>
-          <PremiumStatCard label="Occupancy Rate" value={`${occupancyPercent}%`} hint={`Stays: ${currentStays.length}/${totalRooms} rms`} icon={Percent} accentColor="#FF6B8B" />
+          <PremiumStatCard label="Occupancy Rate" value={`${occupancyPercent}%`} hint={`Stays: ${occupiedCount}/${totalRooms} rms`} icon={Percent} accentColor="#FF6B8B" />
         </div>
       </div>
 

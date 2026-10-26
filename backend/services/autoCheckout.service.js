@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Booking from '../models/booking.model.js';
 import Property from '../models/property.model.js';
-import { syncRoomStatus, extractRoomNumber } from '../utils/roomHelper.js';
+import { syncRoomStatus, extractRoomNumber, extractRoomVariant, reconcileRoomStatuses } from '../utils/roomHelper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { notifyBookingEvent } from '../utils/notification.helper.js';
 import { isCheckOutDue, formatISTDateTime } from '../utils/dateUtils.js';
@@ -83,7 +83,8 @@ export const processAutoCheckouts = async (ioInstance = null) => {
         // 1. Release room status back to Available
         if (roomNum) {
           try {
-            await syncRoomStatus(roomNum, 'Available', propId, io);
+            const rVariant = bookingData.roomVariant || extractRoomVariant(bookingData);
+            await syncRoomStatus(roomNum, 'Available', propId, io, rVariant);
           } catch (rmErr) {
             console.warn(`⚠️ Failed to sync room #${roomNum} on auto-checkout:`, rmErr.message);
           }
@@ -161,6 +162,14 @@ export const processAutoCheckouts = async (ioInstance = null) => {
           room: roomNum,
           checkOut: bookingData.checkOut
         });
+      }
+    }
+
+    if (checkedOutList.length > 0) {
+      try {
+        await reconcileRoomStatuses();
+      } catch (recErr) {
+        console.warn('⚠️ Room status reconciliation error:', recErr.message);
       }
     }
 

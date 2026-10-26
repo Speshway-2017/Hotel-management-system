@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { ExtendStayModal, ExtendStayButton } from "@/components/common/ExtendStayModal";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { formatDisplayDate } from "@/utils/dateUtils";
 import { useServerTime, getCheckInStatusInfo } from "@/utils/serverTime";
 
 function ViewReservation() {
@@ -304,11 +305,11 @@ function ViewReservation() {
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-muted/40">
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Check-In Date</span>
-                    <p className="font-bold text-navy mt-0.5">{booking.checkIn}</p>
+                    <p className="font-bold text-navy mt-0.5">{formatDisplayDate(booking.checkIn)}</p>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Check-Out Date</span>
-                    <p className="font-bold text-navy mt-0.5">{booking.checkOut}</p>
+                    <p className="font-bold text-navy mt-0.5">{formatDisplayDate(booking.checkOut)}</p>
                   </div>
                 </div>
                 <div>

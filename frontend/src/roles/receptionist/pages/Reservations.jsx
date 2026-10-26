@@ -332,9 +332,16 @@ function ReservationsPage() {
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="font-mono text-xs font-bold text-navy block">
-                          {extractRoomNumber(res) ? `Room ${extractRoomNumber(res)}` : (res.roomNumber ? `Room ${res.roomNumber}` : (res.room && res.room !== "Unassigned" ? res.room : "Unassigned"))}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-navy">
+                            {extractRoomNumber(res) ? `Room ${extractRoomNumber(res)}` : (res.roomNumber ? `Room ${res.roomNumber}` : (res.room && res.room !== "Unassigned" ? res.room : "Unassigned"))}
+                          </span>
+                          {res.roomVariant && (
+                            <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded ${res.roomVariant === 'Non-AC' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-sky-50 text-sky-700 border border-sky-200'}`}>
+                              {res.roomVariant}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-muted-foreground font-medium block">
                           {res.roomType || (res.room && res.room.includes('·') ? res.room.split('·')[1]?.trim() : "Standard Room")}
                         </span>
