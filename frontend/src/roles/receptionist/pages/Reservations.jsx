@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
+import { Panel, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -29,6 +29,30 @@ export const Route = createFileRoute("/reception/reservations")({
   component: ReservationsPage
 });
 
+function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          <h3 className="mt-2.5 font-sans tracking-tight tabular-nums text-base font-bold text-slate-800 leading-none">{value}</h3>
+        </div>
+        {Icon && (
+          <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
+            <Icon className="size-3.5" />
+          </span>
+        )}
+      </div>
+      <div className="mt-auto pt-2 text-[9.5px] text-muted-foreground truncate">
+        {hint}
+      </div>
+    </div>
+  );
+}
+
 function ReservationsPage() {
   const navigate = useNavigate();
   useServerTime(2000);
@@ -40,6 +64,25 @@ function ReservationsPage() {
   const [loading, setLoading] = useState(() => !cachedReservations);
   const [reservations, setReservations] = useState(() => cachedReservations || []);
   const [extendingBooking, setExtendingBooking] = useState(null);
+
+  // KPI calculations
+  const totalCount = reservations.length;
+  const checkInCount = reservations.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "checked in" || s === "checked-in" || s === "checkedin";
+  }).length;
+  const checkOutCount = reservations.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "checked out" || s === "checked-out" || s === "checkedout";
+  }).length;
+  const pendingCount = reservations.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "pending";
+  }).length;
+  const cancelledCount = reservations.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "cancelled" || s === "canceled";
+  }).length;
 
   const loadReservations = (isSilent = false) => {
     if (!isSilent && reservations.length === 0) setLoading(true);
@@ -201,95 +244,91 @@ function ReservationsPage() {
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
       
-      {/* Page header with New Reservation button */}
-      <PageHeader
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <Button asChild className="bg-navy hover:bg-navy-deep text-white h-9 px-5 text-xs rounded-full font-bold cursor-pointer">
-              <Link to="/reception/new-booking">New Reservation</Link>
-            </Button>
-          </div>
-        }
-      />
+      {/* KPI Cards Grid: Total, Check-in, Check-out, Pending, Cancelled */}
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        <PremiumStatCard label="Total" value={totalCount} hint="All reservations" icon={CalendarCheck} accentColor="#6366f1" />
+        <PremiumStatCard label="Check-in" value={checkInCount} hint="Currently in-house" icon={LogIn} accentColor="#10b981" />
+        <PremiumStatCard label="Check-out" value={checkOutCount} hint="Completed stays" icon={LogOut} accentColor="#0ea5e9" />
+        <PremiumStatCard label="Pending" value={pendingCount} hint="Awaiting check-in" icon={Clock} accentColor="#f59e0b" />
+        <PremiumStatCard label="Cancelled" value={cancelledCount} hint="Cancelled bookings" icon={XCircle} accentColor="#ef4444" />
+      </div>
 
-      {/* Controls: Search and Filters */}
-      <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft space-y-4">
-        
-        {/* Row 1: Search */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
+      {/* Controls: Search, Filters, and New Reservation Button */}
+      <div className="bg-white border border-muted rounded-2xl p-3 shadow-soft">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
+          
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search guest name, room #, phone, booking ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+              className="w-full h-10 pl-10 pr-4 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
             />
           </div>
-        </div>
 
-        {/* Row 2: Select Filters */}
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-muted/50">
-          
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Booking Status</span>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Statuses</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="Pending">Pending</option>
-              <option value="Checked In">Checked In</option>
-              <option value="Checked Out">Checked Out</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="No Show">No Show</option>
-            </select>
-          </div>
+          {/* Booking Status Filter */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Pending">Pending</option>
+            <option value="Checked In">Checked In</option>
+            <option value="Checked Out">Checked Out</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="No Show">No Show</option>
+          </select>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Room Type</span>
-            <select
-              value={filterRoomType}
-              onChange={(e) => setFilterRoomType(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Types</option>
-              <option value="Standard Room">Standard Room</option>
-              <option value="Deluxe Room">Deluxe Room</option>
-              <option value="Deluxe King">Deluxe King</option>
-              <option value="Executive Room">Executive Room</option>
-              <option value="Villa Suite">Villa Suite</option>
-              <option value="Premium Deluxe">Premium Deluxe</option>
-              <option value="Enterprise Suite">Enterprise Suite</option>
-              <option value="Classic Double">Classic Double</option>
-            </select>
-          </div>
+          {/* Room Type Filter */}
+          <select
+            value={filterRoomType}
+            onChange={(e) => setFilterRoomType(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Types</option>
+            <option value="Standard Room">Standard Room</option>
+            <option value="Deluxe Room">Deluxe Room</option>
+            <option value="Deluxe King">Deluxe King</option>
+            <option value="Executive Room">Executive Room</option>
+            <option value="Villa Suite">Villa Suite</option>
+            <option value="Premium Deluxe">Premium Deluxe</option>
+            <option value="Enterprise Suite">Enterprise Suite</option>
+            <option value="Classic Double">Classic Double</option>
+          </select>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Booking Channel</span>
-            <select
-              value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Sources</option>
-              <option value="Direct Web">Direct Web</option>
-              <option value="Booking.com">Booking.com</option>
-              <option value="MakeMyTrip">MakeMyTrip</option>
-              <option value="Expedia">Expedia</option>
-              <option value="Agoda">Agoda</option>
-              <option value="Goibibo">Goibibo</option>
-            </select>
-          </div>
+          {/* Booking Channel Filter */}
+          <select
+            value={filterSource}
+            onChange={(e) => setFilterSource(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Sources</option>
+            <option value="Direct Web">Direct Web</option>
+            <option value="Booking.com">Booking.com</option>
+            <option value="MakeMyTrip">MakeMyTrip</option>
+            <option value="Expedia">Expedia</option>
+            <option value="Agoda">Agoda</option>
+            <option value="Goibibo">Goibibo</option>
+          </select>
+
+          {/* New Reservation Button */}
+          <Button asChild className="h-10 px-4 bg-navy hover:bg-navy-deep text-white text-xs rounded-xl font-bold cursor-pointer shrink-0 shadow-sm flex items-center justify-center gap-1.5 transition-colors">
+            <Link to="/reception/new-booking">
+              <Plus className="size-4" />
+              <span>New Reservation</span>
+            </Link>
+          </Button>
 
         </div>
       </div>
 
       {/* Table Ledger Panel */}
-      <Panel title="Reservations Registry ledger" description="Comprehensive guest reservations ledger and booking histories database.">
+      <Panel>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[1100px]">
             <thead>

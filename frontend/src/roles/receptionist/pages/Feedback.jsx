@@ -281,16 +281,6 @@ export function ReceptionistFeedbackPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-ui">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-navy/5 pb-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-navy">Front Desk Guest Feedback</h1>
-          <p className="text-xs text-navy/60 mt-0.5">
-            Collect checkout guest ratings, acknowledge comments, and track front desk guest satisfaction.
-          </p>
-        </div>
-      </div>
-
       {/* Summary Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard label="Total Reviews" value={totalCount.toString()} hint="Front desk & guest records" accentColor="#0d1b2a" icon={MessageSquare} />
@@ -299,64 +289,57 @@ export function ReceptionistFeedbackPage() {
         <PremiumStatCard label="Pending Action" value={pendingCount.toString()} hint="Needs acknowledgment" accentColor="#f59e0b" icon={Clock} />
       </div>
 
-      {/* Filters Toolbar */}
-      <div className="bg-white border border-navy/10 rounded-2xl p-5 shadow-soft space-y-4">
-        
-        {/* Status Tab Chips */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy/5 pb-3">
-          <div className="flex rounded-xl border border-navy/10 bg-cream/30 p-1 gap-1 flex-wrap">
-            {[
-              { id: "all", label: "All Reviews" },
-              { id: "Pending", label: "Pending" },
-              { id: "Published", label: "Published" },
-              { id: "Resolved", label: "Resolved" }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => { setStatusFilter(tab.id); setCurrentPage(1); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
-                  statusFilter === tab.id
-                    ? "bg-navy text-cream shadow-sm"
-                    : "text-navy/70 hover:text-navy hover:bg-cream/50"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <span className="text-xs font-bold text-navy/60">
-            Showing <strong className="text-purple">{filteredFeedback.length}</strong> records
-          </span>
-        </div>
-
-        {/* Search & Rating Selector */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="relative sm:col-span-8">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-navy/40" />
+      {/* Controls: Inline Search, Status Dropdown, and Star Rating Filter */}
+      <div className="bg-white border border-muted rounded-2xl p-3 shadow-soft">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               placeholder="Search guest name, room, booking ref, or remarks..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-3 h-10 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple placeholder:text-navy/40"
+              className="w-full h-10 pl-10 pr-4 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
             />
           </div>
 
-          <div className="sm:col-span-4">
-            <select
-              value={ratingFilter}
-              onChange={(e) => { setRatingFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full h-10 px-3 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer"
-            >
-              <option value="all">All Star Ratings</option>
-              <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
-              <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
-              <option value="3">⭐⭐⭐ (3 Stars)</option>
-              <option value="1-2">⭐⭐ / ⭐ (Critical 1-2)</option>
-            </select>
-          </div>
-        </div>
+          {/* Status Dropdown Filter right beside Search bar */}
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Published">Published</option>
+            <option value="Resolved">Resolved</option>
+          </select>
 
+          {/* Star Rating Filter */}
+          <select
+            value={ratingFilter}
+            onChange={(e) => { setRatingFilter(e.target.value); setCurrentPage(1); }}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Star Ratings</option>
+            <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+            <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+            <option value="3">⭐⭐⭐ (3 Stars)</option>
+            <option value="1-2">⭐⭐ / ⭐ (Critical 1-2)</option>
+          </select>
+
+          {/* Share Feedback Button right beside filter bar */}
+          <Button
+            onClick={() => setShowAddModal(true)}
+            variant="hero"
+            size="sm"
+            className="h-10 px-4 text-xs font-bold gap-1.5 shadow-sm rounded-xl cursor-pointer hover:shadow-md transition-all shrink-0 whitespace-nowrap"
+          >
+            <Plus className="size-4" /> Share Feedback
+          </Button>
+
+        </div>
       </div>
 
       {/* Main Feedback Data Table */}

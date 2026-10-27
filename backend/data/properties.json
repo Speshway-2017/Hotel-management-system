@@ -249,7 +249,7 @@
     "assignedAdmin": "Dileep",
     "subscriptionTier": "Basic",
     "subscriptionStatus": "Active",
-    "subscriptionExpiry": "2027-09-18T06:24:25.308Z",
+    "subscriptionExpiry": "2026-11-06T12:00:00.000Z",
     "commissionRate": 12,
     "settings": {
       "hotelName": "Speshway Luxury Hotel",
@@ -301,7 +301,7 @@
       "parityAlerts": true
     },
     "createdAt": "2026-08-18T06:50:34.910Z",
-    "updatedAt": "2026-09-25T05:42:53.638Z"
+    "updatedAt": "2026-10-27T09:30:24.252Z"
   },
   {
     "_id": "HS-0L43K",

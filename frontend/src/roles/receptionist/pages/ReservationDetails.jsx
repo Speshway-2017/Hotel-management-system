@@ -294,6 +294,16 @@ function ReceptionReservationDetailsPage() {
                   <span>₹{Number(booking.totalAmount || booking.amount || 0).toLocaleString()}</span>
                 </div>
               </div>
+
+              <Button
+                asChild
+                variant="outline"
+                className="w-full mt-3 h-9 text-xs font-bold rounded-xl border-muted bg-white hover:bg-muted/30 text-navy cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Link to={`/reception/folio/${booking._id || booking.id || booking.bookingId || id}`}>
+                  <Receipt className="size-3.5 text-navy/70" /> View Digital Folio
+                </Link>
+              </Button>
             </div>
           </Panel>
         </div>

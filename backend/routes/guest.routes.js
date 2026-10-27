@@ -395,8 +395,8 @@ router.get('/dashboard', async (req, res) => {
     });
 
     const upcomingBooking = mapped.find(b => b.status === 'Confirmed' || b.status === 'Paid' || b.status === 'Pending') || null;
-    const currentStay = mapped.find(b => b.status === 'Checked-in') || null;
-    const activeBooking = currentStay || upcomingBooking || (mapped.length > 0 ? mapped[0] : null);
+    const currentStay = mapped.find(b => b.status === 'Checked-in' || b.status === 'Checked In') || null;
+    const activeBooking = currentStay || upcomingBooking || null;
     const totalStays = mapped.length;
     const totalSpent = mapped.reduce((acc, b) => acc + Number(b.amount || 0), 0);
 

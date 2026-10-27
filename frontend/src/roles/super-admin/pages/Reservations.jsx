@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/utils/utils";
-import { Search, RefreshCw, Eye, X, Building, ChevronDown, Calendar, User, Landmark } from "lucide-react";
+import { Search, RefreshCw, Eye, X, Building, ChevronDown, Calendar, User, Landmark, ExternalLink } from "lucide-react";
 import { extractRoomNumber } from "@/utils/roomUtils";
 
 function SuperAdminReservations() {
@@ -37,8 +37,10 @@ function SuperAdminReservations() {
         superAdminService.getProperties().catch(() => ({}))
       ]);
 
-      if (bookingsRes.success && propertiesRes.success) {
+      if (bookingsRes.success && Array.isArray(bookingsRes.data)) {
         setReservations(bookingsRes.data);
+      }
+      if (propertiesRes.success && Array.isArray(propertiesRes.data)) {
         setProperties(propertiesRes.data);
       }
     } catch (err) {
@@ -298,6 +300,13 @@ function SuperAdminReservations() {
                           <ViewActionButton
                             onClick={() => { setSelectedBooking(r); setModalOpen(true); }}
                           />
+                          <Link
+                            to={`/super-admin/reservations/view/${r.id || r._id}`}
+                            className="size-7 grid place-items-center rounded-lg border border-muted hover:border-purple/40 hover:bg-purple/5 text-purple transition cursor-pointer"
+                            title="Open full reservation view"
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </Link>
                           {isCancellable && (
                             <ActionButton
                               icon={X}

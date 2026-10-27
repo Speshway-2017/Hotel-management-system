@@ -11,7 +11,7 @@ import { invalidateApiCache } from "@/services/apiClient";
 import {
   CreditCard, Search, CheckCircle2, ArrowUpRight,
   Undo2, Plus, Wallet, Landmark,
-  IndianRupee, Download, Check, ArrowLeft, User
+  IndianRupee, Download, Check, ArrowLeft, User, Receipt
 } from "lucide-react";
 import { validateWithZod, paymentSchema } from "@/schemas";
 
@@ -740,8 +740,8 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
       {/* 4. Unified Table Ledger */}
       <Panel 
-        title="Live Payments Registry" 
-        description={`Audit real-time guest transaction records and settlement status (${filteredPayments.length} total entries).`}
+        title={role === "reception" ? undefined : "Live Payments Registry"} 
+        description={role === "reception" ? undefined : `Audit real-time guest transaction records and settlement status (${filteredPayments.length} total entries).`}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[1000px]">
@@ -857,6 +857,13 @@ export function UnifiedPaymentsView({ role = "admin" }) {
                                   onClick={() => navigate(`/${role}/payments/${p._id}`)}
                                   title="View Payment Details"
                                 />
+                                {role === "reception" && (p.bookingId || p.reservationId) && (
+                                  <ActionButton
+                                    icon={Receipt}
+                                    onClick={() => navigate(`/reception/folio/${p.bookingId || p.reservationId}`)}
+                                    title="View Digital Folio"
+                                  />
+                                )}
                                 <EditActionButton
                                   onClick={() => handleOpenEditModal(p)}
                                   title="Edit Payment Record"

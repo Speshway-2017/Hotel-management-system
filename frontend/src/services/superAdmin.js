@@ -36,6 +36,14 @@ export const superAdminService = {
     return await apiClient.delete(`/super-admin/users/${id}`);
   },
 
+  getPayments: async () => {
+    try {
+      return await apiClient.get('/super-admin/payments');
+    } catch (e) {
+      return await apiClient.get('/admin/payments');
+    }
+  },
+
   getReservations: async () => {
     return await apiClient.get('/super-admin/reservations');
   },

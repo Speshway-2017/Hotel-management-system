@@ -24,8 +24,8 @@ export const Route = createFileRoute("/admin/notifications")({
 function getToneForType(type) {
   const t = (type || "").toLowerCase();
   if (t.includes("reserv") || t.includes("book") || t.includes("audit")) return "success";
-  if (t.includes("sync") || t.includes("payment") || t.includes("approval") || t.includes("check")) return "warning";
-  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("warning")) return "error";
+  if (t.includes("sync") || t.includes("payment") || t.includes("approval") || t.includes("check") || t.includes("subscription")) return "warning";
+  if (t.includes("security") || t.includes("error") || t.includes("alert") || t.includes("warning") || t.includes("expired")) return "error";
   return "brand";
 }
 
@@ -133,6 +133,7 @@ function AdminNotificationsPage() {
             {[
               { label: "All Alerts", key: "All" },
               { label: `Unread (${unreadCount})`, key: "Unread" },
+              { label: "Subscription", key: "Subscription" },
               { label: "Reservations", key: "Reservations" },
               { label: "Channel Syncs", key: "Sync" },
               { label: "Property Audits", key: "Audit" }

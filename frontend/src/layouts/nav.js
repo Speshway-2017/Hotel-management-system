@@ -72,12 +72,12 @@ export const roleMeta = {
 export const navByRole = {
   "super-admin": [
     {
-      group: "",
+      group: "Super Admin Console",
       items: [
         { label: "Dashboard", to: "/super-admin", icon: LayoutDashboard },
         { label: "Operations", to: "/super-admin/properties", icon: CalendarCheck },
+        { label: "Management", to: "/super-admin/admins", icon: UserCog },
         { label: "Analytics & Reports", to: "/super-admin/reports", icon: TrendingUp },
-        { label: "Subscription Plans", to: "/super-admin/subscription", icon: BadgeIndianRupee },
         { label: "System", to: "/super-admin/branding", icon: Settings }
       ]
     }

@@ -754,4 +754,76 @@ export const purgeGuestAccountDeletionNotifications = async () => {
   }
 };
 
+/**
+ * Checks if a property's subscription plan expires within 15 days (or is already expired).
+ * If so, dispatches an alert notification to Admin if one hasn't been sent within the last 24 hours.
+ */
+export const checkAndNotifySubscriptionExpiry = async (property, req = null) => {
+  try {
+    if (!property || !property.subscriptionExpiry) return null;
+
+    const expiryDate = new Date(property.subscriptionExpiry);
+    if (isNaN(expiryDate.getTime())) return null;
+
+    const now = new Date();
+    const diffMs = expiryDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    // Only notify if expiring within 15 days (daysRemaining <= 15, including <= 0 expired)
+    if (daysRemaining > 15) return null;
+
+    const propertyId = String(property._id || property.id || 'HS-9HQ8P');
+    const planName = property.subscriptionPlanName || property.subscriptionTier || 'Subscription';
+    const dateFormatted = expiryDate.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    const isExpired = daysRemaining <= 0;
+    const title = isExpired ? 'Subscription Plan Expired' : 'Subscription Plan Expiring Soon';
+    const message = isExpired
+      ? `Your ${planName} subscription plan expired on ${dateFormatted}. Please renew your plan immediately to maintain uninterrupted access to all hotel operations.`
+      : `Your ${planName} subscription plan will expire in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} on ${dateFormatted}. Please renew your plan before expiration to prevent service interruption.`;
+
+    // 24-hour deduplication check to prevent duplicate notifications
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existing = await Notification.findOne({
+      role: 'admin',
+      $or: [
+        { propertyId },
+        { propertyId: null }
+      ],
+      category: 'Subscription',
+      title: { $regex: /expir/i },
+      createdAt: { $gte: twentyFourHoursAgo }
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const notif = await triggerNotification({
+      req,
+      role: 'admin',
+      propertyId,
+      title,
+      message,
+      category: 'Subscription',
+      data: {
+        type: 'subscription_expiry',
+        daysRemaining,
+        expiryDate: expiryDate.toISOString(),
+        planName,
+        isExpired
+      }
+    });
+
+    return notif;
+  } catch (err) {
+    console.error('❌ Error in checkAndNotifySubscriptionExpiry:', err.message);
+    return null;
+  }
+};
+
 

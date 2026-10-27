@@ -13,7 +13,7 @@ import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import PromoCoupon from '../models/promoCoupon.model.js';
 import Coupon from '../models/coupon.model.js';
 import { SubscriptionRequest } from '../models/subscriptionRequest.model.js';
-import { Room, ContactMessage, Approval } from '../models/managerData.model.js';
+import { Room, ContactMessage, Approval, Payment } from '../models/managerData.model.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { invalidatePropertyCache } from '../utils/propertyCache.js';
 import { extractRoomNumber, syncRoomStatus } from '../utils/roomHelper.js';
@@ -49,31 +49,80 @@ const logAction = async (user, action, entity, req) => {
 };
 
 const calculateDynamicMetrics = async (property) => {
-  if (!property) return { occupancy: 0, adr: 0, revpar: 0 };
+  if (!property) return { occupancy: 0, adr: 0, revpar: 0, revenue: 0, totalRevenue: 0 };
   const propId = property._id || property.id || '';
   const propIdStr = propId.toString();
   if (!propIdStr) {
-    return { occupancy: 0, adr: 0, revpar: 0 };
+    return { occupancy: 0, adr: 0, revpar: 0, revenue: 0, totalRevenue: 0 };
   }
-  const bookings = await Booking.find({ propertyId: propIdStr });
-  
-  const validBookings = bookings.filter(b => 
-    b.status === 'Confirmed' || 
-    b.status === 'Checked-in' || 
-    b.status === 'Checked-out' ||
-    b.status === 'Paid'
-  );
 
-  let totalNights = validBookings.reduce((sum, b) => sum + (b.nights || 1), 0);
-  let totalRevenue = validBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const propCandidates = Array.from(new Set([
+    property._id,
+    property.id,
+    property.propertyId,
+    propIdStr
+  ].filter(Boolean).map(x => x.toString().trim())));
 
-  const roomsCount = property.rooms || 12;
-  const occupiedCount = bookings.filter(b => b.status === 'Checked-in').length;
-  const occupancy = roomsCount > 0 ? Math.round((occupiedCount / roomsCount) * 100) : 0;
-  const adr = occupiedCount > 0 ? Math.round(totalRevenue / occupiedCount) : (totalNights > 0 ? Math.round(totalRevenue / totalNights) : 0);
-  const revpar = roomsCount > 0 ? Math.round(totalRevenue / roomsCount) : 0;
+  // 1. Check settled payments (matching payments ledger / Admin & Manager dashboards)
+  let totalSettledPayments = 0;
+  try {
+    const payments = await Payment.find({
+      $or: [
+        { propertyId: { $in: propCandidates } },
+        { propertyId: propIdStr }
+      ]
+    });
+    const settledPayments = (payments || []).filter(pay => {
+      const s = String(pay.status || '').toLowerCase().trim();
+      return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+    });
+    totalSettledPayments = settledPayments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+  } catch (payErr) {
+    console.warn('Failed to query payments in calculateDynamicMetrics:', payErr.message);
+  }
 
-  return { occupancy, adr, revpar };
+  // 2. Query bookings
+  const bookings = await Booking.find({
+    $or: [
+      { propertyId: { $in: propCandidates } },
+      { hotelId: { $in: propCandidates } },
+      { propertyId: propIdStr },
+      { hotelId: propIdStr }
+    ]
+  });
+
+  const isNotCancelled = (status) => {
+    const s = String(status || '').toLowerCase().trim();
+    return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+  };
+
+  const validBookings = (bookings || []).filter(b => isNotCancelled(b.status));
+
+  let totalNights = validBookings.reduce((sum, b) => sum + (Number(b.nights) || 1), 0);
+  let bookingRevenue = validBookings.reduce((sum, b) => {
+    const amt = Number(b.amount ?? b.totalAmount ?? b.paidAmount ?? 0);
+    return sum + (isNaN(amt) ? 0 : amt);
+  }, 0);
+
+  // Synchronized revenue resolution:
+  // Use settled payments if present; otherwise dynamic valid bookings revenue; otherwise stored property revenue
+  let totalRevenue = totalSettledPayments > 0 
+    ? totalSettledPayments 
+    : (bookingRevenue > 0 ? bookingRevenue : Number(property.revenue || property.totalRevenue || 0));
+
+  const roomsCount = Number(property.rooms) || 12;
+  const occupiedCount = (bookings || []).filter(b => String(b.status || '').toLowerCase() === 'checked-in').length;
+  const occupancy = roomsCount > 0 ? Math.min(100, Math.round((occupiedCount / roomsCount) * 100)) : (Number(property.occupancy) || 0);
+  const adr = occupiedCount > 0 ? Math.round(totalRevenue / occupiedCount) : (totalNights > 0 ? Math.round(totalRevenue / totalNights) : (Number(property.adr) || 0));
+  const revpar = roomsCount > 0 ? Math.round(totalRevenue / roomsCount) : (Number(property.revpar) || 0);
+
+  return {
+    occupancy,
+    adr,
+    revpar,
+    revenue: totalRevenue,
+    totalRevenue
+  };
 };
 
 // ==========================================
@@ -127,8 +176,29 @@ router.get('/dashboard-stats', checkPropertyStatus, async (req, res) => {
     const totalAdr = activeWithAdr.reduce((acc, p) => acc + (p.adr || 0), 0);
     const avgAdr = activeWithAdr.length ? Math.round(totalAdr / activeWithAdr.length) : 0;
 
-    const totalRev = bookings.reduce((acc, b) => acc + (b.amount || 0), 0);
-    const activeReservations = bookings.filter(b => b.status === 'confirmed' || b.status === 'Paid').length;
+    const isNotCancelled = (status) => {
+      const s = String(status || '').toLowerCase().trim();
+      return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+    };
+    let settledPaymentsSum = 0;
+    try {
+      const payQuery = req.user.role === 'super-admin' ? {} : { propertyId: req.user.propertyId };
+      const allPayments = await Payment.find(payQuery);
+      const settled = (allPayments || []).filter(p => {
+        const s = String(p.status || '').toLowerCase().trim();
+        return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+      });
+      settledPaymentsSum = settled.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    } catch (e) {}
+
+    const totalRev = settledPaymentsSum > 0 ? settledPaymentsSum : validBookings.reduce((acc, b) => {
+      const amt = Number(b.amount ?? b.totalAmount ?? b.paidAmount ?? 0);
+      return acc + (isNaN(amt) ? 0 : amt);
+    }, 0);
+    const activeReservations = bookings.filter(b => {
+      const s = String(b.status || '').toLowerCase();
+      return s === 'confirmed' || s === 'paid' || s === 'checked-in';
+    }).length;
 
     return sendSuccess(res, 200, {
       totalProperties,
@@ -265,6 +335,13 @@ router.post('/properties', authorize('super-admin'), async (req, res) => {
     });
 
     invalidatePropertyCache(property.id || property._id);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'property_created', property);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'property_created', id: property.id || property._id });
+    }
+
     return sendSuccess(res, 201, property, 'Property created successfully');
   } catch (error) {
     console.error('[API] POST /properties error:', error);
@@ -299,7 +376,8 @@ router.put('/properties/:id', authorize('super-admin'), async (req, res) => {
     if (io) {
       emitRealtimeSync(io, id, 'room_updated', { propertyId: id, action: 'property_updated' });
       emitRealtimeSync(io, id, 'availability_changed', { propertyId: id });
-      emitRealtimeSync(io, id, 'dashboard_sync', { propertyId: id, action: 'property_updated' });
+      emitRealtimeSync(io, 'all', 'property_updated', updated);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { propertyId: id, action: 'property_updated' });
     }
 
     return sendSuccess(res, 200, updated, 'Property updated successfully');
@@ -355,6 +433,12 @@ router.delete('/properties/:id', authorize('super-admin'), async (req, res) => {
       message: `Property '${deleted.name}' was removed from the system.`,
       category: 'Property Update'
     });
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'property_deleted', { id, propertyId: id });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'property_deleted', id });
+    }
 
     return sendSuccess(res, 200, deleted, 'Property deleted successfully');
   } catch (error) {
@@ -469,6 +553,13 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
     });
 
     await logAction(req.user, 'Created User', `${name} (${role})`, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_created', newUser);
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'user_created', id: newUser._id });
+    }
+
     return sendSuccess(res, 201, {
       id: newUser.id || newUser._id,
       _id: newUser.id || newUser._id,
@@ -564,6 +655,13 @@ router.delete('/users/:id', checkPropertyStatus, async (req, res) => {
     const deleted = await User.findOneAndDelete({ $or: userQuery });
     clearUserCache();
     await logAction(req.user, 'Deleted User', `${deleted?.name || id}`, req);
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, 'all', 'user_deleted', { id, name: deleted?.name });
+      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'user_deleted', id });
+    }
+
     return sendSuccess(res, 200, deleted, 'User deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete user');
@@ -704,6 +802,23 @@ router.post('/approvals/:id', checkPropertyStatus, async (req, res) => {
     return sendSuccess(res, 200, updated, `Approval request decision marked as ${finalAction}.`);
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to update approval');
+  }
+});
+
+// ==========================================
+// 3.9 PAYMENTS (LEDGER)
+// ==========================================
+router.get('/payments', checkPropertyStatus, async (req, res) => {
+  try {
+    let query = {};
+    if (req.user && req.user.role !== 'super-admin') {
+      const propId = req.user.propertyId || 'HS-9HQ8P';
+      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }] };
+    }
+    const payments = await Payment.find(query).sort({ createdAt: -1 });
+    return sendSuccess(res, 200, payments, 'Payments ledger retrieved successfully');
+  } catch (error) {
+    return sendError(res, 500, error.message || 'Failed to retrieve payments');
   }
 });
 
@@ -1001,9 +1116,6 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const roomNum = extractRoomNumber(booking);
-    const io = req.app.get('socketio');
-
-    // Realtime broadcast socket instance
     const io = req.app.get('socketio');
 
     // Sync Room operational status on check-in, check-out, or cancellation

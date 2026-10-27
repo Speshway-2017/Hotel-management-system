@@ -1,25 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Notice, LoadingRows, Tag, statusTone, ActionGroup, ViewActionButton, ApproveActionButton, RejectActionButton, ActionButton } from "@/components/hs/kit";
+import { PageHeader, Panel, Notice } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { RevenueChart, OccupancyChart } from "@/components/hs/Charts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { adminService } from "@/services/admin";
 import { 
   Building2, TrendingUp, DollarSign, Percent, ArrowUpRight, ArrowDownRight, 
   Calendar, ShieldAlert, Activity, Users, ShieldCheck, CheckCircle2, AlertTriangle, 
-  Play, Bed, RefreshCw, Eye, ExternalLink, ChevronUp, ChevronDown, Search, ArrowRight,
+  Play, Bed, RefreshCw, Eye,
   Plus, X, Ticket, Star, MessageSquareHeart
 } from "lucide-react";
 
-function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+function PremiumStatCard({ label, value, delta = 4, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+  const isPositive = delta >= 0;
   return (
     <div
       style={{ "--accent-color": accentColor }}
-      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full"
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
@@ -35,10 +34,11 @@ function PremiumStatCard({ label, value, delta = 6, hint, icon: Icon, accentColo
         )}
       </div>
       <div className="mt-auto pt-2 flex items-center gap-1.5 text-[10px] h-4">
-        <span className="inline-flex items-center gap-0.5 font-bold shrink-0 text-success">
-          <ArrowUpRight className="size-3.5" />
-          +{delta}%
-        </span>
+        {delta !== null && delta !== undefined && (
+          <span className={`inline-flex items-center gap-0.5 font-bold shrink-0 ${isPositive ? "text-success" : "text-destructive"}`}>
+            {isPositive ? "+" : ""}{delta}%
+          </span>
+        )}
         {hint && <span className="text-[10px] text-muted-foreground truncate">{hint}</span>}
       </div>
     </div>
@@ -54,26 +54,8 @@ function SuperAdminDashboard() {
   // Live state datasets
   const [properties, setProperties] = useState([]);
   const [reservations, setReservations] = useState([]);
-  const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
-  const [subscriptionRequests, setSubscriptionRequests] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
-  const [decidingId, setDecidingId] = useState(null);
-  const [rejectionModalId, setRejectionModalId] = useState(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-
-  // Scope & Date states
-  const [propertyScope, setPropertyScope] = useState("All");
-  const [dateRange, setDateRange] = useState("Last 30 Days");
-
-  // Table controls states
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [propertyFilter, setPropertyFilter] = useState("All");
-  const [sortField, setSortField] = useState("name");
-  const [sortOrder, setSortOrder] = useState("asc");
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 5;
 
   // Revenue Period state
   const [revPeriod, setRevPeriod] = useState("Monthly");
@@ -89,20 +71,16 @@ function SuperAdminDashboard() {
   async function loadDashboardData(isSilent = false) {
     try {
       if (!isSilent) setLoading(true);
-      const [statsRes, propertiesRes, reservationsRes, logsRes, requestsRes, fbRes] = await Promise.all([
+      const [statsRes, propertiesRes, reservationsRes, fbRes] = await Promise.all([
         superAdminService.getDashboardStats().catch(() => ({})),
         superAdminService.getProperties().catch(() => ({})),
         superAdminService.getReservations().catch(() => ({})),
-        superAdminService.getAuditLogs().catch(() => ({})),
-        superAdminService.getSubscriptionRequests().catch(() => ({})),
         adminService.getFeedback().catch(() => ({}))
       ]);
       
       if (statsRes.success) setStats(statsRes.data.stats);
       if (propertiesRes.success) setProperties(propertiesRes.data);
       if (reservationsRes.success) setReservations(reservationsRes.data);
-      if (logsRes.success) setLogs(logsRes.data);
-      if (requestsRes.success) setSubscriptionRequests(requestsRes.data);
       if (fbRes?.success && Array.isArray(fbRes.data)) setFeedbackList(fbRes.data);
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to sync dashboard data.");
@@ -138,71 +116,50 @@ function SuperAdminDashboard() {
     loadDashboardData(false);
   };
 
-  const handleDecide = async (id, action, reason = "") => {
-    setDecidingId(id);
-    try {
-      const res = await superAdminService.decideSubscriptionRequest(id, action, reason);
-      if (res.success) {
-        toast.success(`Subscription request ${action === 'Approve' ? 'approved' : 'rejected'} successfully.`);
-        setRejectionModalId(null);
-        setRejectionReason("");
-        await loadDashboardData();
-      } else {
-        toast.error(res.message || "Failed to process decision.");
-      }
-    } catch (err) {
-      toast.error(err.message || "Failed to process decision.");
-    } finally {
-      setDecidingId(null);
+  const getPropertyRevenue = (p, resList = reservations) => {
+    if (!p) return 0;
+    const backendRev = Number(p.revenue ?? p.totalRevenue ?? 0);
+    if (!isNaN(backendRev) && backendRev > 0) {
+      return backendRev;
     }
+
+    const candidates = [p.id, p._id, p.propertyId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+    if (Array.isArray(resList) && resList.length > 0) {
+      const pReservations = resList.filter(r => {
+        const rPropId = typeof r.propertyId === 'object' ? (r.propertyId?._id || r.propertyId?.id) : r.propertyId;
+        const rHotelId = typeof r.hotelId === 'object' ? (r.hotelId?._id || r.hotelId?.id) : r.hotelId;
+        const rCandidates = [rPropId, rHotelId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+        return rCandidates.some(c => candidates.includes(c));
+      });
+      const valid = pReservations.filter(r => {
+        const s = String(r.status || '').toLowerCase().trim();
+        return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+      });
+      if (valid.length > 0) {
+        const sum = valid.reduce((acc, r) => {
+          const val = Number(r.amount ?? r.totalAmount ?? r.paidAmount ?? 0);
+          return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+        if (sum > 0) return sum;
+      }
+    }
+    return 0;
   };
 
   // Compute live KPIs
   const totalProperties = properties.length;
   const totalRooms = properties.reduce((sum, p) => sum + (p.rooms || 0), 0) || 12;
   const totalBookings = reservations.length;
-  const totalRevenue = reservations.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const validLiveReservations = reservations.filter(r => {
+    const s = String(r.status || '').toLowerCase().trim();
+    return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+  });
+  const totalRevenue = properties.reduce((sum, p) => sum + getPropertyRevenue(p), 0);
   const occupiedCount = reservations.filter(r => r.status === 'Checked-in' || r.status === 'Occupied').length;
   const avgOccupancy = totalRooms > 0 ? Math.round((occupiedCount / totalRooms) * 100) : 0;
   const activeAdmins = properties.length;
 
-  // Sorting Handler
-  const handleSort = (field) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
-    setPage(1);
-  };
 
-  // Table filtering and sorting calculations
-  const filteredAndSortedProperties = properties
-    .filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.city.toLowerCase().includes(search.toLowerCase());
-      const matchesScope = propertyScope === "All" || p.id === propertyScope || p._id === propertyScope;
-      return matchesSearch && matchesScope;
-    })
-    .sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-
-      // Handle calculated values
-      if (sortField === "revenue" || sortField === "reservations") {
-        const aRes = reservations.filter(r => r.propertyId === a.id || r.propertyId === a._id);
-        const bRes = reservations.filter(r => r.propertyId === b.id || r.propertyId === b._id);
-        aVal = sortField === "revenue" ? aRes.reduce((sum, r) => sum + (r.amount || 0), 0) : aRes.length;
-        bVal = sortField === "revenue" ? bRes.reduce((sum, r) => sum + (r.amount || 0), 0) : bRes.length;
-      }
-
-      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-
-  const totalPages = Math.ceil(filteredAndSortedProperties.length / itemsPerPage);
-  const paginatedProperties = filteredAndSortedProperties.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   // Dynamic Channel Performance Aggregations
   const channelPerformanceData = (() => {
@@ -321,200 +278,10 @@ function SuperAdminDashboard() {
         </Panel>
       </div>
 
-      {/* Property Performance Table Section with Search, Sort, Filter, Pagination */}
-      <Panel title="Property Performance" description="Operational statistics across Hour Stay hotels.">
-        <div className="p-4 bg-white rounded-b-xl space-y-4">
-          {/* Controls row */}
-          <div className="flex flex-wrap gap-4 items-center justify-between">
-            {/* Search */}
-            <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search property name or city..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="pl-9 h-9 rounded-full border-muted text-xs bg-white w-full"
-              />
-            </div>
 
-            {/* Filters removed */}
-          </div>
 
-          {/* Table wrapper */}
-          {loading ? (
-            <LoadingRows rows={4} />
-          ) : paginatedProperties.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-xs">No matching property records found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[950px]">
-                <thead>
-                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-semibold">
-                    <th onClick={() => handleSort("name")} className="p-4 w-[20%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Property
-                        {sortField === "name" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("city")} className="p-4 w-[12%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Location
-                        {sortField === "city" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("rooms")} className="p-4 w-[8%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Rooms
-                        {sortField === "rooms" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("occupancy")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Occupancy
-                        {sortField === "occupancy" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("adr")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        ADR
-                        {sortField === "adr" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("revpar")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        RevPAR
-                        {sortField === "revpar" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("revenue")} className="p-4 w-[12%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Revenue
-                        {sortField === "revenue" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("reservations")} className="p-4 w-[10%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Reservations
-                        {sortField === "reservations" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th onClick={() => handleSort("status")} className="p-4 w-[8%] text-left cursor-pointer hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-1">
-                        Status
-                        {sortField === "status" && (sortOrder === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)}
-                      </div>
-                    </th>
-                    <th className="p-4 w-[10%] text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y font-sans">
-                  {paginatedProperties.map((p) => {
-                    const pReservations = reservations.filter(r => r.propertyId === p.id || r.propertyId === p._id);
-                    const resCount = pReservations.length;
-                    const revenueSum = pReservations.reduce((sum, r) => sum + (r.amount || 0), 0);
-
-                    return (
-                      <tr key={p.id || p._id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 w-[20%] text-left">
-                          <p className="font-semibold text-navy text-sm">{p.name}</p>
-                        </td>
-                        <td className="p-4 w-[12%] text-left text-muted-foreground text-xs">
-                          {p.city}
-                        </td>
-                        <td className="p-4 w-[8%] text-left font-semibold text-navy">{p.rooms} Keys</td>
-                        <td className="p-4 w-[10%] text-left font-semibold text-navy">{p.occupancy}%</td>
-                        <td className="p-4 w-[10%] text-left font-semibold text-navy">₹{(p.adr || 0).toLocaleString("en-IN")}</td>
-                        <td className="p-4 w-[10%] text-left font-semibold text-navy">₹{(p.revpar || 0).toLocaleString("en-IN")}</td>
-                        <td className="p-4 w-[12%] text-left font-semibold text-navy">₹{revenueSum.toLocaleString("en-IN")}</td>
-                        <td className="p-4 w-[10%] text-left font-semibold text-navy">{resCount} Bookings</td>
-                        <td className="p-4 w-[8%] text-left">
-                          <Tag tone={statusTone(p.status)}>{p.status}</Tag>
-                        </td>
-                        <td className="p-4 w-[10%] text-right">
-                          <ActionGroup align="right">
-                            <ViewActionButton
-                              onClick={() => navigate({ to: `/super-admin/properties/view/${p.id || p._id}` })}
-                              title="View Details"
-                            />
-                            <ActionButton
-                              icon={ExternalLink}
-                              variant="view"
-                              title="Open Property"
-                              onClick={() => navigate({ to: `/super-admin/properties/view/${p.id || p._id}` })}
-                            />
-                          </ActionGroup>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t pt-4 text-xs">
-              <span className="text-muted-foreground">Showing page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                  disabled={page === 1}
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full border-muted hover:bg-muted font-semibold"
-                >
-                  Previous
-                </Button>
-                <Button
-                  onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={page === totalPages}
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full border-muted hover:bg-muted font-semibold"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </Panel>
-
-      {/* Triple Grid Row: Recent Activity, Channel Performance, Quick Actions */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Activity Log */}
-        <Panel title="Recent Activity" description="Platform audit logs of administrative actions.">
-          <div className="bg-white rounded-b-xl p-2">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[450px] table-fixed">
-                <thead>
-                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[9px] font-semibold">
-                    <th className="p-3 w-[25%] text-left">User</th>
-                    <th className="p-3 w-[35%] text-left">Action</th>
-                    <th className="p-3 w-[20%] text-left">Entity</th>
-                    <th className="p-3 w-[20%] text-right">Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y font-sans">
-                  {logs.slice(0, 5).map((log, idx) => (
-                    <tr key={idx} className="hover:bg-muted/15 transition-colors">
-                      <td className="p-3 w-[25%] text-left font-semibold text-navy truncate" title={log.user || "system@hourstay.com"}>
-                        {String(log.user || "system@hourstay.com").split('@')[0]}
-                      </td>
-                      <td className="p-3 w-[35%] text-left text-muted-foreground truncate" title={log.action}>{log.action}</td>
-                      <td className="p-3 w-[20%] text-left text-purple font-medium truncate" title={log.entity}>{log.entity || "Global"}</td>
-                      <td className="p-3 w-[20%] text-right font-mono text-[9px] text-muted-foreground truncate" title={log.time || log.createdAt || "Global Action"}>
-                        {String(log.time || log.createdAt || "14 Aug 2026").split(',')[0]}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Panel>
-
+      {/* Dual Grid Row: Channel Performance, Quick Actions */}
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Channel Performance (compact table) */}
         <Panel title="Channel Performance" description="OTA and direct bookings contributions.">
           <div className="bg-white rounded-b-xl p-2">
@@ -560,17 +327,17 @@ function SuperAdminDashboard() {
               </div>
             </Link>
 
-            {/* Action 2: Add Subscription */}
+            {/* Action 2: Financial Reports */}
             <Link
-              to="/super-admin/subscription"
+              to="/super-admin/reports"
               className="flex items-center gap-3 p-3 rounded-lg border border-[#0d1b2a]/15 bg-[#FFF7E6]/5 hover:bg-[#FFF7E6]/15 hover:border-[#0d1b2a]/35 hover:-translate-y-0.5 hover:shadow-soft transition-all duration-300 group cursor-pointer"
             >
               <span className="grid size-8 place-items-center rounded-lg bg-[#5B21B6] text-[#FFF7E6] shrink-0 group-hover:scale-105 transition-transform duration-300">
-                <TrendingUp className="size-4" />
+                <DollarSign className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <h4 className="font-bold text-[11px] text-slate-800 group-hover:text-purple transition-colors truncate">Manage Subscriptions</h4>
-                <p className="text-[9px] text-muted-foreground truncate">Pricing plans & billing</p>
+                <h4 className="font-bold text-[11px] text-slate-800 group-hover:text-purple transition-colors truncate">Financial Reports</h4>
+                <p className="text-[9px] text-muted-foreground truncate">Commissions & revenue logs</p>
               </div>
             </Link>
 
@@ -591,75 +358,7 @@ function SuperAdminDashboard() {
         </Panel>
       </div>
 
-      {/* Subscription Approvals Board Panel */}
-      <Panel title="SaaS Subscription Approvals Board" description="Review property-level plan activation requests, approve upgrades, or reject with feedback.">
-        <div className="bg-white rounded-b-xl p-4">
-          {subscriptionRequests.length === 0 ? (
-            <div className="p-8 text-center text-xs text-muted-foreground select-none">
-              No subscription request records found on the system.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[750px]">
-                <thead>
-                  <tr className="border-b bg-muted/40 uppercase tracking-wider text-muted-foreground text-[10px] font-bold select-none">
-                    <th className="p-3">Property Branch</th>
-                    <th className="p-3">Requested Plan</th>
-                    <th className="p-3">Admin</th>
-                    <th className="p-3 text-right">Pricing</th>
-                    <th className="p-3 text-center">Status</th>
-                    <th className="p-3">Date Requested</th>
-                    <th className="p-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y font-sans">
-                  {subscriptionRequests.map((req) => (
-                    <tr key={req._id || req.id} className="hover:bg-muted/15 transition-colors">
-                      <td className="p-3 font-bold text-navy">{req.propertyName}</td>
-                      <td className="p-3 font-semibold text-navy-deep">{req.planName}</td>
-                      <td className="p-3 text-muted-foreground">{req.adminName}</td>
-                      <td className="p-3 text-right font-bold text-navy">₹{req.price.toLocaleString("en-IN")}/mo</td>
-                      <td className="p-3 text-center">
-                        <Tag tone={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'error' : 'warning'}>
-                          {req.status}
-                        </Tag>
-                      </td>
-                      <td className="p-3 text-muted-foreground font-semibold">
-                        {new Date(req.createdAt).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="p-3 text-right">
-                        {req.status === 'Pending' ? (
-                          <ActionGroup align="right">
-                            <ApproveActionButton
-                              disabled={decidingId !== null}
-                              onClick={() => handleDecide(req._id || req.id, 'Approve')}
-                              title="Approve Request"
-                            />
-                            <RejectActionButton
-                              disabled={decidingId !== null}
-                              onClick={() => {
-                                setRejectionModalId(req._id || req.id);
-                                setRejectionReason("");
-                              }}
-                              title="Reject Request"
-                            />
-                          </ActionGroup>
-                        ) : (
-                          <div className="text-right">
-                            <span className="inline-block text-[10px] text-muted-foreground font-bold bg-muted/65 px-2.5 py-1 rounded-md">
-                              {req.status === 'Approved' ? `Approved by ${req.decidedBy === "Nandini Rao" || req.decidedBy === "Super Admin" || !req.decidedBy ? "Nandini Rao Rao" : req.decidedBy}` : `Rejected: "${req.rejectionReason}"`}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Panel>
+
 
       {/* Guest Feedback & Hospitality Sentiment Panel */}
       <Panel
@@ -710,49 +409,7 @@ function SuperAdminDashboard() {
         </div>
       </Panel>
 
-      {/* Rejection Modal */}
-      {rejectionModalId && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4 animate-fade-in select-none">
-          <div className="bg-white rounded-xl border border-muted max-w-sm w-full shadow-lift overflow-hidden text-left flex flex-col font-ui text-navy">
-            <div className="p-4 border-b border-muted bg-[#fcfcfc] flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm">Provide Rejection Reason</h3>
-              <button
-                className="text-muted-foreground hover:text-navy cursor-pointer"
-                onClick={() => setRejectionModalId(null)}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Feedback / Reason for rejection</label>
-                <textarea
-                  className="w-full border border-muted rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-navy resize-none min-h-[80px]"
-                  placeholder="E.g., Requested tier does not match target property rooms count limit."
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t border-muted bg-[#fcfcfc] flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setRejectionModalId(null)}
-                className="h-8 px-4 text-xs rounded-full cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={!rejectionReason.trim()}
-                onClick={() => handleDecide(rejectionModalId, 'Reject', rejectionReason)}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold h-8 px-4 text-xs rounded-full cursor-pointer"
-              >
-                Submit Rejection
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
     </div>
   );

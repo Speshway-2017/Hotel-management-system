@@ -650,9 +650,9 @@ export function GuestIdVerificationCheckIn({ role = "receptionist" }) {
                   {fieldErrors.idDocNumber && (
                     <p className="text-[11px] font-bold text-rose-600 mt-1">{fieldErrors.idDocNumber}</p>
                   )}
-                  {isAadhaarDoc && (
-                    <div className="mt-1.5 min-h-[20px]">
-                      {isAadhaarMismatch ? (
+                  <div className="mt-1.5 min-h-[20px]">
+                    {isAadhaarDoc ? (
+                      isAadhaarMismatch ? (
                         <p className="text-[11px] font-bold text-rose-600 flex items-center gap-1">
                           <AlertCircle className="size-3.5 shrink-0" />
                           Aadhaar Mismatch: Ends with {cleanAadhaar.slice(-4)}, but registered record is on file. Verification blocked.

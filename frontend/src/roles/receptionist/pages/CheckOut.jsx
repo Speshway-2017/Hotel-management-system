@@ -156,6 +156,7 @@ function DeparturesPage() {
       (filterStatus === "Pending Checkout" && d.status !== "Checked Out") ||
       (filterStatus === "Payment Pending" && Number(d.balance || 0) > 0 && d.status !== "Checked Out") ||
       (filterStatus === "Ready to Checkout" && Number(d.balance || 0) === 0 && d.status === "Ready") ||
+      (filterStatus === "Late Checkout" && d.isLate) ||
       d.status === filterStatus;
 
     return matchesSearch && matchesStatus;
@@ -174,37 +175,36 @@ function DeparturesPage() {
         <PremiumStatCard label="Checked Out" value={checkedOutCount} hint="Released rooms (Dirty)" icon={CheckCircle2} accentColor="#10b981" />
       </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+      {/* Controls: Inline Search and Status Dropdown Filter */}
+      <div className="bg-white border border-muted rounded-2xl p-3 shadow-soft">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
           
           {/* Search bar */}
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search guest name, room #, booking ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+              className="w-full h-10 pl-10 pr-4 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
             />
           </div>
 
-        </div>
+          {/* Status Dropdown Filter right beside Search bar */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Pending Checkout">Pending Checkout</option>
+            <option value="Payment Pending">Payment Pending</option>
+            <option value="Ready to Checkout">Ready to Checkout</option>
+            <option value="Checked Out">Checked Out</option>
+            <option value="Late Checkout">Late Checkout</option>
+          </select>
 
-        {/* Tab filters */}
-        <div className="flex flex-wrap gap-1 border-t border-muted/50 pt-3">
-          {["All", "Pending Checkout", "Payment Pending", "Ready to Checkout", "Checked Out", "Late Checkout"].map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={filterStatus === status ? "secondary" : "ghost"}
-              className="h-8 text-xs font-bold px-4 capitalize rounded-full"
-              onClick={() => setFilterStatus(status)}
-            >
-              {status}
-            </Button>
-          ))}
         </div>
       </div>
 

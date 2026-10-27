@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader, Panel, Tag, Notice } from "@/components/hs/kit";
+import { Panel, Tag, Notice } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { 
-  User, Mail, Phone, MapPin, Sparkles, Heart,
+  User, Mail, Phone, MapPin, Heart,
   History, CreditCard, Award, FileText, ChevronRight, Sliders, Calendar
 } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
@@ -303,243 +303,245 @@ function ViewGuestPage() {
 
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui">
-      {/* Top Page Header with Guest Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <PageHeader
-          title="Guest Details"
-        />
-        <div className="flex gap-2 select-none self-start sm:self-center">
-          {guest.status !== "Inactive" && (
-            <Button
-              variant="outline"
-              className="h-9 px-4 text-xs font-bold border-muted text-navy rounded-full"
-              onClick={() => navigate({ to: `/admin/guests/edit/${guest._id || guest.id}` })}
-            >
-              Edit Profile
-            </Button>
-          )}
-          <Button
-            className="bg-navy hover:bg-navy-deep text-white h-9 px-4 text-xs font-bold rounded-full shadow-soft"
-            onClick={() => navigate({ to: `/admin/reservations/add` })}
-          >
-            Create Reservation
-          </Button>
-        </div>
-      </div>
-
-      {/* Top Profile and Details Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Left Column: Summary Card and Contact Details (with visible Aadhaar Card) */}
-        <div className="space-y-5 md:col-span-1">
-          
-          {/* Header Card */}
-          <div className="bg-white border border-muted rounded-xl p-5 shadow-soft space-y-4 text-center">
-            <div className="mx-auto grid size-16 place-items-center rounded-full bg-navy/5 text-navy font-bold text-2xl select-none">
+      {/* 1. Unified Guest Dossier & Contact Profile Card */}
+      <div className="bg-white border border-muted rounded-2xl p-6 shadow-soft">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <div className="size-14 rounded-2xl bg-navy/5 text-navy font-black text-xl grid place-items-center border border-navy/10 shrink-0 select-none">
               {initials}
             </div>
-            <div>
-              <h3 className="font-display font-black text-navy text-lg">{guest.name}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{guest.city && `${guest.city}, `}{guest.state}</p>
-            </div>
-            <div className="pt-2 border-t border-muted/50 flex justify-center gap-2">
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                guest.status === "Staying-In" ? "bg-success/15 text-success" : guest.status === "Expected" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"
-              }`}>{guest.status}</span>
-              <span className="bg-purple/10 text-purple px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">{guest.type || "Regular"} Member</span>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-display font-black text-navy text-xl sm:text-2xl tracking-tight leading-none">
+                  {guest.name}
+                </h2>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  guest.status === "Staying-In" 
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                    : guest.status === "Expected" 
+                    ? "bg-amber-50 text-amber-700 border border-amber-200" 
+                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                }`}>
+                  {guest.status}
+                </span>
+                <span className="bg-purple/10 text-purple border border-purple/20 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                  {guest.type || "Regular"} Member
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 text-muted-foreground/70 shrink-0" />
+                <span>
+                  {[guest.city, guest.state, guest.country].filter(Boolean).join(", ") || "Location Unspecified"}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Contact Details Panel with Aadhaar Card moved here, visible unmasked number, verified badge */}
-          <Panel title="Contact Details">
-            <div className="p-4.5 space-y-3.5 text-xs text-navy">
-              <div className="flex items-start gap-3">
-                <Mail className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Email Address</span>
-                  <p className="font-semibold mt-0.5 select-all">{guest.email}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Phone className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Phone Connection</span>
-                  <p className="font-semibold mt-0.5 select-all">{guest.phone}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Postal Address</span>
-                  <p className="font-semibold mt-0.5">{guest.address || "—"}, {guest.city}, {guest.state}, {guest.country}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 pt-2 border-t border-muted/50">
-                <CreditCard className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                      {guest.idDocType || "Aadhaar Card"}
-                    </span>
-                    {guest.isAadhaarVerified && (
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                        Verified ✓
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-mono text-xs font-bold text-navy mt-0.5 select-all tracking-wide">
-                    {formatAadhaar(guest.idDocNumber)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Panel>
-
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 self-start md:self-center shrink-0 select-none">
+            {guest.status !== "Inactive" && (
+              <Button
+                variant="outline"
+                className="h-9 px-4 text-xs font-bold border-muted text-navy rounded-xl hover:bg-muted/10 cursor-pointer"
+                onClick={() => navigate({ to: `/admin/guests/edit/${guest._id || guest.id}` })}
+              >
+                Edit Profile
+              </Button>
+            )}
+            <Button
+              className="bg-navy hover:bg-navy-deep text-white h-9 px-4.5 text-xs font-bold rounded-xl shadow-soft cursor-pointer flex items-center gap-1.5"
+              onClick={() => navigate({ to: `/admin/reservations/add` })}
+            >
+              Create Reservation
+            </Button>
+          </div>
         </div>
 
-        {/* Right Columns: Current Stay Allocation, Lifetime Visits, Balance, Preferences, Staff Remarks */}
-        <div className="space-y-5 md:col-span-2">
-          
-          {/* Current Stay & Outstanding Folio */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left space-y-2 animate-fade-in">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold">Current Allocation</span>
-              <p className="font-black text-navy text-base">
-                {guest.roomNumber ? `Room ${guest.roomNumber}` : (extractRoomNumber(guest.room) ? `Room ${extractRoomNumber(guest.room)}` : (guest.room || "Unassigned"))}
-              </p>
-              <p className="text-[10.5px] text-muted-foreground">
-                {guest.currentStay || (guest.latestStay ? `${guest.room || 'Room'} (${guest.latestStay.checkIn} → ${guest.latestStay.checkOut})` : "No active stay")}
-              </p>
-              {guest.latestStay && (guest.latestStay.status === "Checked-in" || guest.latestStay.status === "Staying" || guest.status === "Staying-In") && (
-                <button
-                  onClick={() => handleNavigateExtend(guest.latestStay)}
-                  className="inline-flex items-center gap-1 text-[11px] text-brand hover:underline font-bold mt-2 cursor-pointer"
-                >
-                  Extend Stay →
-                </button>
-              )}
-            </div>
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left space-y-2">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold">Lifetime Visits</span>
-              <p className="font-black text-navy text-base">{guest.stays || 0} Stays</p>
-              <p className="text-[10.5px] text-muted-foreground">Lifetime Revenue: ₹{(guest.spend || 0).toLocaleString()}</p>
-            </div>
-            <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left space-y-2">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold">Outstanding Balance</span>
-              <p className={`font-black text-base ${guest.balance > 0 ? "text-destructive" : "text-success"}`}>₹{(guest.balance || 0).toLocaleString()}</p>
-              <p className="text-[10.5px] text-muted-foreground">Unsettled stays ledger</p>
-            </div>
+        {/* Clean 4-Column Metadata Row (No nested boxes) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-5 mt-5 border-t border-muted/60 text-xs">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Mail className="size-3 text-brand" /> Email Address
+            </span>
+            <p className="font-semibold text-navy select-all truncate" title={guest.email}>
+              {guest.email || "—"}
+            </p>
           </div>
 
-          {/* Preferences Tags */}
-          <Panel title="Guest Preferences">
-            <div className="p-4.5 space-y-2">
-              {guest.preferences && guest.preferences.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 select-none">
-                  {guest.preferences.map((p, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 bg-muted/65 border border-muted/80 px-2.5 py-1 rounded-full text-xs font-semibold text-navy">
-                      <Sparkles className="size-3 text-gold" /> {p}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">No special preferences logged for this profile.</p>
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Phone className="size-3 text-brand" /> Phone Number
+            </span>
+            <p className="font-semibold text-navy select-all">
+              {guest.phone || "—"}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="size-3 text-brand" /> Postal Address
+            </span>
+            <p className="font-semibold text-navy truncate" title={`${guest.address || ""}, ${guest.city || ""}, ${guest.state || ""}, ${guest.country || ""}`}>
+              {guest.address || "—"}, {guest.city}, {guest.state}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <CreditCard className="size-3 text-brand" /> {guest.idDocType || "Aadhaar Card"}
+              </span>
+              {guest.isAadhaarVerified && (
+                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 shrink-0">
+                  Verified ✓
+                </span>
               )}
             </div>
-          </Panel>
-
-          {/* Notes & Special Remarks */}
-          <Panel title="Staff Notes & Remarks">
-            <div className="p-4.5 space-y-3">
-              {guest.notes ? (
-                <p className="text-xs text-[#2a2a2a] leading-relaxed bg-[#fafafa]/50 border border-muted/50 p-3 rounded-lg">{guest.notes}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">No administrative remarks logged for this guest.</p>
-              )}
-            </div>
-          </Panel>
-
+            <p className="font-mono font-bold text-navy select-all tracking-wide">
+              {formatAadhaar(guest.idDocNumber)}
+            </p>
+          </div>
         </div>
-
       </div>
 
-      {/* Side-by-Side Tables: Payment History and Stay History with consistent column alignments */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        
-        {/* Payment History Table */}
-        <Panel title="Payment History">
-          <div className="p-0.5">
-            {guest.billing && guest.billing.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase">
-                      <th className="py-2.5 px-4 text-left">Invoice ID</th>
-                      <th className="py-2.5 px-4 text-left">Billing Date</th>
-                      <th className="py-2.5 px-4 text-left">Invoice Status</th>
-                      <th className="py-2.5 px-4 text-left">Invoice Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-muted/30">
-                    {guest.billing.map((inv, idx) => (
-                      <tr key={idx} className="hover:bg-muted/5">
-                        <td className="py-3 px-4 font-mono font-bold text-navy text-left">{inv.invoiceId}</td>
-                        <td className="py-3 px-4 text-muted-foreground text-left">{inv.date}</td>
-                        <td className="py-3 px-4 text-left">
-                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider ${
-                            inv.status === "Paid" ? "bg-success/15 text-success" : inv.status === "Partial" ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"
-                          }`}>{inv.status}</span>
-                        </td>
-                        <td className="py-3 px-4 text-left font-bold text-navy">₹{Number(inv.amount || 0).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-5 text-center text-xs text-muted-foreground italic">No payment history recorded for this profile.</div>
-            )}
+      {/* 2. Key Metrics Row (3 Clean Standardized Cards) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left flex flex-col justify-between min-h-[120px] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Current Allocation</span>
+              <span className="size-2 rounded-full bg-brand/60" />
+            </div>
+            <p className="font-sans font-bold text-navy text-lg mt-2 tracking-tight">
+              {guest.roomNumber ? `Room ${guest.roomNumber}` : (extractRoomNumber(guest.room) ? `Room ${extractRoomNumber(guest.room)}` : (guest.room || "Unassigned"))}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {guest.currentStay || (guest.latestStay ? `${guest.room || 'Room'} (${guest.latestStay.checkIn} → ${guest.latestStay.checkOut})` : "No active stay")}
+            </p>
           </div>
-        </Panel>
+          {guest.latestStay && (guest.latestStay.status === "Checked-in" || guest.latestStay.status === "Staying" || guest.status === "Staying-In") && (
+            <div className="pt-3 mt-2 border-t border-muted/50">
+              <button
+                onClick={() => handleNavigateExtend(guest.latestStay)}
+                className="inline-flex items-center gap-1 text-[11px] text-brand hover:underline font-bold cursor-pointer"
+              >
+                Extend Stay →
+              </button>
+            </div>
+          )}
+        </div>
 
-        {/* Stay History Table */}
-        <Panel title={`Stay History (${guest.history?.length || 0})`}>
+        <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left flex flex-col justify-between min-h-[120px] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Lifetime Visits</span>
+              <span className="size-2 rounded-full bg-emerald-500/60" />
+            </div>
+            <p className="font-sans font-bold text-navy text-lg mt-2 tracking-tight tabular-nums">
+              {guest.stays || 0} {Number(guest.stays) === 1 ? 'Stay' : 'Stays'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+              Lifetime Revenue: <span className="font-semibold text-slate-800">₹{(guest.spend || 0).toLocaleString()}</span>
+            </p>
+          </div>
+          <div className="pt-3 mt-2 border-t border-muted/50 text-[10.5px] text-muted-foreground">
+            Historical stay tracking record
+          </div>
+        </div>
+
+        <div className="bg-white border border-muted rounded-xl p-5 shadow-soft text-left flex flex-col justify-between min-h-[120px] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Folio Balance</span>
+              <span className={`size-2 rounded-full ${guest.balance > 0 ? "bg-rose-500/80" : "bg-emerald-500/80"}`} />
+            </div>
+            <p className={`font-sans font-bold text-lg mt-2 tracking-tight tabular-nums ${guest.balance > 0 ? "text-destructive" : "text-emerald-600"}`}>
+              ₹{(guest.balance || 0).toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {guest.balance > 0 ? "Unsettled stay ledger" : "All folios settled"}
+            </p>
+          </div>
+          <div className="pt-3 mt-2 border-t border-muted/50 text-[10.5px] text-muted-foreground">
+            {guest.balance > 0 ? "Pending desk payment collection" : "Zero outstanding balances"}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. History Ledgers (Side-by-Side) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Stay History Panel */}
+        <Panel title={`Stay History (${guest.history?.length || 0})`} description="Chronological record of past and active reservations.">
           <div className="p-0.5">
             {guest.history && guest.history.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-muted/15 border-b border-muted/50 text-[10px] font-bold text-muted-foreground uppercase">
+                    <tr className="bg-[#fafafa] border-b border-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       <th className="py-2.5 px-4 text-left">Stay Range</th>
-                      <th className="py-2.5 px-4 text-left">Room No</th>
-                      <th className="py-2.5 px-4 text-left">Stay Status</th>
-                      <th className="py-2.5 px-4 text-left">Stay Amount</th>
+                      <th className="py-2.5 px-3 text-left">Room</th>
+                      <th className="py-2.5 px-3 text-left">Status</th>
+                      <th className="py-2.5 px-4 text-left">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-muted/30">
                     {guest.history.map((hist, idx) => (
-                      <tr key={idx} className="hover:bg-muted/5">
-                        <td className="py-3 px-4 font-semibold text-navy text-left">{hist.checkIn} → {hist.checkOut}</td>
-                        <td className="py-3 px-4 font-bold text-brand text-left">
+                      <tr key={idx} className="hover:bg-muted/10 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-navy text-left whitespace-nowrap">{hist.checkIn} → {hist.checkOut}</td>
+                        <td className="py-3 px-3 font-bold text-brand text-left whitespace-nowrap">
                           {hist.roomNumber ? `Room ${hist.roomNumber}` : (extractRoomNumber(hist.room || hist) ? `Room ${extractRoomNumber(hist.room || hist)}` : (hist.room || "Room 101"))}
                         </td>
-                        <td className="py-3 px-4 text-left">
+                        <td className="py-3 px-3 text-left whitespace-nowrap">
                           <Tag tone={hist.status === "Completed" || hist.status === "Staying" || hist.status === "Checked-in" ? "success" : "warning"}>{hist.status}</Tag>
                         </td>
-                        <td className="py-3 px-4 text-left font-bold text-navy">₹{Number(hist.amount || 0).toLocaleString()}</td>
+                        <td className="py-3 px-4 text-left font-bold text-navy tabular-nums whitespace-nowrap">₹{Number(hist.amount || 0).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="p-5 text-center text-xs text-muted-foreground italic">No stay records logged for this profile.</div>
+              <div className="p-6 text-center text-xs text-muted-foreground italic">No stay records logged for this profile.</div>
             )}
           </div>
         </Panel>
 
+        {/* Payment History Panel */}
+        <Panel title={`Payment & Billing History (${guest.billing?.length || 0})`} description="Invoices, folios, and settlement transaction receipts.">
+          <div className="p-0.5">
+            {guest.billing && guest.billing.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#fafafa] border-b border-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2.5 px-4 text-left">Invoice ID</th>
+                      <th className="py-2.5 px-3 text-left">Billing Date</th>
+                      <th className="py-2.5 px-3 text-left">Status</th>
+                      <th className="py-2.5 px-4 text-left">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-muted/30">
+                    {guest.billing.map((inv, idx) => (
+                      <tr key={idx} className="hover:bg-muted/10 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-navy text-left whitespace-nowrap">{inv.invoiceId}</td>
+                        <td className="py-3 px-3 text-muted-foreground text-left whitespace-nowrap">{inv.date}</td>
+                        <td className="py-3 px-3 text-left whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider ${
+                            inv.status === "Paid" ? "bg-success/15 text-success" : inv.status === "Partial" ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"
+                          }`}>{inv.status}</span>
+                        </td>
+                        <td className="py-3 px-4 text-left font-bold text-navy tabular-nums whitespace-nowrap">₹{Number(inv.amount || 0).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-muted-foreground italic">No payment history recorded for this profile.</div>
+            )}
+          </div>
+        </Panel>
       </div>
-
     </div>
   );
 }

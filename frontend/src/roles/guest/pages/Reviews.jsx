@@ -276,10 +276,15 @@ function GuestReviewsPage() {
 
       let matchesRating = true;
       const rateVal = Math.round(Number(r.rating) || 5);
-      if (ratingFilter === "5") matchesRating = rateVal === 5;
+      const isResponded = Boolean(r.response || r.managementReply || r.reply);
+
+      if (ratingFilter === "all") matchesRating = true;
+      else if (ratingFilter === "5") matchesRating = rateVal === 5;
       else if (ratingFilter === "4") matchesRating = rateVal === 4;
       else if (ratingFilter === "3") matchesRating = rateVal === 3;
       else if (ratingFilter === "1-2") matchesRating = rateVal <= 2;
+      else if (ratingFilter === "responded") matchesRating = isResponded;
+      else if (ratingFilter === "pending") matchesRating = !isResponded;
 
       return matchesSearch && matchesRating;
     });
@@ -287,61 +292,44 @@ function GuestReviewsPage() {
 
   return (
     <div className="space-y-4 text-left font-ui">
-      {/* Top Action & Filter Toolbar (No page header/title section) */}
-      <div className="bg-white border border-navy/10 rounded-2xl p-4 shadow-soft space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          
-          {/* Status & Counter Badges */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple/10 text-purple border border-purple/20">
-              <MessageSquare className="size-3.5" />
-              {reviews.length} {reviews.length === 1 ? "Feedback Record" : "Feedback Records"}
-            </span>
-
-            {reviews.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                <ShieldCheck className="size-3 text-emerald-600" />
-                Verified Stays
-              </span>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-            <Button
-              onClick={() => window.location.href = '/guest/feedback/add'}
-              variant="hero"
-              size="sm"
-              className="h-9 px-4 text-xs font-bold gap-1.5 shadow-sm rounded-xl cursor-pointer hover:shadow-md transition-all"
-            >
-              <Plus className="size-3.5" /> Share Feedback
-            </Button>
-        </div>
-
-        {/* Search & Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-2 border-t border-navy/5">
-          <div className="relative sm:col-span-8">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-navy/40" />
+      {/* Top Action & Filter Toolbar */}
+      <div className="bg-white border border-navy/10 rounded-2xl p-3 sm:p-3.5 shadow-soft">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-navy/40" />
             <input
               placeholder="Search by hotel, room, booking ID, comment, or reply..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 h-9 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple placeholder:text-navy/40"
+              className="w-full pl-10 pr-4 h-10 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple placeholder:text-navy/40"
             />
           </div>
 
-          <div className="sm:col-span-4">
-            <select
-              value={ratingFilter}
-              onChange={(e) => setRatingFilter(e.target.value)}
-              className="w-full h-9 px-3 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer"
-            >
-              <option value="all">All Ratings</option>
-              <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
-              <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
-              <option value="3">⭐⭐⭐ (3 Stars)</option>
-              <option value="1-2">⭐⭐ / ⭐ (1-2 Stars)</option>
-            </select>
-          </div>
+          {/* All Status / Rating Filter Bar */}
+          <select
+            value={ratingFilter}
+            onChange={(e) => setRatingFilter(e.target.value)}
+            className="h-10 px-3.5 rounded-xl bg-cream/20 border border-navy/10 text-xs font-semibold text-navy focus:outline-none focus:border-purple cursor-pointer shrink-0"
+          >
+            <option value="all">All Status</option>
+            <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+            <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+            <option value="3">⭐⭐⭐ (3 Stars)</option>
+            <option value="1-2">⭐⭐ / ⭐ (1-2 Stars)</option>
+            <option value="responded">Responded</option>
+            <option value="pending">Pending Response</option>
+          </select>
+
+          {/* Share Feedback Button right beside the All Status filter bar */}
+          <Button
+            onClick={() => window.location.href = '/guest/feedback/add'}
+            variant="hero"
+            size="sm"
+            className="h-10 px-4 text-xs font-bold gap-1.5 shadow-sm rounded-xl cursor-pointer hover:shadow-md transition-all shrink-0 whitespace-nowrap"
+          >
+            <Plus className="size-4" /> Share Feedback
+          </Button>
         </div>
       </div>
 

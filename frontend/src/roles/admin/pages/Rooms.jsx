@@ -651,33 +651,7 @@ function RoomsRatesPage() {
         <PremiumStatCard label="Blocked" value={kpiBlocked.toString()} hint="Hold or restricted" accentColor="#6b7280" />
       </div>
 
-      {/* 3. Main Navigation Sub-tabs */}
-      <div className="flex flex-wrap gap-1 border-b border-muted pb-px select-none">
-        {[
-          { id: "rooms", label: "Rooms List", icon: Bed },
-          { id: "types", label: "Room Types", icon: Layers },
-          { id: "availability", label: "Availability Calendar", icon: Calendar }
-        ].map((tab) => {
-          const TabIcon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all relative border-b-2 ${
-                isActive 
-                  ? "border-brand text-brand bg-brand/5 rounded-t-lg" 
-                  : "border-transparent text-muted-foreground hover:text-navy hover:bg-muted/10 rounded-t-lg"
-              }`}
-            >
-              <TabIcon className="size-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 4. Tab Contents View */}
+      {/* Tab Contents View */}
 
       {/* Tab A: Rooms Inventory List */}
       {activeTab === "rooms" && (

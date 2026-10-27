@@ -27,10 +27,11 @@ function SuperAdminAdmins() {
         superAdminService.getProperties().catch(() => ({}))
       ]);
 
-      if (usersRes.success && propertiesRes.success) {
-        // Filter users to only show admins
+      if (usersRes.success && Array.isArray(usersRes.data)) {
         const filteredAdmins = usersRes.data.filter(u => u.role === 'admin');
         setAdmins(filteredAdmins);
+      }
+      if (propertiesRes.success && Array.isArray(propertiesRes.data)) {
         setProperties(propertiesRes.data);
       }
     } catch (err) {
@@ -182,10 +183,13 @@ function SuperAdminAdmins() {
                         <td className="p-4 text-muted-foreground">{a.email}</td>
                         <td className="p-4 text-muted-foreground">{a.phone || "—"}</td>
                         <td className="p-4 font-semibold text-navy">
-                          {a.properties && a.properties.length > 0 ? (
-                            <span className="truncate max-w-xs block">{a.properties.join(", ")}</span>
+                          {a.propertyId ? (
+                            <div className="flex items-center gap-1.5 truncate max-w-xs">
+                              <Building2 className="size-3.5 text-purple shrink-0" />
+                              <span className="truncate">{getPropertyName(a.propertyId)}</span>
+                            </div>
                           ) : (
-                            <span className="text-muted-foreground italic">None Assigned</span>
+                            <span className="text-muted-foreground italic">Unassigned</span>
                           )}
                         </td>
                         <td className="p-4">

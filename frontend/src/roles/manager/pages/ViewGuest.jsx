@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PageHeader, Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, Crumbs } from "@/components/hs/kit";
+import { Panel, Tag, Notice, LoadingRows, ActionGroup, ViewActionButton, Crumbs } from "@/components/hs/kit";
 import { managerService } from "@/services/manager";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
@@ -165,10 +165,6 @@ function ManagerViewGuest() {
         ]}
       />
 
-      <PageHeader
-        title={guestProfile ? `${guestProfile.name}'s Profile` : "Guest CRM Profile"}
-        subtitle="Stay metrics, dynamic room preferences, and feedback tracking ledger."
-      />
 
       {error && <Notice tone="error" title="CRM Fetch Error">{error}</Notice>}
 

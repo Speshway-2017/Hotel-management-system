@@ -268,15 +268,6 @@ function ManagerShiftsPage() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans">
-      <div className="flex justify-end">
-        <Button
-          onClick={() => navigate({ to: "/manager/staff/add" })}
-          className="bg-navy hover:bg-navy-deep text-white font-bold h-9 px-4 rounded-md cursor-pointer flex items-center gap-1.5"
-        >
-          <Plus className="size-4" /> Add Staff Member
-        </Button>
-      </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PremiumStatCard label="Total Staff" value={totalCount.toString()} hint="Property headcount log" accentColor="#0d1b2a" />
@@ -287,8 +278,8 @@ function ManagerShiftsPage() {
 
       {/* Search & Filters */}
       <div className="bg-white border border-muted rounded-xl p-4 shadow-soft">
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-          <div className="relative w-full md:flex-1">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          <div className="relative w-full md:flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input
               placeholder="Search by staff name, email, employee ID..."
@@ -301,7 +292,7 @@ function ManagerShiftsPage() {
             />
           </div>
 
-          <div className="w-full md:w-56">
+          <div className="w-full md:w-48">
             <Select
               value={shiftFilter}
               onChange={(e) => { setShiftFilter(e.target.value); setCurrentPage(1); }}
@@ -315,17 +306,24 @@ function ManagerShiftsPage() {
             </Select>
           </div>
 
-          <div className="w-full md:w-56">
+          <div className="w-full md:w-44">
             <Select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               className="text-xs h-9 font-semibold bg-[#FDFCFA]/20 border-muted"
             >
-              <option value="all">All Statuses</option>
+              <option value="all">All Status</option>
               <option value="Active">Active</option>
               <option value="On Leave">On Leave</option>
             </Select>
           </div>
+
+          <Button
+            onClick={() => navigate({ to: "/manager/staff/add" })}
+            className="w-full md:w-auto bg-navy hover:bg-navy-deep text-white font-bold h-9 px-4 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap shadow-soft"
+          >
+            <Plus className="size-4" /> Add Staff Member
+          </Button>
         </div>
       </div>
 

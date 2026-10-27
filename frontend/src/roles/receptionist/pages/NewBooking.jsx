@@ -173,31 +173,6 @@ function ReceptionistNewBooking() {
         const variant = getVariant(r);
         nums.forEach(n => {
           variantOccupied.add(`${n}_${variant}`);
-      // Determine active bookings to exclude only the specific occupied variant
-      const activeBookings = (resRes && resRes.success && Array.isArray(resRes.data))
-        ? resRes.data.filter(r => {
-            const s = String(r.status || '').toLowerCase().trim();
-            return s !== 'checked-out' && s !== 'checked out' && s !== 'checkout' && s !== 'completed' && s !== 'cancelled' && s !== 'canceled';
-          })
-        : [];
-
-      // Filter ONLY available/vacant rooms (not occupied or reserved)
-      const availableRooms = dbRooms
-        .map(r => ({
-          _id: r._id || r.id,
-          num: String(r.roomNumber || r.num || ''),
-          type: r.category || r.roomType || 'Standard Room',
-          status: r.status || 'Available',
-          roomVariant: r.type || extractRoomVariant(r) || (String(r.category || '').toLowerCase().includes('non-ac') ? 'Non-AC' : 'AC'),
-          rate: r.currentRate || r.baseRate || r.rate || (r.category === 'Executive Suite' ? 6500 : r.category === 'Deluxe Room' ? 4500 : 3000)
-        }))
-        .filter(r => {
-          if (!r.num) return false;
-          // Check if there is an active booking strictly matching this room and variant
-          const hasActiveBooking = activeBookings.some(b => isBookingMatchingRoom(b, r));
-          if (hasActiveBooking) return false;
-          const roomStat = String(r.status || 'Available').toLowerCase().trim();
-          return roomStat === 'available' || roomStat === 'vacant';
         });
       }
     });
