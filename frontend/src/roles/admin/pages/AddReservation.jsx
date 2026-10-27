@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { PageHeader, Panel, Crumbs } from "@/components/hs/kit";
+import { Panel, Crumbs } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { adminService } from "@/services/admin";
 import { Button } from "@/components/ui/button";
@@ -417,12 +417,6 @@ function AddReservation() {
 
   return (
     <div className="space-y-6 text-left max-w-4xl pb-16">
-      <PageHeader
-        title="Add Reservation"
-        subtitle="Assign reservation particulars, guest identification, room details, and tariff."
-      />
-
-
       <div className="max-w-xl">
 
         <Panel title="Booking Parameters Form" description="Assign reservation particulars.">

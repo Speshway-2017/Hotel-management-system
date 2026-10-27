@@ -1243,9 +1243,6 @@ router.put('/reservations/:id/status', async (req, res) => {
     const io = req.app.get('socketio');
 
     // Sync operational room status on check-in, check-out, cancel, or no-show
-    const io = req.app.get('socketio');
-
-    // Sync operational room status on check-in, check-out, cancel, or no-show
     if (roomNum) {
       let rmStatus = 'Available';
       if (status === 'Checked-in') rmStatus = 'Occupied';
@@ -1361,15 +1358,22 @@ router.get('/folios/:id', async (req, res) => {
     const folioDetail = {
       id: `FOL-${booking.id || booking._id}`,
       guestName: booking.guest,
-      roomNo: booking.room ? booking.room.split(' ')[0] : 'TBD',
-      roomType: booking.room ? booking.room.split('·')[1]?.trim() || 'Standard' : 'Standard',
+      guestPhone: booking.phone || '',
+      guestEmail: booking.email || '',
+      roomNo: booking.room ? booking.room.split(' ')[0] : (booking.roomNumber || 'TBD'),
+      roomType: booking.room ? (booking.room.includes('·') ? booking.room.split('·')[1]?.trim() : (booking.roomType || 'Standard')) : (booking.roomType || 'Standard'),
       bookingId: booking.id || booking._id,
       stayDates: `${booking.checkIn} - ${booking.checkOut}`,
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
+      nights: booking.nights || 1,
+      source: booking.source || 'Front Desk',
+      pax: booking.pax || booking.guests || '1 Guest',
       totalCharges: finalAmt,
       amountPaid: totalPaid,
       balanceDue: bal,
       paymentStatus: bal === 0 ? 'Paid' : 'Pending',
-      status: booking.status === 'Checked-out' ? 'Closed' : 'Active',
+      status: (booking.status === 'Checked-out' || booking.folioStatus === 'Closed') ? 'Closed' : 'Active',
       items
     };
 

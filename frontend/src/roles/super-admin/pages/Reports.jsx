@@ -56,26 +56,34 @@ const tooltipStyle = {
 
 const pieColors = ["#6366f1", "#a855f7", "#ec4899", "#f43f5e", "#eab308", "#10b981"];
 
-function FinanceStatCard({ label, value, hint, icon: Icon, accentColor = "#0f172a" }) {
+function FinanceStatCard({ label, value, hint, delta = 4, icon: Icon, accentColor = "#0f172a" }) {
+  const isPositive = delta >= 0;
   return (
     <div
       style={{ "--accent-color": accentColor }}
-      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full"
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left font-ui"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight truncate" title={label}>{label}</p>
-          <h4 className="mt-2.5 font-sans tracking-tight tabular-nums text-sm font-bold text-slate-800 leading-none whitespace-nowrap">{value}</h4>
+          <div className="min-h-5 sm:h-8 flex items-start">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          </div>
+          <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
         </div>
         {Icon && (
-          <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
-            <Icon className="size-3.5" />
+          <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
+            <Icon className="size-4" />
           </span>
         )}
       </div>
-      {hint && (
-        <p className="mt-3.5 text-[9px] text-muted-foreground truncate">{hint}</p>
-      )}
+      <div className="mt-auto pt-2 flex items-center gap-1.5 text-[10px] h-4">
+        {delta !== null && delta !== undefined && (
+          <span className={`inline-flex items-center gap-0.5 font-bold shrink-0 ${isPositive ? "text-success" : "text-destructive"}`}>
+            {isPositive ? "+" : ""}{delta}%
+          </span>
+        )}
+        {hint && <span className="text-[10px] text-muted-foreground truncate">{hint}</span>}
+      </div>
     </div>
   );
 }
@@ -168,7 +176,7 @@ function SuperAdminReports() {
       {error && <Notice tone="error" title="Sync Failure" className="text-left">{error}</Notice>}
 
       {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 font-ui dashboard-stats-grid">
         <FinanceStatCard
           label="Total Platform Commission"
           value={`₹${aggregates.totalCommission.toLocaleString("en-IN")}`}

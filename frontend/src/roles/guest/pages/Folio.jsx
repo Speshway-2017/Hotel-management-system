@@ -187,13 +187,6 @@ function GuestFolioPage() {
         <div className="bg-white rounded-2xl border border-navy/10 p-6 shadow-soft flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleSelectFolio(null)}
-                className="text-xs font-bold text-purple hover:underline inline-flex items-center gap-1 cursor-pointer border-none bg-transparent p-0 mr-1"
-              >
-                <ArrowLeft className="size-3.5" /> Back to Folios
-              </button>
-              <span className="text-navy/20">•</span>
               <span className="text-xs font-semibold text-navy/60">Booking Ref: {f.bookingId}</span>
             </div>
             <h2 className="font-display text-xl font-bold text-navy mt-1">{f.hotel}</h2>

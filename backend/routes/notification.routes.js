@@ -6,7 +6,8 @@ import Booking from '../models/booking.model.js';
 import { ManagerNotification } from '../models/managerData.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
-import { getAdminManagedPropertyIds, isAllowedForSuperAdminNotification, purgeGuestAccountDeletionNotifications } from '../utils/notification.helper.js';
+import { getAdminManagedPropertyIds, isAllowedForSuperAdminNotification, purgeGuestAccountDeletionNotifications, checkAndNotifySubscriptionExpiry } from '../utils/notification.helper.js';
+import { findPropertySafely } from '../utils/propertyCache.js';
 import { sendPushToTokens } from '../services/fcm.service.js';
 
 const router = express.Router();
@@ -351,6 +352,12 @@ router.get('/', protect, async (req, res) => {
         ]
       };
     } else if (userRole === 'admin') {
+      try {
+        const prop = await findPropertySafely(propId, req.user);
+        if (prop) {
+          await checkAndNotifySubscriptionExpiry(prop, req);
+        }
+      } catch (_) {}
       query = {
         $or: [
           { userId },
@@ -445,6 +452,12 @@ router.get('/unread-count', protect, async (req, res) => {
         ]
       };
     } else if (userRole === 'admin') {
+      try {
+        const prop = await findPropertySafely(propId, req.user);
+        if (prop) {
+          await checkAndNotifySubscriptionExpiry(prop, req);
+        }
+      } catch (_) {}
       query = {
         $or: [
           { userId },

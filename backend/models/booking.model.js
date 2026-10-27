@@ -288,8 +288,20 @@ class BookingInstance {
 }
 
 const matchBookingQuery = (b, query = {}) => {
-  if (!query || Object.keys(query).length === 0) return true;
-  if (query.propertyId && query.propertyId !== 'all' && b.propertyId !== query.propertyId) return false;
+  if (query.propertyId && query.propertyId !== 'all') {
+    if (typeof query.propertyId === 'object' && query.propertyId.$in && Array.isArray(query.propertyId.$in)) {
+      if (!query.propertyId.$in.includes(b.propertyId) && !query.propertyId.$in.includes(b.hotelId)) return false;
+    } else if (b.propertyId !== query.propertyId && b.hotelId !== query.propertyId) {
+      return false;
+    }
+  }
+  if (query.hotelId && query.hotelId !== 'all') {
+    if (typeof query.hotelId === 'object' && query.hotelId.$in && Array.isArray(query.hotelId.$in)) {
+      if (!query.hotelId.$in.includes(b.hotelId) && !query.hotelId.$in.includes(b.propertyId)) return false;
+    } else if (b.hotelId !== query.hotelId && b.propertyId !== query.hotelId) {
+      return false;
+    }
+  }
   if (query.guestId && b.guestId !== query.guestId) return false;
   if (query.status) {
     if (typeof query.status === 'object') {

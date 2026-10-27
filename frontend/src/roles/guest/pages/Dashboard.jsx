@@ -151,9 +151,22 @@ function GuestDashboardPage() {
 
   const stats = data?.stats || {};
   const recentBookings = data?.recentBookings || [];
-  const upcoming = stats.upcomingBooking;
-  const currentStay = stats.currentStay;
-  const activeBooking = currentStay || upcoming || stats.activeBooking || (recentBookings.length > 0 ? recentBookings[0] : null);
+
+  const isValidUpcoming = (b) => b && ['confirmed', 'paid', 'pending'].includes(String(b.status || '').toLowerCase());
+  const isValidActive = (b) => {
+    const s = String(b?.status || '').toLowerCase();
+    return s === 'checked-in' || s === 'checked in';
+  };
+
+  const upcoming = isValidUpcoming(stats.upcomingBooking)
+    ? stats.upcomingBooking
+    : recentBookings.find(isValidUpcoming) || null;
+
+  const currentStay = isValidActive(stats.currentStay)
+    ? stats.currentStay
+    : recentBookings.find(isValidActive) || null;
+
+  const activeBooking = currentStay || upcoming || null;
 
   return (
     <div className="space-y-6 text-left font-ui">
@@ -198,7 +211,7 @@ function GuestDashboardPage() {
       </div>
 
       {/* Featured Active (Checked-in) or Upcoming Reservation Banner */}
-      {activeBooking ? (
+      {activeBooking && (
         <div className="bg-[#FFF7E6] border border-[#F5C06A]/40 rounded-2xl p-6 sm:p-8 text-[#0D1B2A] shadow-soft relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
             <Sparkles className="size-48 text-[#5B21B6]" />
@@ -206,13 +219,13 @@ function GuestDashboardPage() {
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-xl">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                activeBooking.status === 'Checked-in'
+                activeBooking.status === 'Checked-in' || activeBooking.status === 'Checked In'
                   ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                   : activeBooking.status === 'Confirmed' || activeBooking.status === 'Paid'
                   ? 'bg-[#F5C06A]/25 text-[#92400E] border-[#F5C06A]/50'
                   : 'bg-purple/15 text-purple border-purple/30'
               }`}>
-                {activeBooking.status === 'Checked-in' ? (
+                {activeBooking.status === 'Checked-in' || activeBooking.status === 'Checked In' ? (
                   <>
                     <CheckCircle2 className="size-3 text-emerald-700" /> Active Checked-in Stay
                   </>
@@ -252,28 +265,6 @@ function GuestDashboardPage() {
               })()}
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-r from-navy/5 via-purple/5 to-navy/5 border border-navy/10 rounded-2xl p-6 sm:p-7 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-left">
-            <div className="size-12 rounded-xl bg-purple/10 text-purple flex items-center justify-center shrink-0">
-              <Calendar className="size-6" />
-            </div>
-            <div>
-              <h3 className="font-sans tracking-tight tabular-nums text-base font-bold text-slate-800">No Active Booking</h3>
-              <p className="text-xs text-navy/60 mt-0.5">
-                You don't have an active or upcoming stay reservation right now.
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={handleBookNow}
-            variant="hero"
-            size="touch"
-            className="px-6 py-2.5 text-xs font-bold gap-2 cursor-pointer shadow-soft shrink-0"
-          >
-            <Calendar className="size-4" /> Book Now
-          </Button>
         </div>
       )}
 

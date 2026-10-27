@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { 
   Calendar, Bed, Hotel, MapPin, ArrowRight, ShieldCheck, 
@@ -25,14 +25,20 @@ export const Route = createFileRoute("/guest/bookings")({
 });
 
 function GuestBookingsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
-  // Read initial tab parameter from URL search string
-  const urlParams = new URLSearchParams(window.location.search);
+  // Read query params reactively from location.search
+  const searchStr = location?.search 
+    ? (typeof location.search === 'string' ? location.search : new URLSearchParams(location.search).toString()) 
+    : window.location.search;
+  const urlParams = new URLSearchParams(searchStr);
   const initialTab = urlParams.get('tab') || urlParams.get('status') || 'all';
-  const initialSelectedId = urlParams.get('id') || null;
+  const activeBookingId = urlParams.get('id') || urlParams.get('view') || null;
 
   const [activeTab, setActiveTab] = useState(initialTab); // 'all', 'upcoming', 'check-ins', 'check-outs', 'cancelled'
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -80,7 +86,7 @@ function GuestBookingsPage() {
       setBookings(list);
 
       const currentParams = new URLSearchParams(window.location.search);
-      const targetId = currentParams.get('id') || currentParams.get('view') || initialSelectedId;
+      const targetId = currentParams.get('id') || currentParams.get('view') || activeBookingId;
       if (targetId) {
         const cleanTarget = String(targetId).toUpperCase();
         const matched = list.find(b => {
@@ -110,11 +116,13 @@ function GuestBookingsPage() {
     if (b) {
       const bId = b.bookingId || b.id || b._id;
       const bRef = bId ? (String(bId).startsWith('BK') ? String(bId) : `BK${bId}`) : '';
+      navigate({ to: '/guest/bookings', search: { id: bRef } });
       const newUrl = window.location.pathname + '?id=' + bRef;
       window.history.pushState({}, '', newUrl);
       window.dispatchEvent(new Event('popstate'));
       window.dispatchEvent(new Event('locationchange'));
     } else {
+      navigate({ to: '/guest/bookings', search: {} });
       window.history.pushState({}, '', window.location.pathname);
       window.dispatchEvent(new Event('popstate'));
       window.dispatchEvent(new Event('locationchange'));
@@ -210,6 +218,20 @@ function GuestBookingsPage() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  // Reactively synchronize selected booking with route location search params
+  useEffect(() => {
+    if (!activeBookingId) {
+      setSelectedBooking(null);
+    } else if (bookings.length > 0) {
+      const cleanTarget = String(activeBookingId).toUpperCase();
+      const matched = bookings.find(b => {
+        const bId = String(b.bookingId || b.id || b._id || '').toUpperCase();
+        return bId === cleanTarget || `BK${bId}` === cleanTarget || bId === cleanTarget.replace(/^BK/, '');
+      });
+      setSelectedBooking(matched || null);
+    }
+  }, [activeBookingId, bookings]);
 
   if (loading) {
     return (

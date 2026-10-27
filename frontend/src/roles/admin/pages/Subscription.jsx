@@ -5,7 +5,7 @@ import { adminService } from "@/services/admin";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CheckCircle2, ShieldCheck, Calendar, Sparkles, Building2, Layers, Clock, AlertOctagon } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Calendar, Sparkles, Building2, Layers, Clock, AlertOctagon, AlertTriangle, RefreshCw } from "lucide-react";
 
 import { subscribeRealtimeSync } from "@/services/socket";
 
@@ -100,12 +100,144 @@ function AdminSubscriptionPage() {
   const pendingRequest = requests.find(r => r.status === "Pending");
   const lastRequest = requests[0]; // sorted descending by createdAt in backend
 
+  const getExpiryInfo = () => {
+    if (!property?.subscriptionExpiry) return null;
+    const expiryDate = new Date(property.subscriptionExpiry);
+    if (isNaN(expiryDate.getTime())) return null;
+
+    const now = new Date();
+    const diffTime = expiryDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const isExpired = daysRemaining <= 0;
+    const isExpiringSoon = daysRemaining <= 15;
+
+    return {
+      expiryDate,
+      formattedDate: expiryDate.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      }),
+      daysRemaining,
+      isExpired,
+      isExpiringSoon
+    };
+  };
+
+  const expiryInfo = getExpiryInfo();
+
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in select-none">
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
-      {/* Expiry Details Notice */}
-      {property && (property.subscriptionTier !== "None" || property.subscriptionPlanName) && property.subscriptionStatus === 'Active' && (
+      {/* Neat & Clean Subscription Expiration Card (Triggered when plan expires within 15 days or has expired) */}
+      {expiryInfo && expiryInfo.isExpiringSoon && (
+        <div
+          className={`bg-white rounded-2xl border border-muted shadow-soft p-5 sm:p-6 transition-all duration-200 relative overflow-hidden ${
+            expiryInfo.isExpired ? "border-l-4 border-l-rose-500" : "border-l-4 border-l-amber-500"
+          }`}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            {/* Left: Icon & Details */}
+            <div className="flex items-start gap-4 min-w-0">
+              <div
+                className={`size-11 rounded-xl grid place-items-center shrink-0 border ${
+                  expiryInfo.isExpired
+                    ? "bg-rose-50/80 border-rose-200/80 text-rose-600"
+                    : "bg-amber-50/80 border-amber-200/80 text-amber-600"
+                }`}
+              >
+                {expiryInfo.isExpired ? (
+                  <AlertTriangle className="size-5" />
+                ) : (
+                  <Clock className="size-5" />
+                )}
+              </div>
+
+              <div className="space-y-1.5 min-w-0">
+                {/* Meta Ribbon */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      expiryInfo.isExpired
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {expiryInfo.isExpired
+                      ? "Plan Expired"
+                      : `Expiring in ${expiryInfo.daysRemaining} ${expiryInfo.daysRemaining === 1 ? "day" : "days"}`}
+                  </span>
+                  <span className="text-muted-foreground/40 hidden sm:inline">•</span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Plan: <strong className="text-navy font-bold">{currentPlanName}</strong>
+                  </span>
+                  <span className="text-muted-foreground/40 hidden sm:inline">•</span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Renewal Date: <strong className="text-navy font-bold">{expiryInfo.formattedDate}</strong>
+                  </span>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-base font-bold text-navy-deep tracking-tight">
+                  {expiryInfo.isExpired
+                    ? "Your property subscription plan has expired"
+                    : `Your subscription plan will expire in ${expiryInfo.daysRemaining} days`}
+                </h3>
+
+                {/* Subtitle */}
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                  {expiryInfo.isExpired
+                    ? `Your subscription expired on ${expiryInfo.formattedDate}. Please renew or upgrade your plan to maintain uninterrupted reservations, rates sync, and front-desk operations.`
+                    : `Your ${currentPlanName} plan expires on ${expiryInfo.formattedDate}. Renew your plan before the expiration date to prevent any disruption to hotel bookings and channel integrations.`}
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2.5 shrink-0 self-start lg:self-center pt-2 lg:pt-0">
+              <Button
+                disabled={requestingPlan !== null || pendingRequest !== undefined}
+                onClick={() => {
+                  const activePlanObj = plans.find(
+                    (p) =>
+                      p.name === currentPlanName ||
+                      p.name?.toLowerCase() === property?.subscriptionTier?.toLowerCase() ||
+                      p.name?.toLowerCase() === property?.subscriptionPlanName?.toLowerCase()
+                  ) || { name: currentPlanName, monthlyPrice: 0 };
+                  handleRequestPlan(activePlanObj);
+                }}
+                className={`h-9 px-4 rounded-xl font-bold text-xs shadow-soft flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                  expiryInfo.isExpired
+                    ? "bg-rose-600 hover:bg-rose-700 text-white"
+                    : "bg-navy hover:bg-navy-deep text-white"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <RefreshCw className={`size-3.5 ${requestingPlan ? "animate-spin" : ""}`} />
+                {requestingPlan
+                  ? "Submitting..."
+                  : expiryInfo.isExpired
+                  ? "Renew Plan Now"
+                  : "Renew Current Plan"}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  document.getElementById("plans-grid")?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="h-9 px-3.5 rounded-xl font-semibold text-xs bg-white text-navy border-muted hover:bg-muted/50 shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="size-3.5 text-purple" />
+                Change Plan
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Normal Active Plan Notice (Shown when expiry is > 15 days) */}
+      {property && (property.subscriptionTier !== "None" || property.subscriptionPlanName) && property.subscriptionStatus === 'Active' && !expiryInfo?.isExpiringSoon && (
         <Notice tone="success" title="Subscription Activated">
           Your property has an active **{currentPlanName}** subscription plan.
           {property.subscriptionExpiry && (
@@ -138,7 +270,7 @@ function AdminSubscriptionPage() {
       )}
 
       {/* Pricing Cards List */}
-      <div className="space-y-4">
+      <div id="plans-grid" className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-navy uppercase tracking-wider">Available Subscription Plans</h3>
         </div>

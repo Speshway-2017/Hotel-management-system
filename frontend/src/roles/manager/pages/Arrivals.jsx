@@ -655,7 +655,7 @@ function ManagerOperationsPage() {
         booking={extendingBooking}
         isOpen={!!extendingBooking}
         onClose={() => setExtendingBooking(null)}
-        onSuccess={() => loadArrivals(false)}
+        onSuccess={() => loadData()}
         userRole="manager"
       />
 

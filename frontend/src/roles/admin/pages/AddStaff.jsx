@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { PageHeader, Panel } from "@/components/hs/kit";
+import { Panel } from "@/components/hs/kit";
 import { superAdminService } from "@/services/superAdmin";
 import { Button } from "@/components/ui/button";
 import { FormField, Input, Select } from "@/components/hs/FormFields";
@@ -78,11 +78,6 @@ function AddStaff() {
 
   return (
     <div className="space-y-6 text-left">
-      <PageHeader
-        title="Register Staff Profile"
-        subtitle="Onboard a new employee, set role configurations and shift assignments."
-      />
-
       <div className="max-w-xl">
         <Panel title="Employee Registration Form" description="Assign credentials and contact details.">
           <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white rounded-b-xl">

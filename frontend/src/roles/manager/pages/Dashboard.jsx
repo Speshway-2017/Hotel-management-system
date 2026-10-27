@@ -215,8 +215,9 @@ function ManagerDashboard() {
 
   // Dynamic Occupancy computations using shared KPI helper
   const roomKPIs = calculateRoomKPIs(rooms, bookings);
-  const totalRooms = roomKPIs.totalRooms;
-  const occupancyPercent = roomKPIs.occupancyRate;
+  const totalRooms = roomKPIs.totalRooms || 0;
+  const occupiedCount = roomKPIs.occupiedRooms ?? currentStays.length;
+  const occupancyPercent = roomKPIs.occupancyRate || 0;
   
   // Calculate Today's Revenue strictly for today's transactions / arrivals / bookings
   const todayRevenue = activeBookings.filter(r => {
@@ -394,20 +395,20 @@ function ManagerDashboard() {
               {/* Action 1: Operations */}
               <Link
                 to="/manager/operations"
-                className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-indigo/40 hover:bg-gradient-to-r hover:from-indigo/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
+                className="group relative flex items-center justify-between p-3 rounded-xl border border-muted/80 bg-white hover:border-black/40 hover:bg-gradient-to-r hover:from-black/5 hover:to-transparent hover:shadow-soft transition-all duration-200 cursor-pointer hover:no-underline"
               >
                 <div className="flex items-center gap-3">
-                  <div className="size-9 rounded-xl bg-indigo/10 text-indigo flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-indigo group-hover:text-white transition-all duration-200 shadow-sm">
+                  <div className="size-9 rounded-xl bg-black/10 text-black flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-black group-hover:text-white transition-all duration-200 shadow-sm">
                     <Building className="size-4" />
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-bold text-navy group-hover:text-indigo transition-colors leading-snug">Operations Grid</p>
+                    <p className="text-xs font-bold text-navy group-hover:text-black transition-colors leading-snug">Operations Grid</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">Check-ins & Movements</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo/10 text-indigo">Live</span>
-                  <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-indigo group-hover:translate-x-0.5 transition-all" />
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-black/10 text-black group-hover:bg-black group-hover:text-white transition-colors">Live</span>
+                  <ArrowRight className="size-3.5 text-muted-foreground group-hover:text-black group-hover:translate-x-0.5 transition-all" />
                 </div>
               </Link>
 

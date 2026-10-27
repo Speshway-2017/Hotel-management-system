@@ -12,7 +12,7 @@ import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.j
 import { upload, uploadImageToCloudinary } from '../utils/uploader.js';
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
-import { triggerNotification, notifyFeedbackEvent } from '../utils/notification.helper.js';
+import { triggerNotification, notifyFeedbackEvent, checkAndNotifySubscriptionExpiry } from '../utils/notification.helper.js';
 import { extractRoomNumber, calculatePropertyStats } from '../utils/roomHelper.js';
 import { sendAccountCreatedEmail } from '../services/email.service.js';
 
@@ -76,6 +76,12 @@ const defaultSettings = {
 router.get('/dashboard', async (req, res) => {
   try {
     const propertyId = req.user?.propertyId;
+    try {
+      const property = await findPropertySafely(propertyId, req.user);
+      if (property) {
+        await checkAndNotifySubscriptionExpiry(property, req);
+      }
+    } catch (_) {}
     const stats = await calculatePropertyStats(propertyId);
     return sendSuccess(res, 200, stats, 'Admin dashboard metrics retrieved');
   } catch (error) {
@@ -230,6 +236,9 @@ router.get('/property', async (req, res) => {
         gm: req.user?.name || "Vikram Rathore"
       });
       invalidatePropertyCache(defaultId);
+    }
+    if (property) {
+      await checkAndNotifySubscriptionExpiry(property, req);
     }
     return sendSuccess(res, 200, property, 'Property details retrieved successfully');
   } catch (error) {

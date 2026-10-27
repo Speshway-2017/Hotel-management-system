@@ -7,7 +7,7 @@ import { receptionistService } from "@/services/receptionist";
 import { toast } from "sonner";
 import { subscribeRealtimeSync, emitRealtimeEvent } from "@/services/socket";
 import { 
-  Search, X, Wrench, Shield, Check, Bed
+  Search, X, Wrench, Shield, Check, Bed, Users, Clock, CheckCircle2
 } from "lucide-react";
 import { formatDisplayDate } from "@/utils/dateUtils";
 import { receptionCache } from "@/services/receptionCache";
@@ -22,6 +22,30 @@ export const Route = createFileRoute("/reception/room-assignment")({
   }),
   component: RoomStatusPage
 });
+
+function PremiumStatCard({ label, value, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[110px] h-full text-left"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          <h3 className="mt-2.5 font-sans tracking-tight tabular-nums text-base font-bold text-slate-800 leading-none">{value}</h3>
+        </div>
+        {Icon && (
+          <span className="grid size-7 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-2">
+            <Icon className="size-3.5" />
+          </span>
+        )}
+      </div>
+      <div className="mt-auto pt-2 text-[9.5px] text-muted-foreground truncate">
+        {hint}
+      </div>
+    </div>
+  );
+}
 
 function RoomStatusPage() {
   const navigate = useNavigate();
@@ -112,6 +136,12 @@ function RoomStatusPage() {
     "Out of Service": { tone: "neutral", label: "Out of Service", color: "text-slate-700 bg-slate-50 border-slate-200" }
   };
 
+  // KPI Stats
+  const totalCount = rooms.length;
+  const occupiedCount = rooms.filter(r => r.status === "Occupied").length;
+  const reservedCount = rooms.filter(r => r.status === "Reserved").length;
+  const availableCount = rooms.filter(r => r.status === "Available").length;
+
   // Filter computations
   const filteredRooms = rooms.filter(rm => {
     const roomStr = String(rm.room || rm.roomNumber || "").toLowerCase();
@@ -132,84 +162,80 @@ function RoomStatusPage() {
   return (
     <div className="space-y-6 text-left font-sans animate-fade-in font-ui text-navy">
       
-      {/* Controls: Search and Filters */}
-      <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft space-y-4">
-        
-        {/* Row 1: Search */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
+      {/* KPI Cards Grid: Total, Occupied, Reserved, Available */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <PremiumStatCard label="Total Rooms" value={totalCount} hint="All inventory units" icon={Bed} accentColor="#6366f1" />
+        <PremiumStatCard label="Occupied" value={occupiedCount} hint="Currently in stay" icon={Users} accentColor="#10b981" />
+        <PremiumStatCard label="Reserved" value={reservedCount} hint="Booked & upcoming" icon={Clock} accentColor="#f59e0b" />
+        <PremiumStatCard label="Available" value={availableCount} hint="Ready for check-in" icon={CheckCircle2} accentColor="#0ea5e9" />
+      </div>
+
+      {/* Controls: Inline Search, Floor, Type, Climate, and Status Filters */}
+      <div className="bg-white border border-muted rounded-2xl p-3 shadow-soft">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
+          
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search by room number or current guest name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+              className="w-full h-10 pl-10 pr-4 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
             />
           </div>
-        </div>
 
-        {/* Row 2: Select Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-muted/50">
-          
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Floor</span>
-            <select
-              value={floorFilter}
-              onChange={(e) => setFloorFilter(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Floors</option>
-              <option value="Floor 1">Floor 1</option>
-              <option value="Floor 2">Floor 2</option>
-              <option value="Floor 3">Floor 3</option>
-            </select>
-          </div>
+          {/* Floor Filter */}
+          <select
+            value={floorFilter}
+            onChange={(e) => setFloorFilter(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Floors</option>
+            <option value="Floor 1">Floor 1</option>
+            <option value="Floor 2">Floor 2</option>
+            <option value="Floor 3">Floor 3</option>
+          </select>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Room Type</span>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Room Types</option>
-              <option value="Standard Room">Standard Room</option>
-              <option value="Deluxe Room">Deluxe Room</option>
-              <option value="Deluxe King">Deluxe King</option>
-              <option value="Executive Room">Executive Room</option>
-              <option value="Villa Suite">Villa Suite</option>
-            </select>
-          </div>
+          {/* Room Type Filter */}
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Room Types</option>
+            <option value="Standard Room">Standard Room</option>
+            <option value="Deluxe Room">Deluxe Room</option>
+            <option value="Deluxe King">Deluxe King</option>
+            <option value="Executive Room">Executive Room</option>
+            <option value="Villa Suite">Villa Suite</option>
+          </select>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Climate</span>
-            <select
-              value={variantFilter}
-              onChange={(e) => setVariantFilter(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All (AC & Non-AC)</option>
-              <option value="AC">AC Only</option>
-              <option value="Non-AC">Non-AC Only</option>
-            </select>
-          </div>
+          {/* Climate Filter */}
+          <select
+            value={variantFilter}
+            onChange={(e) => setVariantFilter(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All (AC & Non-AC)</option>
+            <option value="AC">AC Only</option>
+            <option value="Non-AC">Non-AC Only</option>
+          </select>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider select-none">Room Status</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer w-full"
-            >
-              <option value="all">All Statuses</option>
-              <option value="Available">Available</option>
-              <option value="Occupied">Occupied</option>
-              <option value="Reserved">Reserved</option>
-              <option value="Out of Order">Out of Order</option>
-              <option value="Out of Service">Out of Service</option>
-            </select>
-          </div>
+          {/* Room Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Available">Available</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Reserved">Reserved</option>
+            <option value="Out of Order">Out of Order</option>
+            <option value="Out of Service">Out of Service</option>
+          </select>
 
         </div>
       </div>

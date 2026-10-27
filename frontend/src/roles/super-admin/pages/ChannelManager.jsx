@@ -2,9 +2,43 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { PageHeader, Panel, Tag, statusTone, Notice, ActionGroup, ViewActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Activity, Sliders, CheckCircle2, AlertTriangle, AlertCircle, X, ShieldAlert, Key, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Activity, Sliders, CheckCircle2, AlertTriangle, AlertCircle, X, ShieldAlert, Key, Eye, EyeOff, Building2 } from "lucide-react";
 import { superAdminService } from "@/services/superAdmin";
 import { subscribeRealtimeSync } from "@/services/socket";
+
+function ChannelStatCard({ label, value, hint, delta = 4, icon: Icon, accentColor = "#0d1b2a", isAlert = false }) {
+  const isPositive = delta >= 0;
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left font-ui"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="min-h-5 sm:h-8 flex items-start">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          </div>
+          <h3 className={`mt-1.5 font-sans text-lg font-bold ${isAlert ? "text-destructive" : "text-slate-800"} leading-none tracking-tight tabular-nums whitespace-nowrap`}>
+            {value}
+          </h3>
+        </div>
+        {Icon && (
+          <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
+            <Icon className="size-4" />
+          </span>
+        )}
+      </div>
+      <div className="mt-auto pt-2 flex items-center gap-1.5 text-[10px] h-4">
+        {delta !== null && delta !== undefined && (
+          <span className={`inline-flex items-center gap-0.5 font-bold shrink-0 ${isPositive ? "text-success" : "text-destructive"}`}>
+            {isPositive ? "+" : ""}{delta}%
+          </span>
+        )}
+        {hint && <span className="text-[10px] text-muted-foreground truncate">{hint}</span>}
+      </div>
+    </div>
+  );
+}
 
 function SuperAdminChannelManager() {
   const [loading, setLoading] = useState(false);
@@ -141,34 +175,40 @@ function SuperAdminChannelManager() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Connected Channels */}
-        <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#5B21B6" }}>
-          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total Connected Channels</span>
-          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-slate-800 mt-2">3 / 4</h4>
-          <p className="text-[10px] text-muted-foreground mt-1">MakeMyTrip, Goibibo, Booking</p>
-        </div>
-
-        {/* Active Properties */}
-        <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#4E7C59" }}>
-          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Active Properties</span>
-          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-slate-800 mt-2">6 Properties</h4>
-          <p className="text-[10px] text-muted-foreground mt-1">Global group integration</p>
-        </div>
-
-        {/* Last Successful Sync */}
-        <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#F5C06A" }}>
-          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Last Successful Sync</span>
-          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-slate-800 mt-2">2 min ago</h4>
-          <p className="text-[10px] text-muted-foreground mt-1">Via central XML gateway</p>
-        </div>
-
-        {/* Sync Issues */}
-        <div className="bg-card border rounded-2xl p-5 shadow-soft PremiumStatCard flex flex-col justify-between" style={{ "--accent-color": "#FF6B8B" }}>
-          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Sync Issues Flagged</span>
-          <h4 className="font-sans tracking-tight tabular-nums font-bold text-2xl text-error mt-2">2 Mismatches</h4>
-          <p className="text-[10px] text-muted-foreground mt-1">Requires immediate manual audit</p>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 font-ui dashboard-stats-grid">
+        <ChannelStatCard
+          label="Connected Channels"
+          value="3 / 4"
+          hint="MakeMyTrip, Goibibo, Booking"
+          delta={5}
+          icon={Activity}
+          accentColor="#5B21B6"
+        />
+        <ChannelStatCard
+          label="Active Properties"
+          value="6 Hotels"
+          hint="Global group integration"
+          delta={8}
+          icon={Building2}
+          accentColor="#10B981"
+        />
+        <ChannelStatCard
+          label="Last Successful Sync"
+          value="2 min ago"
+          hint="Central XML gateway"
+          delta={10}
+          icon={RefreshCw}
+          accentColor="#F5C06A"
+        />
+        <ChannelStatCard
+          label="Sync Issues Flagged"
+          value="2 Mismatches"
+          hint="Requires audit"
+          delta={-2}
+          icon={AlertTriangle}
+          accentColor="#FF6B8B"
+          isAlert={true}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

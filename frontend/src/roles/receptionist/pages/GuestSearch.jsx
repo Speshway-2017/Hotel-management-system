@@ -151,7 +151,7 @@ function InHouseGuestsPage() {
     const query = searchQuery.toLowerCase();
 
     const matchesSearch = nameStr.includes(query) || roomStr.includes(query) || phoneStr.includes(query) || emailStr.includes(query);
-    const matchesStatus = filterStatus === "All" || g.status === filterStatus;
+    const matchesStatus = filterStatus === "All" || g.status === filterStatus || (filterStatus === "Due Out Today" && isToday(g.checkOut));
     const matchesType = filterRoomType === "all" || g.roomType === filterRoomType;
 
     return matchesSearch && matchesStatus && matchesType;
@@ -253,55 +253,49 @@ function InHouseGuestsPage() {
         <PremiumStatCard label="Due Out Today" value={dueOutCount} hint="Pending departures today" icon={Clock} accentColor="#f59e0b" />
       </div>
 
-      {/* Filters & Search controls */}
-      <div className="bg-white border border-muted rounded-2xl p-4 shadow-soft space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+      {/* Controls: Inline Search, Status Dropdown, and Room Type Dropdown */}
+      <div className="bg-white border border-muted rounded-2xl p-3 shadow-soft">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
           
           {/* Search bar */}
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-2.5 size-4 text-muted-foreground" />
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search guest name, room #, phone, booking ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
+              className="w-full h-10 pl-10 pr-4 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy"
             />
           </div>
 
-          {/* Room Type filter dropdown */}
-          <div className="flex items-center gap-2 w-full md:w-auto shrink-0 justify-end">
-            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider select-none">Room Type:</span>
-            <select
-              value={filterRoomType}
-              onChange={(e) => setFilterRoomType(e.target.value)}
-              className="px-3 py-1.5 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none cursor-pointer"
-            >
-              <option value="all">All Types</option>
-              <option value="Standard Room">Standard Room</option>
-              <option value="Deluxe Room">Deluxe Room</option>
-              <option value="Deluxe King">Deluxe King</option>
-              <option value="Executive Room">Executive Room</option>
-              <option value="Villa Suite">Villa Suite</option>
-              <option value="Premium Deluxe">Premium Deluxe</option>
-            </select>
-          </div>
+          {/* Status Dropdown Filter right beside Search bar */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Staying">Staying</option>
+            <option value="Extended Stay">Extended Stay</option>
+            <option value="Due Out Today">Due Out Today</option>
+          </select>
 
-        </div>
+          {/* Room Type Dropdown Filter */}
+          <select
+            value={filterRoomType}
+            onChange={(e) => setFilterRoomType(e.target.value)}
+            className="h-10 px-3 border border-muted bg-[#fcfcfc] rounded-xl text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy cursor-pointer shrink-0"
+          >
+            <option value="all">All Room Types</option>
+            <option value="Standard Room">Standard Room</option>
+            <option value="Deluxe Room">Deluxe Room</option>
+            <option value="Deluxe King">Deluxe King</option>
+            <option value="Executive Room">Executive Room</option>
+            <option value="Villa Suite">Villa Suite</option>
+            <option value="Premium Deluxe">Premium Deluxe</option>
+          </select>
 
-        {/* Tab filters */}
-        <div className="flex flex-wrap gap-1 border-t border-muted/50 pt-3">
-          {["All", "Staying", "Extended Stay", "Due Out Today"].map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={filterStatus === status ? "secondary" : "ghost"}
-              className="h-8 text-xs font-bold px-4 capitalize rounded-full"
-              onClick={() => setFilterStatus(status)}
-            >
-              {status}
-            </Button>
-          ))}
         </div>
       </div>
 

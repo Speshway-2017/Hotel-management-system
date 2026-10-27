@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { PageHeader, Tag, Notice, LoadingRows, Panel, Crumbs, ActionGroup } from "@/components/hs/kit";
+import { PageHeader, Tag, Notice, LoadingRows, Panel, ActionGroup } from "@/components/hs/kit";
 import { receptionistService } from "@/services/receptionist";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import {
   Bed,
   CheckCircle2,
   Send,
-  ArrowLeft,
   Smile,
   Meh,
   Frown
@@ -183,14 +182,6 @@ function ReceptionistViewFeedback() {
 
   return (
     <div className="space-y-6 text-left animate-fade-in font-sans font-ui text-navy">
-      <Crumbs
-        items={[
-          { label: "Front Desk", to: "/reception" },
-          { label: "Feedback", to: "/reception/feedback" },
-          { label: feedback ? `${guestName}'s Review` : "Feedback Details" }
-        ]}
-      />
-
       {error && <Notice tone="error" title="Feedback Error">{error}</Notice>}
 
       {loading ? (
@@ -355,17 +346,6 @@ function ReceptionistViewFeedback() {
                       </span>
                     </div>
                   )}
-                </div>
-
-                <div className="pt-4 border-t border-muted">
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate("/reception/feedback")}
-                    className="w-full text-xs font-bold gap-1.5 h-9 rounded-xl cursor-pointer"
-                  >
-                    <ArrowLeft className="size-3.5" />
-                    Back to Feedback List
-                  </Button>
                 </div>
               </div>
             </Panel>

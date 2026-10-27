@@ -61,7 +61,6 @@ function ManagerRoomsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [variantFilter, setVariantFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [variantFilter, setVariantFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 

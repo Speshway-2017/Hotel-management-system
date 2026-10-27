@@ -56,11 +56,32 @@ function ViewProperty() {
        users.find(u => u.name === property.gm || u.name === property.assignedAdmin?.name))
     : null;
 
-  const propertyReservations = property
-    ? reservations.filter(r => r.propertyId === property._id || r.propertyId === property.id)
+  const propCandidates = property
+    ? [property._id, property.id, property.propertyId].filter(Boolean).map(x => String(x).toLowerCase().trim())
     : [];
 
-  const totalRevenue = propertyReservations.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const propertyReservations = property
+    ? reservations.filter(r => {
+        const rPropId = typeof r.propertyId === 'object' ? (r.propertyId?._id || r.propertyId?.id) : r.propertyId;
+        const rHotelId = typeof r.hotelId === 'object' ? (r.hotelId?._id || r.hotelId?.id) : r.hotelId;
+        const candidates = [rPropId, rHotelId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+        return candidates.some(c => propCandidates.includes(c));
+      })
+    : [];
+
+  const validReservations = propertyReservations.filter(r => {
+    const s = String(r.status || '').toLowerCase().trim();
+    return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+  });
+
+  const calculatedRevenue = validReservations.reduce((sum, r) => {
+    const val = Number(r.amount ?? r.totalAmount ?? r.paidAmount ?? 0);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
+
+  const totalRevenue = (Number(property?.revenue ?? property?.totalRevenue ?? 0) > 0)
+    ? Number(property?.revenue ?? property?.totalRevenue)
+    : (calculatedRevenue || 0);
 
   return (
     <div className="space-y-6">

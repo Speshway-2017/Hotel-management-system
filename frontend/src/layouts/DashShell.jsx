@@ -36,9 +36,19 @@ const subModules = {
   "super-admin": {
     "Operations": [
       { label: "Properties", to: "/super-admin/properties" },
+      { label: "Reservations", to: "/super-admin/reservations" },
+      { label: "Guests Portfolio", to: "/super-admin/users" },
       { label: "Channel Manager", to: "/super-admin/channel-manager" },
-      { label: "Contact Requests", to: "/super-admin/contacts" },
-      { label: "Guests Portfolio", to: "/super-admin/users" }
+      { label: "Contact Requests", to: "/super-admin/contacts" }
+    ],
+    "Management": [
+      { label: "Admin Management", to: "/super-admin/admins" },
+      { label: "Subscription Plans", to: "/super-admin/subscription" },
+      { label: "Promo Coupons", to: "/super-admin/coupons" }
+    ],
+    "Analytics & Reports": [
+      { label: "Financial Reports", to: "/super-admin/reports" },
+      { label: "Occupancy Trends", to: "/super-admin/occupancy" }
     ],
     "System": [
       { label: "Branding", to: "/super-admin/branding" },
@@ -663,6 +673,30 @@ export function DashShell({ role, children }) {
                   };
                 }
 
+                if (path.startsWith("/super-admin/subscription")) {
+                  return {
+                    title: "Subscription Plans & Requests",
+                    subtitle: "Manage SaaS subscription plans, quotas, pricing tiers, and property upgrade requests."
+                  };
+                }
+                if (path.startsWith("/super-admin/contacts")) {
+                  return {
+                    title: "Contact Inquiries Desk",
+                    subtitle: "Review public website contact requests, inquiries, and customer communication logs."
+                  };
+                }
+                if (path.startsWith("/super-admin/occupancy")) {
+                  return {
+                    title: "Occupancy & Portfolio Revenue",
+                    subtitle: "Consolidated occupancy trends, room utilization, ADR, and RevPAR metrics across all properties."
+                  };
+                }
+                if (path.startsWith("/super-admin/global-settings")) {
+                  return {
+                    title: "Global Platform Settings",
+                    subtitle: "Configure platform-wide defaults, security protocols, GST tax rates, and API keys."
+                  };
+                }
                 if (path.startsWith("/super-admin/coupons")) {
                   return {
                     title: "Promo Coupons Console",
@@ -900,6 +934,12 @@ export function DashShell({ role, children }) {
                     subtitle: "Look up guest logs, contact info, previous visits, and flags."
                   };
                 }
+                if (path.match(/\/reception\/folio\/[^\/]+/)) {
+                  return {
+                    title: "Guest Digital Folio",
+                    subtitle: "Real-time itemized billing dossier, incidental postings, and settlement records."
+                  };
+                }
                 if (path.startsWith("/reception/payments") || path.startsWith("/reception/folio")) {
                   return {
                     title: "Payments Ledger",
@@ -910,6 +950,12 @@ export function DashShell({ role, children }) {
                   return {
                     title: "Desk Notifications",
                     subtitle: "Track live property-level alarms, housekeeping alerts, and booking updates."
+                  };
+                }
+                if (path.startsWith("/reception/feedback")) {
+                  return {
+                    title: "Front Desk Guest Feedback",
+                    subtitle: "Collect checkout guest ratings, acknowledge comments, and track front desk guest satisfaction."
                   };
                 }
                 if (path.startsWith("/reception/profile")) {
@@ -1281,6 +1327,8 @@ export function DashShell({ role, children }) {
                 "/reception/folio": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio" }],
                 "/reception/notifications": [{ label: "Notifications" }],
                 "/reception/profile": [{ label: "Profile" }],
+                "/reception/feedback": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Guest Feedback" }],
+                "/reception/feedback/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Guest Feedback", to: "/reception/feedback" }, { label: "Feedback Details" }],
                 "/reception/check-in/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Arrivals", to: "/reception/check-in" }, { label: "Guest Verification & Check-In" }],
                 "/reception/check-out/:id": [{ label: "Front Desk", to: "/reception/check-in" }, { label: "Departures", to: "/reception/check-out" }, { label: "Checkout Details" }],
                 "/reception/folio/:id": [{ label: "Payments", to: "/reception/payments" }, { label: "Folio Details" }],
@@ -1319,6 +1367,7 @@ export function DashShell({ role, children }) {
                                             .replace(/\/reception\/reservations\/[^\/]+$/, "/reception/reservations/:id")
                                             .replace(/\/reception\/room-assignment\/[^\/]+$/, "/reception/room-assignment/:id")
                                             .replace(/\/reception\/guest-search\/[^\/]+$/, "/reception/guest-search/:id")
+                                            .replace(/\/reception\/feedback\/[^\/]+$/, "/reception/feedback/:id")
                                             .replace(/\/guest\/folio\/[^\/]+$/, "/guest/folio/:id")
                                             .replace(/\/guest\/refund\/[^\/]+$/, "/guest/refund/:id")
                                             .replace(/\/guest\/refund-request\/[^\/]+$/, "/guest/refund/:id")
@@ -1330,19 +1379,42 @@ export function DashShell({ role, children }) {
 
               if (cleanPathname === "/guest/folio/:id" || (cleanPathname === "/guest/folio" && (queryParams.has('id') || queryParams.has('view')))) {
                 segments = [
-                  { label: "Digital Folio", to: "/guest/folio" },
-                  { label: "Folio Details" }
+                  { label: "Digital Folio", to: "/guest/folio", search: {} },
+                  { label: "Folio Details", className: "text-navy font-normal" }
                 ];
               } else if (cleanPathname === "/guest/bookings/:id" || cleanPathname === "/guest/bookings") {
                 if (bookingIdParam) {
                   const bRef = bookingIdParam.startsWith('BK') ? bookingIdParam : `BK${bookingIdParam}`;
                   segments = [
-                    { label: "My Bookings", to: "/guest/bookings" },
-                    { label: `Booking #${bRef}` }
+                    { label: "My Bookings", to: "/guest/bookings", search: {} },
+                    { label: bRef, className: "text-navy font-normal" }
                   ];
                 } else {
                   segments = [
                     { label: "My Bookings" }
+                  ];
+                }
+              }
+
+              if (pathname.startsWith("/reception/reservations/")) {
+                const resId = pathname.split("/reception/reservations/")[1]?.split("?")[0];
+                if (resId) {
+                  const bRef = resId.startsWith('BK') ? resId : `BK${resId}`;
+                  segments = [
+                    { label: "Reservations", to: "/reception/reservations" },
+                    { label: "Reservations Ledger", to: "/reception/reservations" },
+                    { label: bRef, className: "text-navy font-normal" }
+                  ];
+                }
+              }
+
+              if (pathname.startsWith("/reception/folio/")) {
+                const folId = pathname.split("/reception/folio/")[1]?.split("?")[0];
+                if (folId) {
+                  const fRef = folId.startsWith('FOL-') ? folId : `FOL-${folId}`;
+                  segments = [
+                    { label: "Payments", to: "/reception/payments" },
+                    { label: fRef, className: "text-navy font-normal" }
                   ];
                 }
               }
@@ -1361,19 +1433,28 @@ export function DashShell({ role, children }) {
                       const isLast = idx === segments.length - 1;
                       const label = typeof seg === "object" ? seg.label : seg;
                       const to = typeof seg === "object" ? seg.to : null;
+                      const search = typeof seg === "object" && seg.search !== undefined ? seg.search : undefined;
                       return (
                         <span key={idx} className="inline-flex items-center gap-1.5 shrink-0 max-w-full">
                           <span className="text-muted-foreground/45" aria-hidden>/</span>
                           {to && !isLast ? (
                             <Link 
                               to={to} 
+                              search={search}
+                              onClick={() => {
+                                if (to === "/guest/bookings") {
+                                  window.history.pushState({}, '', '/guest/bookings');
+                                  window.dispatchEvent(new Event('popstate'));
+                                  window.dispatchEvent(new Event('locationchange'));
+                                }
+                              }}
                               style={{ color: '#2563eb' }}
                               className="hover:underline transition-colors font-medium cursor-pointer truncate max-w-[180px] sm:max-w-none"
                             >
                               {label}
                             </Link>
                           ) : (
-                            <span className={isLast ? "text-navy font-bold truncate max-w-[200px] sm:max-w-none" : "text-muted-foreground font-normal truncate max-w-[180px] sm:max-w-none"}>
+                            <span className={isLast ? (typeof seg === "object" && seg.className ? `${seg.className} truncate max-w-[200px] sm:max-w-none` : "text-navy font-bold truncate max-w-[200px] sm:max-w-none") : "text-muted-foreground font-normal truncate max-w-[180px] sm:max-w-none"}>
                               {label}
                             </span>
                           )}
