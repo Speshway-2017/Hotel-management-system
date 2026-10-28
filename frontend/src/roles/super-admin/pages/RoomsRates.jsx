@@ -185,14 +185,14 @@ function SuperAdminRoomsRates() {
       {error && <Notice tone="error" title="Data Load Failure" className="text-left">{error}</Notice>}
 
       {/* Advanced Filter Toolbar */}
-      <div className="flex flex-col gap-3 bg-white border border-muted p-4 rounded-2xl shadow-soft">
+      <div className="flex flex-col gap-2.5 bg-white border border-muted p-3.5 rounded-xl shadow-soft">
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Property Filter */}
-          <div className="relative">
+          <div className="relative min-w-[150px] flex-1 sm:flex-initial">
             <select
               value={propertyFilter}
               onChange={(e) => setPropertyFilter(e.target.value)}
-              className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[160px] cursor-pointer appearance-none"
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
             >
               <option value="All">All Properties</option>
               {properties.map((p) => (
@@ -203,11 +203,11 @@ function SuperAdminRoomsRates() {
           </div>
 
           {/* Room Type Filter */}
-          <div className="relative">
+          <div className="relative min-w-[140px] flex-1 sm:flex-initial">
             <select
               value={roomTypeFilter}
               onChange={(e) => setRoomTypeFilter(e.target.value)}
-              className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[140px] cursor-pointer appearance-none"
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
             >
               <option value="All">All Room Types</option>
               <option value="Standard">Standard</option>
@@ -218,11 +218,11 @@ function SuperAdminRoomsRates() {
           </div>
 
           {/* Rate Plan Filter */}
-          <div className="relative">
+          <div className="relative min-w-[140px] flex-1 sm:flex-initial">
             <select
               value={ratePlanFilter}
               onChange={(e) => setRatePlanFilter(e.target.value)}
-              className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[140px] cursor-pointer appearance-none"
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
             >
               <option value="All">All Rate Plans</option>
               <option value="Standard">Standard</option>
@@ -234,11 +234,11 @@ function SuperAdminRoomsRates() {
           </div>
 
           {/* Status Filter */}
-          <div className="relative">
+          <div className="relative min-w-[140px] flex-1 sm:flex-initial">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[140px] cursor-pointer appearance-none"
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
             >
               <option value="All">All Statuses</option>
               <option value="Available">Available</option>

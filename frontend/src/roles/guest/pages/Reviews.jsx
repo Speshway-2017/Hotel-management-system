@@ -10,6 +10,7 @@ import { apiClient, invalidateApiCache } from "@/services/apiClient";
 import { authService } from "@/services/auth";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { validateWithZod, feedbackSchema } from "@/schemas";
 
 export const Route = createFileRoute("/guest/feedback")({
@@ -298,7 +299,7 @@ function GuestReviewsPage() {
           {/* Search bar */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-navy/40" />
-            <input
+            <Input
               placeholder="Search by hotel, room, booking ID, comment, or reply..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

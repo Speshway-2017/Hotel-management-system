@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, EditActionButton, DeleteActionButton, DownloadActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { adminService } from "@/services/admin";
 import { managerService } from "@/services/manager";
@@ -683,7 +684,7 @@ export function UnifiedPaymentsView({ role = "admin" }) {
           <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center flex-1">
             <div className="relative flex-1 min-w-[220px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-              <input
+              <Input
                 type="text"
                 placeholder="Search by Guest Name, Booking ID, Transaction ID, Room..."
                 value={searchQuery}

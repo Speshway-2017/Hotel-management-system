@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, ExtendActionButton, DetailsActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { receptionistService } from "@/services/receptionist";
 import { 
   Plus, LogIn, LogOut, Calendar, Users, Home, IndianRupee, 
@@ -260,7 +261,7 @@ function InHouseGuestsPage() {
           {/* Search bar */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Search guest name, room #, phone, booking ID..."
               value={searchQuery}

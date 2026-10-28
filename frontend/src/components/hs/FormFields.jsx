@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/utils/utils";
-import { validateFieldValue } from "@/schemas/primitives";
+import { validateFieldValue, hasRepeatedChars, isAllSameChar, isRepeatedSearchQuery } from "@/schemas/primitives";
 
 export const FormFieldContext = React.createContext(null);
 
@@ -15,6 +15,10 @@ export function FormField({
   className
 }) {
   const [childError, setChildError] = React.useState(null);
+
+  const isSearchField =
+    (typeof label === "string" && /search|filter|find|query|lookup|destination|location|keyword/i.test(label)) ||
+    (typeof id === "string" && /search|filter|find|query|lookup|destination|location|keyword/i.test(id));
 
   // If errorMsg changes from parent form submit, use it; otherwise use live childError from user typing
   const displayError = childError || errorMsg;
@@ -96,6 +100,9 @@ export const Input = React.forwardRef(
       nameOnly = false,
       dataType,
       required,
+      isSearch = false,
+      noValidate = false,
+      disableValidation = false,
       onBlur,
       onChange,
       onKeyDown,
@@ -110,8 +117,28 @@ export const Input = React.forwardRef(
     const [localError, setLocalError] = React.useState(null);
     const [touched, setTouched] = React.useState(false);
 
+    // Identify search and filter inputs across the entire application
+    const isSearchField = React.useMemo(() => {
+      if (isSearch || noValidate || disableValidation) return true;
+      if (type === "search" || dataType === "search") return true;
+      if (props.role === "searchbox" || props.role === "search") return true;
+      const searchPattern = /search|filter|find|query|lookup|destination|location|keyword|term/i;
+      const placeholder = String(props.placeholder || "");
+      if (searchPattern.test(placeholder) || /hyderabad|jaipur|goa/i.test(placeholder)) return true;
+      const name = String(props.name || "");
+      if (searchPattern.test(name) || name.toLowerCase() === "q") return true;
+      const id = String(props.id || "");
+      if (searchPattern.test(id) || id.toLowerCase() === "q") return true;
+      const ariaLabel = String(props["aria-label"] || "");
+      if (searchPattern.test(ariaLabel)) return true;
+      const cls = String(className || "");
+      if (searchPattern.test(cls)) return true;
+      return false;
+    }, [isSearch, noValidate, disableValidation, type, dataType, props.role, props.placeholder, props.name, props.id, props["aria-label"], className]);
+
     // Determine validation type
     const validationType = React.useMemo(() => {
+      if (isSearchField) return "search";
       if (dataType) return dataType;
       if (nameOnly) return "name";
       if (textOnly) return "text-only";
@@ -123,26 +150,29 @@ export const Input = React.forwardRef(
         return "number";
       }
       return type;
-    }, [dataType, nameOnly, textOnly, type, props.step, props.name]);
+    }, [isSearchField, dataType, nameOnly, textOnly, type, props.step, props.name]);
 
     const isNumberField =
-      validationType === "number" ||
+      !isSearchField &&
+      (validationType === "number" ||
       validationType === "amount" ||
       validationType === "integer" ||
-      type === "number";
+      type === "number");
 
     const isTextField =
-      validationType === "name" ||
+      !isSearchField &&
+      (validationType === "name" ||
       validationType === "text-only" ||
       validationType === "city" ||
       nameOnly ||
-      textOnly;
+      textOnly);
 
     const isPhoneField =
-      validationType === "tel" ||
+      !isSearchField &&
+      (validationType === "tel" ||
       validationType === "phone" ||
       type === "tel" ||
-      Boolean(props.name && (props.name.toLowerCase().includes("phone") || props.name.toLowerCase().includes("mobile")));
+      Boolean(props.name && (props.name.toLowerCase().includes("phone") || props.name.toLowerCase().includes("mobile"))));
 
     const updateError = (err) => {
       setLocalError(err);
@@ -158,7 +188,9 @@ export const Input = React.forwardRef(
         fieldName: props.placeholder || props.name || "Field",
         min: props.min ? Number(props.min) : 0,
         max: props.max ? Number(props.max) : Infinity,
-        allowZero: props.min === undefined || Number(props.min) <= 0
+        maxLength: props.maxLength || (isSearchField ? 50 : undefined),
+        allowZero: props.min === undefined || Number(props.min) <= 0,
+        isSearch: isSearchField
       });
       return res.isValid ? null : res.error;
     };
@@ -166,6 +198,37 @@ export const Input = React.forwardRef(
     const handleKeyDown = (e) => {
       // Allow navigation and shortcut keys
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1) {
+        if (onKeyDown) onKeyDown(e);
+        return;
+      }
+
+      // Search fields: prevent exceeding 50 characters and prevent repeated characters
+      if (isSearchField) {
+        const target = e.target;
+        const maxLen = props.maxLength || 50;
+        const selStart = target.selectionStart ?? 0;
+        const selEnd = target.selectionEnd ?? 0;
+        const currentVal = props.value !== undefined ? String(props.value) : (target.value || "");
+        const isReplacing = selEnd > selStart;
+
+        if (!isReplacing && currentVal.length >= maxLen) {
+          e.preventDefault();
+          updateError(`Search query cannot exceed ${maxLen} characters.`);
+          if (onKeyDown) onKeyDown(e);
+          return;
+        }
+
+        const before = currentVal.slice(0, selStart);
+        const after = currentVal.slice(selEnd);
+        const nextVal = before + e.key + after;
+        if (isRepeatedSearchQuery(nextVal)) {
+          e.preventDefault();
+          updateError("Search query contains invalid repeated characters.");
+          if (onKeyDown) onKeyDown(e);
+          return;
+        }
+
+        if (localError) updateError(null);
         if (onKeyDown) onKeyDown(e);
         return;
       }
@@ -228,6 +291,35 @@ export const Input = React.forwardRef(
     const handlePaste = (e) => {
       const pasteText = e.clipboardData?.getData("text") || "";
 
+      if (isSearchField) {
+        const target = e.target;
+        const maxLen = props.maxLength || 50;
+        const selStart = target.selectionStart ?? 0;
+        const selEnd = target.selectionEnd ?? 0;
+        const currentVal = props.value !== undefined ? String(props.value) : (target.value || "");
+        const before = currentVal.slice(0, selStart);
+        const after = currentVal.slice(selEnd);
+        const nextVal = before + pasteText + after;
+
+        if (isRepeatedSearchQuery(nextVal)) {
+          e.preventDefault();
+          updateError("Search query contains invalid repeated characters.");
+          if (onPaste) onPaste(e);
+          return;
+        }
+
+        if (nextVal.length > maxLen) {
+          e.preventDefault();
+          updateError(`Search query cannot exceed ${maxLen} characters.`);
+          if (onPaste) onPaste(e);
+          return;
+        }
+
+        if (localError) updateError(null);
+        if (onPaste) onPaste(e);
+        return;
+      }
+
       if (isNumberField) {
         if (/[a-zA-Z]/.test(pasteText) || (pasteText.trim() !== "" && isNaN(Number(pasteText)))) {
           e.preventDefault();
@@ -284,6 +376,19 @@ export const Input = React.forwardRef(
 
     const handleChange = (e) => {
       const val = e.target.value;
+
+      if (isSearchField) {
+        const maxLen = props.maxLength || 50;
+        if (val.length > maxLen) {
+          updateError(`Search query cannot exceed ${maxLen} characters.`);
+        } else if (isRepeatedSearchQuery(val)) {
+          updateError("Search query contains invalid repeated characters.");
+        } else {
+          updateError(null);
+        }
+        if (onChange) onChange(e);
+        return;
+      }
 
       // Check HTML5 validity badInput (e.g. invalid characters typed into native number input)
       if (e.target.validity?.badInput) {
@@ -349,6 +454,19 @@ export const Input = React.forwardRef(
 
     const handleBlur = (e) => {
       setTouched(true);
+      if (isSearchField) {
+        const val = e.target.value;
+        const maxLen = props.maxLength || 50;
+        if (val.length > maxLen) {
+          updateError(`Search query cannot exceed ${maxLen} characters.`);
+        } else if (isRepeatedSearchQuery(val)) {
+          updateError("Search query contains invalid repeated characters.");
+        } else {
+          updateError(null);
+        }
+        if (onBlur) onBlur(e);
+        return;
+      }
       const val = e.target.value;
       const err = runValidation(val);
       updateError(err);
@@ -368,6 +486,7 @@ export const Input = React.forwardRef(
           )}
           <input
             type={type}
+            maxLength={isSearchField ? (props.maxLength || 50) : props.maxLength}
             className={cn(
               "w-full h-10 px-3.5 border rounded-lg text-sm bg-white font-medium text-navy placeholder:text-muted-foreground/50 transition-all duration-200 focus:outline-none focus:ring-2 disabled:bg-[#fcfcfc] disabled:text-muted-foreground/60 disabled:cursor-not-allowed",
               Icon ? "pl-10" : "",

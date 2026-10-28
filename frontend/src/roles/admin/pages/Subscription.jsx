@@ -270,7 +270,7 @@ function AdminSubscriptionPage() {
       )}
 
       {/* Pricing Cards List */}
-      <div id="plans-grid" className="space-y-4 pt-2">
+      <div id="plans-grid" className="space-y-4 pt-2 scroll-mt-20">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-navy uppercase tracking-wider">Available Subscription Plans</h3>
         </div>

@@ -167,6 +167,59 @@ console.assert(!checkRepeatedLive.isValid, 'Live check must reject repeated char
 
 const checkGoodLive = validateFieldValue('phone', '9876543210', { required: true });
 console.assert(checkGoodLive.isValid, 'Live check must accept good phone');
+
+// 8. Test searchbar validation: rejects repeated characters and excessive length
+console.log('--- 8. Testing Searchbar Query Validation ---');
+const checkGoodSearch = validateFieldValue('search', 'Luxury Heritage Palace');
+console.assert(checkGoodSearch.isValid, 'Valid search query must pass');
+
+const checkSearchRepeatedType = validateFieldValue('search', 'aaaa');
+console.assert(!checkSearchRepeatedType.isValid, 'Search type with repeated characters "aaaa" must be rejected');
+console.assert(checkSearchRepeatedType.error.includes('repeated characters'), 'Error must mention repeated characters');
+
+const checkSearchLongType = validateFieldValue('search', 'a'.repeat(51));
+console.assert(!checkSearchLongType.isValid, 'Search query exceeding 50 characters must be rejected');
+console.assert(checkSearchLongType.error.includes('50 characters'), 'Error must mention 50 characters limit');
+
+const checkSearchRepeatedPlaceholder = validateFieldValue('text', '1111', {
+  fieldName: 'Search guest name, room number, or booking reference...'
+});
+console.assert(!checkSearchRepeatedPlaceholder.isValid, 'Search fieldName with repeated digits must be rejected');
+
+const checkSearchRepeatedThreeLetters = validateFieldValue('search', 'aaa');
+console.assert(!checkSearchRepeatedThreeLetters.isValid, 'Search query with "aaa" must be rejected');
+
+const checkSearchRepeatedThreeDigits = validateFieldValue('search', '111');
+console.assert(!checkSearchRepeatedThreeDigits.isValid, 'Search query with "111" must be rejected');
+
+const checkSearchValidDoubleLetter = validateFieldValue('search', 'Radisson Blu');
+console.assert(checkSearchValidDoubleLetter.isValid, 'Search query "Radisson Blu" with double letters must pass');
+
+const checkSearchValidRoom = validateFieldValue('search', 'Room 101');
+console.assert(checkSearchValidRoom.isValid, 'Search query "Room 101" must pass');
+
+const checkSearchValidIndianCity = validateFieldValue('search', 'Alleppey');
+console.assert(checkSearchValidIndianCity.isValid, 'Search query "Alleppey" with valid doubles must pass');
+
+const checkSearchDestinationRepeated = validateFieldValue('text', 'aaaa', {
+  fieldName: 'Destination (e.g. Hyderabad, Jaipur, Goa)...'
+});
+console.assert(!checkSearchDestinationRepeated.isValid, 'Destination searchbar with repeated characters must be rejected');
+
+const checkSearchDestinationLong = validateFieldValue('text', 'Hyderabad '.repeat(10), {
+  fieldName: 'Destination (e.g. Hyderabad, Jaipur, Goa)...'
+});
+console.assert(!checkSearchDestinationLong.isValid, 'Destination searchbar exceeding 50 characters must be rejected');
+
+const checkSearchFilterUnicodeRepeated = validateFieldValue('text', 'xxxx', {
+  fieldName: 'Filter…'
+});
+console.assert(!checkSearchFilterUnicodeRepeated.isValid, 'Filter searchbar with repeated characters must be rejected');
+
+const checkSearchWithOption = validateFieldValue('text', '9999', { isSearch: true });
+console.assert(!checkSearchWithOption.isValid, 'Search with isSearch option must reject repeated characters');
+
+console.log('✅ Searchbar validator strictly rejects repeated characters (3+ identical letters/chars) and queries exceeding 50 characters');
 console.log('✅ Live field-level validator provides instant on-blur and typing feedback');
 
 console.log('\n🎉 ALL CENTRALIZED ZOD SCHEMAS & VALIDATION SUITES PASSED!\n');

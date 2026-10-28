@@ -229,7 +229,7 @@ function Home() {
   return (
     <SiteLayout>
       {/* Dynamic Hero Slider */}
-      <section className="relative w-full overflow-hidden bg-navy py-12 md:py-20 lg:py-24">
+      <section id="hero" className="relative w-full overflow-hidden bg-navy py-12 md:py-20 lg:py-24">
         <div className="absolute inset-0 z-0">
           {dynamicSlides.map((slide, idx) => (
             <div
@@ -274,6 +274,11 @@ function Home() {
                     <span className="relative mt-1.5 block">
                       <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4.5 -translate-y-1/2 text-navy/50" />
                       <Input 
+                        type="search"
+                        role="searchbox"
+                        isSearch={true}
+                        name="destination"
+                        aria-label="Search destination"
                         value={heroLocation}
                         onChange={e => setHeroLocation(e.target.value)}
                         className="h-12 border-navy/10 bg-cream/10 pl-10 focus-visible:ring-gold text-navy font-semibold text-xs" 
@@ -349,7 +354,7 @@ function Home() {
 
 
       {/* Direct Booking vs OTA Sync Section (Interactive Animation) */}
-      <section className="bg-white py-24 border-y border-navy/5">
+      <section id="channel-manager" className="bg-white py-24 border-y border-navy/5 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
             <div className="lg:col-span-5">
@@ -490,7 +495,7 @@ function Home() {
       </section>
 
       {/* Guest Experience Workflow Section */}
-      <section className="bg-white py-24 border-y border-navy/5">
+      <section id="workflow" className="bg-white py-24 border-y border-navy/5 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Guest Journey Map</span>
@@ -620,7 +625,7 @@ function Home() {
       </section>
 
       {/* Signature Properties Showcase (Dynamic stay view) */}
-      <section className="bg-cream py-20 border-b border-navy/5">
+      <section id="signature-stays" className="bg-cream py-20 border-b border-navy/5 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
             <div>
@@ -695,7 +700,7 @@ function Home() {
       </section>
 
       {/* Latest Blog Insights from Journal - Overlapping Stacked Card Carousel */}
-      <section className="bg-cream/40 py-24 border-t border-navy/5 overflow-hidden">
+      <section id="journal" className="bg-cream/40 py-24 border-t border-navy/5 overflow-hidden scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-12">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Hour Stay Journal</span>
@@ -712,7 +717,7 @@ function Home() {
       </section>
 
       {/* Testimonials Section */}
-      <section className="bg-white py-24 border-t border-navy/5">
+      <section id="testimonials" className="bg-white py-24 border-t border-navy/5 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Partner Testimonials</span>

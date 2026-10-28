@@ -320,7 +320,7 @@ function Contact() {
   return (
     <SiteLayout>
       {/* 1. Hero Section */}
-      <section className="relative bg-navy py-16 lg:py-20 text-center overflow-hidden border-b border-white/5">
+      <section id="contact-hero" className="relative bg-navy py-16 lg:py-20 text-center overflow-hidden border-b border-white/5 scroll-mt-20">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(91,33,182,0.12),transparent_50%)]" />
         </div>
@@ -338,7 +338,7 @@ function Contact() {
       </section>
 
       {/* 2. Contact Channels (Sales, Support, Partnerships) */}
-      <section className="bg-white py-16 sm:py-20 border-b border-navy/5 relative z-10">
+      <section id="channels" className="bg-white py-16 sm:py-20 border-b border-navy/5 relative z-10 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-7 sm:gap-8 lg:grid-cols-3 text-left">
             {contactOptions.map((opt, idx) => (
@@ -349,7 +349,7 @@ function Contact() {
       </section>
 
       {/* 3. Form and Contact Info Layout */}
-      <section className="bg-cream/40 py-16 sm:py-24">
+      <section id="inquiry-form" className="bg-cream/40 py-16 sm:py-24 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-12 lg:grid-cols-[1fr_1.2fr] items-start">
             
@@ -552,7 +552,7 @@ function Contact() {
       </section>
 
       {/* 4. Request a Demo (Hotel owners focus) */}
-      <section className="bg-white py-16 text-center border-t border-navy/5 relative overflow-hidden">
+      <section id="demo" className="bg-white py-16 text-center border-t border-navy/5 relative overflow-hidden scroll-mt-20">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(91,33,182,0.03),transparent_60%)]" />
         </div>

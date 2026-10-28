@@ -216,7 +216,11 @@ export function SearchPage() {
                 <div className="relative">
                   <SearchIcon className="absolute left-4 top-3.5 size-5 text-navy/40 pointer-events-none" />
                   <Input 
-                    type="text"
+                    type="search"
+                    role="searchbox"
+                    isSearch={true}
+                    name="destination"
+                    aria-label="Search destination"
                     placeholder="Destination (e.g. Hyderabad, Jaipur, Goa)..."
                     value={searchTerm}
                     onChange={(e) => {

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, EditActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { receptionistService } from "@/services/receptionist";
@@ -177,7 +178,7 @@ function RoomStatusPage() {
           {/* Search bar */}
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Search by room number or current guest name..."
               value={searchQuery}

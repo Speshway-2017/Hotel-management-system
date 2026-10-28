@@ -466,7 +466,7 @@ function Features() {
   return (
     <SiteLayout>
       {/* Premium Hero Section */}
-      <section className="relative w-full overflow-hidden bg-navy py-20 lg:py-24">
+      <section id="features-hero" className="relative w-full overflow-hidden bg-navy py-20 lg:py-24 scroll-mt-20">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(91,33,182,0.15),transparent_50%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(245,192,106,0.08),transparent_50%)]" />
@@ -485,7 +485,7 @@ function Features() {
       </section>
 
       {/* 2. DYNAMIC SUBSCRIPTION PLANS & PRICING */}
-      <section id="pricing" className="bg-white py-20 border-b border-navy/5">
+      <section id="pricing" className="bg-white py-20 border-b border-navy/5 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 text-center font-ui">
           <span className="text-xs font-bold uppercase tracking-widest text-purple">Transparent Pricing</span>
           <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy">
@@ -641,7 +641,7 @@ function Features() {
       </section>
 
       {/* Complete Product Feature Directory Section */}
-      <section id="modules" className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80 scroll-mt-16">
+      <section id="modules" className="bg-[#F8FAFC] py-20 lg:py-24 border-t border-slate-200/80 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple font-ui">Complete Directory</span>

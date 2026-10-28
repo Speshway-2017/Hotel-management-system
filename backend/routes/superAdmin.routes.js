@@ -191,10 +191,16 @@ router.get('/dashboard-stats', checkPropertyStatus, async (req, res) => {
       settledPaymentsSum = settled.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     } catch (e) {}
 
-    const totalRev = settledPaymentsSum > 0 ? settledPaymentsSum : validBookings.reduce((acc, b) => {
+    const validBookings = (bookings || []).filter(b => isNotCancelled(b.status));
+    const bookingRevenue = validBookings.reduce((acc, b) => {
       const amt = Number(b.amount ?? b.totalAmount ?? b.paidAmount ?? 0);
       return acc + (isNaN(amt) ? 0 : amt);
     }, 0);
+    const propertiesRevenue = calculatedProperties.reduce((acc, p) => acc + Number(p.revenue || p.totalRevenue || 0), 0);
+
+    const totalRev = settledPaymentsSum > 0 
+      ? settledPaymentsSum 
+      : (propertiesRevenue > 0 ? propertiesRevenue : bookingRevenue);
     const activeReservations = bookings.filter(b => {
       const s = String(b.status || '').toLowerCase();
       return s === 'confirmed' || s === 'paid' || s === 'checked-in';

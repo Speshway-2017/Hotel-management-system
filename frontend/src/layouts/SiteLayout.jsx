@@ -7,11 +7,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/utils";
 
 const links = [
-{ label: "Home", to: "/" },
-{ label: "Features", to: "/features" },
-{ label: "About", to: "/about" },
-{ label: "Blog", to: "/blog" },
-{ label: "Contact", to: "/contact" }];
+  { label: "Home", to: "/" },
+  { label: "Categories", to: "/#categories" },
+  { label: "Stays", to: "/#signature-stays" },
+  { label: "Features", to: "/features" },
+  { label: "Pricing", to: "/features#pricing" },
+  { label: "About", to: "/about" },
+  { label: "Blog", to: "/blog" },
+  { label: "Contact", to: "/contact" }
+];
 
 
 export function SiteHeader() {
@@ -361,6 +365,7 @@ export function SiteFooter() {
 }
 
 export function SiteLayout({ children }) {
+
   useEffect(() => {
     publicService.getBranding()
       .then(res => {

@@ -766,6 +766,41 @@ body,
   scrollbar-width: none !important;  /* Firefox */
 }
 
+/* Smooth Scrolling for Public Pages, Dashboards, and Overflow Containers */
+html,
+body {
+  scroll-behavior: smooth !important;
+  scroll-padding-top: 5rem !important; /* Offset for sticky SiteHeader & DashShell Header */
+}
+
+.dashboard-theme,
+.dashboard-theme main,
+.dashboard-theme [class*="overflow-y-auto"],
+.dashboard-theme [class*="overflow-auto"],
+.dashboard-theme [class*="overflow-x-auto"],
+[class*="overflow-y-auto"],
+[class*="overflow-auto"] {
+  scroll-behavior: smooth !important;
+}
+
+.dashboard-theme {
+  scroll-padding-top: 4.5rem !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  .dashboard-theme,
+  .dashboard-theme main,
+  .dashboard-theme [class*="overflow-y-auto"],
+  .dashboard-theme [class*="overflow-auto"],
+  .dashboard-theme [class*="overflow-x-auto"],
+  [class*="overflow-y-auto"],
+  [class*="overflow-auto"] {
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ==========================================================================
    Enterprise Hotel-Management Table Styles (Universal)
    ========================================================================== */

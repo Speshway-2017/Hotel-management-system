@@ -470,7 +470,7 @@ export function DashShell({ role, children }) {
         </div>
 
         {/* Navigation list */}
-        <nav className="flex-1 space-y-4 overflow-y-auto scrollbar-none px-3 py-4">
+        <nav className="flex-1 space-y-4 overflow-y-auto scroll-smooth scrollbar-none px-3 py-4">
           {groups.map((g) => (
             <div key={g.group} className="space-y-1">
               {!collapsed && g.group && (
@@ -1083,7 +1083,7 @@ export function DashShell({ role, children }) {
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 p-4 sm:p-6">
+        <main className="min-w-0 flex-1 p-4 sm:p-6 scroll-smooth">
           <div className="mx-auto w-full max-w-[1400px] space-y-6 animate-fade-up">
             {(() => {
               if (pathname === "/admin" || pathname === "/super-admin" || pathname === "/manager" || pathname === "/guest" || pathname === "/reception" || pathname === "/admin/" || pathname === "/super-admin/" || pathname === "/manager/" || pathname === "/guest/" || pathname === "/reception/") {
@@ -1486,6 +1486,7 @@ export function DashShell({ role, children }) {
           {tooltip.text}
         </div>
       )}
+
     </div>
   );
 }

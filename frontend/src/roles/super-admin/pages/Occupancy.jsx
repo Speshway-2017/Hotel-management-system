@@ -89,6 +89,7 @@ function SuperAdminOccupancy() {
   const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -100,10 +101,11 @@ function SuperAdminOccupancy() {
     if (!isSilent) setLoading(true);
     setError(null);
     try {
-      const [statsRes, propsRes, resRes] = await Promise.all([
+      const [statsRes, propsRes, resRes, payRes] = await Promise.all([
         superAdminService.getDashboardStats().catch(() => ({})),
         superAdminService.getProperties().catch(() => ({})),
-        superAdminService.getReservations().catch(() => ({}))
+        superAdminService.getReservations().catch(() => ({})),
+        superAdminService.getPayments().catch(() => ({}))
       ]);
 
       if (statsRes.success && statsRes.data) {
@@ -114,6 +116,9 @@ function SuperAdminOccupancy() {
       }
       if (resRes.success && Array.isArray(resRes.data)) {
         setReservations(resRes.data);
+      }
+      if (payRes.success && Array.isArray(payRes.data)) {
+        setPayments(payRes.data);
       }
     } catch (err) {
       if (!isSilent) setError(err.message || "Failed to load occupancy analytics");
@@ -134,32 +139,143 @@ function SuperAdminOccupancy() {
     };
   }, []);
 
+  // Synchronized property revenue helper matching Dashboard and Properties pages
+  const getPropertyRevenue = (p) => {
+    if (!p) return 0;
+    const candidates = [p.id, p._id, p.propertyId]
+      .filter(Boolean)
+      .map(x => String(x).toLowerCase().trim());
+
+    // 1. Calculate from live loaded settled payments (matches Payments Ledger and Admin/Manager Dashboards)
+    if (Array.isArray(payments) && payments.length > 0) {
+      const propPayments = payments.filter(pay => {
+        const payPropId = typeof pay.propertyId === 'object' ? (pay.propertyId?._id || pay.propertyId?.id) : pay.propertyId;
+        const payHotelId = typeof pay.hotelId === 'object' ? (pay.hotelId?._id || pay.hotelId?.id) : pay.hotelId;
+        const pCandidates = [payPropId, payHotelId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+        return pCandidates.some(c => candidates.includes(c));
+      });
+
+      const settledPayments = propPayments.filter(pay => {
+        const s = String(pay.status || '').toLowerCase().trim();
+        return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+      });
+
+      const settledSum = settledPayments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+      if (settledSum > 0) return settledSum;
+    }
+
+    // 2. Property revenue calculated dynamically by backend API (incorporates settled ledger revenue)
+    const backendRev = Number(p.revenue ?? p.totalRevenue ?? 0);
+    if (!isNaN(backendRev) && backendRev > 0) {
+      return backendRev;
+    }
+
+    // 3. Fallback to live loaded reservations if available
+    if (Array.isArray(reservations) && reservations.length > 0) {
+      const pReservations = reservations.filter(r => {
+        const rPropId = typeof r.propertyId === 'object' ? (r.propertyId?._id || r.propertyId?.id) : r.propertyId;
+        const rHotelId = typeof r.hotelId === 'object' ? (r.hotelId?._id || r.hotelId?.id) : r.hotelId;
+        const rCandidates = [rPropId, rHotelId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+        return rCandidates.some(c => candidates.includes(c));
+      });
+
+      const validReservations = pReservations.filter(r => {
+        const s = String(r.status || '').toLowerCase().trim();
+        return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+      });
+
+      if (validReservations.length > 0) {
+        const calculated = validReservations.reduce((sum, r) => {
+          const val = Number(r.amount ?? r.totalAmount ?? r.paidAmount ?? 0);
+          return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+        if (calculated > 0) return calculated;
+      }
+    }
+
+    return 0;
+  };
+
   // Compute portfolio metrics
   const portfolioKPIs = useMemo(() => {
     const totalRooms = properties.reduce((sum, p) => sum + (Number(p.rooms) || 0), 0);
-    const activeCheckins = reservations.filter(r => r.status === "Checked-in").length;
-    const totalConfirmed = reservations.filter(r => r.status === "Confirmed" || r.status === "Checked-in" || r.status === "Paid").length;
-    const avgOccupancy = totalRooms > 0 ? Math.min(100, Math.round((activeCheckins / totalRooms) * 100)) : 68;
+    
+    // Check active check-ins (case-insensitive)
+    const activeCheckins = reservations.filter(r => {
+      const s = String(r.status || '').toLowerCase().trim();
+      return s === "checked-in" || s === "occupied";
+    }).length;
 
-    const totalRevenue = reservations.reduce((sum, r) => {
-      if (r.status === "Confirmed" || r.status === "Checked-in" || r.status === "Checked-out" || r.status === "Paid") {
-        return sum + (Number(r.amount) || 0);
-      }
-      return sum;
+    // Check confirmed reservations (case-insensitive)
+    const totalConfirmed = reservations.filter(r => {
+      const s = String(r.status || '').toLowerCase().trim();
+      return s === "confirmed" || s === "checked-in" || s === "paid" || s === "occupied";
+    }).length;
+
+    // Occupancy percentage across portfolio
+    const backendAvgOcc = Number(dashboardStats?.avgOccupancy);
+    const calculatedOcc = totalRooms > 0 ? Math.min(100, Math.round((activeCheckins / totalRooms) * 100)) : 0;
+    const avgOccupancy = calculatedOcc > 0 
+      ? calculatedOcc 
+      : (!isNaN(backendAvgOcc) && backendAvgOcc > 0 
+        ? backendAvgOcc 
+        : (properties.length > 0 
+          ? Math.round(properties.reduce((sum, p) => sum + (Number(p.occupancy) || 0), 0) / properties.length) 
+          : 0));
+
+    // Calculate revenue using synchronized sources:
+    // 1. Settled payments ledger total
+    const settledPaymentsTotal = (payments || []).filter(pay => {
+      const s = String(pay.status || '').toLowerCase().trim();
+      return s === 'settled' || s === 'paid' || s === 'success' || s === 'completed';
+    }).reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+
+    // 2. Sum of property revenues (matches Properties.jsx & Dashboard.jsx)
+    const propertiesTotalRevenue = properties.reduce((sum, p) => sum + getPropertyRevenue(p), 0);
+
+    // 3. Sum of valid non-cancelled reservations
+    const reservationsTotalRevenue = (reservations || []).filter(r => {
+      const s = String(r.status || '').toLowerCase().trim();
+      return s !== 'cancelled' && s !== 'canceled' && s !== 'void' && s !== 'rejected';
+    }).reduce((sum, r) => {
+      const val = Number(r.amount ?? r.totalAmount ?? r.paidAmount ?? 0);
+      return sum + (isNaN(val) ? 0 : val);
     }, 0);
 
-    const adr = activeCheckins > 0 ? Math.round(totalRevenue / activeCheckins) : (totalConfirmed > 0 ? Math.round(totalRevenue / totalConfirmed) : 4200);
-    const revpar = totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : Math.round(adr * 0.68);
+    // 4. Backend dashboardStats totalRev
+    const backendStatsRevenue = Number(dashboardStats?.totalRev || 0);
+
+    const totalRevenue = settledPaymentsTotal > 0
+      ? settledPaymentsTotal
+      : (propertiesTotalRevenue > 0
+        ? propertiesTotalRevenue
+        : (reservationsTotalRevenue > 0
+          ? reservationsTotalRevenue
+          : backendStatsRevenue));
+
+    // ADR & RevPAR calculations
+    const backendAdr = Number(dashboardStats?.avgAdr || 0);
+    const adr = activeCheckins > 0 
+      ? Math.round(totalRevenue / activeCheckins) 
+      : (totalConfirmed > 0 
+        ? Math.round(totalRevenue / totalConfirmed) 
+        : (backendAdr > 0 
+          ? backendAdr 
+          : (totalRooms > 0 ? Math.round(totalRevenue / totalRooms) : 0)));
+
+    const revpar = totalRooms > 0 
+      ? Math.round(totalRevenue / totalRooms) 
+      : (adr > 0 && avgOccupancy > 0 ? Math.round(adr * (avgOccupancy / 100)) : 0);
 
     return {
       totalRooms,
       activeCheckins,
       occupancy: avgOccupancy,
-      revenue: totalRevenue > 0 ? totalRevenue : 485000,
-      adr: adr > 0 ? adr : 4500,
-      revpar: revpar > 0 ? revpar : 3060
+      revenue: totalRevenue,
+      adr,
+      revpar
     };
-  }, [properties, reservations]);
+  }, [properties, reservations, payments, dashboardStats]);
 
   // 30-day occupancy trend data
   const trendData = useMemo(() => {
@@ -185,11 +301,19 @@ function SuperAdminOccupancy() {
   // Property occupancy comparison chart data
   const propertyBarData = useMemo(() => {
     return properties.map(p => {
-      const pId = p.id || p._id;
-      const propBookings = reservations.filter(r => r.propertyId === pId);
-      const checkedIn = propBookings.filter(r => r.status === "Checked-in").length;
-      const rooms = Number(p.rooms) || 30;
-      const occ = rooms > 0 ? Math.min(100, Math.round((checkedIn / rooms) * 100)) : (p.occupancy || 70);
+      const candidates = [p.id, p._id, p.propertyId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+      const propBookings = reservations.filter(r => {
+        const rPropId = typeof r.propertyId === 'object' ? (r.propertyId?._id || r.propertyId?.id) : r.propertyId;
+        const rHotelId = typeof r.hotelId === 'object' ? (r.hotelId?._id || r.hotelId?.id) : r.hotelId;
+        const rCandidates = [rPropId, rHotelId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+        return rCandidates.some(c => candidates.includes(c));
+      });
+      const checkedIn = propBookings.filter(r => {
+        const s = String(r.status || '').toLowerCase().trim();
+        return s === "checked-in" || s === "occupied";
+      }).length;
+      const rooms = Number(p.rooms) || 12;
+      const occ = rooms > 0 ? Math.min(100, Math.round((checkedIn / rooms) * 100)) : (Number(p.occupancy) || 0);
 
       return {
         name: (p.name || "Hotel").replace("Speshway ", "").slice(0, 15),
@@ -373,24 +497,24 @@ function SuperAdminOccupancy() {
         title="Live Property Occupancy Ledger"
         description={`Showing ${filteredProperties.length} properties across your portfolio.`}
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
               <Input
                 placeholder="Search hotel or city..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 rounded-full border-muted text-xs bg-muted/20 w-48 sm:w-64"
+                className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-48 sm:w-64"
               />
             </div>
-            <div className="flex gap-1 bg-muted/40 p-1 rounded-full border border-muted/50 text-[10px]">
+            <div className="flex gap-1 bg-muted/30 p-1 rounded-lg border border-muted/50 text-[10px] h-9 items-center">
               {["All", "Active", "Onboarding"].map(s => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
                   className={cn(
-                    "px-3 py-1 rounded-full font-semibold transition cursor-pointer",
-                    statusFilter === s ? "bg-navy text-white shadow-xs" : "text-muted-foreground hover:text-navy"
+                    "px-3 py-1 rounded-md font-semibold transition cursor-pointer text-xs",
+                    statusFilter === s ? "bg-navy text-white shadow-2xs" : "text-muted-foreground hover:text-navy"
                   )}
                 >
                   {s}
@@ -415,6 +539,7 @@ function SuperAdminOccupancy() {
                   <th className="p-3.5">Location</th>
                   <th className="p-3.5">Total Rooms</th>
                   <th className="p-3.5">Live Occupancy</th>
+                  <th className="p-3.5">Total Revenue</th>
                   <th className="p-3.5">Est. ADR</th>
                   <th className="p-3.5">Est. RevPAR</th>
                   <th className="p-3.5">Status</th>
@@ -424,12 +549,22 @@ function SuperAdminOccupancy() {
               <tbody className="divide-y font-sans">
                 {filteredProperties.map((p) => {
                   const pId = p.id || p._id;
-                  const propBookings = reservations.filter(r => r.propertyId === pId);
-                  const checkedIn = propBookings.filter(r => r.status === "Checked-in").length;
-                  const rooms = Number(p.rooms) || 30;
-                  const occ = rooms > 0 ? Math.min(100, Math.round((checkedIn / rooms) * 100)) : (p.occupancy || 70);
-                  const pAdr = p.adr || 4200;
-                  const pRevpar = Math.round(pAdr * (occ / 100));
+                  const candidates = [p.id, p._id, p.propertyId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+                  const propBookings = reservations.filter(r => {
+                    const rPropId = typeof r.propertyId === 'object' ? (r.propertyId?._id || r.propertyId?.id) : r.propertyId;
+                    const rHotelId = typeof r.hotelId === 'object' ? (r.hotelId?._id || r.hotelId?.id) : r.hotelId;
+                    const rCandidates = [rPropId, rHotelId].filter(Boolean).map(x => String(x).toLowerCase().trim());
+                    return rCandidates.some(c => candidates.includes(c));
+                  });
+                  const checkedIn = propBookings.filter(r => {
+                    const s = String(r.status || '').toLowerCase().trim();
+                    return s === "checked-in" || s === "occupied";
+                  }).length;
+                  const rooms = Number(p.rooms) || 12;
+                  const occ = rooms > 0 ? Math.min(100, Math.round((checkedIn / rooms) * 100)) : (Number(p.occupancy) || 0);
+                  const propRev = getPropertyRevenue(p);
+                  const pAdr = Number(p.adr) > 0 ? Number(p.adr) : (checkedIn > 0 ? Math.round(propRev / checkedIn) : (rooms > 0 ? Math.round(propRev / rooms) : 0));
+                  const pRevpar = Number(p.revpar) > 0 ? Number(p.revpar) : (rooms > 0 ? Math.round(propRev / rooms) : Math.round(pAdr * (occ / 100)));
 
                   return (
                     <tr key={pId} className="hover:bg-muted/15 transition-colors">
@@ -460,6 +595,9 @@ function SuperAdminOccupancy() {
                             />
                           </div>
                         </div>
+                      </td>
+                      <td className="p-3.5 font-bold text-navy font-mono">
+                        ₹{propRev.toLocaleString("en-IN")}
                       </td>
                       <td className="p-3.5 font-bold text-navy font-mono">
                         ₹{pAdr.toLocaleString("en-IN")}

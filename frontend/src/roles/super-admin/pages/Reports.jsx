@@ -208,25 +208,25 @@ function SuperAdminReports() {
       </div>
 
       {/* Advanced Filter Toolbar */}
-      <div className="flex flex-col gap-3 bg-white border border-muted p-4 rounded-2xl shadow-soft">
+      <div className="flex flex-col gap-2.5 bg-white border border-muted p-3.5 rounded-xl shadow-soft">
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Search bar */}
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative flex-1 w-full sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
             <Input
               placeholder="Search properties by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 rounded-full border-muted text-xs bg-cream/5"
+              className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
             />
           </div>
 
           {/* Property Filter */}
-          <div className="relative">
+          <div className="relative min-w-[150px] flex-1 sm:flex-initial">
             <select
               value={propertyFilter}
               onChange={(e) => setPropertyFilter(e.target.value)}
-              className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[160px] cursor-pointer appearance-none"
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
             >
               <option value="All">All Properties</option>
               {propertyReportsList.map((p) => (
@@ -237,11 +237,11 @@ function SuperAdminReports() {
           </div>
 
           {/* Status Filter */}
-          <div className="relative">
+          <div className="relative min-w-[140px] flex-1 sm:flex-initial">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[140px] cursor-pointer appearance-none"
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
             >
               <option value="All">All Statuses</option>
               <option value="Settled">Settled Only</option>
