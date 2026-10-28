@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Panel, Tag, ActionGroup, ViewActionButton, CheckInActionButton, CheckOutActionButton, ActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { receptionistService } from "@/services/receptionist";
@@ -243,7 +244,7 @@ function ArrivalsPage() {
           {/* Search bar */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+            <Input
               type="text"
               placeholder="Search guest name, booking ID, or phone..."
               value={searchQuery}

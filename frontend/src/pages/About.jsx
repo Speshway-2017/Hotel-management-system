@@ -454,7 +454,7 @@ function About() {
   return (
     <SiteLayout>
       {/* 1. Hero Section */}
-      <section className="relative bg-navy py-20 lg:py-28 overflow-hidden">
+      <section id="about-hero" className="relative bg-navy py-20 lg:py-28 overflow-hidden scroll-mt-20">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(91,33,182,0.15),transparent_50%)]" />
         </div>
@@ -485,7 +485,7 @@ function About() {
       </section>
 
       {/* 2. Our Story Section */}
-      <section className="bg-white py-20">
+      <section id="story" className="bg-white py-20 scroll-mt-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 text-left">
           <div className="grid gap-8 lg:grid-cols-12">
             <div className="lg:col-span-4">
@@ -502,7 +502,7 @@ function About() {
       </section>
 
       {/* 2.5. Mission & Vision Section (Purpose & Future) */}
-      <section className="bg-white py-16 sm:py-20 border-t border-slate-100 relative z-10">
+      <section id="mission-vision" className="bg-white py-16 sm:py-20 border-t border-slate-100 relative z-10 scroll-mt-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="grid gap-7 sm:gap-8 md:grid-cols-2 text-left">
             <PurposeFutureCard
@@ -540,7 +540,7 @@ function About() {
       </section>
 
       {/* 3. Why Hour Stay Section (Core Pillars) */}
-      <section className="bg-[#0B1528] py-20 lg:py-28 relative overflow-hidden border-y border-slate-800/80">
+      <section id="pillars" className="bg-[#0B1528] py-20 lg:py-28 relative overflow-hidden border-y border-slate-800/80 scroll-mt-20">
         {/* Subtle Ambient Background Glows */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#7C3AED]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#0284C7]/10 rounded-full blur-3xl pointer-events-none" />
@@ -567,7 +567,7 @@ function About() {
       </section>
 
       {/* 4. Built for Indian Hospitality Section */}
-      <section className="bg-white py-20">
+      <section id="property-types" className="bg-white py-20 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-purple">Engineered For Scale</span>
@@ -599,7 +599,7 @@ function About() {
       </section>
 
       {/* 5. One Platform, Every Operation Section (Operational Cycle) */}
-      <section className="bg-[#FAF9F5] py-20 lg:py-24 border-t border-navy/5">
+      <section id="operational-cycle" className="bg-[#FAF9F5] py-20 lg:py-24 border-t border-navy/5 scroll-mt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-[#5B21B6] bg-[#F3E8FF] px-3.5 py-1 rounded-full mb-2">

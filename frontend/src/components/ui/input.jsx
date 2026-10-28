@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/utils/utils";
 import { Eye, EyeOff } from "lucide-react";
-import { validateFieldValue } from "@/schemas/primitives";
+import { validateFieldValue, hasRepeatedChars, isAllSameChar, isRepeatedSearchQuery } from "@/schemas/primitives";
 
 const Input = React.forwardRef(
   (
@@ -15,8 +15,13 @@ const Input = React.forwardRef(
       nameOnly = false,
       dataType,
       required,
+      isSearch = false,
+      noValidate = false,
+      disableValidation = false,
       onBlur,
       onChange,
+      onKeyDown,
+      onPaste,
       ...props
     },
     ref
@@ -25,8 +30,28 @@ const Input = React.forwardRef(
     const [localError, setLocalError] = React.useState(null);
     const [touched, setTouched] = React.useState(false);
 
+    // Identify search and filter inputs across the entire application
+    const isSearchField = React.useMemo(() => {
+      if (isSearch || noValidate || disableValidation) return true;
+      if (type === "search" || dataType === "search") return true;
+      if (props.role === "searchbox" || props.role === "search") return true;
+      const searchPattern = /search|filter|find|query|lookup|destination|location|keyword|term/i;
+      const placeholder = String(props.placeholder || "");
+      if (searchPattern.test(placeholder) || /hyderabad|jaipur|goa/i.test(placeholder)) return true;
+      const name = String(props.name || "");
+      if (searchPattern.test(name) || name.toLowerCase() === "q") return true;
+      const id = String(props.id || "");
+      if (searchPattern.test(id) || id.toLowerCase() === "q") return true;
+      const ariaLabel = String(props["aria-label"] || "");
+      if (searchPattern.test(ariaLabel)) return true;
+      const cls = String(className || "");
+      if (searchPattern.test(cls)) return true;
+      return false;
+    }, [isSearch, noValidate, disableValidation, type, dataType, props.role, props.placeholder, props.name, props.id, props["aria-label"], className]);
+
     // Determine validation type
     const validationType = React.useMemo(() => {
+      if (isSearchField) return "search";
       if (dataType) return dataType;
       if (nameOnly) return "name";
       if (textOnly) return "text-only";
@@ -38,26 +63,29 @@ const Input = React.forwardRef(
         return "number";
       }
       return type;
-    }, [dataType, nameOnly, textOnly, type, props.step, props.name]);
+    }, [isSearchField, dataType, nameOnly, textOnly, type, props.step, props.name]);
 
     const isNumberField =
-      validationType === "number" ||
+      !isSearchField &&
+      (validationType === "number" ||
       validationType === "amount" ||
       validationType === "integer" ||
-      type === "number";
+      type === "number");
 
     const isTextField =
-      validationType === "name" ||
+      !isSearchField &&
+      (validationType === "name" ||
       validationType === "text-only" ||
       validationType === "city" ||
       nameOnly ||
-      textOnly;
+      textOnly);
 
     const isPhoneField =
-      validationType === "tel" ||
+      !isSearchField &&
+      (validationType === "tel" ||
       validationType === "phone" ||
       type === "tel" ||
-      Boolean(props.name && (props.name.toLowerCase().includes("phone") || props.name.toLowerCase().includes("mobile")));
+      Boolean(props.name && (props.name.toLowerCase().includes("phone") || props.name.toLowerCase().includes("mobile"))));
 
     const runValidation = (val) => {
       const res = validateFieldValue(validationType, val, {
@@ -66,14 +94,47 @@ const Input = React.forwardRef(
         fieldName: props.placeholder || props.name || "Field",
         min: props.min ? Number(props.min) : 0,
         max: props.max ? Number(props.max) : Infinity,
-        allowZero: props.min === undefined || Number(props.min) <= 0
+        maxLength: props.maxLength || (isSearchField ? 50 : undefined),
+        allowZero: props.min === undefined || Number(props.min) <= 0,
+        isSearch: isSearchField
       });
       return res.isValid ? null : res.error;
     };
 
     const handleKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1) {
-        if (props.onKeyDown) props.onKeyDown(e);
+        if (onKeyDown) onKeyDown(e);
+        return;
+      }
+
+      // Search fields: prevent exceeding 50 characters and prevent repeated characters
+      if (isSearchField) {
+        const target = e.target;
+        const maxLen = props.maxLength || 50;
+        const selStart = target.selectionStart ?? 0;
+        const selEnd = target.selectionEnd ?? 0;
+        const currentVal = props.value !== undefined ? String(props.value) : (target.value || "");
+        const isReplacing = selEnd > selStart;
+
+        if (!isReplacing && currentVal.length >= maxLen) {
+          e.preventDefault();
+          setLocalError(`Search query cannot exceed ${maxLen} characters.`);
+          if (onKeyDown) onKeyDown(e);
+          return;
+        }
+
+        const before = currentVal.slice(0, selStart);
+        const after = currentVal.slice(selEnd);
+        const nextVal = before + e.key + after;
+        if (isRepeatedSearchQuery(nextVal)) {
+          e.preventDefault();
+          setLocalError("Search query contains invalid repeated characters.");
+          if (onKeyDown) onKeyDown(e);
+          return;
+        }
+
+        if (localError) setLocalError(null);
+        if (onKeyDown) onKeyDown(e);
         return;
       }
 
@@ -85,7 +146,7 @@ const Input = React.forwardRef(
         if (!isValidChar) {
           e.preventDefault();
           setLocalError("Number fields allow numbers only; invalid text is not allowed.");
-          if (props.onKeyDown) props.onKeyDown(e);
+          if (onKeyDown) onKeyDown(e);
           return;
         }
       }
@@ -99,7 +160,7 @@ const Input = React.forwardRef(
               ? "Name must contain letters only; numbers are not allowed."
               : "Text fields allow text only; numbers are not allowed.";
           setLocalError(err);
-          if (props.onKeyDown) props.onKeyDown(e);
+          if (onKeyDown) onKeyDown(e);
           return;
         }
       }
@@ -109,7 +170,7 @@ const Input = React.forwardRef(
         if (/[a-zA-Z]/.test(e.key)) {
           e.preventDefault();
           setLocalError("Phone number must contain numbers only.");
-          if (props.onKeyDown) props.onKeyDown(e);
+          if (onKeyDown) onKeyDown(e);
           return;
         }
         if (/^[0-9]$/.test(e.key)) {
@@ -122,24 +183,53 @@ const Input = React.forwardRef(
             if (cleanDigits.length >= 10) {
               e.preventDefault();
               setLocalError("Mobile/Phone number must be 10 digits only.");
-              if (props.onKeyDown) props.onKeyDown(e);
+              if (onKeyDown) onKeyDown(e);
               return;
             }
           }
         }
       }
 
-      if (props.onKeyDown) props.onKeyDown(e);
+      if (onKeyDown) onKeyDown(e);
     };
 
     const handlePaste = (e) => {
       const pasteText = e.clipboardData?.getData("text") || "";
 
+      if (isSearchField) {
+        const target = e.target;
+        const maxLen = props.maxLength || 50;
+        const selStart = target.selectionStart ?? 0;
+        const selEnd = target.selectionEnd ?? 0;
+        const currentVal = props.value !== undefined ? String(props.value) : (target.value || "");
+        const before = currentVal.slice(0, selStart);
+        const after = currentVal.slice(selEnd);
+        const nextVal = before + pasteText + after;
+
+        if (isRepeatedSearchQuery(nextVal)) {
+          e.preventDefault();
+          setLocalError("Search query contains invalid repeated characters.");
+          if (onPaste) onPaste(e);
+          return;
+        }
+
+        if (nextVal.length > maxLen) {
+          e.preventDefault();
+          setLocalError(`Search query cannot exceed ${maxLen} characters.`);
+          if (onPaste) onPaste(e);
+          return;
+        }
+
+        if (localError) setLocalError(null);
+        if (onPaste) onPaste(e);
+        return;
+      }
+
       if (isNumberField) {
         if (/[a-zA-Z]/.test(pasteText) || (pasteText.trim() !== "" && isNaN(Number(pasteText)))) {
           e.preventDefault();
           setLocalError("Number fields allow numbers only; invalid text is not allowed.");
-          if (props.onPaste) props.onPaste(e);
+          if (onPaste) onPaste(e);
           return;
         }
       }
@@ -152,7 +242,7 @@ const Input = React.forwardRef(
               ? "Name must contain letters only; numbers are not allowed."
               : "Text fields allow text only; numbers are not allowed.";
           setLocalError(err);
-          if (props.onPaste) props.onPaste(e);
+          if (onPaste) onPaste(e);
           return;
         }
       }
@@ -161,7 +251,7 @@ const Input = React.forwardRef(
         if (/[a-zA-Z]/.test(pasteText)) {
           e.preventDefault();
           setLocalError("Phone number must contain numbers only.");
-          if (props.onPaste) props.onPaste(e);
+          if (onPaste) onPaste(e);
           return;
         }
         const cleanPasteDigits = pasteText.replace(/^(\+91|0)/, "").replace(/\D/g, "");
@@ -181,16 +271,29 @@ const Input = React.forwardRef(
           const event = new Event("input", { bubbles: true });
           target.dispatchEvent(event);
           setLocalError("Mobile/Phone number must be 10 digits only.");
-          if (props.onPaste) props.onPaste(e);
+          if (onPaste) onPaste(e);
           return;
         }
       }
 
-      if (props.onPaste) props.onPaste(e);
+      if (onPaste) onPaste(e);
     };
 
     const handleChange = (e) => {
       const val = e.target.value;
+
+      if (isSearchField) {
+        const maxLen = props.maxLength || 50;
+        if (val.length > maxLen) {
+          setLocalError(`Search query cannot exceed ${maxLen} characters.`);
+        } else if (isRepeatedSearchQuery(val)) {
+          setLocalError("Search query contains invalid repeated characters.");
+        } else {
+          setLocalError(null);
+        }
+        if (onChange) onChange(e);
+        return;
+      }
 
       if (e.target.validity?.badInput) {
         setLocalError("Number fields allow numbers only; invalid text is not allowed.");
@@ -254,6 +357,19 @@ const Input = React.forwardRef(
 
     const handleBlur = (e) => {
       setTouched(true);
+      if (isSearchField) {
+        const val = e.target.value;
+        const maxLen = props.maxLength || 50;
+        if (val.length > maxLen) {
+          setLocalError(`Search query cannot exceed ${maxLen} characters.`);
+        } else if (isRepeatedSearchQuery(val)) {
+          setLocalError("Search query contains invalid repeated characters.");
+        } else {
+          setLocalError(null);
+        }
+        if (onBlur) onBlur(e);
+        return;
+      }
       const val = e.target.value;
       const err = runValidation(val);
       setLocalError(err);
@@ -269,6 +385,7 @@ const Input = React.forwardRef(
           <div className="relative w-full flex items-center">
             <input
               type={showPassword ? "text" : "password"}
+              maxLength={isSearchField ? (props.maxLength || 50) : props.maxLength}
               className={cn(
                 "flex h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-10 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
                 hasError
@@ -298,7 +415,7 @@ const Input = React.forwardRef(
               )}
             </button>
           </div>
-          {localError && !errorMsg && (
+          {activeError && (
             <p
               className="text-[11px] font-bold text-red-600 flex items-center gap-1.5 mt-1 animate-fade-in"
               style={{ color: "#dc2626" }}
@@ -317,7 +434,7 @@ const Input = React.forwardRef(
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
-              <span style={{ color: "#dc2626" }}>{localError}</span>
+              <span style={{ color: "#dc2626" }}>{activeError}</span>
             </p>
           )}
         </div>
@@ -328,6 +445,7 @@ const Input = React.forwardRef(
       <div className="w-full">
         <input
           type={type}
+          maxLength={isSearchField ? (props.maxLength || 50) : props.maxLength}
           className={cn(
             "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus:placeholder-transparent focus-visible:placeholder-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             hasError
@@ -344,7 +462,7 @@ const Input = React.forwardRef(
           onChange={handleChange}
           {...props}
         />
-        {localError && !errorMsg && (
+        {activeError && (
           <p
             className="text-[11px] font-bold text-red-600 flex items-center gap-1.5 mt-1 animate-fade-in"
             style={{ color: "#dc2626" }}
@@ -363,7 +481,7 @@ const Input = React.forwardRef(
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <span style={{ color: "#dc2626" }}>{localError}</span>
+            <span style={{ color: "#dc2626" }}>{activeError}</span>
           </p>
         )}
       </div>

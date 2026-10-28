@@ -1,6 +1,6 @@
 import { FormField, Input, Select, Textarea, Checkbox, Switch } from "@/components/hs/FormFields";
 import { Label } from "@/components/ui/label";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
@@ -33,10 +33,12 @@ import {
   Activity,
   ToggleLeft,
   ToggleRight,
+  ChevronDown,
   Eye
 } from "lucide-react";
 
 function SuperAdminCoupons() {
+  const navigate = useNavigate();
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,29 +104,23 @@ function SuperAdminCoupons() {
   const totalUsedCount = coupons.reduce((sum, c) => sum + (c.usedCount || 0), 0);
   const totalDiscountVal = coupons.reduce((sum, c) => sum + ((c.usedCount || 0) * (c.discountValue || 0)), 0);
 
-  const triggerToggleStatus = (coupon) => {
+  const handleToggleStatus = async (coupon) => {
     const nextStatus = coupon.status === "Active" ? "Inactive" : "Active";
-    setConfirmModal({
-      open: true,
-      title: `${nextStatus === "Active" ? "Activate" : "Deactivate"} Coupon`,
-      message: `Are you sure you want to toggle the status of Coupon "${coupon.code}" to ${nextStatus}?`,
-      action: async () => {
-        try {
-          const res = await superAdminService.updatePromoCoupon(coupon._id || coupon.id, {
-            status: nextStatus
-          });
-          if (res.success) {
-            toast.success(`Coupon "${coupon.code}" is now ${nextStatus}.`);
-            loadData();
-          }
-        } catch (err) {
-          toast.error(err.message || "Failed to toggle status.");
-        } finally {
-          setConfirmModal({ open: false, title: "", message: "", action: null });
-        }
+    try {
+      const res = await superAdminService.updatePromoCoupon(coupon._id || coupon.id, {
+        status: nextStatus
+      });
+      if (res.success) {
+        toast.success(`Coupon "${coupon.code}" is now ${nextStatus}.`);
+        loadData(true);
+      } else {
+        toast.error(res.message || "Failed to toggle status.");
       }
-    });
+    } catch (err) {
+      toast.error(err.message || "Failed to toggle status.");
+    }
   };
+  const triggerToggleStatus = handleToggleStatus;
 
   const triggerDelete = (coupon) => {
     setConfirmModal({
@@ -153,46 +149,47 @@ function SuperAdminCoupons() {
       <PageHeader
         title="Promo Coupons Control Center"
         subtitle="Manage discounts, promo coupons, usage boundaries, and applicable tier plans for subscriptions."
-        actions={
-          <Link
-            to="/super-admin/coupons/add"
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 flex items-center gap-1.5 h-9 font-bold text-xs cursor-pointer"
-          >
-            <Plus className="size-4" />
-            Add Coupon
-          </Link>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
 
 
-      <Panel title="Promo Coupons Database" description="Live promo coupons for guest reservations.">
+      <Panel>
         <div className="p-4 bg-white rounded-b-xl space-y-4">
           {/* Controls */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-            <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search coupon code..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
-              />
+          <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-2.5 w-full sm:flex-1 items-center">
+              <div className="relative flex-1 w-full">
+                <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
+                <Input
+                  placeholder="Search coupon code..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                  className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
+                />
+              </div>
+              
+              <div className="relative w-full sm:w-44 shrink-0">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none text-left"
+                >
+                  <option value="All">All Coupons</option>
+                  <option value="Active">Active Only</option>
+                  <option value="Inactive">Inactive Only</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              </div>
             </div>
-            
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground font-semibold">Status:</span>
-              <Select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-                className="h-9 border border-navy/45 bg-cream/10 rounded-full px-4 text-xs font-semibold text-navy focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Coupons</option>
-                <option value="Active">Active Only</option>
-                <option value="Inactive">Inactive Only</option>
-              </Select>
-            </div>
+
+            <Link
+              to="/super-admin/coupons/add"
+              className="bg-navy hover:bg-navy/90 text-white rounded-full px-4 flex items-center justify-center gap-1.5 h-9 font-bold text-xs cursor-pointer shrink-0 transition-all duration-200 shadow-soft w-full sm:w-auto"
+            >
+              <Plus className="size-3.5" />
+              Add Coupon
+            </Link>
           </div>
 
           {/* Table */}
@@ -213,17 +210,19 @@ function SuperAdminCoupons() {
                       <th className="p-4">Usage Limits</th>
                       <th className="p-4">Used Count</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                      <th className="p-4 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
                     {paginatedCoupons.map((c) => (
                       <tr key={c._id || c.id} className="hover:bg-muted/15 transition-colors">
-                        <td className="p-4 pl-6 font-bold text-navy flex items-center gap-2">
-                          <Ticket className="size-4 text-purple" />
-                          <div>
-                            <div className="font-bold text-navy">{c.code}</div>
-                            {c.description && <div className="text-[9px] text-muted-foreground font-semibold">{c.description}</div>}
+                        <td className="p-4 pl-6 font-bold text-navy">
+                          <div className="flex items-center gap-2">
+                            <Ticket className="size-4 text-purple shrink-0" />
+                            <div>
+                              <div className="font-bold text-navy">{c.code}</div>
+                              {c.description && <div className="text-[9px] text-muted-foreground font-semibold">{c.description}</div>}
+                            </div>
                           </div>
                         </td>
                         <td className="p-4 font-semibold text-navy">
@@ -241,15 +240,22 @@ function SuperAdminCoupons() {
                         <td className="p-4">
                           <Tag tone={c.status === "Active" ? "success" : "neutral"}>{c.status}</Tag>
                         </td>
-                        <td className="p-4 text-right">
-                          <ActionGroup align="right">
-                            <ViewActionButton onClick={() => navigate({ to: `/super-admin/coupons/view/${c._id || c.id}` })} />
-                            <EditActionButton onClick={() => navigate({ to: `/super-admin/coupons/edit/${c._id || c.id}` })} />
+                        <td className="p-4 text-left">
+                          <ActionGroup align="left">
+                            <ViewActionButton
+                              to={`/super-admin/coupons/view/${c._id || c.id}`}
+                              onClick={() => navigate({ to: `/super-admin/coupons/view/${c._id || c.id}` })}
+                            />
+                            <EditActionButton
+                              to={`/super-admin/coupons/edit/${c._id || c.id}`}
+                              onClick={() => navigate({ to: `/super-admin/coupons/edit/${c._id || c.id}` })}
+                            />
                             <ActionButton
                               icon={c.status === "Active" ? ToggleLeft : ToggleRight}
                               label={c.status === "Active" ? "Deactivate" : "Activate"}
+                              title={c.status === "Active" ? "Deactivate Coupon" : "Activate Coupon"}
                               variant={c.status === "Active" ? "warning" : "success"}
-                              onClick={() => triggerToggleStatus(c)}
+                              onClick={() => handleToggleStatus(c)}
                             />
                             <DeleteActionButton onClick={() => triggerDelete(c)} />
                           </ActionGroup>
@@ -306,8 +312,12 @@ function SuperAdminCoupons() {
                 Cancel
               </Button>
               <Button
-                onClick={confirmModal.action}
-                className="bg-error hover:bg-error/90 text-cream rounded-full px-5 text-xs font-semibold cursor-pointer"
+                onClick={() => {
+                  if (typeof confirmModal.action === "function") {
+                    confirmModal.action();
+                  }
+                }}
+                className="bg-error hover:bg-error/90 text-white rounded-full px-5 text-xs font-semibold cursor-pointer"
               >
                 Confirm Action
               </Button>

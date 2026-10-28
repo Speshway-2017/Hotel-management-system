@@ -249,7 +249,7 @@ function FlipFrameworkCard({ item, idx }) {
 
 export function CategoryLayeredCards() {
   return (
-    <section className="relative bg-[#FAFAF8] py-24 sm:py-28 overflow-hidden border-y border-[#0D1B2A]/5">
+    <section id="categories" className="relative bg-[#FAFAF8] py-24 sm:py-28 overflow-hidden border-y border-[#0D1B2A]/5 scroll-mt-20">
       {/* Light Abstract / Map Contour Vector Lines */}
       <svg
         className="absolute inset-0 w-full h-full opacity-[0.04] pointer-events-none"

@@ -141,7 +141,7 @@ function EditCoupon() {
       {loading ? (
         <LoadingRows rows={4} />
       ) : (
-        <Panel title="Update Coupon Parameters" description="Submit updates.">
+        <Panel>
           <form onSubmit={handleSubmit} className="p-5 space-y-4 bg-white rounded-b-xl">
             <FormField
               label="Coupon Code"

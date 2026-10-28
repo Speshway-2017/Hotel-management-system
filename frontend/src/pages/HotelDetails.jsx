@@ -297,7 +297,10 @@ export function HotelDetailsPage() {
               <div className="flex flex-wrap gap-3">
                 <Button 
                   onClick={() => {
-                    if (roomTypeCards.length > 0) {
+                    const roomsEl = document.getElementById("rooms-section");
+                    if (roomsEl) {
+                      roomsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                    } else if (roomTypeCards.length > 0) {
                       handleNavigateToRoom(roomTypeCards[0]);
                     } else {
                       window.location.href = `/rooms/Standard%20Room`;
@@ -363,7 +366,7 @@ export function HotelDetailsPage() {
               </div>
 
               {/* Available Rooms Section - 1 Card Per Configured Room Type */}
-              <div className="space-y-6 font-ui text-left">
+              <div id="rooms-section" className="space-y-6 font-ui text-left scroll-mt-20">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-navy/5 pb-3">
                   <div>
                     <h2 className="font-display text-2xl sm:text-3xl font-bold text-navy">Available Rooms</h2>

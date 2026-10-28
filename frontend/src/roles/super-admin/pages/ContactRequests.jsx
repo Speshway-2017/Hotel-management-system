@@ -23,8 +23,41 @@ import {
   Sparkles,
   Filter,
   Check,
+  ChevronDown,
   ExternalLink
 } from "lucide-react";
+
+function PremiumStatCard({ label, value, delta, hint, icon: Icon, accentColor = "#0d1b2a" }) {
+  const isPositive = (delta ?? 0) >= 0;
+  return (
+    <div
+      style={{ "--accent-color": accentColor }}
+      className="PremiumStatCard bg-white rounded-xl border border-muted p-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift relative overflow-hidden flex flex-col justify-between min-h-[120px] h-full text-left font-ui"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="min-h-5 sm:h-8 flex items-start">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-tight">{label}</p>
+          </div>
+          <h3 className="mt-1.5 font-sans text-lg font-bold text-slate-800 leading-none tracking-tight tabular-nums whitespace-nowrap">{value}</h3>
+        </div>
+        {Icon && (
+          <span className="grid size-8 place-items-center rounded-lg bg-muted/65 text-navy-deep shrink-0 ml-3">
+            <Icon className="size-4" />
+          </span>
+        )}
+      </div>
+      <div className="mt-auto pt-2 flex items-center gap-1.5 text-[10px] h-4">
+        {delta !== null && delta !== undefined && (
+          <span className={`inline-flex items-center gap-0.5 font-bold shrink-0 ${isPositive ? "text-success" : "text-destructive"}`}>
+            {isPositive ? "+" : ""}{delta}%
+          </span>
+        )}
+        {hint && <span className="text-[10px] text-muted-foreground truncate">{hint}</span>}
+      </div>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/super-admin/contacts")({
   head: () => ({
@@ -182,71 +215,63 @@ export function ContactRequestsPage() {
       )}
 
       {/* 2. KPI Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Inquiries</span>
-            <span className="p-2 rounded-lg bg-navy/5 text-navy"><MessageSquare className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-navy font-sans tracking-tight tabular-nums">{stats.total}</p>
-          <span className="text-[11px] text-muted-foreground">All client messages</span>
-        </div>
-
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-purple uppercase tracking-wider">New Requests</span>
-            <span className="p-2 rounded-lg bg-purple/10 text-purple"><Sparkles className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-purple font-sans tracking-tight tabular-nums">{stats.newCount}</p>
-          <span className="text-[11px] text-muted-foreground">Awaiting initial review</span>
-        </div>
-
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">In Progress</span>
-            <span className="p-2 rounded-lg bg-amber-50 text-amber-600"><Clock className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-amber-600 font-sans tracking-tight tabular-nums">{stats.inProgressCount}</p>
-          <span className="text-[11px] text-muted-foreground">Follow-up ongoing</span>
-        </div>
-
-        <div className="card-guest bg-white border border-navy/5 p-4 rounded-xl shadow-soft">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Resolved</span>
-            <span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><CheckCircle2 className="size-4" /></span>
-          </div>
-          <p className="mt-2 text-2xl font-extrabold text-emerald-600 font-sans tracking-tight tabular-nums">{stats.resolvedCount}</p>
-          <span className="text-[11px] text-muted-foreground">Onboarded / Closed</span>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 font-ui dashboard-stats-grid">
+        <PremiumStatCard
+          label="Total Inquiries"
+          value={loading ? "—" : stats.total}
+          hint="All client messages"
+          icon={MessageSquare}
+          accentColor="#0D1B2A"
+        />
+        <PremiumStatCard
+          label="New Requests"
+          value={loading ? "—" : stats.newCount}
+          hint="Awaiting initial review"
+          icon={Sparkles}
+          accentColor="#5B21B6"
+        />
+        <PremiumStatCard
+          label="In Progress"
+          value={loading ? "—" : stats.inProgressCount}
+          hint="Follow-up ongoing"
+          icon={Clock}
+          accentColor="#F5C06A"
+        />
+        <PremiumStatCard
+          label="Resolved"
+          value={loading ? "—" : stats.resolvedCount}
+          hint="Onboarded / Closed"
+          icon={CheckCircle2}
+          accentColor="#10B981"
+        />
       </div>
 
       {/* 3. Search and Filter Bar */}
-      <Panel title="Inquiry Log Files" description="Filter and inspect submissions received through the public Contact page.">
-        <div className="p-4 border-b border-navy/5 bg-cream/20 flex flex-wrap gap-3 justify-between items-center">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+      <Panel>
+        <div className="p-4 border-b border-muted bg-[#FDFCFA]/10 flex flex-col sm:flex-row gap-2.5 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
             <Input
               placeholder="Search by name, email, property, text..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 text-xs bg-white h-9 rounded-lg"
+              className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
             />
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto">
-            {["all", "New", "In Progress", "Resolved"].map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  statusFilter === st
-                    ? "bg-navy text-cream shadow-sm"
-                    : "bg-white text-navy/70 border border-navy/10 hover:bg-cream/50"
-                }`}
-              >
-                {st === "all" ? "All Inquiries" : st}
-              </button>
-            ))}
+          <div className="relative min-w-[170px] w-full sm:w-auto shrink-0">
+            <select
+              id="contact-status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none transition-all"
+            >
+              <option value="all">All Inquiries</option>
+              <option value="New">New</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           </div>
         </div>
 

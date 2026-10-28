@@ -101,32 +101,28 @@ function SuperAdminAdmins() {
       <PageHeader
         title="Admin Management"
         subtitle="Manage property administrators, owners, and general managers with hotel-level credentials."
-        actions={
-          <Button onClick={() => navigate({ to: "/super-admin/admins/add" })} className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 text-xs">
-            <UserPlus className="size-4 mr-2" /> Add Property Admin
-          </Button>
-        }
       />
 
       {error && <Notice tone="error" title="Governance Error" className="text-left">{error}</Notice>}
 
       <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white border border-muted p-4 rounded-2xl shadow-soft">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search administrators by Admin Name, Email, or Phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 rounded-full border-muted text-xs bg-muted/20"
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative">
+          <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between bg-white border border-muted p-3.5 rounded-xl shadow-soft">
+            <div className="flex flex-col sm:flex-row gap-2.5 flex-1 items-center">
+              <div className="relative flex-1 w-full">
+                <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
+                <Input
+                  placeholder="Search administrators by Admin Name, Email, or Phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
+                />
+              </div>
+
+              <div className="relative min-w-[150px] w-full sm:w-auto shrink-0">
                 <select
                   value={propertyFilter}
                   onChange={(e) => setPropertyFilter(e.target.value)}
-                  className="bg-white border border-muted pl-4 pr-9 h-10 rounded-full text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-purple min-w-[160px] cursor-pointer appearance-none"
+                  className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
                 >
                   <option value="All">All Properties</option>
                   {properties.map((p) => (
@@ -135,25 +131,30 @@ function SuperAdminAdmins() {
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               </div>
-              <div className="flex gap-1 bg-muted/30 p-1 rounded-full border border-muted/50">
-                {["All", "Active", "Suspended"].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={`px-4 py-1.5 rounded-full text-[10px] font-semibold transition-all duration-200 cursor-pointer ${
-                      statusFilter === status
-                        ? "bg-navy text-white shadow-sm"
-                        : "text-muted-foreground hover:text-navy hover:bg-white/50"
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
+
+              <div className="relative min-w-[135px] w-full sm:w-auto shrink-0">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               </div>
             </div>
+
+            <Button
+              onClick={() => navigate({ to: "/super-admin/admins/add" })}
+              className="bg-navy hover:bg-navy/90 text-white rounded-full px-4 h-9 text-xs font-bold shadow-soft flex items-center justify-center shrink-0 cursor-pointer transition-all duration-200 hover:shadow-md w-full sm:w-auto"
+            >
+              <UserPlus className="size-3.5 mr-1.5" /> Add Property Admin
+            </Button>
           </div>
 
-          <Panel title="Property Administrators Directory" description={`Showing ${filteredAdmins.length} admins`}>
+          <Panel>
             {loading ? (
               <LoadingRows rows={4} />
             ) : filteredAdmins.length === 0 ? (
@@ -168,7 +169,7 @@ function SuperAdminAdmins() {
                       <th className="p-4">Phone</th>
                       <th className="p-4">Assigned Properties</th>
                       <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                      <th className="p-4 text-left">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y font-sans">
@@ -195,8 +196,8 @@ function SuperAdminAdmins() {
                         <td className="p-4">
                           <Tag tone={statusTone(a.status || "Active")}>{a.status || "Active"}</Tag>
                         </td>
-                        <td className="p-4 text-right">
-                          <ActionGroup align="right">
+                        <td className="p-4 text-left">
+                          <ActionGroup align="left">
                             <ViewActionButton onClick={() => navigate({ to: `/super-admin/admins/view/${a.id || a._id}` })} />
                             <EditActionButton onClick={() => navigate({ to: `/super-admin/admins/edit/${a.id || a._id}` })} />
                             <ActionButton

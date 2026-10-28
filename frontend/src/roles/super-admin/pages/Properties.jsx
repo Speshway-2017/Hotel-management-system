@@ -315,25 +315,25 @@ function SuperAdminPlatform() {
 
       <div className="space-y-4">
         {/* Toolbar with Search, Status Dropdown Filter and Add Property Button */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white border border-muted rounded-2xl p-3.5 shadow-soft">
-          <div className="relative w-full sm:max-w-md">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search properties by Property Name, ID, or Location..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-10 rounded-full border-muted text-xs bg-muted/20 focus-visible:ring-1 focus-visible:ring-navy"
-            />
-          </div>
+        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between bg-white border border-muted rounded-xl p-3.5 shadow-soft">
+          <div className="flex flex-col sm:flex-row gap-2.5 flex-1 items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
+              <Input
+                placeholder="Search properties by Property Name, ID, or Location..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
+              />
+            </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end shrink-0">
             {/* Status Dropdown Filter */}
-            <div className="relative min-w-[145px]">
+            <div className="relative min-w-[145px] w-full sm:w-auto shrink-0">
               <select
                 id="property-status-dropdown"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full h-10 px-4 pr-9 rounded-full border border-muted bg-white text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-xs cursor-pointer appearance-none transition-all"
+                className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none transition-all"
               >
                 <option value="All">All Statuses</option>
                 <option value="Active">Active</option>
@@ -342,15 +342,15 @@ function SuperAdminPlatform() {
               </select>
               <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             </div>
-
-            {/* Add Property Button right beside it */}
-            <Button
-              onClick={() => navigate({ to: "/super-admin/properties/add" })}
-              className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 h-10 text-xs font-semibold shadow-xs flex items-center shrink-0 cursor-pointer transition-all duration-200 hover:shadow-md"
-            >
-              <Plus className="size-4 mr-1.5" /> Add Property
-            </Button>
           </div>
+
+          {/* Add Property Button right beside it */}
+          <Button
+            onClick={() => navigate({ to: "/super-admin/properties/add" })}
+            className="bg-navy hover:bg-navy/90 text-white rounded-full px-4 h-9 text-xs font-bold shadow-soft flex items-center shrink-0 cursor-pointer transition-all duration-200 hover:shadow-md w-full sm:w-auto justify-center"
+          >
+            <Plus className="size-3.5 mr-1.5" /> Add Property
+          </Button>
         </div>
 
         <Panel title="Properties Directory" description={`Showing ${filteredProperties.length} of ${properties.length} total hotel records`}>

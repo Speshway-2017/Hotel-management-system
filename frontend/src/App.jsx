@@ -318,12 +318,35 @@ function ScrollManager() {
         } catch {
           // Ignore invalid selector
         }
-      }, 100);
+      }, 120);
       return () => clearTimeout(timer);
     } else {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
   }, [pathname, hash]);
+
+  // Global handler for smooth scrolling on any hash anchor links across public pages
+  React.useEffect(() => {
+    const handleAnchorClick = (e) => {
+      const anchor = e.target.closest('a[href*="#"]');
+      if (anchor) {
+        const href = anchor.getAttribute('href');
+        if (!href) return;
+        const [path, targetHash] = href.split('#');
+        if (targetHash && (!path || path === window.location.pathname || path === '')) {
+          const targetEl = document.getElementById(targetHash) || document.querySelector(`#${targetHash}`);
+          if (targetEl) {
+            e.preventDefault();
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window.history.pushState(null, '', `#${targetHash}`);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('click', handleAnchorClick);
+    return () => document.removeEventListener('click', handleAnchorClick);
+  }, []);
 
   return null;
 }

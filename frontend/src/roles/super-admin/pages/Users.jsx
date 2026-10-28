@@ -15,7 +15,8 @@ import {
   Calendar,
   Sparkles,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from "lucide-react";
 
 export const Route = createFileRoute("/super-admin/users")({
@@ -158,10 +159,10 @@ function SuperAdminGuests() {
       {error && <Notice tone="error" title="Synchronization Notice">{error}</Notice>}
 
       {/* Filters */}
-      <Panel title="Guest Directory Index" description={`Displaying ${filteredGuests.length} registered guest accounts.`}>
-        <div className="p-4 border-b border-navy/5 bg-cream/20 flex flex-wrap gap-3 justify-between items-center">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+      <Panel>
+        <div className="p-4 border-b border-muted bg-[#FDFCFA]/10 flex flex-col sm:flex-row gap-2.5 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
             <Input
               placeholder="Search guest by name, email, phone..."
               value={searchQuery}
@@ -169,39 +170,45 @@ function SuperAdminGuests() {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="pl-10 text-xs bg-white h-9 rounded-lg"
+              className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
             />
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <select
-              value={propertyFilter}
-              onChange={(e) => {
-                setPropertyFilter(e.target.value);
-                setPage(1);
-              }}
-              className="h-9 px-3 text-xs bg-white rounded-lg border border-navy/15 focus:ring-1 focus:ring-purple font-medium cursor-pointer"
-            >
-              <option value="All">All Properties</option>
-              {properties.map((p) => (
-                <option key={p.id || p._id} value={p.id || p._id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto shrink-0">
+            <div className="relative min-w-[150px] w-full sm:w-auto">
+              <select
+                value={propertyFilter}
+                onChange={(e) => {
+                  setPropertyFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
+              >
+                <option value="All">All Properties</option>
+                {properties.map((p) => (
+                  <option key={p.id || p._id} value={p.id || p._id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            </div>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="h-9 px-3 text-xs bg-white rounded-lg border border-navy/15 focus:ring-1 focus:ring-purple font-medium cursor-pointer"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
+            <div className="relative min-w-[135px] w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            </div>
           </div>
         </div>
 

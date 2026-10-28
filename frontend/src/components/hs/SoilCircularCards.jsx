@@ -150,7 +150,7 @@ function CompactCircularCard({ item, idx }) {
 
 export function SoilCircularCards() {
   return (
-    <section className="relative bg-white py-16 sm:py-20 overflow-hidden border-y border-navy/5">
+    <section id="experience" className="relative bg-white py-16 sm:py-20 overflow-hidden border-y border-navy/5 scroll-mt-20">
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Two-Column Layout on Desktop: Left text & Right 2x2 grid */}
         <div className="grid gap-10 lg:grid-cols-12 lg:items-center">

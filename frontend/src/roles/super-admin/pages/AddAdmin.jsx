@@ -89,7 +89,7 @@ function AddAdmin() {
 
       {error && <Notice tone="error" title="Form Submission Error">{error}</Notice>}
 
-      <Panel title="Administrator Credentials & Scope" description="Specify account logins and assigned properties.">
+      <Panel>
         <form onSubmit={handleSubmit} className="p-5 space-y-4 bg-white rounded-b-xl max-w-xl">
           <FormField
             label="Full Name"

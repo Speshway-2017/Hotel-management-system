@@ -36,7 +36,8 @@ import {
   Eye,
   X,
   Clock,
-  AlertOctagon
+  AlertOctagon,
+  ChevronDown
 } from "lucide-react";
 
 function SuperAdminSubscription() {
@@ -200,15 +201,6 @@ function SuperAdminSubscription() {
       <PageHeader
         title="Subscription Plans Control Center"
         subtitle="Configure system-wide subscription packages, monthly/yearly pricing parameters, and active platform subscribers."
-        actions={
-          <Link
-            to="/super-admin/subscription/add"
-            className="bg-navy hover:bg-navy/90 text-white rounded-full px-5 flex items-center gap-1.5 h-9 font-bold text-xs cursor-pointer"
-          >
-            <Plus className="size-4" />
-            Add Subscription Plan
-          </Link>
-        }
       />
 
       {error && <Notice tone="error" title="Synchronization Error">{error}</Notice>}
@@ -240,21 +232,27 @@ function SuperAdminSubscription() {
       {loading ? (
         <LoadingRows rows={4} />
       ) : activeTab === "plans" ? (
-        <Panel title="Platform Plans Catalog" description="Manage access packages and pricing limits across properties.">
+        <Panel>
           <div className="p-4 bg-white rounded-b-xl space-y-4">
             {/* Controls */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-              <div className="relative w-full max-w-xs">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1 w-full sm:max-w-md">
+                <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
                 <Input
                   placeholder="Search plan by name..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                  className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
+                  className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
                 />
               </div>
-              
-              <div></div>
+
+              <Link
+                to="/super-admin/subscription/add"
+                className="bg-navy hover:bg-navy/90 text-white rounded-full px-4 flex items-center justify-center gap-1.5 h-9 font-bold text-xs cursor-pointer shrink-0 transition-all duration-200 shadow-soft w-full sm:w-auto"
+              >
+                <Plus className="size-3.5" />
+                Add Subscription Plan
+              </Link>
             </div>
 
             {/* Table */}
@@ -350,27 +348,30 @@ function SuperAdminSubscription() {
           <Panel title="Incoming Subscription Upgrade & Renewal Requests" description="Review subscription requests submitted by property administrators.">
             <div className="p-4 bg-white rounded-b-xl space-y-4">
               {/* Controls */}
-              <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-                <div className="relative w-full max-w-xs">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+                <div className="relative flex-1 w-full">
+                  <Search className="pointer-events-none absolute left-3 top-[18px] size-3.5 -translate-y-1/2 text-muted-foreground z-10" />
                   <Input
                     placeholder="Search requests by branch or admin..."
                     value={requestSearch}
                     onChange={(e) => setRequestSearch(e.target.value)}
-                    className="pl-9 h-9 rounded-full border border-navy/45 text-xs bg-white w-full text-navy font-semibold focus:border-navy focus:ring-1 focus:ring-navy"
+                    className="pl-9 h-9 text-xs font-semibold bg-[#FDFCFA]/10 border-muted w-full"
                   />
                 </div>
 
-                <Select
-                  value={requestStatusFilter}
-                  onChange={(e) => setRequestStatusFilter(e.target.value)}
-                  className="h-9 rounded-full border border-navy/45 text-xs bg-white text-navy font-bold focus:border-navy focus:ring-1"
-                >
-                  <option value="all">All Request Statuses</option>
-                  <option value="Pending">Pending Review</option>
-                  <option value="Approved">Approved Tiers</option>
-                  <option value="Rejected">Rejected Tiers</option>
-                </Select>
+                <div className="relative w-full sm:w-48 shrink-0">
+                  <select
+                    value={requestStatusFilter}
+                    onChange={(e) => setRequestStatusFilter(e.target.value)}
+                    className="w-full h-9 pl-3.5 pr-9 rounded-lg border border-muted bg-[#FDFCFA]/10 text-xs font-semibold text-navy focus:outline-none focus:ring-1 focus:ring-navy shadow-2xs cursor-pointer appearance-none text-left"
+                  >
+                    <option value="all">All Request Statuses</option>
+                    <option value="Pending">Pending Review</option>
+                    <option value="Approved">Approved Tiers</option>
+                    <option value="Rejected">Rejected Tiers</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                </div>
               </div>
 
               {/* Requests Table */}

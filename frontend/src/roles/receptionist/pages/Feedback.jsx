@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ActionGroup, ViewActionButton } from "@/components/hs/kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { receptionistService } from "@/services/receptionist";
 import { authService } from "@/services/auth";
 import { toast } from "sonner";
@@ -296,7 +297,7 @@ export function ReceptionistFeedbackPage() {
           {/* Search bar */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <input
+            <Input
               placeholder="Search guest name, room, booking ref, or remarks..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}

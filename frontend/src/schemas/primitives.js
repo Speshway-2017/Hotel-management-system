@@ -25,6 +25,24 @@ export const isAllSameChar = (val) => {
   return clean.split('').every(c => c.toLowerCase() === clean[0].toLowerCase());
 };
 
+// Helper: Check if search query contains invalid repeated characters (e.g. "aaa", "111", "aaaa", "=====")
+export const isRepeatedSearchQuery = (val) => {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (trimmed.length < 3) return false;
+
+  // 3+ consecutive identical letters (e.g. "aaa", "bbb", "zzz")
+  if (/([a-zA-Z])\1{2,}/i.test(trimmed)) return true;
+
+  // 3+ of only a single repeated character (e.g. "111", "---", "000")
+  if (isAllSameChar(trimmed)) return true;
+
+  // 4+ consecutive identical characters of any type (e.g. "1111", "====")
+  if (hasRepeatedChars(trimmed, 4)) return true;
+
+  return false;
+};
+
 // 1. Text field validations (Allow text only; reject numbers or pure numeric input)
 export const textOnlySchema = (min = 1, message = "This field is required", max = 500) =>
   z
@@ -464,10 +482,35 @@ export function validateFieldValue(type, value, options = {}) {
     fieldName = "Field",
     min = 0,
     max = Infinity,
-    allowZero = true
+    allowZero = true,
+    isSearch = false,
+    disableValidation = false,
+    noValidate = false
   } = options;
 
+  // Search and filter fields are freeform query inputs across the application and should never show validation or repeated character errors
+  const isSearchField =
+    Boolean(isSearch) ||
+    Boolean(disableValidation) ||
+    Boolean(noValidate) ||
+    type === "search" ||
+    (typeof type === "string" && /search|filter|query|lookup|destination|location|find|keyword|term/i.test(type)) ||
+    (typeof fieldName === "string" && (/search|filter|find|query|lookup|destination|location|keyword|term/i.test(fieldName) || /hyderabad|jaipur|goa/i.test(fieldName)));
+
   const strVal = value === null || value === undefined ? "" : String(value).trim();
+
+  // Search and filter fields: enforce max length 50 and reject repeated characters
+  if (isSearchField) {
+    if (!strVal) return { isValid: true, error: null };
+    const maxSearchLen = options.max && options.max !== Infinity ? options.max : (options.maxLength || 50);
+    if (strVal.length > maxSearchLen) {
+      return { isValid: false, error: `${fieldName || "Search query"} cannot exceed ${maxSearchLen} characters` };
+    }
+    if (isRepeatedSearchQuery(strVal)) {
+      return { isValid: false, error: `${fieldName || "Search query"} contains invalid repeated characters` };
+    }
+    return { isValid: true, error: null };
+  }
 
   if (!strVal) {
     if (required) {
@@ -476,12 +519,15 @@ export function validateFieldValue(type, value, options = {}) {
     return { isValid: true, error: null };
   }
 
-  // Check repeated characters across text/name/email/phone
-  if (type !== "password" && hasRepeatedChars(strVal, 6)) {
+  // Check repeated characters across text/name/email/phone (exclude password and search inputs)
+  if (type !== "password" && !isSearchField && hasRepeatedChars(strVal, 6)) {
     return { isValid: false, error: `${fieldName} contains invalid repeated characters` };
   }
 
   switch (type) {
+    case "search":
+      return { isValid: true, error: null };
+
     case "text":
     case "text-only": {
       if (options.textOnly && /\d/.test(strVal)) {
