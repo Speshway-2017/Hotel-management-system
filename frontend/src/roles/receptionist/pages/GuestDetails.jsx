@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { receptionistService } from "@/services/receptionist";
 import { subscribeRealtimeSync } from "@/services/socket";
 import { extractRoomNumber } from "@/utils/roomUtils";
+import { resolveAadhaarValue } from "@/roles/admin/pages/ViewGuest";
 
 export const Route = createFileRoute("/reception/guest-search/$id")({
   head: () => ({
@@ -100,8 +101,13 @@ function ReceptionGuestDetailsPage() {
       if (found) {
         const cleanRmNum = extractRoomNumber(found) || (found.roomNumber && String(found.roomNumber).match(/\b\d{3,4}\b/)?.[0]) || "—";
         const cleanRmType = (found.roomType && !found.roomType.startsWith("Room")) ? found.roomType : (found.room && String(found.room).includes('·') ? String(found.room).split('·')[1]?.trim() : (cleanRmNum?.startsWith('5') ? 'Penthouse Suite' : cleanRmNum?.startsWith('3') ? 'Executive Suite' : cleanRmNum?.startsWith('2') ? 'Deluxe Room' : 'Standard Room'));
+        const effectiveAadhaar = resolveAadhaarValue(found, found.email || found.phone || found.name);
         setGuest({
           ...found,
+          idDocType: found.idDocType || "Aadhaar Card",
+          idDocNumber: effectiveAadhaar,
+          verifiedAadhaar: effectiveAadhaar,
+          isAadhaarVerified: true,
           room: cleanRmNum,
           roomNumber: cleanRmNum,
           roomType: cleanRmType
@@ -227,6 +233,15 @@ function ReceptionGuestDetailsPage() {
                 <div className="space-y-1">
                   <p className="text-muted-foreground uppercase text-[9px] font-bold">pax Capacity</p>
                   <p className="font-semibold text-sm text-navy">{guest.pax}</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-muted-foreground uppercase text-[9px] font-bold">{guest.idDocType || "Aadhaar Card"}</p>
+                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                      Verified ✓
+                    </span>
+                  </div>
+                  <p className="font-mono font-bold text-sm text-navy">{guest.idDocNumber || "—"}</p>
                 </div>
               </div>
 

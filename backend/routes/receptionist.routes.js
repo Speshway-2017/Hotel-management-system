@@ -27,13 +27,14 @@ import {
   isBookingStatusActive,
   reconcileRoomStatuses
 } from '../utils/roomHelper.js';
-import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
+import { triggerNotification, notifyBookingEvent, notifyFeedbackEvent } from '../utils/notification.helper.js';
 import {
   validateAadhaarConsistency,
   validateBookingAadhaarConsistency,
   syncVerifiedAadhaarToGuestProfile,
   findExistingVerifiedAadhaar,
-  formatAadhaar
+  formatAadhaar,
+  resolveGuestAadhaar
 } from '../utils/aadhaarValidator.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 
@@ -460,6 +461,13 @@ router.get('/guests', async (req, res) => {
           status: isGuestInactive ? 'Inactive' : (b.status === 'Checked-in' || b.status === 'Checked In' ? 'Staying' : (b.status || 'Staying')),
           accountStatus: isGuestInactive ? 'Inactive' : (userMatch?.status || 'Active'),
           vipTier: 'Gold Elite',
+          idDocType: userMatch?.idDocType || b.idDocType || 'Aadhaar Card',
+          idDocNumber: resolveGuestAadhaar(userMatch || b),
+          idProofType: userMatch?.idProofType || b.idProofType || 'Aadhaar Card',
+          idProofNumber: resolveGuestAadhaar(userMatch || b),
+          verifiedAadhaar: resolveGuestAadhaar(userMatch || b),
+          verifiedAadhaarLast4: resolveGuestAadhaar(userMatch || b) ? resolveGuestAadhaar(userMatch || b).replace(/\D/g, '').slice(-4) : '',
+          isAadhaarVerified: true,
           specialRequests: b.specialRequests || b.notes || 'None',
           timeline: [
             { time: b.checkIn || 'Recent', action: isGuestInactive ? 'Guest account deleted/inactive.' : `Guest in-house active stay in Room ${rmNum}.` }
@@ -538,31 +546,46 @@ const handleReceptionistExtendStay = async (req, res) => {
     const addAmount = additionalAmount !== undefined ? Number(additionalAmount) : 0;
 
     const newAmount = Number(booking.totalAmount || booking.amount || 0) + addAmount;
+    const newBalance = Number(booking.balance || 0) + addAmount;
+    const newPaymentStatus = newBalance <= 0 ? 'Paid' : (newBalance < newAmount ? 'Partial' : 'Pending');
+
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, {
       nights: Number(booking.nights || 1) + calculatedNights,
       checkOut: calculatedCheckOut,
       amount: newAmount,
       totalAmount: newAmount,
       netAmount: newAmount,
-      balance: Number(booking.balance || 0) + addAmount
+      balance: newBalance,
+      paymentStatus: newPaymentStatus,
+      checkoutReminderSent: false,
+      checkoutReminderSentAt: null
     }, { new: true });
 
-    // Trigger notification
-    await triggerNotification({
-      role: 'manager',
-      propertyId: booking.propertyId || req.user.propertyId || 'HS-9HQ8P',
-      title: 'Stay Extended',
-      message: `Stay extended by ${calculatedNights} night(s) for guest ${booking.guest}. New checkout: ${updated.checkOut}.`,
-      category: 'Operations'
+    const io = req.app.get('socketio');
+
+    // Broadcast notifications to all stakeholders including Guest (FCM + Socket + In-App)
+    await notifyBookingEvent({
+      req,
+      io,
+      action: 'extended',
+      booking: updated
     });
 
-    const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-9HQ8P', 'booking_updated', {
         action: 'extend',
         booking: updated,
         bookingId: updated._id,
-        checkOut: updated.checkOut
+        checkOut: updated.checkOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        additionalAmount: addAmount
+      });
+      emitRealtimeSync(io, booking.propertyId || req.user.propertyId || 'HS-9HQ8P', 'stay_extended', {
+        bookingId: updated._id,
+        checkOut: updated.checkOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus
       });
     }
 
@@ -1233,8 +1256,12 @@ router.put('/reservations/:id/status', async (req, res) => {
       updateData.roomNumber = roomNum;
       updateData.room = room && room.includes('·') ? room : `${roomNum} · ${booking.roomType || 'Standard Room'}`;
     }
-    if (status === 'Checked-in' && (!booking.balance || booking.balance === 0)) {
-      updateData.paymentStatus = 'Paid';
+    if (status === 'Checked-in') {
+      updateData.checkinReminderSent = true;
+      updateData.checkinArrivedSent = true;
+      if (!booking.balance || booking.balance === 0) {
+        updateData.paymentStatus = 'Paid';
+      }
     }
 
     const updated = await Booking.findByIdAndUpdate(booking.id || booking._id, updateData, { new: true });

@@ -251,6 +251,8 @@ function GuestNotificationsPage() {
             {filteredNotifications.map((n) => {
               const IconComp = getCategoryIcon(n.category, n.title);
               const isCheckout = (n.title || "").toLowerCase().includes("check-out") || (n.category || "").toLowerCase().includes("check-out") || (n.message || "").toLowerCase().includes("check-out");
+              const isCheckin = !isCheckout && ((n.title || "").toLowerCase().includes("check-in") || (n.category || "").toLowerCase().includes("check-in") || (n.message || "").toLowerCase().includes("check-in"));
+              const isFeedback = (n.category || "").toLowerCase().includes("feedback") || (n.category || "").toLowerCase().includes("experience") || (n.title || "").toLowerCase().includes("feedback") || (n.title || "").toLowerCase().includes("replied");
 
               return (
                 <div
@@ -261,18 +263,24 @@ function GuestNotificationsPage() {
                     !n.read 
                       ? isCheckout 
                         ? "border-l-amber-500 bg-amber-500/[0.02] shadow-[0_2px_12px_rgba(217,119,6,0.06)]"
+                        : isCheckin
+                        ? "border-l-emerald-500 bg-emerald-500/[0.02] shadow-[0_2px_12px_rgba(16,185,129,0.06)]"
+                        : isFeedback
+                        ? "border-l-amber-500 bg-amber-500/[0.02] shadow-[0_2px_12px_rgba(217,119,6,0.06)]"
                         : "border-l-purple bg-purple/[0.01] shadow-[0_2px_12px_rgba(124,58,237,0.04)]" 
                       : "border-l-transparent opacity-90"
                   )}
                 >
-                  {/* Left Side: Icon + Unread purple dot + Title/Message */}
+                  {/* Left Side: Icon + Unread dot + Title/Message */}
                   <div className="flex items-start gap-3.5 flex-1 min-w-0 text-left">
                     <div className={cn(
                       "size-9 rounded-xl flex items-center justify-center shrink-0 border transition-all",
                       isCheckout 
                         ? "bg-amber-50 border-amber-200 text-amber-600"
-                        : (n.category || "").toLowerCase().includes("check-in")
+                        : isCheckin
                         ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                        : isFeedback
+                        ? "bg-amber-50 border-amber-200 text-amber-600"
                         : (n.category || "").toLowerCase().includes("pay")
                         ? "bg-teal-50 border-teal-200 text-teal-600"
                         : "bg-purple/10 border-purple/20 text-purple"
@@ -284,13 +292,61 @@ function GuestNotificationsPage() {
                       <div className="flex flex-wrap items-center gap-2 text-left">
                         <h4 className={cn(
                           "text-xs font-bold text-navy truncate text-left", 
-                          !n.read && (isCheckout ? "text-amber-700 font-extrabold" : "text-purple font-extrabold")
+                          !n.read && (isCheckout ? "text-amber-700 font-extrabold" : isCheckin ? "text-emerald-700 font-extrabold" : isFeedback ? "text-amber-700 font-extrabold" : "text-purple font-extrabold")
                         )}>
                           {n.title}
                         </h4>
                         <Tag tone={getToneForCategory(n.category, n.title)}>{n.category}</Tag>
                       </div>
                       <p className="text-xs text-navy/75 leading-relaxed text-left font-medium">{n.message}</p>
+                      {(isCheckout || (n.message || "").toLowerCase().includes("extend")) && (
+                        <div className="pt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate({ to: "/guest/current-stay" });
+                            }}
+                            className="text-xs h-7 px-3 rounded-lg border border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 font-bold inline-flex items-center gap-1.5 shadow-none cursor-pointer transition-colors"
+                          >
+                            <Clock className="size-3.5 text-amber-600" />
+                            Extend Stay / View Details
+                            <ArrowRight className="size-3 text-amber-600" />
+                          </button>
+                        </div>
+                      )}
+                      {isCheckin && (
+                        <div className="pt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate({ to: "/guest/bookings" });
+                            }}
+                            className="text-xs h-7 px-3 rounded-lg border border-emerald-300 text-emerald-900 bg-emerald-50 hover:bg-emerald-100 font-bold inline-flex items-center gap-1.5 shadow-none cursor-pointer transition-colors"
+                          >
+                            <Key className="size-3.5 text-emerald-600" />
+                            View Reservation / Check-in
+                            <ArrowRight className="size-3 text-emerald-600" />
+                          </button>
+                        </div>
+                      )}
+                      {isFeedback && (
+                        <div className="pt-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate({ to: "/guest/reviews" });
+                            }}
+                            className="text-xs h-7 px-3 rounded-lg border border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 font-bold inline-flex items-center gap-1.5 shadow-none cursor-pointer transition-colors"
+                          >
+                            <MessageSquare className="size-3.5 text-amber-600" />
+                            View Feedback & Reply
+                            <ArrowRight className="size-3 text-amber-600" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -305,7 +361,7 @@ function GuestNotificationsPage() {
                         }}
                         className={cn(
                           "text-[10px] font-bold px-2.5 py-1 rounded-md border-none cursor-pointer hover:underline",
-                          isCheckout ? "text-amber-700 bg-amber-100/80" : "text-purple bg-purple/10"
+                          isCheckout ? "text-amber-700 bg-amber-100/80" : isCheckin ? "text-emerald-700 bg-emerald-100/80" : "text-purple bg-purple/10"
                         )}
                       >
                         Mark as Read

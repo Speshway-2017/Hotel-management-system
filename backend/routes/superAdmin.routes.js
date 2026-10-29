@@ -25,7 +25,9 @@ import {
   validateBookingAadhaarConsistency,
   syncVerifiedAadhaarToGuestProfile,
   findExistingVerifiedAadhaar,
-  formatAadhaar
+  formatAadhaar,
+  resolveGuestAadhaar,
+  generateConsistentAadhaar
 } from '../utils/aadhaarValidator.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 import { sendAccountCreatedEmail } from '../services/email.service.js';
@@ -466,30 +468,42 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
       query.role = req.query.role;
     }
     const users = await User.find(query);
-    const sanitized = users.map(u => ({
-      id: u.id || u._id,
-      _id: u.id || u._id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      mobile: u.mobile || '—',
-      status: u.status || 'Active',
-      propertyId: u.propertyId || null,
-      dept: u.dept || 'Front Desk',
-      shift: u.shift || 'Morning (06:00 - 14:00)',
-      avatar: u.avatar || null,
-      phone: u.mobile || u.phone || '',
-      city: u.city || '',
-      state: u.state || '',
-      country: u.country || 'India',
-      address: u.address || '',
-      type: u.type || 'Regular',
-      preferences: u.preferences || '',
-      idDocType: u.idDocType || 'Aadhaar Card',
-      idDocNumber: u.idDocNumber || '',
-      loyaltyPoints: u.loyaltyPoints || 0,
-      notes: u.notes || ''
-    }));
+    const sanitized = users.map(u => {
+      const isGuest = u.role === 'guest';
+      const effectiveAadhaar = resolveGuestAadhaar(u);
+      const isVerified = Boolean(u.isAadhaarVerified || u.verifiedAadhaar || (isGuest && effectiveAadhaar));
+      return {
+        id: u.id || u._id,
+        _id: u.id || u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        mobile: u.mobile || '—',
+        status: u.status || 'Active',
+        propertyId: u.propertyId || null,
+        dept: u.dept || 'Front Desk',
+        shift: u.shift || 'Morning (06:00 - 14:00)',
+        avatar: u.avatar || null,
+        phone: u.mobile || u.phone || '',
+        city: u.city || '',
+        state: u.state || '',
+        country: u.country || 'India',
+        address: u.address || '',
+        type: u.type || 'Regular',
+        preferences: u.preferences || '',
+        idDocType: u.idDocType || u.idProofType || 'Aadhaar Card',
+        idDocNumber: isGuest ? effectiveAadhaar : (u.idDocNumber || ''),
+        idProofType: u.idProofType || u.idDocType || 'Aadhaar Card',
+        idProofNumber: isGuest ? effectiveAadhaar : (u.idProofNumber || u.idDocNumber || ''),
+        verifiedAadhaar: isGuest ? effectiveAadhaar : (u.verifiedAadhaar || ''),
+        verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+        isAadhaarVerified: isVerified,
+        aadhaarNumber: isGuest ? effectiveAadhaar : (u.aadhaarNumber || ''),
+        aadharNumber: isGuest ? effectiveAadhaar : (u.aadharNumber || ''),
+        loyaltyPoints: u.loyaltyPoints || 0,
+        notes: u.notes || ''
+      };
+    });
     return sendSuccess(res, 200, sanitized, 'Users list retrieved');
   } catch (error) {
     return sendError(res, 500, 'Failed to retrieve users');
@@ -505,6 +519,9 @@ router.get('/users/:id', checkPropertyStatus, async (req, res) => {
     }
     const user = await User.findOne({ $or: userQuery });
     if (!user) return sendError(res, 404, 'Staff not found');
+    const isGuest = user.role === 'guest';
+    const effectiveAadhaar = resolveGuestAadhaar(user);
+    const isVerified = Boolean(user.isAadhaarVerified || user.verifiedAadhaar || (isGuest && effectiveAadhaar));
     return sendSuccess(res, 200, {
       id: user.id || user._id,
       _id: user.id || user._id,
@@ -512,10 +529,28 @@ router.get('/users/:id', checkPropertyStatus, async (req, res) => {
       email: user.email,
       role: user.role,
       mobile: user.mobile || '',
+      phone: user.mobile || user.phone || '',
       status: user.status || 'Active',
       propertyId: user.propertyId || null,
       dept: user.dept || 'Front Desk',
       shift: user.shift || 'Morning (06:00 - 14:00)',
+      avatar: user.avatar || null,
+      city: user.city || '',
+      state: user.state || '',
+      country: user.country || 'India',
+      address: user.address || '',
+      type: user.type || 'Regular',
+      preferences: user.preferences || '',
+      idDocType: user.idDocType || user.idProofType || 'Aadhaar Card',
+      idDocNumber: isGuest ? effectiveAadhaar : (user.idDocNumber || ''),
+      idProofType: user.idProofType || user.idDocType || 'Aadhaar Card',
+      idProofNumber: isGuest ? effectiveAadhaar : (user.idProofNumber || user.idDocNumber || ''),
+      verifiedAadhaar: isGuest ? effectiveAadhaar : (user.verifiedAadhaar || ''),
+      verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+      isAadhaarVerified: isVerified,
+      aadhaarNumber: isGuest ? effectiveAadhaar : (user.aadhaarNumber || ''),
+      aadharNumber: isGuest ? effectiveAadhaar : (user.aadharNumber || ''),
+      notes: user.notes || '',
       lastLogin: user.lastLogin || '—'
     }, 'User retrieved successfully');
   } catch (error) {
@@ -525,7 +560,11 @@ router.get('/users/:id', checkPropertyStatus, async (req, res) => {
 
 router.post('/users', checkPropertyStatus, async (req, res) => {
   try {
-    const { name, email, password, role, mobile, propertyId, status, dept, shift } = req.body;
+    const { 
+      name, email, password, role, mobile, phone, propertyId, status, dept, shift,
+      city, state, country, address, type, preferences, notes,
+      idDocType, idDocNumber, idProofType, idProofNumber
+    } = req.body;
     if (!name || !email || !password || !role) {
       return sendError(res, 400, 'All fields (name, email, password, role) are required');
     }
@@ -541,16 +580,42 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
     const existing = await User.findOne({ email });
     if (existing) return sendError(res, 400, 'User with this email already exists');
 
+    const effectiveRole = String(role).toLowerCase();
+    const isGuest = effectiveRole === 'guest';
+    const rawDocNum = idDocNumber || idProofNumber;
+    let finalAadhaar = '';
+    if (rawDocNum) {
+      finalAadhaar = formatAadhaar(rawDocNum);
+    } else if (isGuest) {
+      finalAadhaar = generateConsistentAadhaar(email || mobile || phone || name);
+    }
+
     const newUser = await User.create({
       name,
       email,
       password,
-      role,
-      mobile: mobile || '',
+      role: effectiveRole,
+      mobile: mobile || phone || '',
+      phone: mobile || phone || '',
       propertyId: targetPropertyId,
       status: status || 'Active',
       dept: dept || 'Front Desk',
-      shift: shift || 'Morning (06:00 - 14:00)'
+      shift: shift || 'Morning (06:00 - 14:00)',
+      city: city || 'Hyderabad',
+      state: state || 'Telangana',
+      country: country || 'India',
+      address: address || '',
+      type: type || 'Regular',
+      preferences: preferences || '',
+      notes: notes || '',
+      idDocType: idDocType || idProofType || 'Aadhaar Card',
+      idDocNumber: finalAadhaar,
+      idProofType: idProofType || idDocType || 'Aadhaar Card',
+      idProofNumber: finalAadhaar,
+      verifiedAadhaar: finalAadhaar,
+      verifiedAadhaarLast4: finalAadhaar ? finalAadhaar.replace(/\D/g, '').slice(-4) : '',
+      isAadhaarVerified: Boolean(finalAadhaar),
+      aadhaarVerifiedAt: finalAadhaar ? new Date() : null
     });
 
     // Send Account Credentials Email via Nodemailer
@@ -573,10 +638,17 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       email: newUser.email,
       role: newUser.role,
       mobile: newUser.mobile,
+      phone: newUser.mobile || newUser.phone,
       propertyId: newUser.propertyId,
       status: newUser.status,
       dept: newUser.dept,
       shift: newUser.shift,
+      idDocType: newUser.idDocType,
+      idDocNumber: newUser.idDocNumber,
+      idProofType: newUser.idProofType,
+      idProofNumber: newUser.idProofNumber,
+      verifiedAadhaar: newUser.verifiedAadhaar,
+      isAadhaarVerified: newUser.isAadhaarVerified,
       lastLogin: newUser.lastLogin || '—'
     }, 'User created successfully');
   } catch (error) {
@@ -587,7 +659,11 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
 router.put('/users/:id', checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, mobile, status, propertyId, dept, shift } = req.body;
+    const { 
+      name, role, mobile, phone, status, propertyId, dept, shift,
+      idDocType, idDocNumber, idProofType, idProofNumber,
+      city, state, country, address, type, preferences, notes
+    } = req.body;
 
     const userQuery = [{ _id: id }, { id: id }, { email: id }];
     if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id) {
@@ -607,9 +683,34 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
     if (name !== undefined) updateFields.name = name;
     if (role !== undefined) updateFields.role = role;
     if (mobile !== undefined) updateFields.mobile = mobile;
+    if (phone !== undefined) updateFields.phone = phone;
     if (status !== undefined) updateFields.status = status;
     if (dept !== undefined) updateFields.dept = dept;
     if (shift !== undefined) updateFields.shift = shift;
+    if (city !== undefined) updateFields.city = city;
+    if (state !== undefined) updateFields.state = state;
+    if (country !== undefined) updateFields.country = country;
+    if (address !== undefined) updateFields.address = address;
+    if (type !== undefined) updateFields.type = type;
+    if (preferences !== undefined) updateFields.preferences = preferences;
+    if (notes !== undefined) updateFields.notes = notes;
+
+    const docNum = idDocNumber || idProofNumber;
+    if (docNum !== undefined) {
+      const formatted = formatAadhaar(docNum);
+      const isAadh = String(idDocType || idProofType || 'Aadhaar Card').toLowerCase().includes('aadhaar');
+      updateFields.idDocType = idDocType || idProofType || 'Aadhaar Card';
+      updateFields.idDocNumber = formatted;
+      updateFields.idProofType = idProofType || idDocType || 'Aadhaar Card';
+      updateFields.idProofNumber = formatted;
+      if (isAadh) {
+        updateFields.verifiedAadhaar = formatted;
+        updateFields.verifiedAadhaarLast4 = formatted.replace(/\D/g, '').slice(-4);
+        updateFields.isAadhaarVerified = true;
+        updateFields.aadhaarVerifiedAt = new Date();
+      }
+    }
+
     if (req.user.role === 'super-admin' && propertyId !== undefined) {
       updateFields.propertyId = propertyId || null;
     }
@@ -626,6 +727,7 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
       emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id });
     }
 
+    const effectiveAadhaar = resolveGuestAadhaar(updated);
     return sendSuccess(res, 200, {
       id: updated.id || updated._id,
       _id: updated.id || updated._id,
@@ -633,10 +735,21 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
       email: updated.email,
       role: updated.role,
       mobile: updated.mobile,
+      phone: updated.mobile || updated.phone,
       status: updated.status,
       propertyId: updated.propertyId,
       dept: updated.dept,
       shift: updated.shift,
+      idDocType: updated.idDocType || 'Aadhaar Card',
+      idDocNumber: effectiveAadhaar,
+      idProofType: updated.idProofType || 'Aadhaar Card',
+      idProofNumber: effectiveAadhaar,
+      verifiedAadhaar: effectiveAadhaar,
+      verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+      isAadhaarVerified: Boolean(updated.isAadhaarVerified || effectiveAadhaar),
+      city: updated.city || '',
+      state: updated.state || '',
+      address: updated.address || '',
       lastLogin: updated.lastLogin || '—'
     }, 'User updated successfully');
   } catch (error) {
@@ -1116,6 +1229,11 @@ router.put('/reservations/:id', checkPropertyStatus, async (req, res) => {
       });
     }
 
+    if (updatePayload.status === 'Checked-in') {
+      updatePayload.checkinReminderSent = true;
+      updatePayload.checkinArrivedSent = true;
+    }
+
     const booking = await Booking.findOneAndUpdate(bookingQuery, updatePayload, { new: true });
     if (!booking) return sendError(res, 404, 'Booking not found');
     await logAction(req.user, 'Updated Booking', `${booking.guest}`, req);
@@ -1181,7 +1299,11 @@ router.put('/reservations/:id/extend', checkPropertyStatus, async (req, res) => 
       return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
     }
 
-    const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
+    const addAmt = Number(additionalAmount || 0);
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + addAmt;
+    const newBalance = Number(booking.balance || 0) + addAmt;
+    const newPaymentStatus = newBalance <= 0 ? 'Paid' : (newBalance < newAmount ? 'Partial' : 'Pending');
+
     const updated = await Booking.findOneAndUpdate(
       bookingQuery,
       {
@@ -1190,19 +1312,40 @@ router.put('/reservations/:id/extend', checkPropertyStatus, async (req, res) => 
         amount: newAmount,
         totalAmount: newAmount,
         netAmount: newAmount,
-        balance: Number(booking.balance || 0) + Number(additionalAmount || 0)
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        checkoutReminderSent: false,
+        checkoutReminderSentAt: null
       },
       { new: true }
     );
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const io = req.app.get('socketio');
+
+    // Notify all stakeholders including Guest via notifyBookingEvent
+    await notifyBookingEvent({
+      req,
+      io,
+      action: 'extended',
+      booking: updated
+    });
+
     if (io) {
       emitRealtimeSync(io, targetPropId, 'booking_updated', {
         action: 'extend',
         booking: updated,
         bookingId: updated._id,
-        checkOut: newCheckOut
+        checkOut: newCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        additionalAmount: addAmt
+      });
+      emitRealtimeSync(io, targetPropId, 'stay_extended', {
+        bookingId: updated._id,
+        checkOut: newCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus
       });
     }
 
@@ -1232,8 +1375,11 @@ router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) =>
       return sendError(res, 400, 'Cannot extend stay for a checked-out reservation.');
     }
 
+    const addAmt = Number(additionalAmount || 0);
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + addAmt;
+    const newBalance = Number(booking.balance || 0) + addAmt;
+    const newPaymentStatus = newBalance <= 0 ? 'Paid' : (newBalance < newAmount ? 'Partial' : 'Pending');
 
-    const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
     const updated = await Booking.findOneAndUpdate(
       bookingQuery,
       {
@@ -1242,19 +1388,39 @@ router.post('/reservations/:id/extend', checkPropertyStatus, async (req, res) =>
         amount: newAmount,
         totalAmount: newAmount,
         netAmount: newAmount,
-        balance: Number(booking.balance || 0) + Number(additionalAmount || 0)
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        checkoutReminderSent: false,
+        checkoutReminderSentAt: null
       },
       { new: true }
     );
 
     const targetPropId = booking.propertyId || req.user.propertyId || 'HS-9HQ8P';
     const io = req.app.get('socketio');
+
+    await notifyBookingEvent({
+      req,
+      io,
+      action: 'extended',
+      booking: updated
+    });
+
     if (io) {
       emitRealtimeSync(io, targetPropId, 'booking_updated', {
         action: 'extend',
         booking: updated,
         bookingId: updated._id,
-        checkOut: newCheckOut
+        checkOut: newCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        additionalAmount: addAmt
+      });
+      emitRealtimeSync(io, targetPropId, 'stay_extended', {
+        bookingId: updated._id,
+        checkOut: newCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus
       });
     }
 

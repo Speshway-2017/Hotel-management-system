@@ -114,7 +114,7 @@ class _GuestPaymentsScreenState extends State<GuestPaymentsScreen> {
         backgroundColor: navy,
         onRefresh: () => context.read<GuestPaymentProvider>().fetchPayments(),
         child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             // 1. Top Summary Banner
             SliverToBoxAdapter(

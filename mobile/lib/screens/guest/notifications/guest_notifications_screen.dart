@@ -574,6 +574,89 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
                             height: 1.35,
                           ),
                         ),
+                        if (notif.title.toLowerCase().contains('check-out') ||
+                            notif.title.toLowerCase().contains('checkout') ||
+                            notif.message.toLowerCase().contains('check-out') ||
+                            notif.message.toLowerCase().contains('checkout') ||
+                            notif.message.toLowerCase().contains('extend') ||
+                            notif.category.toLowerCase().contains('check-out')) ...[
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () {
+                              if (isUnread) {
+                                provider.markAsRead(notif.id, title: notif.title, message: notif.message);
+                              }
+                              _navigateToBookingForNotification(context, notif);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFF59E0B).withAlpha(120)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.more_time_rounded, size: 13, color: Color(0xFFB45309)),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'Extend Stay / View Booking',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(Icons.arrow_forward_ios_rounded, size: 9, color: Color(0xFFB45309)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ] else if (notif.title.toLowerCase().contains('check-in') ||
+                            notif.title.toLowerCase().contains('checkin') ||
+                            notif.message.toLowerCase().contains('check-in') ||
+                            notif.message.toLowerCase().contains('checkin') ||
+                            notif.category.toLowerCase().contains('check-in') ||
+                            notif.category.toLowerCase().contains('checkin')) ...[
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () {
+                              if (isUnread) {
+                                provider.markAsRead(notif.id, title: notif.title, message: notif.message);
+                              }
+                              _navigateToBookingForNotification(context, notif);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD1FAE5),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFF10B981).withAlpha(120)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.how_to_reg_rounded, size: 13, color: Color(0xFF047857)),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'View Reservation / Check-in',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF047857),
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(Icons.arrow_forward_ios_rounded, size: 9, color: Color(0xFF047857)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -878,88 +961,114 @@ class _GuestNotificationsScreenState extends State<GuestNotificationsScreen> {
     );
   }
 
+  void _navigateToBookingForNotification(BuildContext context, NotificationModel notif) {
+    final combinedText = '${notif.title} ${notif.message}';
+    final refMatch = RegExp(r'(?:#|Ref:\s*#?|\b)(BK-[A-Za-z0-9-]+)', caseSensitive: false).firstMatch(combinedText);
+    final bookingCode = refMatch?.group(1);
+
+    final bookingProv = context.read<GuestBookingProvider>();
+    ReservationModel? targetBooking;
+
+    if (bookingCode != null) {
+      try {
+        targetBooking = bookingProv.bookings.cast<ReservationModel?>().firstWhere(
+          (b) => b?.bookingId.toLowerCase() == bookingCode.toLowerCase() ||
+                 b?.id.toLowerCase() == bookingCode.toLowerCase(),
+          orElse: () => null,
+        );
+      } catch (_) {}
+    }
+
+    if (targetBooking == null) {
+      for (final b in bookingProv.bookings) {
+        if (b.bookingId.isNotEmpty && combinedText.toLowerCase().contains(b.bookingId.toLowerCase())) {
+          targetBooking = b;
+          break;
+        }
+        if (b.id.isNotEmpty && combinedText.toLowerCase().contains(b.id.toLowerCase())) {
+          targetBooking = b;
+          break;
+        }
+      }
+    }
+
+    if (targetBooking == null) {
+      if (bookingProv.currentStay != null && (bookingCode == null || bookingProv.currentStay!.bookingId.toLowerCase() == bookingCode.toLowerCase())) {
+        targetBooking = bookingProv.currentStay;
+      } else if (bookingProv.upcomingStay != null && (bookingCode == null || bookingProv.upcomingStay!.bookingId.toLowerCase() == bookingCode.toLowerCase())) {
+        targetBooking = bookingProv.upcomingStay;
+      }
+    }
+
+    if (targetBooking != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => GuestBookingDetailScreen(booking: targetBooking!)),
+      );
+    } else if (bookingCode != null) {
+      final fallbackBooking = ReservationModel(
+        id: bookingCode,
+        bookingId: bookingCode,
+        guest: 'Guest',
+        room: 'Room',
+        roomType: 'Standard Room',
+        status: combinedText.toLowerCase().contains('check-in') || combinedText.toLowerCase().contains('checked-in')
+            ? 'Checked-in'
+            : (combinedText.toLowerCase().contains('check-out') || combinedText.toLowerCase().contains('checked-out')
+                ? 'Checked-out'
+                : 'Confirmed'),
+        stayType: 'Standard',
+        checkIn: DateTime.now().toIso8601String(),
+        checkOut: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+        amount: 0.0,
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => GuestBookingDetailScreen(booking: fallbackBooking)),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const GuestBookingsScreen()),
+      );
+    }
+  }
+
   Widget _buildContextualActionButton(BuildContext rootContext, BuildContext sheetContext, NotificationModel notif) {
     final cat = notif.category.toLowerCase();
     final msg = notif.message.toLowerCase();
     final title = notif.title.toLowerCase();
 
+    final isCheckoutOrExtend = title.contains('check-out') ||
+        title.contains('checkout') ||
+        msg.contains('check-out') ||
+        msg.contains('checkout') ||
+        msg.contains('extend') ||
+        cat.contains('check-out') ||
+        cat.contains('checkout');
+
+    final isCheckin = !isCheckoutOrExtend && (title.contains('check-in') ||
+        title.contains('checkin') ||
+        msg.contains('check-in') ||
+        msg.contains('checkin') ||
+        cat.contains('check-in') ||
+        cat.contains('checkin'));
+
     String label = '';
     IconData icon = Icons.arrow_forward_rounded;
     VoidCallback? onNavigate;
 
-    if (cat.contains('reserv') || cat.contains('book') || cat.contains('stay') || msg.contains('booking') || title.contains('booking') || msg.contains('reservation')) {
-      label = 'View Booking';
-      icon = Icons.calendar_month_rounded;
+    if (cat.contains('reserv') || cat.contains('book') || cat.contains('stay') || cat.contains('check') || msg.contains('booking') || title.contains('booking') || msg.contains('reservation') || isCheckoutOrExtend || isCheckin) {
+      if (isCheckoutOrExtend) {
+        label = 'Extend Stay / View Booking';
+        icon = Icons.more_time_rounded;
+      } else if (isCheckin) {
+        label = 'View Reservation / Check-in';
+        icon = Icons.how_to_reg_rounded;
+      } else {
+        label = 'View Booking';
+        icon = Icons.calendar_month_rounded;
+      }
       onNavigate = () {
         Navigator.of(sheetContext).pop();
-
-        final combinedText = '${notif.title} ${notif.message}';
-        final refMatch = RegExp(r'(?:#|Ref:\s*#?|\b)(BK-[A-Za-z0-9-]+)', caseSensitive: false).firstMatch(combinedText);
-        final bookingCode = refMatch?.group(1);
-
-        final bookingProv = rootContext.read<GuestBookingProvider>();
-        ReservationModel? targetBooking;
-
-        if (bookingCode != null) {
-          try {
-            targetBooking = bookingProv.bookings.cast<ReservationModel?>().firstWhere(
-              (b) => b?.bookingId.toLowerCase() == bookingCode.toLowerCase() ||
-                     b?.id.toLowerCase() == bookingCode.toLowerCase(),
-              orElse: () => null,
-            );
-          } catch (_) {}
-        }
-
-        if (targetBooking == null) {
-          for (final b in bookingProv.bookings) {
-            if (b.bookingId.isNotEmpty && combinedText.toLowerCase().contains(b.bookingId.toLowerCase())) {
-              targetBooking = b;
-              break;
-            }
-            if (b.id.isNotEmpty && combinedText.toLowerCase().contains(b.id.toLowerCase())) {
-              targetBooking = b;
-              break;
-            }
-          }
-        }
-
-        if (targetBooking == null) {
-          if (bookingProv.upcomingStay != null && (bookingCode == null || bookingProv.upcomingStay!.bookingId.toLowerCase() == bookingCode.toLowerCase())) {
-            targetBooking = bookingProv.upcomingStay;
-          } else if (bookingProv.currentStay != null && (bookingCode == null || bookingProv.currentStay!.bookingId.toLowerCase() == bookingCode.toLowerCase())) {
-            targetBooking = bookingProv.currentStay;
-          }
-        }
-
-        if (targetBooking != null) {
-          Navigator.of(rootContext).push(
-            MaterialPageRoute(builder: (_) => GuestBookingDetailScreen(booking: targetBooking!)),
-          );
-        } else if (bookingCode != null) {
-          final fallbackBooking = ReservationModel(
-            id: bookingCode,
-            bookingId: bookingCode,
-            guest: 'Guest',
-            room: 'Room',
-            roomType: 'Standard Room',
-            status: combinedText.toLowerCase().contains('check-in') || combinedText.toLowerCase().contains('checked-in')
-                ? 'Checked-in'
-                : (combinedText.toLowerCase().contains('check-out') || combinedText.toLowerCase().contains('checked-out')
-                    ? 'Checked-out'
-                    : 'Confirmed'),
-            stayType: 'Standard',
-            checkIn: DateTime.now().toIso8601String(),
-            checkOut: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
-            amount: 0.0,
-          );
-          Navigator.of(rootContext).push(
-            MaterialPageRoute(builder: (_) => GuestBookingDetailScreen(booking: fallbackBooking)),
-          );
-        } else {
-          Navigator.of(rootContext).push(
-            MaterialPageRoute(builder: (_) => const GuestBookingsScreen()),
-          );
-        }
+        _navigateToBookingForNotification(rootContext, notif);
       };
     } else if (cat.contains('pay') ||
         cat.contains('bill') ||

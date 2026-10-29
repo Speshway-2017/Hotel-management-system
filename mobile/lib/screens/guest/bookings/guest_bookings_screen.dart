@@ -72,7 +72,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
 
   _BookingTabType _getBookingTabType(ReservationModel b) {
     final s = b.status.toLowerCase();
-    if (s == 'cancelled') return _BookingTabType.cancelled;
+    if (s == 'cancelled' || s == 'refunded') return _BookingTabType.cancelled;
     if (s == 'checked_in' || s == 'checked-in') return _BookingTabType.currentStay;
     if (s == 'checked_out' || s == 'checked-out' || s == 'completed') return _BookingTabType.completed;
     return _BookingTabType.upcoming;
@@ -610,22 +610,81 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
     final durationText = isHourly
         ? '${b.hours ?? 3} Hours Stay'
         : '${b.nights > 0 ? b.nights : 1} Night${b.nights > 1 ? "s" : ""} Stay';
+    final actionButtons = _buildContextualActionButtons(context, b, tabType);
+
+    final isCurrent = tabType == _BookingTabType.currentStay;
+    int? remainingOutMins;
+    if (isCurrent && b.checkOut.isNotEmpty) {
+      DateTime? outDt = DateTime.tryParse(b.checkOut);
+      if (outDt == null) {
+        final dmy = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(b.checkOut);
+        final ymd = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(b.checkOut);
+        if (dmy != null) {
+          outDt = DateTime(int.parse(dmy.group(3)!), int.parse(dmy.group(2)!), int.parse(dmy.group(1)!), 11, 0);
+        } else if (ymd != null) {
+          outDt = DateTime(int.parse(ymd.group(1)!), int.parse(ymd.group(2)!), int.parse(ymd.group(3)!), 11, 0);
+        }
+      }
+      if (outDt != null) {
+        remainingOutMins = (outDt.difference(DateTime.now()).inSeconds / 60).round();
+      }
+    }
+    final bool isCheckoutApproaching = remainingOutMins != null && remainingOutMins > 0 && remainingOutMins <= 15;
+    final bool isCheckoutDue = remainingOutMins != null && remainingOutMins <= 0;
+
+    int? checkInRemainingMins;
+    final bStLower = b.status.toLowerCase().trim();
+    final bool isCheckedIn = tabType == _BookingTabType.currentStay ||
+        bStLower == 'checked-in' ||
+        bStLower == 'checked_in' ||
+        bStLower == 'staying' ||
+        bStLower == 'in-house';
+    final bool isUpcoming = tabType == _BookingTabType.upcoming && !isCheckedIn;
+    if (isUpcoming && b.checkIn.isNotEmpty) {
+      DateTime? inDt = DateTime.tryParse(b.checkIn);
+      if (inDt == null) {
+        final dmy = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(b.checkIn);
+        final ymd = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(b.checkIn);
+        if (dmy != null) {
+          inDt = DateTime(int.parse(dmy.group(3)!), int.parse(dmy.group(2)!), int.parse(dmy.group(1)!), 14, 0);
+        } else if (ymd != null) {
+          inDt = DateTime(int.parse(ymd.group(1)!), int.parse(ymd.group(2)!), int.parse(ymd.group(3)!), 14, 0);
+        }
+      }
+      if (inDt != null) {
+        checkInRemainingMins = (inDt.difference(DateTime.now()).inSeconds / 60).round();
+      }
+    }
+
+    DateTime? bOutDt = b.checkOut.isNotEmpty ? DateTime.tryParse(b.checkOut) : null;
+    final bool isStayEnded = bOutDt != null && DateTime.now().isAfter(bOutDt);
+
+    final bool isCheckinApproaching = !isCheckedIn && !isStayEnded && checkInRemainingMins != null && checkInRemainingMins > 0 && checkInRemainingMins <= 15;
+    final bool isCheckinDue = !isCheckedIn && !isStayEnded && checkInRemainingMins != null && checkInRemainingMins <= 0 && checkInRemainingMins >= -360;
 
     return Container(
       decoration: BoxDecoration(
         color: white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: tabType == _BookingTabType.currentStay
-              ? emerald.withAlpha(90)
-              : cardBorder,
-          width: tabType == _BookingTabType.currentStay ? 1.5 : 1,
+          color: (isCheckoutApproaching || isCheckoutDue)
+              ? const Color(0xFFF59E0B)
+              : (isCheckinApproaching || isCheckinDue)
+                  ? const Color(0xFF10B981)
+                  : tabType == _BookingTabType.currentStay
+                      ? emerald.withAlpha(90)
+                      : cardBorder,
+          width: (isCheckoutApproaching || isCheckoutDue || isCheckinApproaching || isCheckinDue || tabType == _BookingTabType.currentStay) ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: tabType == _BookingTabType.currentStay
-                ? emerald.withAlpha(20)
-                : navy.withAlpha(8),
+            color: (isCheckoutApproaching || isCheckoutDue)
+                ? Colors.amber.withAlpha(20)
+                : (isCheckinApproaching || isCheckinDue)
+                    ? emerald.withAlpha(20)
+                    : tabType == _BookingTabType.currentStay
+                        ? emerald.withAlpha(20)
+                        : navy.withAlpha(8),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -710,7 +769,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
                   ),
                   const SizedBox(width: 6),
                   // Payment Status Pill
-                  _buildPaymentPill(b.paymentStatus),
+                  _buildPaymentPill(b.isRefundCompleted ? 'Refunded' : (b.balance > 0 && b.paymentStatus.toLowerCase() == 'paid' ? 'Partial' : b.paymentStatus), balance: b.balance),
                   const SizedBox(width: 6),
                   // Booking Status Badge
                   StatusBadge(status: b.status, fontSize: 11),
@@ -724,6 +783,70 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Check-in approaching / arrived pill
+                  if (isUpcoming && (isCheckinApproaching || isCheckinDue)) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD1FAE5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF10B981)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.how_to_reg_rounded, size: 14, color: Color(0xFF047857)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              isCheckinDue
+                                  ? 'Check-in time arrived! Room ready for check-in.'
+                                  : 'Check-in in $checkInRemainingMins mins! Ready for arrival.',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF065F46),
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFF047857)),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Checkout approaching / arrived warning pill
+                  if (isCurrent && (isCheckoutApproaching || isCheckoutDue)) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFF59E0B)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.timer_outlined, size: 14, color: Color(0xFFB45309)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              isCheckoutDue
+                                  ? 'Check-out time arrived! Extend stay if you need more time.'
+                                  : 'Check-out in $remainingOutMins mins! Extend stay if needed.',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFFB45309)),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // Hotel Name & Room Type
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -901,7 +1024,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // 4. Tariff Amount & Actions Header
+                  // 4. Tariff Amount
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -919,31 +1042,12 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
                           ),
                         ],
                       ),
-                      // Details Quick Link
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: purple,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        ),
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 15),
-                        label: const Text(
-                          'View Details',
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => GuestBookingDetailScreen(booking: b),
-                            ),
-                          );
-                        },
-                      ),
                     ],
                   ),
-                  const Divider(height: 16, color: cardBorder),
-
-                  // 5. Contextual Tab Action Buttons
-                  _buildContextualActionButtons(context, b, tabType),
+                  if (actionButtons != null) ...[
+                    const Divider(height: 16, color: cardBorder),
+                    actionButtons,
+                  ],
                 ],
               ),
             ),
@@ -958,7 +1062,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
   // =========================================================================
   // CONTEXTUAL ACTION BUTTONS (Tab Specific)
   // =========================================================================
-  Widget _buildContextualActionButtons(
+  Widget? _buildContextualActionButtons(
     BuildContext context,
     ReservationModel b,
     _BookingTabType tabType,
@@ -1152,7 +1256,10 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
   }
 
   // --- CANCELLED ACTIONS ---
-  Widget _buildCancelledActions(BuildContext context, ReservationModel b) {
+  Widget? _buildCancelledActions(BuildContext context, ReservationModel b) {
+    if (b.isRefundCompleted) {
+      return null;
+    }
     if (b.hasRefundRequest) {
       return SizedBox(
         width: double.infinity,
@@ -2053,8 +2160,11 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
     );
   }
 
-  Widget _buildPaymentPill(String paymentStatus) {
-    final s = paymentStatus.toLowerCase();
+  Widget _buildPaymentPill(String paymentStatus, {double balance = 0.0}) {
+    String s = paymentStatus.toLowerCase();
+    if (balance > 0 && s == 'paid') {
+      s = 'partial';
+    }
     Color bg;
     Color fg;
     if (s == 'paid') {
@@ -2063,10 +2173,17 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
     } else if (s == 'partial') {
       bg = amberBg;
       fg = amber;
+    } else if (s == 'refunded' || s == 'refund') {
+      bg = purpleBg;
+      fg = purple;
     } else {
       bg = rubyBg;
       fg = ruby;
     }
+
+    final displayText = (s == 'partial' && balance > 0)
+        ? 'Partial (Due ₹${balance.toStringAsFixed(0)})'
+        : Formatters.capitalize(s);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
@@ -2081,7 +2198,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
           Icon(Icons.payment_rounded, size: 10, color: fg),
           const SizedBox(width: 3),
           Text(
-            Formatters.capitalize(paymentStatus),
+            displayText,
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg),
           ),
         ],

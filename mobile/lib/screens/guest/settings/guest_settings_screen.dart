@@ -1311,6 +1311,7 @@ class _GuestSettingsScreenState extends State<GuestSettingsScreen> {
         builder: (ctx, scrollController) => Padding(
           padding: const EdgeInsets.all(20),
           child: ListView(
+            physics: const BouncingScrollPhysics(),
             controller: scrollController,
             children: [
               Row(
