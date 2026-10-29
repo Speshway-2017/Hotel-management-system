@@ -50,7 +50,17 @@ class ReservationModel {
 
   // Refund helpers
   bool get hasRefundRequest => refundRequest != null || (refundStatus != 'None' && refundStatus.isNotEmpty);
-  bool get isCancelled => status.toLowerCase() == 'cancelled';
+  bool get isCancelled => status.toLowerCase() == 'cancelled' || status.toLowerCase() == 'refunded';
+  bool get isRefundCompleted {
+    final statusVal = refundStatus.isNotEmpty && refundStatus != 'None'
+        ? refundStatus
+        : (refundRequest?['status']?.toString() ?? '');
+    final s = statusVal.toLowerCase();
+    return s == 'refunded' ||
+        s == 'completed' ||
+        paymentStatus.toLowerCase() == 'refunded' ||
+        status.toLowerCase() == 'refunded';
+  }
 
   ReservationModel({
     required this.id,
@@ -227,6 +237,12 @@ class ReservationModel {
     }
     if (parsedNights <= 0) parsedNights = 1;
 
+    final parsedBal = double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0;
+    String rawPaymentStatus = json['paymentStatus']?.toString() ?? 'Pending';
+    if (parsedBal > 0 && rawPaymentStatus.trim().toLowerCase() == 'paid') {
+      rawPaymentStatus = 'Partial';
+    }
+
     return ReservationModel(
       id: json['id'] ?? json['_id'] ?? '',
       bookingId: json['bookingId'] ?? json['reservationNumber'] ?? json['id'] ?? json['_id'] ?? '',
@@ -245,9 +261,9 @@ class ReservationModel {
       originalAmount: origAmt,
       discountAmount: discAmt,
       couponCode: json['couponCode']?.toString(),
-      balance: double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0,
+      balance: parsedBal,
       status: json['status'] ?? 'Confirmed',
-      paymentStatus: json['paymentStatus'] ?? 'Pending',
+      paymentStatus: rawPaymentStatus,
       paymentMethod: json['paymentMethod'] ?? 'UPI',
       source: json['source'] ?? 'Direct Booking',
       propertyId: json['propertyId']?.toString() ?? 'HS-9HQ8P',

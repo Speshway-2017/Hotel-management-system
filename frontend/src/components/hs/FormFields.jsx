@@ -27,11 +27,15 @@ export function FormField({
   // Enhance children to inherit error status and parent field binding
   const enhancedChildren = React.Children.map(children, (child) => {
     if (React.isValidElement(child)) {
+      if (typeof child.type === "string") {
+        return React.cloneElement(child, {
+          id: child.props.id || id,
+        });
+      }
       return React.cloneElement(child, {
         status: child.props.status || (hasError ? "error" : undefined),
         id: child.props.id || id,
-        hasParentFormField: true,
-        parentError: errorMsg
+        hasParentFormField: true
       });
     }
     return child;
@@ -543,7 +547,7 @@ export const Input = React.forwardRef(
 Input.displayName = "Input";
 
 export const Select = React.forwardRef(
-  ({ className, status, children, ...props }, ref) => {
+  ({ className, status, children, hasParentFormField, parentError, ...props }, ref) => {
     return (
       <div className="relative w-full">
         <select
@@ -584,7 +588,7 @@ export const Select = React.forwardRef(
 Select.displayName = "Select";
 
 export const Textarea = React.forwardRef(
-  ({ className, status, ...props }, ref) => {
+  ({ className, status, hasParentFormField, parentError, ...props }, ref) => {
     return (
       <textarea
         className={cn(
@@ -605,7 +609,7 @@ export const Textarea = React.forwardRef(
 Textarea.displayName = "Textarea";
 
 export const Checkbox = React.forwardRef(
-  ({ className, label, ...props }, ref) => {
+  ({ className, label, hasParentFormField, parentError, ...props }, ref) => {
     return (
       <label className="inline-flex items-center gap-2.5 cursor-pointer text-sm font-medium text-navy select-none">
         <input
@@ -625,7 +629,7 @@ export const Checkbox = React.forwardRef(
 Checkbox.displayName = "Checkbox";
 
 export const Radio = React.forwardRef(
-  ({ className, label, ...props }, ref) => {
+  ({ className, label, hasParentFormField, parentError, ...props }, ref) => {
     return (
       <label className="inline-flex items-center gap-2.5 cursor-pointer text-sm font-medium text-navy select-none">
         <input
@@ -645,7 +649,7 @@ export const Radio = React.forwardRef(
 Radio.displayName = "Radio";
 
 export const Switch = React.forwardRef(
-  ({ className, label, checked, onChange, ...props }, ref) => {
+  ({ className, label, checked, onChange, hasParentFormField, parentError, ...props }, ref) => {
     return (
       <label className="inline-flex items-center gap-3 cursor-pointer select-none">
         <div className="relative">

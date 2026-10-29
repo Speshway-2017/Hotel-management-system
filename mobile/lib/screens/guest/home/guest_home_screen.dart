@@ -132,6 +132,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
           }
         },
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
           children: [
             if (isGuestMode) ...[
@@ -475,7 +476,57 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
   // --- 7. Recent Booking Card matching Premium Card Style ---
   Widget _buildBookingCard(BuildContext context, ReservationModel res) {
     final isHourly = res.stayType.toLowerCase() == 'hourly';
-    final isCurrent = res.status.toLowerCase() == 'checked-in' || res.status.toLowerCase() == 'checked_in';
+    final stLower = res.status.toLowerCase().trim();
+    final isCurrent = stLower == 'checked-in' || stLower == 'checked_in' || stLower == 'staying' || stLower == 'in-house';
+
+    int? remainingMins;
+    if (isCurrent && res.checkOut.isNotEmpty) {
+      DateTime? outDt = DateTime.tryParse(res.checkOut);
+      if (outDt == null) {
+        final dmy = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(res.checkOut);
+        final ymd = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(res.checkOut);
+        if (dmy != null) {
+          outDt = DateTime(int.parse(dmy.group(3)!), int.parse(dmy.group(2)!), int.parse(dmy.group(1)!), 11, 0);
+        } else if (ymd != null) {
+          outDt = DateTime(int.parse(ymd.group(1)!), int.parse(ymd.group(2)!), int.parse(ymd.group(3)!), 11, 0);
+        }
+      }
+      if (outDt != null) {
+        remainingMins = (outDt.difference(DateTime.now()).inSeconds / 60).round();
+      }
+    }
+    final bool isCheckoutApproaching = remainingMins != null && remainingMins > 0 && remainingMins <= 15;
+    final bool isCheckoutDue = remainingMins != null && remainingMins <= 0;
+
+    int? checkInRemainingMins;
+    final bool isUpcoming = !isCurrent &&
+        stLower != 'checked-in' &&
+        stLower != 'checked_in' &&
+        stLower != 'staying' &&
+        stLower != 'in-house' &&
+        (stLower == 'confirmed' || stLower == 'paid' || stLower == 'reserved' || stLower == 'booked');
+
+    if (isUpcoming && res.checkIn.isNotEmpty) {
+      DateTime? inDt = DateTime.tryParse(res.checkIn);
+      if (inDt == null) {
+        final dmy = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(res.checkIn);
+        final ymd = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(res.checkIn);
+        if (dmy != null) {
+          inDt = DateTime(int.parse(dmy.group(3)!), int.parse(dmy.group(2)!), int.parse(dmy.group(1)!), 14, 0);
+        } else if (ymd != null) {
+          inDt = DateTime(int.parse(ymd.group(1)!), int.parse(ymd.group(2)!), int.parse(ymd.group(3)!), 14, 0);
+        }
+      }
+      if (inDt != null) {
+        checkInRemainingMins = (inDt.difference(DateTime.now()).inSeconds / 60).round();
+      }
+    }
+
+    DateTime? outDt = res.checkOut.isNotEmpty ? DateTime.tryParse(res.checkOut) : null;
+    final bool isStayEnded = outDt != null && DateTime.now().isAfter(outDt);
+
+    final bool isCheckinApproaching = !isCurrent && !isStayEnded && checkInRemainingMins != null && checkInRemainingMins > 0 && checkInRemainingMins <= 15;
+    final bool isCheckinDue = !isCurrent && !isStayEnded && checkInRemainingMins != null && checkInRemainingMins <= 0 && checkInRemainingMins >= -360;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -483,12 +534,20 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
         color: white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCurrent ? emerald.withAlpha(90) : cardBorder,
-          width: isCurrent ? 1.5 : 1.0,
+          color: (isCheckoutApproaching || isCheckoutDue)
+              ? const Color(0xFFF59E0B)
+              : (isCheckinApproaching || isCheckinDue)
+                  ? const Color(0xFF10B981)
+                  : isCurrent ? emerald.withAlpha(90) : cardBorder,
+          width: (isCheckoutApproaching || isCheckoutDue || isCheckinApproaching || isCheckinDue || isCurrent) ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: isCurrent ? emerald.withAlpha(15) : navy.withAlpha(6),
+            color: (isCheckoutApproaching || isCheckoutDue)
+                ? Colors.amber.withAlpha(20)
+                : (isCheckinApproaching || isCheckinDue)
+                    ? emerald.withAlpha(20)
+                    : isCurrent ? emerald.withAlpha(15) : navy.withAlpha(6),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -518,6 +577,69 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Check-in approaching / arrived pill
+                if (isUpcoming && (isCheckinApproaching || isCheckinDue)) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF10B981)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.how_to_reg_rounded, size: 14, color: Color(0xFF047857)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            isCheckinDue
+                                ? 'Check-in time arrived! Room ready for check-in.'
+                                : 'Check-in in $checkInRemainingMins mins! Ready for arrival.',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF065F46),
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFF047857)),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Checkout approaching / arrived warning pill
+                if (isCurrent && (isCheckoutApproaching || isCheckoutDue)) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF59E0B)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, size: 14, color: Color(0xFFB45309)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            isCheckoutDue
+                                ? 'Check-out time arrived! Extend booking to stay extra.'
+                                : 'Check-out in $remainingMins mins! Extend booking to stay extra.',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFFB45309)),
+                      ],
+                    ),
+                  ),
+                ],
                 // Top Row: Room Badge, Booking Reference & Status Badge
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1309,6 +1431,7 @@ class _GuestStaysCarouselState extends State<GuestStaysCarousel> {
         SizedBox(
           height: 192,
           child: PageView.builder(
+            physics: const BouncingScrollPhysics(),
             controller: _pageController,
             itemCount: stays.length,
             onPageChanged: (index) {

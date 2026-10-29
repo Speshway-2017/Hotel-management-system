@@ -191,6 +191,7 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
         ),
       ),
       body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         child: Form(
           key: _formKey,

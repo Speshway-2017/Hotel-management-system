@@ -74,14 +74,20 @@ function AddGuestPage() {
       // 1. First format custom metadata and ID info
       const notesWithId = `[ID: ${formData.idType.toUpperCase()} - ${formData.idNumber || 'None'}] ${formData.notes || ''}`.trim();
       
+      const effectiveDocType = formData.idType === 'aadhaar' ? 'Aadhaar Card' : (formData.idType || 'Aadhaar Card');
       const payload = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        mobile: formData.phone,
         city: formData.city,
         state: formData.state,
         country: formData.country,
         address: formData.address,
+        idDocType: effectiveDocType,
+        idDocNumber: formData.idNumber || '',
+        idProofType: effectiveDocType,
+        idProofNumber: formData.idNumber || '',
         notes: notesWithId,
         type: formData.type,
         status: formData.status

@@ -282,9 +282,31 @@ function GuestBookingsPage() {
     const statusLower = (b.status || '').toLowerCase();
     const isCheckedOut = statusLower === 'checked-out' || statusLower === 'checked out' || statusLower === 'completed';
     const isCancelled = statusLower === 'cancelled';
-    const isUpcoming = (statusLower === 'confirmed' || statusLower === 'paid' || statusLower === 'pending') && !isCheckedOut && !isCancelled;
-    const refundSubmitted = Boolean(b.refundRequest || b.refundStatus);
-    const refundStatusText = b.refundStatus || b.refundRequest?.status || 'Pending';
+    // Calculate check-in time countdown for upcoming stays
+    let checkinMinsRemaining = null;
+    if (isUpcoming && b.checkIn) {
+      try {
+        const s = String(b.checkIn).trim();
+        let y, m, d;
+        const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+        const ymd = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        if (dmy) {
+          d = parseInt(dmy[1], 10);
+          m = parseInt(dmy[2], 10);
+          y = parseInt(dmy[3], 10);
+        } else if (ymd) {
+          y = parseInt(ymd[1], 10);
+          m = parseInt(ymd[2], 10);
+          d = parseInt(ymd[3], 10);
+        }
+        if (y && m && d) {
+          const scheduledCheckIn = new Date(y, m - 1, d, 12, 0, 0);
+          checkinMinsRemaining = Math.round((scheduledCheckIn.getTime() - Date.now()) / 60000);
+        }
+      } catch (_) {}
+    }
+    const isCheckinApproaching = checkinMinsRemaining !== null && checkinMinsRemaining > 0 && checkinMinsRemaining <= 15;
+    const isCheckinDue = checkinMinsRemaining !== null && checkinMinsRemaining <= 0;
 
     return (
       <div className="space-y-4 text-left font-ui">
@@ -330,11 +352,45 @@ function GuestBookingsPage() {
                   Coupon {b.couponCode || 'APPLIED'}: -{inr(b.discountAmount)} OFF
                 </span>
               )}
-              <span className={`text-[11px] font-semibold block mt-0.5 ${isCancelled ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {isCancelled ? '• Booking Cancelled' : '✓ Payment Confirmed'}
+              <span className={`text-[11px] font-semibold block mt-0.5 ${
+                isCancelled
+                  ? 'text-rose-600'
+                  : Number(b.balance || 0) > 0
+                  ? 'text-amber-700'
+                  : 'text-emerald-600'
+              }`}>
+                {isCancelled
+                  ? '• Booking Cancelled'
+                  : Number(b.balance || 0) > 0
+                  ? `⚠ Balance Due: ${inr(b.balance)}`
+                  : '✓ Payment Confirmed'}
               </span>
             </div>
           </div>
+
+          {/* Check-in Notice / Arrival Banner for Upcoming Bookings */}
+          {isUpcoming && (isCheckinApproaching || isCheckinDue) && (
+            <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="size-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="size-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-950 flex items-center gap-2">
+                    <span>{isCheckinDue ? "Check-in Time Has Arrived!" : `Check-in in ${checkinMinsRemaining} Minutes`}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-200 text-emerald-900 uppercase">
+                      Ready for Arrival
+                    </span>
+                  </h4>
+                  <p className="text-xs text-emerald-900/80 font-medium mt-0.5">
+                    {isCheckinDue
+                      ? "Your scheduled check-in time has arrived! Welcome to Hour Stay. Please proceed to the reception desk for your room key."
+                      : `Your check-in is approaching in ${checkinMinsRemaining} minutes. Please prepare for arrival at the hotel reception.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Refund Notice / Action Banner for Cancelled Bookings */}
           {isCancelled && (
@@ -424,12 +480,18 @@ function GuestBookingsPage() {
                   (b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded') ? 'text-purple' :
                   (b.paymentStatus === 'Processing' || refundStatusText === 'Processing') ? 'text-blue-600' :
                   (b.paymentStatus === 'Approved' || refundStatusText === 'Approved') ? 'text-emerald-600' :
-                  isCancelled ? 'text-rose-600' : 'text-emerald-600'
+                  isCancelled ? 'text-rose-600' :
+                  (Number(b.balance || 0) > 0 || (b.paymentStatus || '').toLowerCase() === 'partial') ? 'text-amber-700' :
+                  (b.paymentStatus || '').toLowerCase() === 'pending' ? 'text-amber-700' :
+                  'text-emerald-600'
                 }>
                   {(b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded') ? 'Refunded' :
                    (b.paymentStatus === 'Processing' || refundStatusText === 'Processing') ? 'Processing' :
                    (b.paymentStatus === 'Approved' || refundStatusText === 'Approved') ? 'Approved' :
-                   isCancelled ? 'Refundable' : 'Paid Online'}
+                   isCancelled ? 'Refundable' :
+                   (Number(b.balance || 0) > 0 || (b.paymentStatus || '').toLowerCase() === 'partial') ? `Partial (Due ${inr(b.balance || 0)})` :
+                   (b.paymentStatus || '').toLowerCase() === 'pending' ? `Pending (Due ${inr(b.balance || b.totalAmount || b.amount || 0)})` :
+                   'Paid Online'}
                 </strong></p>
                 <p className="text-navy/60 font-medium">Invoice GST: Included</p>
               </div>
@@ -746,6 +808,10 @@ function GuestBookingsPage() {
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : isCancelled
                             ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : (Number(b.balance || 0) > 0 || (b.paymentStatus || '').toLowerCase() === 'partial')
+                            ? 'bg-amber-50 text-amber-700 border-amber-300'
+                            : (b.paymentStatus || '').toLowerCase() === 'pending'
+                            ? 'bg-amber-50 text-amber-700 border-amber-300'
                             : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         }`}>
                           {(b.paymentStatus === 'Refunded' || refundStatusText === 'Refunded')
@@ -756,6 +822,10 @@ function GuestBookingsPage() {
                             ? 'Approved'
                             : isCancelled
                             ? 'Refundable'
+                            : (Number(b.balance || 0) > 0 || (b.paymentStatus || '').toLowerCase() === 'partial')
+                            ? `Partial (Due ${inr(b.balance || 0)})`
+                            : (b.paymentStatus || '').toLowerCase() === 'pending'
+                            ? `Pending (Due ${inr(b.balance || b.totalAmount || b.amount || 0)})`
                             : 'Paid Online'}
                         </span>
                       </td>

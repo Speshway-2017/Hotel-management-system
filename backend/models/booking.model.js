@@ -45,7 +45,13 @@ const bookingSchema = new mongoose.Schema({
   idDocNumber: { type: String, default: '' },
   idDocImage: { type: String, default: '' },
   idVerifiedAt: { type: Date, default: null },
-  idVerifiedBy: { type: String, default: '' }
+  idVerifiedBy: { type: String, default: '' },
+  checkoutReminderSent: { type: Boolean, default: false },
+  checkoutReminderSentAt: { type: Date, default: null },
+  checkinReminderSent: { type: Boolean, default: false },
+  checkinReminderSentAt: { type: Date, default: null },
+  checkinArrivedSent: { type: Boolean, default: false },
+  checkinArrivedSentAt: { type: Date, default: null }
 }, {
   timestamps: true,
   strict: false

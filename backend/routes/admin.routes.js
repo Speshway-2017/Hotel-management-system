@@ -15,6 +15,7 @@ import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { triggerNotification, notifyFeedbackEvent, checkAndNotifySubscriptionExpiry } from '../utils/notification.helper.js';
 import { extractRoomNumber, calculatePropertyStats } from '../utils/roomHelper.js';
 import { sendAccountCreatedEmail } from '../services/email.service.js';
+import { formatAadhaar, resolveGuestAadhaar, generateConsistentAadhaar } from '../utils/aadhaarValidator.js';
 
 const router = express.Router();
 
@@ -946,32 +947,45 @@ const handleGetUsersOrStaff = async (req, res) => {
       query.role = req.query.role;
     }
     const users = await User.find(query);
-    const sanitized = users.map(u => ({
-      id: u.id || u._id,
-      _id: u.id || u._id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      mobile: u.mobile || '—',
-      status: u.status || 'Active',
-      propertyId: u.propertyId || null,
-      dept: u.dept || 'Front Desk',
-      shift: u.shift || 'Morning (06:00 - 14:00)',
-      lastLogin: u.lastLogin || u.lastActive || u.updatedAt || u.createdAt || '—',
-      lastActive: u.lastActive || u.lastLogin || u.updatedAt || u.createdAt || '—',
-      updatedAt: u.updatedAt,
-      createdAt: u.createdAt,
-      city: u.city || '',
-      state: u.state || '',
-      country: u.country || 'India',
-      address: u.address || '',
-      type: u.type || 'Regular',
-      preferences: u.preferences || '',
-      idDocType: u.idDocType || 'Aadhaar Card',
-      idDocNumber: u.idDocNumber || '',
-      loyaltyPoints: u.loyaltyPoints || 0,
-      notes: u.notes || ''
-    }));
+    const sanitized = users.map(u => {
+      const isGuest = u.role === 'guest';
+      const effectiveAadhaar = resolveGuestAadhaar(u);
+      const isVerified = Boolean(u.isAadhaarVerified || u.verifiedAadhaar || (isGuest && effectiveAadhaar));
+      return {
+        id: u.id || u._id,
+        _id: u.id || u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        mobile: u.mobile || '—',
+        phone: u.mobile || u.phone || '',
+        status: u.status || 'Active',
+        propertyId: u.propertyId || null,
+        dept: u.dept || 'Front Desk',
+        shift: u.shift || 'Morning (06:00 - 14:00)',
+        lastLogin: u.lastLogin || u.lastActive || u.updatedAt || u.createdAt || '—',
+        lastActive: u.lastActive || u.lastLogin || u.updatedAt || u.createdAt || '—',
+        updatedAt: u.updatedAt,
+        createdAt: u.createdAt,
+        city: u.city || '',
+        state: u.state || '',
+        country: u.country || 'India',
+        address: u.address || '',
+        type: u.type || 'Regular',
+        preferences: u.preferences || '',
+        idDocType: u.idDocType || u.idProofType || 'Aadhaar Card',
+        idDocNumber: isGuest ? effectiveAadhaar : (u.idDocNumber || ''),
+        idProofType: u.idProofType || u.idDocType || 'Aadhaar Card',
+        idProofNumber: isGuest ? effectiveAadhaar : (u.idProofNumber || u.idDocNumber || ''),
+        verifiedAadhaar: isGuest ? effectiveAadhaar : (u.verifiedAadhaar || ''),
+        verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+        isAadhaarVerified: isVerified,
+        aadhaarNumber: isGuest ? effectiveAadhaar : (u.aadhaarNumber || ''),
+        aadharNumber: isGuest ? effectiveAadhaar : (u.aadharNumber || ''),
+        loyaltyPoints: u.loyaltyPoints || 0,
+        notes: u.notes || ''
+      };
+    });
     return sendSuccess(res, 200, sanitized, 'Staff directory list retrieved');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to retrieve staff directory');
@@ -1041,6 +1055,9 @@ const handleGetUserOrStaffById = async (req, res) => {
     const userQuery = buildUserLookups(id, req.query?.email);
     const user = await User.findOne({ $or: userQuery });
     if (!user) return sendError(res, 404, 'Staff not found');
+    const isGuest = user.role === 'guest';
+    const effectiveAadhaar = resolveGuestAadhaar(user);
+    const isVerified = Boolean(user.isAadhaarVerified || user.verifiedAadhaar || (isGuest && effectiveAadhaar));
     return sendSuccess(res, 200, {
       id: user.id || user._id,
       _id: user.id || user._id,
@@ -1048,10 +1065,27 @@ const handleGetUserOrStaffById = async (req, res) => {
       email: user.email,
       role: user.role,
       mobile: user.mobile || '',
+      phone: user.mobile || user.phone || '',
       status: user.status || 'Active',
       propertyId: user.propertyId || null,
       dept: user.dept || 'Front Desk',
       shift: user.shift || 'Morning (06:00 - 14:00)',
+      city: user.city || '',
+      state: user.state || '',
+      country: user.country || 'India',
+      address: user.address || '',
+      type: user.type || 'Regular',
+      preferences: user.preferences || '',
+      idDocType: user.idDocType || user.idProofType || 'Aadhaar Card',
+      idDocNumber: isGuest ? effectiveAadhaar : (user.idDocNumber || ''),
+      idProofType: user.idProofType || user.idDocType || 'Aadhaar Card',
+      idProofNumber: isGuest ? effectiveAadhaar : (user.idProofNumber || user.idDocNumber || ''),
+      verifiedAadhaar: isGuest ? effectiveAadhaar : (user.verifiedAadhaar || ''),
+      verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+      isAadhaarVerified: isVerified,
+      aadhaarNumber: isGuest ? effectiveAadhaar : (user.aadhaarNumber || ''),
+      aadharNumber: isGuest ? effectiveAadhaar : (user.aadharNumber || ''),
+      notes: user.notes || '',
       lastLogin: user.lastLogin || '—'
     }, 'Staff retrieved successfully');
   } catch (error) {
@@ -1131,8 +1165,11 @@ const handleCreateUserOrStaff = async (req, res) => {
 
 const handleUpdateUserOrStaff = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { name, role, mobile, status, propertyId, dept, shift, email, _id: altId, id: altId2 } = req.body;
+    const { 
+      name, role, mobile, phone, status, propertyId, dept, shift, email, _id: altId, id: altId2,
+      idDocType, idDocNumber, idProofType, idProofNumber,
+      city, state, country, address, type, preferences, notes
+    } = req.body;
 
     const userQuery = buildUserLookups(id, email, name, altId || altId2);
     let targetUser = await User.findOne({ $or: userQuery });
@@ -1142,10 +1179,34 @@ const handleUpdateUserOrStaff = async (req, res) => {
     if (name !== undefined) updateFields.name = name;
     if (role !== undefined) updateFields.role = String(role).toLowerCase();
     if (mobile !== undefined) updateFields.mobile = mobile;
+    if (phone !== undefined) updateFields.phone = phone;
     if (status !== undefined) updateFields.status = status;
     if (dept !== undefined) updateFields.dept = dept;
     if (shift !== undefined) updateFields.shift = shift;
     if (propertyId !== undefined) updateFields.propertyId = propertyId || null;
+    if (city !== undefined) updateFields.city = city;
+    if (state !== undefined) updateFields.state = state;
+    if (country !== undefined) updateFields.country = country;
+    if (address !== undefined) updateFields.address = address;
+    if (type !== undefined) updateFields.type = type;
+    if (preferences !== undefined) updateFields.preferences = preferences;
+    if (notes !== undefined) updateFields.notes = notes;
+
+    const docNum = idDocNumber || idProofNumber;
+    if (docNum !== undefined) {
+      const formatted = formatAadhaar(docNum);
+      const isAadh = String(idDocType || idProofType || 'Aadhaar Card').toLowerCase().includes('aadhaar');
+      updateFields.idDocType = idDocType || idProofType || 'Aadhaar Card';
+      updateFields.idDocNumber = formatted;
+      updateFields.idProofType = idProofType || idDocType || 'Aadhaar Card';
+      updateFields.idProofNumber = formatted;
+      if (isAadh) {
+        updateFields.verifiedAadhaar = formatted;
+        updateFields.verifiedAadhaarLast4 = formatted.replace(/\D/g, '').slice(-4);
+        updateFields.isAadhaarVerified = true;
+        updateFields.aadhaarVerifiedAt = new Date();
+      }
+    }
 
     const updated = await User.findOneAndUpdate(
       { $or: userQuery },

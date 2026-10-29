@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../models/notification_model.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/storage_service.dart';
+import 'guest_booking_provider.dart';
 
 class GuestNotificationProvider with ChangeNotifier {
   List<NotificationModel> _notifications = [];
@@ -14,6 +17,8 @@ class GuestNotificationProvider with ChangeNotifier {
   StreamSubscription? _fcmForegroundSub;
   StreamSubscription? _fcmTapSub;
   Timer? _debounceTimer;
+  final Set<String> _shownLocalNotificationKeys = {};
+  bool _hasInitialLoaded = false;
 
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -122,19 +127,203 @@ class GuestNotificationProvider with ChangeNotifier {
 
   void _registerSocketListeners() {
     SocketService.on('notification_received', (_) => _debouncedFetchNotifications());
-    SocketService.on('notification_created', (_) => _debouncedFetchNotifications());
-    SocketService.on('new_notification', (_) => _debouncedFetchNotifications());
-    SocketService.on('guest_notification', (_) => _debouncedFetchNotifications());
+    SocketService.on('notification_created', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('new_notification', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('guest_notification', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
     SocketService.on('unread_notifications_count_updated', (_) => _debouncedFetchNotifications());
     SocketService.on('dashboard_sync', (_) => _debouncedFetchNotifications());
     SocketService.on('booking_created', (_) => _debouncedFetchNotifications());
-    SocketService.on('booking_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('booking_updated', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
     SocketService.on('room_status_changed', (_) => _debouncedFetchNotifications());
     SocketService.on('room_assigned', (_) => _debouncedFetchNotifications());
-    SocketService.on('checkin_completed', (_) => _debouncedFetchNotifications());
+    SocketService.on('stay_extended', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketStayExtended(data);
+    });
+    SocketService.on('checkin_completed', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketCheckinCompleted(data);
+    });
     SocketService.on('checkout_completed', (_) => _debouncedFetchNotifications());
     SocketService.on('payment_logged', (_) => _debouncedFetchNotifications());
     SocketService.on('payment_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('feedback_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('feedback_received', (_) => _debouncedFetchNotifications());
+  }
+
+  Future<void> _handleSocketStayExtended(dynamic data) async {
+    try {
+      if (data is! Map) return;
+      final b = data['booking'];
+      final bMap = b is Map ? b : <dynamic, dynamic>{};
+      final bId = (data['bookingId'] ?? bMap['bookingId'] ?? bMap['_id'] ?? '').toString();
+      final checkOut = (data['checkOut'] ?? bMap['checkOut'] ?? '').toString();
+      final guestEmail = (data['email'] ?? bMap['email'] ?? bMap['guestEmail'] ?? '').toString().toLowerCase().trim();
+
+      final currentUser = await StorageService.getUser();
+      bool isMatch = true;
+      if (currentUser != null && guestEmail.isNotEmpty) {
+        isMatch = currentUser.email.toLowerCase().trim() == guestEmail;
+      }
+
+      if (isMatch) {
+        const title = 'Stay Extended';
+        final body = checkOut.isNotEmpty
+            ? 'Your stay reservation #${bId.isNotEmpty ? bId : ""} has been extended to $checkOut. Enjoy your continued stay!'
+            : 'Your stay reservation #${bId.isNotEmpty ? bId : ""} has been extended. Enjoy your continued stay!';
+        final dedupKey = 'extend_${bId}_${DateTime.now().minute}';
+
+        if (!_shownLocalNotificationKeys.contains(dedupKey)) {
+          _shownLocalNotificationKeys.add(dedupKey);
+          await NotificationService.showLocalNotification(
+            title: title,
+            body: body,
+            payload: {
+              'bookingId': bId,
+              'action': 'extended',
+              'category': 'Stay',
+              'role': 'guest'
+            },
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error in _handleSocketStayExtended: $e');
+    }
+  }
+
+  Future<void> _handleSocketCheckinCompleted(dynamic data) async {
+    try {
+      if (data is! Map) return;
+      final action = (data['action'] ?? '').toString();
+      final status = (data['status'] ?? '').toString();
+      final b = data['booking'];
+      final bMap = b is Map ? b : <dynamic, dynamic>{};
+
+      final bId = (data['bookingId'] ?? bMap['bookingId'] ?? bMap['_id'] ?? '').toString();
+      final guestEmail = (data['email'] ?? bMap['email'] ?? bMap['guestEmail'] ?? '').toString().toLowerCase().trim();
+      final guestPhone = (data['phone'] ?? bMap['phone'] ?? bMap['guestPhone'] ?? '').toString().trim();
+      final guestName = (data['guest'] ?? bMap['guest'] ?? bMap['guestName'] ?? '').toString().trim();
+      final room = (data['roomNumber'] ?? bMap['roomNumber'] ?? bMap['room'] ?? '').toString();
+
+      final currentUser = await StorageService.getUser();
+      bool isMatch = false;
+      if (currentUser != null) {
+        if (guestEmail.isNotEmpty && currentUser.email.toLowerCase().trim() == guestEmail) isMatch = true;
+        if (guestPhone.isNotEmpty && currentUser.mobile.contains(guestPhone)) isMatch = true;
+        if (guestName.isNotEmpty && currentUser.name.toLowerCase().contains(guestName.toLowerCase())) isMatch = true;
+      } else {
+        isMatch = true;
+      }
+
+      if (isMatch && (action == 'checkin' || status == 'Checked-in' || action.isEmpty)) {
+        final title = 'Check-in Confirmed!';
+        final roomText = room.isNotEmpty ? 'Room $room' : 'your room';
+        final body = 'Welcome! You have checked in to $roomText. Enjoy your stay!${bId.isNotEmpty ? " [Ref: #$bId]" : ""}';
+        final dedupKey = 'checkin_${bId}_${DateTime.now().minute}';
+
+        if (!_shownLocalNotificationKeys.contains(dedupKey)) {
+          _shownLocalNotificationKeys.add(dedupKey);
+          await NotificationService.showLocalNotification(
+            title: title,
+            body: body,
+            payload: {
+              'bookingId': bId,
+              'action': 'checkin',
+              'category': 'Check-in',
+              'role': 'guest'
+            },
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error in _handleSocketCheckinCompleted: $e');
+    }
+  }
+
+  Future<void> _handleSocketIncomingAlert(dynamic data) async {
+    try {
+      if (data is! Map) return;
+      final notif = data['notification'] is Map ? data['notification'] : data;
+      final title = (notif['title'] ?? data['title'] ?? '').toString().trim();
+      final body = (notif['message'] ?? data['message'] ?? notif['body'] ?? data['body'] ?? '').toString().trim();
+      final category = (notif['category'] ?? data['category'] ?? 'General').toString();
+      final email = (notif['email'] ?? data['email'] ?? '').toString().toLowerCase().trim();
+      final bId = (notif['bookingId'] ?? data['bookingId'] ?? '').toString();
+
+      if (title.isEmpty && body.isEmpty) return;
+
+      final isRelevant = title.toLowerCase().contains('check-in') ||
+          title.toLowerCase().contains('checked in') ||
+          title.toLowerCase().contains('extend') ||
+          title.toLowerCase().contains('stay') ||
+          title.toLowerCase().contains('booking') ||
+          body.toLowerCase().contains('checked into') ||
+          body.toLowerCase().contains('checked in') ||
+          body.toLowerCase().contains('extended') ||
+          category.toLowerCase().contains('check-in') ||
+          category.toLowerCase().contains('stay') ||
+          category.toLowerCase().contains('booking');
+
+      if (!isRelevant) return;
+
+      final currentUser = await StorageService.getUser();
+      bool isMatch = false;
+      if (currentUser != null) {
+        if (email.isNotEmpty) {
+          isMatch = currentUser.email.toLowerCase().trim() == email;
+        } else {
+          isMatch = true;
+        }
+      }
+
+      if (!isMatch) return;
+
+      final isCheckinArrivedAlert = title.toLowerCase().contains('check-in time arrived') ||
+          title.toLowerCase().contains('ready for check-in') ||
+          body.toLowerCase().contains('reception desk to complete check-in') ||
+          body.toLowerCase().contains('front desk is preparing your room key');
+
+      if (isCheckinArrivedAlert) {
+        final bProv = rootNavigatorKey.currentContext?.read<GuestBookingProvider>();
+        final hasActiveStay = bProv != null && (bProv.currentStay != null || bProv.bookings.any((b) {
+          final s = b.status.toLowerCase().trim();
+          return s == 'checked-in' || s == 'checked_in' || s == 'staying' || s == 'in-house';
+        }));
+        if (hasActiveStay) {
+          debugPrint('ℹ️ [GuestNotif] Skipping check-in arrival alert: guest is already in-house/checked-in.');
+          return;
+        }
+      }
+
+      final dedupKey = '${title.toLowerCase()}_${body.toLowerCase()}';
+      if (!_shownLocalNotificationKeys.contains(dedupKey)) {
+        _shownLocalNotificationKeys.add(dedupKey);
+        await NotificationService.showLocalNotification(
+          title: title,
+          body: body,
+          payload: {
+            'bookingId': bId,
+            'category': category,
+            'role': 'guest'
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error in _handleSocketIncomingAlert: $e');
+    }
   }
 
   void _registerFcmListeners() {
@@ -183,6 +372,66 @@ class GuestNotificationProvider with ChangeNotifier {
           }
         }
         _notifications = unique;
+
+        // Bridge to device local notifications: Alert guest when check-in confirmed arrives
+        if (!_hasInitialLoaded) {
+          // On app launch initial load, record existing IDs to prevent historical notification spam
+          for (final n in unique) {
+            _shownLocalNotificationKeys.add(n.id);
+            _shownLocalNotificationKeys.add('${n.title.trim().toLowerCase()}_${n.message.trim().toLowerCase()}');
+          }
+          _hasInitialLoaded = true;
+        } else {
+          // On polling or real-time sync refresh, trigger system notification for newly arrived alerts
+          for (final n in unique) {
+            final dedupKey = '${n.title.trim().toLowerCase()}_${n.message.trim().toLowerCase()}';
+            if (!n.isRead && !_shownLocalNotificationKeys.contains(n.id) && !_shownLocalNotificationKeys.contains(dedupKey)) {
+              _shownLocalNotificationKeys.add(n.id);
+              _shownLocalNotificationKeys.add(dedupKey);
+
+              final isRelevant = n.title.toLowerCase().contains('check-in') ||
+                  n.title.toLowerCase().contains('checked in') ||
+                  n.title.toLowerCase().contains('extend') ||
+                  n.title.toLowerCase().contains('stay') ||
+                  n.title.toLowerCase().contains('booking') ||
+                  n.message.toLowerCase().contains('checked into') ||
+                  n.message.toLowerCase().contains('checked in') ||
+                  n.message.toLowerCase().contains('extended') ||
+                  n.category.toLowerCase().contains('check-in') ||
+                  n.category.toLowerCase().contains('stay') ||
+                  n.category.toLowerCase().contains('booking');
+
+              final isCheckinArrived = n.title.toLowerCase().contains('check-in time arrived') ||
+                  n.title.toLowerCase().contains('ready for check-in') ||
+                  n.message.toLowerCase().contains('reception desk to complete check-in') ||
+                  n.message.toLowerCase().contains('front desk is preparing your room key');
+
+              if (isCheckinArrived) {
+                final bProv = rootNavigatorKey.currentContext?.read<GuestBookingProvider>();
+                final hasActiveStay = bProv != null && (bProv.currentStay != null || bProv.bookings.any((b) {
+                  final s = b.status.toLowerCase().trim();
+                  return s == 'checked-in' || s == 'checked_in' || s == 'staying' || s == 'in-house';
+                }));
+                if (hasActiveStay) {
+                  continue; // Skip local notification for check-in arrival if guest is already checked-in
+                }
+              }
+
+              if (isRelevant) {
+                NotificationService.showLocalNotification(
+                  title: n.title,
+                  body: n.message,
+                  payload: {
+                    'notificationId': n.id,
+                    'category': n.category,
+                    'type': n.type,
+                    'role': 'guest'
+                  },
+                );
+              }
+            }
+          }
+        }
       } else {
         if (!silent && response.statusCode != 401) {
           _error = 'Unable to connect to server. Please check your connection.';

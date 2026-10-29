@@ -741,8 +741,8 @@ export function UnifiedPaymentsView({ role = "admin" }) {
 
       {/* 4. Unified Table Ledger */}
       <Panel 
-        title={role === "reception" ? undefined : "Live Payments Registry"} 
-        description={role === "reception" ? undefined : `Audit real-time guest transaction records and settlement status (${filteredPayments.length} total entries).`}
+        title={(role === "reception" || role === "manager") ? undefined : "Live Payments Registry"} 
+        description={(role === "reception" || role === "manager") ? undefined : `Audit real-time guest transaction records and settlement status (${filteredPayments.length} total entries).`}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[1000px]">

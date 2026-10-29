@@ -19,7 +19,7 @@ import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitt
 import { findPropertySafely, invalidatePropertyCache } from '../utils/propertyCache.js';
 import { getUnifiedFeedbacksAndReviews } from '../utils/unifiedFeedback.helper.js';
 import { extractRoomNumber, extractRoomVariant, syncRoomStatus, isBookingMatchingRoom, reconcileRoomStatuses } from '../utils/roomHelper.js';
-import { triggerNotification, notifyBookingEvent } from '../utils/notification.helper.js';
+import { triggerNotification, notifyBookingEvent, notifyFeedbackEvent } from '../utils/notification.helper.js';
 import { isCheckInAllowed, formatISTDateTime, parseDateSafe } from '../utils/dateUtils.js';
 import { processAutoCheckouts } from '../services/autoCheckout.service.js';
 import {
@@ -27,7 +27,8 @@ import {
   validateBookingAadhaarConsistency,
   syncVerifiedAadhaarToGuestProfile,
   findExistingVerifiedAadhaar,
-  formatAadhaar
+  formatAadhaar,
+  resolveGuestAadhaar
 } from '../utils/aadhaarValidator.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 import { sendAccountCreatedEmail } from '../services/email.service.js';
@@ -668,6 +669,11 @@ router.put('/reservations/:id', async (req, res) => {
       });
     }
 
+    if (updatePayload.status === 'Checked-in') {
+      updatePayload.checkinReminderSent = true;
+      updatePayload.checkinArrivedSent = true;
+    }
+
     const updated = await Booking.findOneAndUpdate(
       lookupQuery,
       updatePayload,
@@ -1111,6 +1117,7 @@ router.get('/guests', async (req, res) => {
       const statusStr = b.status || 'Confirmed';
       const isCheckedIn = (statusStr.toLowerCase().includes('in') && statusStr.toLowerCase().includes('check')) || statusStr.toLowerCase() === 'staying';
       
+      const effectiveAadhaar = resolveGuestAadhaar(userMatch || b);
       const isGuestInactive = userMatch?.status === 'Inactive' || userMatch?.isDeleted;
       const guestData = {
         id: b._id || b.id || b.bookingId,
@@ -1130,7 +1137,14 @@ router.get('/guests', async (req, res) => {
         accountStatus: isGuestInactive ? 'Inactive' : (userMatch?.status || 'Active'),
         paymentStatus: (b.balance === 0 || b.paymentStatus === 'Paid') ? 'Paid' : 'Pending',
         bookingId: b.bookingId || b._id || b.id,
-        loyaltyPoints: userMatch?.loyaltyPoints || 0
+        loyaltyPoints: userMatch?.loyaltyPoints || 0,
+        idDocType: userMatch?.idDocType || b.idDocType || 'Aadhaar Card',
+        idDocNumber: effectiveAadhaar,
+        idProofType: userMatch?.idProofType || b.idProofType || 'Aadhaar Card',
+        idProofNumber: effectiveAadhaar,
+        verifiedAadhaar: effectiveAadhaar,
+        verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+        isAadhaarVerified: true
       };
 
       if (!guestsMap[key]) {
@@ -1151,6 +1165,7 @@ router.get('/guests', async (req, res) => {
       const key = (u.email || u.name || '').trim().toLowerCase();
       if (key && !guestsMap[key]) {
         const isUserInactive = u.status === 'Inactive' || u.isDeleted;
+        const effectiveAadhaar = resolveGuestAadhaar(u);
         guestsMap[key] = {
           id: u.id || u._id,
           _id: u.id || u._id,
@@ -1169,7 +1184,14 @@ router.get('/guests', async (req, res) => {
           accountStatus: isUserInactive ? 'Inactive' : (u.status || 'Active'),
           paymentStatus: 'Paid',
           bookingId: u.id || u._id,
-          loyaltyPoints: u.loyaltyPoints || 0
+          loyaltyPoints: u.loyaltyPoints || 0,
+          idDocType: u.idDocType || 'Aadhaar Card',
+          idDocNumber: effectiveAadhaar,
+          idProofType: u.idProofType || 'Aadhaar Card',
+          idProofNumber: effectiveAadhaar,
+          verifiedAadhaar: effectiveAadhaar,
+          verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
+          isAadhaarVerified: true
         };
       }
     });
@@ -2375,7 +2397,11 @@ const handleExtendReservation = async (req, res) => {
     }
 
 
-    const newAmount = Number(booking.totalAmount || booking.amount || 0) + Number(additionalAmount || 0);
+    const addAmount = Number(additionalAmount || 0);
+    const newAmount = Number(booking.totalAmount || booking.amount || 0) + addAmount;
+    const newBalance = Number(booking.balance || 0) + addAmount;
+    const newPaymentStatus = newBalance <= 0 ? 'Paid' : (newBalance < newAmount ? 'Partial' : 'Pending');
+
     const updated = await Booking.findOneAndUpdate(
       bookingQuery,
       {
@@ -2384,17 +2410,42 @@ const handleExtendReservation = async (req, res) => {
         amount: newAmount,
         totalAmount: newAmount,
         netAmount: newAmount,
-        balance: Number(booking.balance || 0) + Number(additionalAmount || 0)
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        checkoutReminderSent: false,
+        checkoutReminderSentAt: null
       },
       { new: true }
     );
 
-    // Trigger notifications for all stakeholders including guest
+    const io = req.app.get('socketio');
+    const targetPropId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
+
+    // Trigger notifications for all stakeholders including guest (FCM + Socket)
     await notifyBookingEvent({
       req,
+      io,
       action: 'extended',
       booking: updated
     });
+
+    if (io) {
+      emitRealtimeSync(io, targetPropId, 'booking_updated', {
+        action: 'extend',
+        booking: updated,
+        bookingId: updated._id,
+        checkOut: newCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
+        additionalAmount: addAmount
+      });
+      emitRealtimeSync(io, targetPropId, 'stay_extended', {
+        bookingId: updated._id,
+        checkOut: newCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus
+      });
+    }
 
     return sendSuccess(res, 200, updated, 'Stay reservation extended successfully.');
   } catch (err) {

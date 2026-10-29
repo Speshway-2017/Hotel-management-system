@@ -38,6 +38,50 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     debugPrint('📬 [FCM BACKGROUND] Title: ${message.notification?.title ?? message.data['title']}');
     debugPrint('📬 [FCM BACKGROUND] Body: ${message.notification?.body ?? message.data['body']}');
     debugPrint('📬 [FCM BACKGROUND] Data: ${message.data}');
+
+    // If message is data-only (no top-level notification payload), show local notification in system tray
+    if (message.notification == null) {
+      final title = (message.data['title'] ?? '').toString().trim();
+      final body = (message.data['body'] ?? message.data['message'] ?? '').toString().trim();
+      if (title.isNotEmpty || body.isNotEmpty) {
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+        const androidChannel = AndroidNotificationChannel(
+          'hourstay_high_importance_channel',
+          'Hour Stay Notifications',
+          description: 'This channel is used for HMS guest and manager notifications & alerts.',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        );
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(androidChannel);
+
+        await flutterLocalNotificationsPlugin.show(
+          message.hashCode,
+          title.isNotEmpty ? title : 'Hour Stay',
+          body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              androidChannel.id,
+              androidChannel.name,
+              channelDescription: androidChannel.description,
+              importance: Importance.max,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+              playSound: true,
+              enableVibration: true,
+            ),
+            iOS: const DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
+          ),
+          payload: jsonEncode(message.data),
+        );
+      }
+    }
   } catch (e) {
     debugPrint('⚠️ [FCM BACKGROUND] Error handling background message: $e');
   }
@@ -265,6 +309,44 @@ class NotificationService {
       }
     } catch (err) {
       debugPrint('⚠️ [FCM ROUTE ERROR] $err');
+    }
+  }
+
+  /// Displays a local heads-up system notification in the device tray
+  static Future<void> showLocalNotification({
+    required String title,
+    required String body,
+    Map<String, dynamic>? payload,
+    int? id,
+  }) async {
+    try {
+      final notifId = id ?? (DateTime.now().millisecondsSinceEpoch.remainder(100000));
+      await _localNotifications.show(
+        notifId,
+        title,
+        body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _highImportanceChannel.id,
+            _highImportanceChannel.name,
+            channelDescription: _highImportanceChannel.description,
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: payload != null ? jsonEncode(payload) : null,
+      );
+      debugPrint('🔔 [LOCAL NOTIF] Displayed notification in system tray: "$title"');
+    } catch (e) {
+      debugPrint('⚠️ [LOCAL NOTIF ERROR] Failed to display local notification: $e');
     }
   }
 

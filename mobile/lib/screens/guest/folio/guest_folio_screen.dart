@@ -176,6 +176,7 @@ class _GuestFolioScreenState extends State<GuestFolioScreen> {
         : (booking?.balance ?? payment?.balance ?? folio?.balance ?? totalAmount);
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -544,7 +545,7 @@ class _GuestFolioScreenState extends State<GuestFolioScreen> {
           await bookingProvider.fetchMyBookings();
         },
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.7,
             child: EmptyState(
@@ -568,6 +569,7 @@ class _GuestFolioScreenState extends State<GuestFolioScreen> {
         await bookingProvider.fetchMyBookings();
       },
       child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
         itemCount: bookings.isNotEmpty ? bookings.length : folios.length,
         separatorBuilder: (_, _) => const SizedBox(height: 14),

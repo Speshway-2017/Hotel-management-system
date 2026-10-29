@@ -9,8 +9,8 @@ import Review from '../models/review.model.js';
 import Notification from '../models/notification.model.js';
 import { Room, Feedback, Payment, Approval } from '../models/managerData.model.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
-import { notifyFeedbackEvent, triggerNotification, notifyAccountDeletionEvent } from '../utils/notification.helper.js';
-import { calculateStayNights, formatToYYYYMMDD, parseDateSafe } from '../utils/dateUtils.js';
+import { notifyFeedbackEvent, triggerNotification, notifyAccountDeletionEvent, notifyBookingEvent } from '../utils/notification.helper.js';
+import { calculateStayNights, formatToYYYYMMDD, parseDateSafe, parseDateTimeToIST } from '../utils/dateUtils.js';
 import {
   extractRoomNumber,
   isBookingMatchingRoom,
@@ -897,7 +897,7 @@ const syncGuestBookingNotifications = async (user) => {
   const userId = user._id || user.id;
   const userKey = String(userId);
   const now = Date.now();
-  if (lastGuestSyncMap.has(userKey) && (now - lastGuestSyncMap.get(userKey) < 300000)) return;
+  if (lastGuestSyncMap.has(userKey) && (now - lastGuestSyncMap.get(userKey) < 30000)) return;
   lastGuestSyncMap.set(userKey, now);
 
   try {
@@ -916,17 +916,24 @@ const syncGuestBookingNotifications = async (user) => {
     ]);
 
     const existingCheckouts = new Set();
-    const existingCheckins = new Set();
+    const existingCheckinConfirmed = new Set();
+    const existingCheckinArrived = new Set();
+    const existingCheckinReminders = new Set();
     const existingConfirmations = new Set();
     for (const n of existingNotifs || []) {
       const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+      const titleLower = (n.title || '').toLowerCase();
       const matches = text.match(/([a-z0-9_-]{4,})/g);
       if (matches) {
         for (const m of matches) {
-          if (text.includes('check-out') || text.includes('checked out') || text.includes('checkout')) {
+          if (titleLower.includes('check-out') || titleLower.includes('checked out') || titleLower.includes('checkout')) {
             existingCheckouts.add(m);
-          } else if (text.includes('check-in') || text.includes('checked in') || text.includes('checkin')) {
-            existingCheckins.add(m);
+          } else if (titleLower.includes('check-in time arrived') || titleLower.includes('ready for check-in') || text.includes('check-in time has arrived')) {
+            existingCheckinArrived.add(m);
+          } else if (titleLower.includes('check-in in') || text.includes('check-in is in') || text.includes('approaching in')) {
+            existingCheckinReminders.add(m);
+          } else if (titleLower.includes('check-in confirmed') || text.includes('checked in to') || text.includes('complete. enjoy your stay')) {
+            existingCheckinConfirmed.add(m);
           } else {
             existingConfirmations.add(m);
           }
@@ -962,8 +969,8 @@ const syncGuestBookingNotifications = async (user) => {
           });
         }
       } else if (status === 'checked-in' || status === 'checked_in' || status === 'checked in' || status === 'staying' || status === 'active') {
-        if (!existingCheckins.has(bIdLower)) {
-          existingCheckins.add(bIdLower);
+        if (!existingCheckinConfirmed.has(bIdLower)) {
+          existingCheckinConfirmed.add(bIdLower);
           toInsert.push({
             userId: String(userId),
             role: 'guest',
@@ -975,7 +982,8 @@ const syncGuestBookingNotifications = async (user) => {
             createdAt: b.updatedAt || b.createdAt || new Date()
           });
         }
-      } else {
+      } else if (status === 'confirmed' || status === 'paid' || status === 'reserved' || status === 'booked' || status === 'pending') {
+        // Confirmed / Paid stay
         if (!existingConfirmations.has(bIdLower)) {
           existingConfirmations.add(bIdLower);
           toInsert.push({
@@ -988,6 +996,48 @@ const syncGuestBookingNotifications = async (user) => {
             isRead: false,
             createdAt: b.createdAt || new Date()
           });
+        }
+
+        // Check if Check-in Time has Arrived or is within 15 Minutes
+        const checkInDate = b.checkIn || b.checkInDate;
+        const checkInTime = b.checkInTime || b.checkInSlot || '12:00 PM';
+        const scheduledCheckIn = parseDateTimeToIST(checkInDate, checkInTime);
+        const checkOutDate = b.checkOut || b.checkOutDate;
+        const scheduledCheckOut = parseDateTimeToIST(checkOutDate, b.checkOutTime || '11:00 AM');
+        const currDate = new Date();
+
+        // If stay has already concluded, skip arrival notifications
+        const isPastStay = scheduledCheckOut && currDate >= scheduledCheckOut;
+        const diffMins = scheduledCheckIn ? Math.round((scheduledCheckIn.getTime() - currDate.getTime()) / 60000) : null;
+
+        if (!isPastStay && diffMins !== null && diffMins <= 0 && diffMins >= -360) {
+          if (!existingCheckinArrived.has(bIdLower)) {
+            existingCheckinArrived.add(bIdLower);
+            toInsert.push({
+              userId: String(userId),
+              role: 'guest',
+              propertyId: propId,
+              title: 'Check-in Time Arrived',
+              message: `Your scheduled check-in time has arrived for ${roomInfo}! Welcome to ${hotelName}. Please present your booking reference #${bId} at the reception desk to complete check-in and collect your room key.`,
+              category: 'Check-in',
+              isRead: false,
+              createdAt: currDate
+            });
+          }
+        } else if (!isPastStay && diffMins !== null && diffMins <= 15 && diffMins > 0) {
+          if (!existingCheckinReminders.has(bIdLower) && !existingCheckinArrived.has(bIdLower)) {
+            existingCheckinReminders.add(bIdLower);
+            toInsert.push({
+              userId: String(userId),
+              role: 'guest',
+              propertyId: propId,
+              title: `Check-in in ${diffMins} Minutes`,
+              message: `Your check-in time for ${roomInfo} at ${hotelName} is approaching in ${diffMins} minutes. Front desk is preparing your room key. [Ref: #${bId}]`,
+              category: 'Check-in',
+              isRead: false,
+              createdAt: currDate
+            });
+          }
         }
       }
     }
@@ -1009,9 +1059,9 @@ router.get('/notifications', async (req, res) => {
     const userPhone = (req.user?.mobile || req.user?.phone || '').trim();
     const userName = (req.user?.name || '').trim();
 
-    setImmediate(() => {
-      syncGuestBookingNotifications(req.user).catch(() => {});
-    });
+    try {
+      await syncGuestBookingNotifications(req.user);
+    } catch (_) {}
 
     // 1. Collect all bookings for this guest
     const bQuery = [
@@ -1135,6 +1185,24 @@ router.get('/notifications', async (req, res) => {
       const nRole = (n.role || '').toLowerCase();
       if ((nRole === 'manager' || nRole === 'admin' || nRole === 'super-admin' || nRole === 'receptionist') && !isExplicitlyForMe) {
         continue;
+      }
+
+      // If notification is a check-in arrival reminder, but the referenced booking is already checked-in or ended:
+      if (
+        title.toLowerCase().includes('check-in time arrived') ||
+        title.toLowerCase().includes('check-in in') ||
+        message.toLowerCase().includes('reception desk to complete check-in') ||
+        message.toLowerCase().includes('front desk is preparing your room key')
+      ) {
+        const isBookingAlreadyCheckedIn = guestBookings.some(b => {
+          const bId = String(b.bookingId || b._id || b.id || '').toLowerCase();
+          const st = String(b.status || '').toLowerCase();
+          const isStCheckedIn = st.includes('checked-in') || st.includes('stay') || st.includes('in-house') || st.includes('checked-out');
+          return isStCheckedIn && (allRefs.length === 0 || allRefs.some(ref => bId.includes(ref) || ref.includes(bId)));
+        });
+        if (isBookingAlreadyCheckedIn) {
+          continue; // Suppress obsolete check-in arrival notification for already checked-in stay
+        }
       }
 
       const key = `${title.toLowerCase()}:::${message.toLowerCase()}`;
@@ -1530,6 +1598,8 @@ const handleGuestExtendStay = async (req, res) => {
       newBalance += finalAdditionalAmount;
     }
 
+    const newPaymentStatus = newBalance <= 0 ? 'Paid' : (newBalance < newTotalAmount ? 'Partial' : 'Pending');
+
     const updated = await Booking.findOneAndUpdate(
       bookingQuery,
       {
@@ -1538,65 +1608,41 @@ const handleGuestExtendStay = async (req, res) => {
         hours: (Number(booking.hours) || 0) + (Number(extendHours) || 0),
         amount: newTotalAmount,
         totalAmount: newTotalAmount,
+        netAmount: newTotalAmount,
         balance: newBalance,
-        paymentStatus: newBalance === 0 ? 'Paid' : 'Partial'
+        paymentStatus: newPaymentStatus,
+        checkoutReminderSent: false,
+        checkoutReminderSentAt: null
       },
       { new: true }
     );
 
     const propId = booking.propertyId || req.user?.propertyId || 'HS-9HQ8P';
-
-    // 1. Notify Admin (Global)
-    await triggerNotification({
-      req,
-      role: 'admin',
-      propertyId: propId,
-      title: 'Guest Extended Stay',
-      message: `Guest ${booking.guest || req.user.name} extended stay (+₹${finalAdditionalAmount}). New checkout: ${finalNewCheckOut}.`,
-      category: 'Operations',
-      data: { bookingId: updated._id, additionalAmount: finalAdditionalAmount, newCheckOut: finalNewCheckOut }
-    });
-
-    // 2. Notify Manager
-    await triggerNotification({
-      req,
-      role: 'manager',
-      propertyId: propId,
-      title: 'Guest Extended Stay',
-      message: `Guest ${booking.guest || req.user.name} extended stay (+₹${finalAdditionalAmount}). New checkout: ${finalNewCheckOut}.`,
-      category: 'Operations',
-      data: { bookingId: updated._id, additionalAmount: finalAdditionalAmount, newCheckOut: finalNewCheckOut }
-    });
-
-    // 3. Notify Receptionist
-    await triggerNotification({
-      req,
-      role: 'receptionist',
-      propertyId: propId,
-      title: 'Guest Extended Stay',
-      message: `Guest ${booking.guest || req.user.name} extended stay (+₹${finalAdditionalAmount}). New checkout: ${finalNewCheckOut}.`,
-      category: 'Operations',
-      data: { bookingId: updated._id, additionalAmount: finalAdditionalAmount, newCheckOut: finalNewCheckOut }
-    });
-
-    // 4. Notify Guest Confirmation
-    await triggerNotification({
-      req,
-      userId: req.user._id || req.user.id,
-      role: 'guest',
-      title: 'Stay Extended Successfully',
-      message: `Your stay has been extended. Additional tariff: ₹${finalAdditionalAmount}. New checkout: ${finalNewCheckOut}.`,
-      category: 'Booking Confirmation'
-    });
-
     const io = req.app.get('socketio');
+
+    await notifyBookingEvent({
+      req,
+      io,
+      action: 'extended',
+      booking: updated,
+      guestUser: req.user
+    });
+
     if (io) {
       emitRealtimeSync(io, propId, 'booking_updated', {
         action: 'extend',
         booking: updated,
         bookingId: updated._id,
         checkOut: finalNewCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus,
         additionalAmount: finalAdditionalAmount
+      });
+      emitRealtimeSync(io, propId, 'stay_extended', {
+        bookingId: updated._id,
+        checkOut: finalNewCheckOut,
+        balance: newBalance,
+        paymentStatus: newPaymentStatus
       });
       emitRealtimeSync(io, propId, 'dashboard_sync', {
         action: 'stay_extended',
@@ -2014,6 +2060,9 @@ const handleGuestCancelBooking = async (req, res) => {
 };
 
 router.get('/bookings/:id', handleGetSingleBooking);
+router.post('/bookings/:id/extend', handleGuestExtendStay);
+router.put('/bookings/:id/extend', handleGuestExtendStay);
+router.post('/reservations/:id/extend', handleGuestExtendStay);
 router.post('/bookings/:id/cancel', handleGuestCancelBooking);
 router.put('/bookings/:id/cancel', handleGuestCancelBooking);
 router.post('/bookings/cancel', handleGuestCancelBooking);

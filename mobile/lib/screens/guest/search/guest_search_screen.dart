@@ -1467,6 +1467,7 @@ class _GuestSearchScreenState extends State<GuestSearchScreen> {
               expand: false,
               builder: (_, scrollController) {
                 return ListView(
+                  physics: const BouncingScrollPhysics(),
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
                   children: [

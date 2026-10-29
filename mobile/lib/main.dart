@@ -84,6 +84,7 @@ class HourStayApp extends StatelessWidget {
         title: 'Hour Stay',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        scrollBehavior: const AppScrollBehavior(),
         home: const SplashScreen(),
         routes: {
           '/splash': (context) => const SplashScreen(),
@@ -97,3 +98,14 @@ class HourStayApp extends StatelessWidget {
     );
   }
 }
+
+/// Global Smooth Scroll Behavior providing fluid bouncing scroll physics across all platforms
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+

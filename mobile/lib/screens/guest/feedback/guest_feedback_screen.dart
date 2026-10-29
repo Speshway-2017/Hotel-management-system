@@ -95,7 +95,7 @@ class _GuestFeedbackScreenState extends State<GuestFeedbackScreen> {
           }
         },
         child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             // 1. Summary Header Banner
             SliverToBoxAdapter(

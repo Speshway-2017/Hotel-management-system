@@ -4,7 +4,7 @@ import Property from '../models/property.model.js';
 import { syncRoomStatus, extractRoomNumber, extractRoomVariant, reconcileRoomStatuses } from '../utils/roomHelper.js';
 import { emitRealtimeSync, broadcastCheckinCheckout } from '../utils/socketEmitter.js';
 import { notifyBookingEvent } from '../utils/notification.helper.js';
-import { isCheckOutDue, formatISTDateTime } from '../utils/dateUtils.js';
+import { isCheckOutDue, formatISTDateTime, parseDateTimeToIST } from '../utils/dateUtils.js';
 
 let isRunning = false;
 let globalIo = null;
@@ -62,11 +62,39 @@ export const processAutoCheckouts = async (ioInstance = null) => {
         bookingData.checkOutTime = propertySettingsCache[String(bookingData.propertyId)];
       }
 
-      if (isCheckOutDue(bookingData, now)) {
-        const bId = bookingData._id || bookingData.id || bookingData.bookingId;
-        const roomNum = extractRoomNumber(bookingData);
-        const propId = bookingData.propertyId || 'HS-9HQ8P';
+      const bId = bookingData._id || bookingData.id || bookingData.bookingId;
+      const roomNum = extractRoomNumber(bookingData);
+      const propId = bookingData.propertyId || 'HS-9HQ8P';
 
+      // 1. Pre-checkout reminder: Trigger notification 10 to 15 mins before scheduled checkout
+      const checkOutDate = bookingData.checkOut || bookingData.checkOutDate;
+      const checkOutTime = bookingData.checkOutTime || bookingData.checkOutSlot || '11:00 AM';
+      const scheduledCheckout = parseDateTimeToIST(checkOutDate, checkOutTime);
+
+      if (scheduledCheckout) {
+        const diffMins = Math.round((scheduledCheckout.getTime() - now.getTime()) / 60000);
+        if (diffMins <= 15 && diffMins > 0 && !bookingData.checkoutReminderSent) {
+          try {
+            console.log(`⏰ [CheckoutReminder] Sending 15-min checkout reminder for booking #${bookingData.bookingId || bId} (Room: ${roomNum || 'N/A'}, Remaining: ${diffMins}m)`);
+            await notifyBookingEvent({
+              action: 'checkout_reminder',
+              booking: bookingData,
+              minutesRemaining: diffMins,
+              io
+            });
+            await Booking.findByIdAndUpdate(bId, {
+              checkoutReminderSent: true,
+              checkoutReminderSentAt: now.toISOString()
+            });
+            bookingData.checkoutReminderSent = true;
+          } catch (reminderErr) {
+            console.warn(`⚠️ Failed to dispatch checkout reminder for booking #${bId}:`, reminderErr.message);
+          }
+        }
+      }
+
+      // 2. Checkout time arrived: Process auto-checkout
+      if (isCheckOutDue(bookingData, now)) {
         console.log(`⏰ [AutoCheckOut] Automatically checking out booking #${bookingData.bookingId || bId} (Guest: ${bookingData.guest || bookingData.name}, Room: ${roomNum || 'N/A'}, Scheduled checkout: ${bookingData.checkOut} ${bookingData.checkOutTime || '11:00 AM'}) at server time ${formatISTDateTime(now)}`);
 
         const updatePayload = {
@@ -183,12 +211,115 @@ export const processAutoCheckouts = async (ioInstance = null) => {
 };
 
 /**
+ * Sweeps all upcoming confirmed/booked reservations and sends:
+ * 1. Pre-checkin reminder notification (10 to 15 mins before scheduled check-in)
+ * 2. Check-in time arrived notification when scheduled check-in time is reached.
+ */
+export const processCheckInReminders = async (ioInstance = null) => {
+  const io = ioInstance || globalIo;
+  const now = new Date();
+
+  try {
+    const upcomingBookings = await Booking.find({
+      status: { $in: ['Confirmed', 'Paid', 'Reserved', 'Booked', 'pending', 'confirmed', 'paid'] }
+    });
+
+    if (!upcomingBookings || upcomingBookings.length === 0) return { processed: 0 };
+
+    for (const b of upcomingBookings) {
+      const bookingData = b.toObject ? b.toObject() : b;
+      const bId = bookingData._id || bookingData.id || bookingData.bookingId;
+      const roomNum = extractRoomNumber(bookingData);
+
+      const bStatus = String(bookingData.status || '').toLowerCase().trim();
+      // If already checked in or ended, skip immediately
+      if (bStatus.includes('checked-in') || bStatus.includes('stay') || bStatus.includes('in-house') || bStatus.includes('checked-out') || bStatus.includes('cancel')) {
+        if (!bookingData.checkinReminderSent || !bookingData.checkinArrivedSent) {
+          await Booking.findByIdAndUpdate(bId, { checkinReminderSent: true, checkinArrivedSent: true });
+        }
+        continue;
+      }
+
+      const checkInDate = bookingData.checkIn || bookingData.checkInDate;
+      const checkInTime = bookingData.checkInTime || bookingData.checkInSlot || '12:00 PM';
+      const scheduledCheckIn = parseDateTimeToIST(checkInDate, checkInTime);
+
+      const checkOutDate = bookingData.checkOut || bookingData.checkOutDate;
+      const checkOutTime = bookingData.checkOutTime || '11:00 AM';
+      const scheduledCheckOut = parseDateTimeToIST(checkOutDate, checkOutTime);
+
+      // If scheduled checkout has already passed, stay is in the past! Mark flags and skip
+      if (scheduledCheckOut && now >= scheduledCheckOut) {
+        if (!bookingData.checkinReminderSent || !bookingData.checkinArrivedSent) {
+          await Booking.findByIdAndUpdate(bId, { checkinReminderSent: true, checkinArrivedSent: true });
+        }
+        continue;
+      }
+
+      if (scheduledCheckIn) {
+        const diffMins = Math.round((scheduledCheckIn.getTime() - now.getTime()) / 60000);
+
+        // Pre-checkin reminder: 10 to 15 mins before scheduled checkin (diffMins between 1 and 15)
+        if (diffMins <= 15 && diffMins > 0 && !bookingData.checkinReminderSent) {
+          try {
+            console.log(`🛎️ [CheckinReminder] Sending 15-min check-in reminder for booking #${bookingData.bookingId || bId} (Room: ${roomNum || 'N/A'}, Remaining: ${diffMins}m)`);
+            await notifyBookingEvent({
+              action: 'checkin_reminder',
+              booking: bookingData,
+              minutesRemaining: diffMins,
+              io
+            });
+            await Booking.findByIdAndUpdate(bId, {
+              checkinReminderSent: true,
+              checkinReminderSentAt: now.toISOString()
+            });
+            bookingData.checkinReminderSent = true;
+          } catch (reminderErr) {
+            console.warn(`⚠️ Failed to dispatch check-in reminder for booking #${bId}:`, reminderErr.message);
+          }
+        } else if (diffMins <= 0 && diffMins >= -180 && !bookingData.checkinArrivedSent) {
+          // Check-in time has arrived within the last 3 hours: notify guest that room/front-desk is ready
+          try {
+            console.log(`🛎️ [CheckinArrived] Sending check-in arrived notification for booking #${bookingData.bookingId || bId} (Room: ${roomNum || 'N/A'})`);
+            await notifyBookingEvent({
+              action: 'checkin_arrived',
+              booking: bookingData,
+              io
+            });
+            await Booking.findByIdAndUpdate(bId, {
+              checkinArrivedSent: true,
+              checkinArrivedSentAt: now.toISOString()
+            });
+            bookingData.checkinArrivedSent = true;
+          } catch (arrivedErr) {
+            console.warn(`⚠️ Failed to dispatch check-in arrived notification for #${bId}:`, arrivedErr.message);
+          }
+        } else if (diffMins < -180 && !bookingData.checkinArrivedSent) {
+          // Check-in was more than 3 hours ago: mark sent without sending stale notifications
+          await Booking.findByIdAndUpdate(bId, {
+            checkinArrivedSent: true,
+            checkinReminderSent: true,
+            checkinArrivedSentAt: now.toISOString()
+          });
+          bookingData.checkinArrivedSent = true;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('❌ Check-in reminder processing error:', err.message);
+  }
+};
+
+/**
  * Non-blocking convenience function to trigger an auto-checkout sweep
  * before returning reservation queries.
  */
 export const runAutoCheckoutSweep = () => {
   processAutoCheckouts().catch(err => {
     console.warn('AutoCheckout sweep error:', err.message);
+  });
+  processCheckInReminders().catch(err => {
+    console.warn('CheckIn reminders sweep error:', err.message);
   });
 };
 
@@ -207,9 +338,12 @@ export const startAutoCheckoutScheduler = (io = null, intervalMs = 30000) => {
     }
   }).catch(err => console.error('Initial auto-checkout sweep failed:', err));
 
+  processCheckInReminders(io).catch(err => console.error('Initial check-in reminder sweep failed:', err));
+
   // Run recurring background interval
   const timer = setInterval(() => {
     processAutoCheckouts().catch(err => console.error('Interval auto-checkout error:', err));
+    processCheckInReminders().catch(err => console.error('Interval check-in reminder error:', err));
   }, intervalMs);
 
   return timer;

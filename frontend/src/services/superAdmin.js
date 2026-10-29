@@ -29,6 +29,9 @@ export const superAdminService = {
   createUser: async (data) => {
     return await apiClient.post('/super-admin/users', data);
   },
+  createGuest: async (data) => {
+    return await apiClient.post('/super-admin/users', { ...data, role: 'guest', password: data.password || 'password123' });
+  },
   updateUser: async (id, data) => {
     return await apiClient.put(`/super-admin/users/${id}`, data);
   },

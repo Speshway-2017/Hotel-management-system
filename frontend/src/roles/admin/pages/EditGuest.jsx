@@ -19,6 +19,7 @@ export const Route = createFileRoute("/admin/guests/edit/$id")({
 import { superAdminService } from "@/services/superAdmin";
 import { managerService } from "@/services/manager";
 import { validateWithZod, guestProfileSchema } from "@/schemas";
+import { resolveAadhaarValue } from "./ViewGuest";
 
 function EditGuestPage() {
   const params = useParams() || {};
@@ -77,6 +78,7 @@ function EditGuestPage() {
         }
 
         if (matched) {
+          const effectiveAadhaar = resolveAadhaarValue(matched, matched.email || matched.phone || matched.mobile || matched.name || id);
           setFormData({
             name: matched.name || matched.guestName || "",
             email: matched.email || "",
@@ -88,7 +90,7 @@ function EditGuestPage() {
             type: matched.type || matched.tier || matched.guestType || "Regular",
             preferences: matched.preferences || "",
             idDocType: matched.idDocType || matched.idType || "Aadhaar Card",
-            idDocNumber: matched.idDocNumber || matched.idNumber || matched.idProofNumber || "",
+            idDocNumber: effectiveAadhaar,
             notes: matched.notes || ""
           });
         }

@@ -1,7 +1,9 @@
 import Notification from '../models/notification.model.js';
 import Property from '../models/property.model.js';
-import { ManagerNotification, ReceptionistNotification } from '../models/managerData.model.js';
+import { ManagerNotification, ReceptionistNotification, Feedback } from '../models/managerData.model.js';
 import User from '../models/user.model.js';
+import Booking from '../models/booking.model.js';
+import mongoose from 'mongoose';
 import { emitRealtimeSync } from './socketEmitter.js';
 import { sendPushToTokens } from '../services/fcm.service.js';
 
@@ -320,6 +322,9 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       if (role === 'manager') {
         emitRealtimeSync(socketIo, targetPropId, 'manager_notification', notif);
       }
+      if (role === 'guest') {
+        emitRealtimeSync(socketIo, targetPropId, 'guest_notification', notif);
+      }
       emitRealtimeSync(socketIo, targetPropId, 'unread_notifications_count_updated', {
         role,
         userId,
@@ -335,46 +340,101 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
     try {
       const userQuery = [];
       if (userId) {
-        userQuery.push({ _id: userId }, { id: userId });
-      } else if (role && targetPropId) {
-        userQuery.push({ role, propertyId: targetPropId });
-      } else if (role) {
-        userQuery.push({ role });
-      } else if (targetPropId) {
-        userQuery.push({ propertyId: targetPropId, role: 'manager' });
-      } else {
-        userQuery.push({ role: 'manager' });
+        userQuery.push({ _id: String(userId) }, { id: String(userId) });
+        if (typeof userId === 'string' && userId.includes('@')) {
+          userQuery.push({ email: userId.toLowerCase().trim() });
+        }
+      }
+      const potentialEmail = (data?.email || data?.guestEmail || data?.userEmail || '').toLowerCase().trim();
+      if (potentialEmail) {
+        userQuery.push({ email: potentialEmail });
+      }
+      const potentialPhone = (data?.phone || data?.guestPhone || data?.mobile || '').trim();
+      if (potentialPhone) {
+        const cleanP = potentialPhone.replace(/[^0-9]/g, '');
+        userQuery.push({ phone: potentialPhone }, { mobile: potentialPhone });
+        if (cleanP.length >= 10) {
+          userQuery.push({ phone: { $regex: cleanP.slice(-10) } }, { mobile: { $regex: cleanP.slice(-10) } });
+        }
       }
 
+      if (userQuery.length === 0) {
+        if (role && targetPropId) {
+          userQuery.push({ role, propertyId: targetPropId });
+        } else if (role) {
+          userQuery.push({ role });
+        } else if (targetPropId) {
+          userQuery.push({ propertyId: targetPropId, role: 'manager' });
+        } else {
+          userQuery.push({ role: 'manager' });
+        }
+      }
+
+      let targetUsers = [];
       if (userQuery.length > 0) {
-        const targetUsers = await User.find({ $or: userQuery });
-        const tokens = new Set();
-        for (const u of targetUsers) {
-          if (u.fcmToken) tokens.add(u.fcmToken);
-          if (Array.isArray(u.fcmTokens)) {
-            for (const t of u.fcmTokens) {
-              if (t) tokens.add(t);
+        targetUsers = (await User.find({ $or: userQuery })) || [];
+      }
+
+      // Fallback: If role is guest and no user with token found yet, search via bookingId
+      if (targetUsers.length === 0 && role === 'guest' && data?.bookingId) {
+        try {
+          const bDoc = await Booking.findOne({
+            $or: [
+              { bookingId: data.bookingId },
+              { reservationNumber: data.bookingId },
+              ...(mongoose.Types.ObjectId.isValid(data.bookingId) ? [{ _id: data.bookingId }] : [])
+            ]
+          }).lean();
+          if (bDoc) {
+            const fallbackQueries = [];
+            if (bDoc.userId) fallbackQueries.push({ _id: String(bDoc.userId) }, { id: String(bDoc.userId) });
+            if (bDoc.guestId) fallbackQueries.push({ _id: String(bDoc.guestId) }, { id: String(bDoc.guestId) });
+            if (bDoc.email) fallbackQueries.push({ email: bDoc.email.toLowerCase().trim() });
+            if (bDoc.phone) {
+              const cleanP = bDoc.phone.replace(/[^0-9]/g, '');
+              fallbackQueries.push({ phone: bDoc.phone }, { mobile: bDoc.phone });
+              if (cleanP.length >= 10) {
+                fallbackQueries.push({ phone: { $regex: cleanP.slice(-10) } }, { mobile: { $regex: cleanP.slice(-10) } });
+              }
+            }
+            if (fallbackQueries.length > 0) {
+              targetUsers = (await User.find({ $or: fallbackQueries })) || [];
             }
           }
-        }
+        } catch (_) {}
+      }
 
-        if (tokens.size > 0) {
-          sendPushToTokens(Array.from(tokens), {
-            title: cleanTitle,
-            body: cleanMsg,
-            data: {
-              ...(data || {}),
-              notificationId: notif._id || notif.id,
-              category: category || 'General',
-              role: role || '',
-              propertyId: targetPropId || ''
-            },
+      const tokens = new Set();
+      for (const u of (targetUsers || [])) {
+        if (u.fcmToken) tokens.add(u.fcmToken);
+        if (Array.isArray(u.fcmTokens)) {
+          for (const t of u.fcmTokens) {
+            if (t) tokens.add(t);
+          }
+        }
+      }
+
+      if (tokens.size > 0) {
+        console.log(`📱 [FCM PUSH] Dispatching notification to ${tokens.size} token(s) for "${cleanTitle}"...`);
+        sendPushToTokens(Array.from(tokens), {
+          title: cleanTitle,
+          body: cleanMsg,
+          data: {
+            ...(data || {}),
             notificationId: notif._id || notif.id,
             category: category || 'General',
             role: role || '',
             propertyId: targetPropId || ''
-          }).catch(pushErr => console.warn("⚠️ FCM push dispatch notice:", pushErr.message));
-        }
+          },
+          notificationId: notif._id || notif.id,
+          category: category || 'General',
+          role: role || '',
+          propertyId: targetPropId || ''
+        }).then(res => {
+          console.log(`✅ [FCM PUSH RESULT] Sent: ${res.successCount} succeeded, ${res.failureCount} failed for "${cleanTitle}"`);
+        }).catch(pushErr => console.warn("⚠️ FCM push dispatch notice:", pushErr.message));
+      } else {
+        console.log(`ℹ️ [FCM PUSH] No device tokens found for notification "${cleanTitle}" (role: ${role || 'all'}, userId: ${userId || 'none'})`);
       }
     } catch (fcmErr) {
       console.warn("⚠️ FCM lookup notice:", fcmErr.message);
@@ -391,7 +451,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
  * Dispatches database notifications and emits realtime socket synchronization
  * across Admin, Super Admin, Manager, Receptionist, and Guest consoles.
  */
-export const notifyBookingEvent = async ({ req, io, action = 'created', booking, guestUser = null, property = null }) => {
+export const notifyBookingEvent = async ({ req, io, action = 'created', booking, guestUser = null, property = null, minutesRemaining = 15 }) => {
   try {
     const socketIo = io || (req && req.app ? req.app.get('socketio') : null);
     const propId = booking.propertyId || 'HS-9HQ8P';
@@ -401,6 +461,37 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
     const checkIn = booking.checkIn || booking.checkInDate || 'Today';
     const checkOut = booking.checkOut || booking.checkOutDate || 'Tomorrow';
     const amount = booking.totalAmount || booking.amount || 0;
+
+    const bStatus = String(booking.status || '').toLowerCase().trim();
+    const isAlreadyCheckedIn = bStatus === 'checked-in' || bStatus === 'checked in' || bStatus === 'staying' || bStatus === 'in-house';
+    const isEndedOrCancelled = bStatus === 'checked-out' || bStatus === 'checked out' || bStatus === 'cancelled' || bStatus === 'no-show';
+
+    // Strictly suppress check-in reminder & arrival notifications if guest is already checked-in or stay has ended
+    if ((action === 'checkin_reminder' || action === 'checkin_arrived') && (isAlreadyCheckedIn || isEndedOrCancelled)) {
+      console.log(`ℹ️ [notifyBookingEvent] Suppressing '${action}' for booking #${bookingId} because status is already '${booking.status}'.`);
+      return;
+    }
+
+    if (action === 'checkin') {
+      // Mark flags on booking document so scheduler never sends check-in reminders
+      Booking.findByIdAndUpdate(booking._id || booking.id, {
+        checkinReminderSent: true,
+        checkinArrivedSent: true
+      }).catch(() => null);
+
+      // Auto-resolve any pending check-in arrival alerts for this booking in Notification collection
+      Notification.updateMany(
+        {
+          $or: [
+            { title: /check-in/i },
+            { category: 'Check-in' }
+          ],
+          message: new RegExp(String(bookingId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+          isRead: false
+        },
+        { $set: { isRead: true } }
+      ).catch(() => null);
+    }
 
     let title = 'New Reservation Booking';
     let msg = `Guest ${guestName} booked ${roomInfo} (${checkIn} → ${checkOut}) for ₹${amount}. [Ref: #${bookingId}]`;
@@ -414,14 +505,26 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       title = 'Reservation Cancelled';
       msg = `Booking #${bookingId} for guest ${guestName} (${roomInfo}) was cancelled.`;
       category = 'Alerts';
+    } else if (action === 'checkin_reminder') {
+      title = `Check-in in ${minutesRemaining || 15} Minutes`;
+      msg = `Check-in approaching in ${minutesRemaining || 15} minutes for guest ${guestName} (${roomInfo}). [Ref: #${bookingId}]`;
+      category = 'Check-in';
+    } else if (action === 'checkin_arrived') {
+      title = 'Check-in Time Arrived';
+      msg = `Scheduled check-in time has arrived for guest ${guestName} (${roomInfo}). [Ref: #${bookingId}]`;
+      category = 'Check-in';
     } else if (action === 'checkin') {
       title = 'Guest Checked In';
       msg = `Guest ${guestName} checked into ${roomInfo} (Ref: #${bookingId}).`;
       category = 'Operations';
+    } else if (action === 'checkout_reminder') {
+      title = `Check-out in ${minutesRemaining || 15} Minutes`;
+      msg = `Check-out approaching in ${minutesRemaining || 15} minutes for guest ${guestName} in ${roomInfo}. [Ref: #${bookingId}]`;
+      category = 'Check-out';
     } else if (action === 'checkout') {
       title = 'Guest Checked Out';
       msg = `Guest ${guestName} checked out from ${roomInfo} (Ref: #${bookingId}).`;
-      category = 'Operations';
+      category = 'Check-out';
     } else if (action === 'room_assigned') {
       title = 'Room Assigned';
       msg = `Room ${roomInfo} assigned for guest ${guestName} (Ref: #${bookingId}).`;
@@ -440,7 +543,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       title,
       message: msg,
       category,
-      data: { bookingId, guestName, room: roomInfo, action }
+      data: { bookingId, guestName, room: roomInfo, action, minutesRemaining }
     });
 
     // 2. Notify Manager for this property (single clean dispatch)
@@ -452,7 +555,7 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       title,
       message: msg,
       category,
-      data: { bookingId, guestName, room: roomInfo, action }
+      data: { bookingId, guestName, room: roomInfo, action, minutesRemaining }
     });
 
     // 3. Notify Receptionist for this property
@@ -464,27 +567,66 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       title,
       message: msg,
       category,
-      data: { bookingId, guestName, room: roomInfo, action }
+      data: { bookingId, guestName, room: roomInfo, action, minutesRemaining }
     });
 
-    // 4. Resolve Guest Recipient Identity
-    let targetGuestId = booking.guestId || booking.userId || (guestUser ? (guestUser._id || guestUser.id) : null);
-    if (!targetGuestId && (booking.email || booking.guestEmail)) {
+    // 4. Resolve Guest Recipient Identity and User Document robustly
+    let resolvedGuestUser = guestUser || null;
+    const bookingGuestEmail = (booking.email || booking.guestEmail || '').toLowerCase().trim();
+    const bookingGuestPhone = (booking.phone || booking.guestPhone || '').trim();
+    const rawGuestId = booking.guestId || booking.userId || null;
+
+    if (!resolvedGuestUser && rawGuestId) {
       try {
-        const u = await User.findOne({ email: booking.email || booking.guestEmail });
-        if (u) targetGuestId = String(u._id || u.id);
+        const u = await User.findOne({
+          $or: [
+            { _id: String(rawGuestId) },
+            { id: String(rawGuestId) }
+          ]
+        });
+        if (u) resolvedGuestUser = u;
       } catch (_) {}
     }
-    if (!targetGuestId && (booking.phone || booking.guestPhone)) {
+
+    if (!resolvedGuestUser && bookingGuestEmail) {
       try {
-        const u = await User.findOne({ phone: booking.phone || booking.guestPhone });
-        if (u) targetGuestId = String(u._id || u.id);
+        const u = await User.findOne({ email: bookingGuestEmail });
+        if (u) resolvedGuestUser = u;
       } catch (_) {}
+    }
+
+    if (!resolvedGuestUser && bookingGuestPhone) {
+      try {
+        const cleanPhone = bookingGuestPhone.replace(/[^0-9]/g, '');
+        const u = await User.findOne({
+          $or: [
+            { phone: bookingGuestPhone },
+            { mobile: bookingGuestPhone },
+            ...(cleanPhone.length >= 10 ? [
+              { phone: { $regex: cleanPhone.slice(-10) } },
+              { mobile: { $regex: cleanPhone.slice(-10) } }
+            ] : [])
+          ]
+        });
+        if (u) resolvedGuestUser = u;
+      } catch (_) {}
+    }
+
+    const targetGuestId = resolvedGuestUser
+      ? String(resolvedGuestUser._id || resolvedGuestUser.id)
+      : (rawGuestId ? String(rawGuestId) : bookingGuestEmail || null);
+
+    // If we resolved a real user, ensure booking document is linked to this user
+    if (resolvedGuestUser && booking._id && !booking.userId) {
+      Booking.findByIdAndUpdate(booking._id, { userId: String(resolvedGuestUser._id || resolvedGuestUser.id) }).catch(() => null);
     }
 
     // 5. Notify Guest
     let guestTitle = action === 'created' || action === 'booked' ? 'Booking Confirmed!' :
+      action === 'checkin_reminder' ? `Check-in in ${minutesRemaining || 15} Minutes` :
+      action === 'checkin_arrived' ? 'Check-in Time Arrived' :
       action === 'checkin' ? 'Check-in Confirmed!' :
+      action === 'checkout_reminder' ? `Check-out in ${minutesRemaining || 15} Minutes` :
       action === 'checkout' ? 'Check-out Time Arrived' :
       action === 'room_assigned' ? 'Room Assigned' :
       action === 'extended' ? 'Stay Extended' :
@@ -492,10 +634,16 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
 
     let guestMsg = action === 'created' || action === 'booked'
       ? `Your reservation is confirmed for ${checkIn} → ${checkOut}. Booking Reference: #${bookingId}.`
+      : action === 'checkin_reminder'
+      ? `Your check-in time for Room ${roomInfo} is approaching in ${minutesRemaining || 15} minutes. You can review your booking or prepare for arrival at the hotel. [Ref: #${bookingId}]`
+      : action === 'checkin_arrived'
+      ? `Your scheduled check-in time has arrived for Room ${roomInfo}! Welcome to Hour Stay. Please visit the reception desk to complete check-in. [Ref: #${bookingId}]`
       : action === 'checkin'
       ? `Welcome! You have checked in to Room ${roomInfo}. Enjoy your stay! [Ref: #${bookingId}]`
+      : action === 'checkout_reminder'
+      ? `Your check-out time for Room ${roomInfo} is approaching in ${minutesRemaining || 15} minutes. If you want to stay extra, please extend your booking or contact the front desk. [Ref: #${bookingId}]`
       : action === 'checkout'
-      ? `Your scheduled check-out time has arrived for Room ${roomInfo}. Thank you for choosing Hour Stay! We hope you had a pleasant stay. [Ref: #${bookingId}]`
+      ? `Your scheduled check-out time has arrived for Room ${roomInfo}. If you want to stay extra, please extend your booking or visit the front desk to complete check-out. [Ref: #${bookingId}]`
       : action === 'room_assigned'
       ? `Room ${roomInfo} has been assigned for your reservation. [Ref: #${bookingId}]`
       : action === 'extended'
@@ -504,29 +652,60 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       ? `Your reservation #${bookingId} for ${roomInfo} has been cancelled.`
       : msg;
 
-    const guestCategory = action === 'checkout' ? 'Check-out' :
-      action === 'checkin' ? 'Check-in' :
+    const guestCategory = (action === 'checkout' || action === 'checkout_reminder') ? 'Check-out' :
+      (action === 'checkin' || action === 'checkin_reminder' || action === 'checkin_arrived') ? 'Check-in' :
       action === 'created' || action === 'booked' ? 'Booking Confirmation' :
       'Stay';
 
     await triggerNotification({
       req,
       io: socketIo,
-      userId: targetGuestId || (booking.guestId ? String(booking.guestId) : null) || booking.email || null,
+      userId: targetGuestId || bookingGuestEmail || null,
       role: 'guest',
       propertyId: propId,
       title: guestTitle,
       message: guestMsg,
       category: guestCategory,
-      data: { bookingId, guestName, room: roomInfo, action }
+      data: {
+        bookingId,
+        guestName,
+        room: roomInfo,
+        action,
+        status: action === 'checkin' ? 'Checked-in' : booking.status,
+        minutesRemaining,
+        email: bookingGuestEmail,
+        guestEmail: bookingGuestEmail,
+        phone: bookingGuestPhone,
+        guestPhone: bookingGuestPhone,
+        userId: targetGuestId
+      }
     });
 
     // 6. Realtime Socket.io Broadcast
     if (socketIo) {
       emitRealtimeSync(socketIo, propId, 'booking_created', { booking, propertyId: propId });
       emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), action, booking, propertyId: propId });
-      emitRealtimeSync(socketIo, propId, 'guest_notification', { action, bookingId, title: guestTitle, message: guestMsg, category: guestCategory });
-      emitRealtimeSync(socketIo, propId, 'notification_created', { action, bookingId, role: 'guest', userId: targetGuestId, title: guestTitle, message: guestMsg, category: guestCategory });
+      emitRealtimeSync(socketIo, propId, 'guest_notification', {
+        action,
+        bookingId,
+        title: guestTitle,
+        message: guestMsg,
+        category: guestCategory,
+        userId: targetGuestId,
+        email: bookingGuestEmail,
+        phone: bookingGuestPhone
+      });
+      emitRealtimeSync(socketIo, propId, 'notification_created', {
+        action,
+        bookingId,
+        role: 'guest',
+        userId: targetGuestId,
+        title: guestTitle,
+        message: guestMsg,
+        category: guestCategory,
+        email: bookingGuestEmail,
+        phone: bookingGuestPhone
+      });
       emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: `booking_${action}`, bookingId });
     }
   } catch (err) {
@@ -563,19 +742,112 @@ export const notifyFeedbackEvent = async ({ req, io, action, feedback, actor = '
         emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_received' });
       }
     } else if (action === 'responded') {
-      const title = `Management Responded to Feedback`;
-      const msg = `${actor || 'Management'} replied to review #${feedback.bookingId || feedback.id}: "${(feedback.response || '').slice(0, 60)}..."`;
+      const bRef = feedback.bookingId || feedback.id || (feedback._id ? String(feedback._id) : '');
+      const propName = feedback.propertyName || 'Hour Stay Luxury Hotel';
+      const replySnippet = (feedback.response || '').trim();
 
-      // Notify Guest if userId present
-      if (feedback.userId) {
-        await triggerNotification({ req, io: socketIo, userId: feedback.userId, role: 'guest', title: 'Hotel Replied to Your Feedback', message: msg, category: 'Guest Experience' });
+      // 1. Resolve guest recipient by all available identifiers
+      let guestUserId = feedback.userId ? String(feedback.userId).trim() : null;
+      let guestEmail = (feedback.guestEmail || '').toLowerCase().trim();
+      let guestPhone = (feedback.guestPhone || '').trim();
+
+      // Look up User by email if no guestUserId
+      if (!guestUserId && guestEmail) {
+        try {
+          const u = await User.findOne({ email: guestEmail });
+          if (u) guestUserId = String(u._id || u.id);
+        } catch (_) {}
       }
+
+      // Look up User by phone if still no guestUserId
+      if (!guestUserId && guestPhone) {
+        try {
+          const u = await User.findOne({ $or: [{ phone: guestPhone }, { mobile: guestPhone }] });
+          if (u) guestUserId = String(u._id || u.id);
+        } catch (_) {}
+      }
+
+      // Look up Booking by bookingId / reservationNumber
+      if (bRef) {
+        try {
+          const bookingDoc = await Booking.findOne({
+            $or: [
+              { bookingId: bRef },
+              { reservationNumber: bRef },
+              ...(mongoose.Types.ObjectId.isValid(bRef) ? [{ _id: bRef }] : [])
+            ]
+          }).lean();
+
+          if (bookingDoc) {
+            if (!guestUserId && (bookingDoc.guestId || bookingDoc.userId)) {
+              guestUserId = String(bookingDoc.guestId || bookingDoc.userId);
+            }
+            if (!guestEmail && (bookingDoc.email || bookingDoc.guestEmail)) {
+              guestEmail = (bookingDoc.email || bookingDoc.guestEmail).toLowerCase().trim();
+            }
+          }
+        } catch (_) {}
+      }
+
+      // If resolved guestUserId and Feedback document didn't have it, persist it
+      if (guestUserId && !feedback.userId && feedback._id) {
+        try {
+          await Feedback.findByIdAndUpdate(feedback._id, { userId: guestUserId });
+        } catch (_) {}
+      }
+
+      const guestTitle = `Hotel Replied to Your Feedback`;
+      const guestMsg = `${actor || 'Hotel Management'} replied to your review for ${propName}: "${replySnippet.slice(0, 80)}${replySnippet.length > 80 ? '...' : ''}" [ref: #${bRef}]`;
+
+      // Dispatch to Guest (both via userId and email fallback so guest query in guest.routes.js finds it)
+      const targetGuestId = guestUserId || guestEmail || null;
+      if (targetGuestId) {
+        await triggerNotification({
+          req,
+          io: socketIo,
+          userId: targetGuestId,
+          role: 'guest',
+          propertyId: propId,
+          title: guestTitle,
+          message: guestMsg,
+          category: 'Guest Experience',
+          data: {
+            feedbackId: String(feedback._id || feedback.id),
+            bookingId: bRef,
+            action: 'feedback_responded'
+          }
+        });
+      } else {
+        await triggerNotification({
+          req,
+          io: socketIo,
+          role: 'guest',
+          propertyId: propId,
+          title: guestTitle,
+          message: guestMsg,
+          category: 'Guest Experience',
+          data: {
+            feedbackId: String(feedback._id || feedback.id),
+            bookingId: bRef,
+            action: 'feedback_responded'
+          }
+        });
+      }
+
       // Notify Admin & Manager
-      await triggerNotification({ req, io: socketIo, role: 'admin', propertyId: propId, title, message: msg, category: 'Guest Experience' });
-      await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: propId, title, message: msg, category: 'Guest Experience' });
+      const staffTitle = `Management Responded to Feedback`;
+      const staffMsg = `${actor || 'Management'} replied to review #${bRef}: "${replySnippet.slice(0, 60)}..."`;
+      await triggerNotification({ req, io: socketIo, role: 'admin', propertyId: propId, title: staffTitle, message: staffMsg, category: 'Guest Experience' });
+      await triggerNotification({ req, io: socketIo, role: 'manager', propertyId: propId, title: staffTitle, message: staffMsg, category: 'Guest Experience' });
 
       if (socketIo) {
         emitRealtimeSync(socketIo, propId, 'feedback_updated', feedback);
+        emitRealtimeSync(socketIo, propId, 'guest_notification', {
+          title: guestTitle,
+          message: guestMsg,
+          category: 'Guest Experience',
+          userId: targetGuestId
+        });
         emitRealtimeSync(socketIo, propId, 'dashboard_sync', { propertyId: propId, action: 'feedback_updated' });
       }
     } else if (action === 'status_updated') {
