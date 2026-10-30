@@ -750,7 +750,7 @@ router.post('/reservations/:id/assign-room', async (req, res) => {
     await notifyBookingEvent({
       req,
       io,
-      action,
+      action: 'room_assigned',
       booking: updated
     });
 
@@ -2169,20 +2169,26 @@ router.get('/notifications', async (req, res) => {
       syncManagerBookingNotifications(propertyId).catch(() => {});
     });
 
-    // Fetch from both Notification and ManagerNotification with fallback property coverage
+    // Fetch from both Notification and ManagerNotification with full property and role coverage
     const propQuery = [
       { role: 'manager' },
       { role: 'all' },
       { role: null },
-      { userId: req.user.id || req.user._id },
+      { role: 'guest' },
+      { role: 'receptionist' },
+      { role: 'admin' },
+      { userId: req.user?.id || req.user?._id },
       { propertyId },
       { propertyId: 'HS-9HQ8P' },
-      { propertyId: 'HS-9HQ8P' }
+      { propertyId: null },
+      { propertyId: 'all' },
+      { propertyId: 'global' },
+      { propertyId: { $exists: false } }
     ];
 
     const [standardList, managerList] = await Promise.all([
-      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(100),
-      ManagerNotification.find().sort({ createdAt: -1 }).lean().limit(100)
+      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(200),
+      ManagerNotification.find().sort({ createdAt: -1 }).lean().limit(200)
     ]);
 
     // Map and merge with robust deduplication
@@ -2461,19 +2467,25 @@ router.post('/reservations/:id/extend', handleExtendReservation);
 // ==========================================
 router.get('/notifications', async (req, res) => {
   try {
-    const propertyId = req.user?.propertyId || 'HS-9HQ8P';
     const propQuery = [
       { role: 'manager' },
       { role: 'all' },
       { role: null },
-      { userId: req.user.id || req.user._id },
+      { role: 'guest' },
+      { role: 'receptionist' },
+      { role: 'admin' },
+      { userId: req.user?.id || req.user?._id },
       { propertyId },
-      { propertyId: 'HS-9HQ8P' }
+      { propertyId: 'HS-9HQ8P' },
+      { propertyId: null },
+      { propertyId: 'all' },
+      { propertyId: 'global' },
+      { propertyId: { $exists: false } }
     ];
 
     const [standardList, managerList] = await Promise.all([
-      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(100),
-      ManagerNotification.find().sort({ createdAt: -1 }).lean().limit(100)
+      Notification.find({ $or: propQuery }).sort({ createdAt: -1 }).lean().limit(200),
+      ManagerNotification.find().sort({ createdAt: -1 }).lean().limit(200)
     ]);
 
     const itemsMap = new Map();

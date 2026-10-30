@@ -703,15 +703,17 @@
     "state": "",
     "status": "Active",
     "type": "Regular",
-    "updatedAt": "2026-10-29T09:56:38.459Z",
+    "updatedAt": "2026-10-30T05:58:31.213Z",
     "idProofType": "Aadhaar Card",
     "idProofNumber": "",
     "verifiedAadhaar": "",
     "verifiedAadhaarLast4": "",
     "isAadhaarVerified": false,
     "aadhaarVerifiedAt": null,
-    "fcmToken": null,
-    "fcmTokens": []
+    "fcmToken": "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM",
+    "fcmTokens": [
+      "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM"
+    ]
   },
   {
     "_id": "2y1ilu5fn41",
@@ -847,27 +849,35 @@
     "_id": "83emngc4opx",
     "email": "poojitha@hourstay.com",
     "address": "",
-    "avatar": null,
+    "avatar": "https://res.cloudinary.com/dg9sqvxen/image/upload/v1787659187/hourstay_hms_assets/sbscgnxepsoxycbdce2k.jpg",
     "city": "",
     "country": "India",
-    "createdAt": "2026-09-01T04:34:46.052Z",
+    "createdAt": "2026-08-24T11:47:56.630Z",
     "dept": "Front Desk",
     "id": "83emngc4opx",
     "idDocNumber": "",
     "idDocType": "Aadhaar Card",
     "loyaltyPoints": 0,
-    "mobile": "7576556777",
+    "mobile": "9888888888",
     "name": "Poojitha",
     "notes": "",
-    "password": "$2a$10$3NzL55uwycBojoPfzzDAmemUU/nY.OQJ/f1QQam3T8Byjg4jt6EpK",
+    "password": "$2a$10$fEQ67uOeMLAtgiA8WqSAoOZhnvE/K2iIRTnV0n952s1wJq.P0Xi3K",
     "preferences": "",
     "propertyId": "HS-9HQ8P",
     "role": "receptionist",
-    "shift": "Morning (06:00 - 14:00)",
+    "shift": "General Shift",
     "state": "",
     "status": "Active",
     "type": "Regular",
-    "updatedAt": "2026-09-01T04:34:46.054Z"
+    "updatedAt": "2026-10-30T05:58:43.742Z",
+    "idProofType": "Aadhaar Card",
+    "idProofNumber": "",
+    "verifiedAadhaar": "",
+    "verifiedAadhaarLast4": "",
+    "isAadhaarVerified": false,
+    "aadhaarVerifiedAt": null,
+    "fcmToken": null,
+    "fcmTokens": []
   },
   {
     "_id": "6ab3778914c9f1411d008200",
@@ -892,7 +902,7 @@
     "loyaltyPoints": 3200,
     "notes": "VIP Guest of Speshway Luxury Hotel",
     "createdAt": "2026-10-29T07:29:00.710Z",
-    "updatedAt": "2026-10-29T09:34:39.443Z",
+    "updatedAt": "2026-10-30T08:15:18.031Z",
     "aadhaarVerifiedAt": null,
     "idProofNumber": "6353 7576 4646",
     "idProofType": "Aadhaar Card",
@@ -900,8 +910,10 @@
     "verifiedAadhaar": "6353 7576 4646",
     "verifiedAadhaarLast4": "",
     "id": "6ab3778914c9f1411d008200",
-    "fcmToken": null,
-    "fcmTokens": []
+    "fcmToken": "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM",
+    "fcmTokens": [
+      "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM"
+    ]
   },
   {
     "_id": "usr-gst-mani",

@@ -111,10 +111,13 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
         },
       );
     } else {
-      final bId = _selectedBooking?.id ?? widget.reservationId ?? '';
+      final bId = (_selectedBooking?.bookingId.isNotEmpty == true)
+          ? _selectedBooking!.bookingId
+          : (_selectedBooking?.id ?? widget.reservationId ?? '');
+      final rId = _selectedBooking?.id ?? widget.reservationId ?? '';
       success = await feedbackProv.submitFeedback(
         bookingId: bId,
-        reservationId: bId,
+        reservationId: rId,
         rating: _overallRating,
         comment: commentText,
         categoryRatings: {
@@ -134,6 +137,11 @@ class _GuestAddFeedbackScreenState extends State<GuestAddFeedbackScreen> {
     setState(() => _isSubmitting = false);
 
     if (success) {
+      final bId = _selectedBooking?.bookingId ?? '';
+      final rId = _selectedBooking?.id ?? widget.reservationId ?? '';
+      context.read<GuestBookingProvider>().markBookingFeedbackGiven(bId, rId);
+      context.read<GuestFeedbackProvider>().fetchMyFeedbacks(silent: true);
+      context.read<GuestBookingProvider>().fetchDashboardData(silent: true);
       messenger.showSnackBar(
         SnackBar(
           content: Row(

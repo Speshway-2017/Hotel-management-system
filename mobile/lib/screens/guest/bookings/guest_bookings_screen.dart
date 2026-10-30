@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
+import 'package:hour_stay_mobile/providers/guest/guest_feedback_provider.dart';
 import 'package:hour_stay_mobile/providers/auth_provider.dart';
 import 'package:hour_stay_mobile/widgets/empty_state.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
@@ -51,6 +52,7 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GuestBookingProvider>().fetchMyBookings();
+      context.read<GuestFeedbackProvider>().fetchMyFeedbacks(silent: true);
     });
   }
 
@@ -71,10 +73,17 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
   }
 
   _BookingTabType _getBookingTabType(ReservationModel b) {
-    final s = b.status.toLowerCase();
+    final s = b.status.toLowerCase().trim().replaceAll(' ', '-').replaceAll('_', '-');
     if (s == 'cancelled' || s == 'refunded') return _BookingTabType.cancelled;
-    if (s == 'checked_in' || s == 'checked-in') return _BookingTabType.currentStay;
-    if (s == 'checked_out' || s == 'checked-out' || s == 'completed') return _BookingTabType.completed;
+    if (s == 'checked-in' || s == 'staying' || s == 'in-house') return _BookingTabType.currentStay;
+    if (s == 'checked-out' || s == 'completed' || s == 'past') return _BookingTabType.completed;
+
+    if (b.checkOut.isNotEmpty) {
+      final outDt = DateTime.tryParse(b.checkOut);
+      if (outDt != null && DateTime.now().isAfter(outDt)) {
+        return _BookingTabType.completed;
+      }
+    }
     return _BookingTabType.upcoming;
   }
 
@@ -695,12 +704,16 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            Navigator.of(context).push(
+          onTap: () async {
+            await Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => GuestBookingDetailScreen(booking: b),
               ),
             );
+            if (context.mounted) {
+              context.read<GuestFeedbackProvider>().fetchMyFeedbacks(silent: true);
+              context.read<GuestBookingProvider>().fetchMyBookings(silent: true);
+            }
           },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(17),
@@ -1194,6 +1207,44 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
 
   // --- COMPLETED ACTIONS ---
   Widget _buildCompletedActions(BuildContext context, ReservationModel b) {
+    final feedbackProvider = context.watch<GuestFeedbackProvider>();
+    final hasFeedback = b.hasFeedback ||
+        (b.feedbackRating != null && b.feedbackRating! > 0) ||
+        feedbackProvider.hasFeedbackForBooking(b.id, b.bookingId) ||
+        feedbackProvider.hasFeedbackForBooking(b.bookingId, b.reservationNumber);
+
+    // If guest already submitted feedback, hide the feedback button
+    if (hasFeedback) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: navy,
+            side: const BorderSide(color: cardBorder),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          icon: const Icon(Icons.receipt_long_outlined, size: 15, color: navy),
+          label: const Text(
+            'Digital Folio',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => GuestFolioScreen(
+                  booking: b,
+                  bookingId: b.id,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     return Row(
       children: [
         // 1. Write Feedback / Review
@@ -1213,12 +1264,17 @@ class _GuestBookingsScreenState extends State<GuestBookingsScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              final result = await Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => GuestAddFeedbackScreen(reservationId: b.id),
+                  builder: (_) => GuestAddFeedbackScreen(booking: b, reservationId: b.id),
                 ),
               );
+              if (result == true && context.mounted) {
+                context.read<GuestBookingProvider>().markBookingFeedbackGiven(b.bookingId, b.id);
+                context.read<GuestFeedbackProvider>().fetchMyFeedbacks(silent: true);
+                context.read<GuestBookingProvider>().fetchMyBookings(silent: true);
+              }
             },
           ),
         ),

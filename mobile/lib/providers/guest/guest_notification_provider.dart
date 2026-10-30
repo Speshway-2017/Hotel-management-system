@@ -141,13 +141,19 @@ class GuestNotificationProvider with ChangeNotifier {
     });
     SocketService.on('unread_notifications_count_updated', (_) => _debouncedFetchNotifications());
     SocketService.on('dashboard_sync', (_) => _debouncedFetchNotifications());
-    SocketService.on('booking_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('booking_created', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
     SocketService.on('booking_updated', (data) {
       _debouncedFetchNotifications();
       _handleSocketIncomingAlert(data);
     });
     SocketService.on('room_status_changed', (_) => _debouncedFetchNotifications());
-    SocketService.on('room_assigned', (_) => _debouncedFetchNotifications());
+    SocketService.on('room_assigned', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
     SocketService.on('stay_extended', (data) {
       _debouncedFetchNotifications();
       _handleSocketStayExtended(data);
@@ -156,10 +162,38 @@ class GuestNotificationProvider with ChangeNotifier {
       _debouncedFetchNotifications();
       _handleSocketCheckinCompleted(data);
     });
-    SocketService.on('checkout_completed', (_) => _debouncedFetchNotifications());
-    SocketService.on('payment_logged', (_) => _debouncedFetchNotifications());
-    SocketService.on('payment_updated', (_) => _debouncedFetchNotifications());
-    SocketService.on('feedback_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('checkout_completed', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('payment_logged', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('payment_added', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('payment_updated', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('refund_requested', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('refund_status_updated', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('charge_added', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
+    SocketService.on('feedback_updated', (data) {
+      _debouncedFetchNotifications();
+      _handleSocketIncomingAlert(data);
+    });
     SocketService.on('feedback_received', (_) => _debouncedFetchNotifications());
   }
 
@@ -257,44 +291,81 @@ class GuestNotificationProvider with ChangeNotifier {
     try {
       if (data is! Map) return;
       final notif = data['notification'] is Map ? data['notification'] : data;
-      final title = (notif['title'] ?? data['title'] ?? '').toString().trim();
-      final body = (notif['message'] ?? data['message'] ?? notif['body'] ?? data['body'] ?? '').toString().trim();
+      String title = (notif['title'] ?? data['title'] ?? '').toString().trim();
+      String body = (notif['message'] ?? data['message'] ?? notif['body'] ?? data['body'] ?? '').toString().trim();
       final category = (notif['category'] ?? data['category'] ?? 'General').toString();
-      final email = (notif['email'] ?? data['email'] ?? '').toString().toLowerCase().trim();
+      final email = (notif['email'] ?? data['email'] ?? notif['guestEmail'] ?? data['guestEmail'] ?? '').toString().toLowerCase().trim();
+      final phone = (notif['phone'] ?? data['phone'] ?? notif['guestPhone'] ?? data['guestPhone'] ?? '').toString().trim();
+      final targetUserId = (notif['userId'] ?? data['userId'] ?? '').toString().trim();
+      final targetRole = (notif['role'] ?? data['role'] ?? '').toString().toLowerCase().trim();
       final bId = (notif['bookingId'] ?? data['bookingId'] ?? '').toString();
+      final action = (notif['action'] ?? data['action'] ?? '').toString();
+
+      // Ensure friendly title/body if inferred from action
+      if (title.isEmpty) {
+        if (action == 'checkin_reminder') {
+          final mins = notif['minutesRemaining'] ?? data['minutesRemaining'] ?? 15;
+          title = 'Check-in in $mins Minutes';
+          body = body.isNotEmpty ? body : 'Your check-in time is approaching in $mins minutes.';
+        } else if (action == 'checkin_arrived') {
+          title = 'Check-in Time Arrived';
+          body = body.isNotEmpty ? body : 'Your scheduled check-in time has arrived! Welcome to Hour Stay.';
+        } else if (action == 'room_assigned') {
+          title = 'Room Assigned';
+          body = body.isNotEmpty ? body : 'A room has been assigned for your reservation #${bId.isNotEmpty ? bId : ""}.';
+        } else if (action == 'charge_added') {
+          title = 'Folio Charge Added';
+          body = body.isNotEmpty ? body : 'A new service charge was posted to your folio #${bId.isNotEmpty ? bId : ""}.';
+        } else if (action == 'payment') {
+          title = 'Payment Received';
+          body = body.isNotEmpty ? body : 'Payment was recorded for your stay.';
+        }
+      }
 
       if (title.isEmpty && body.isEmpty) return;
 
-      final isRelevant = title.toLowerCase().contains('check-in') ||
-          title.toLowerCase().contains('checked in') ||
-          title.toLowerCase().contains('extend') ||
-          title.toLowerCase().contains('stay') ||
-          title.toLowerCase().contains('booking') ||
-          body.toLowerCase().contains('checked into') ||
-          body.toLowerCase().contains('checked in') ||
-          body.toLowerCase().contains('extended') ||
-          category.toLowerCase().contains('check-in') ||
-          category.toLowerCase().contains('stay') ||
-          category.toLowerCase().contains('booking');
-
-      if (!isRelevant) return;
+      // Disallow administrative account deletion alerts
+      final lowerTitle = title.toLowerCase();
+      final lowerBody = body.toLowerCase();
+      if (lowerTitle.contains('account deleted') ||
+          lowerTitle.contains('deleted account') ||
+          lowerBody.contains('permanently deleted their account')) {
+        return;
+      }
 
       final currentUser = await StorageService.getUser();
       bool isMatch = false;
       if (currentUser != null) {
-        if (email.isNotEmpty) {
-          isMatch = currentUser.email.toLowerCase().trim() == email;
-        } else {
+        if (targetUserId.isNotEmpty && targetUserId != 'all' && targetUserId != 'null' && targetUserId != 'undefined') {
+          if (currentUser.id == targetUserId || currentUser.email.toLowerCase().trim() == targetUserId.toLowerCase()) {
+            isMatch = true;
+          }
+        }
+        if (email.isNotEmpty && currentUser.email.toLowerCase().trim() == email) {
           isMatch = true;
         }
+        if (phone.isNotEmpty) {
+          final cleanP = phone.replaceAll(RegExp(r'[^0-9]'), '');
+          final cleanUserP = currentUser.mobile.replaceAll(RegExp(r'[^0-9]'), '');
+          if (cleanUserP.contains(cleanP) || cleanP.contains(cleanUserP)) {
+            isMatch = true;
+          }
+        }
+        if (targetUserId.isEmpty || targetUserId == 'all' || targetUserId == 'null' || targetUserId == 'undefined') {
+          if (targetRole == 'guest' || targetRole == 'all' || targetRole.isEmpty) {
+            isMatch = true;
+          }
+        }
+      } else {
+        isMatch = true;
       }
 
       if (!isMatch) return;
 
-      final isCheckinArrivedAlert = title.toLowerCase().contains('check-in time arrived') ||
-          title.toLowerCase().contains('ready for check-in') ||
-          body.toLowerCase().contains('reception desk to complete check-in') ||
-          body.toLowerCase().contains('front desk is preparing your room key');
+      final isCheckinArrivedAlert = lowerTitle.contains('check-in time arrived') ||
+          lowerTitle.contains('ready for check-in') ||
+          lowerBody.contains('reception desk to complete check-in') ||
+          lowerBody.contains('front desk is preparing your room key');
 
       if (isCheckinArrivedAlert) {
         final bProv = rootNavigatorKey.currentContext?.read<GuestBookingProvider>();
@@ -308,7 +379,7 @@ class GuestNotificationProvider with ChangeNotifier {
         }
       }
 
-      final dedupKey = '${title.toLowerCase()}_${body.toLowerCase()}';
+      final dedupKey = '${title.toLowerCase()}:::${body.toLowerCase()}';
       if (!_shownLocalNotificationKeys.contains(dedupKey)) {
         _shownLocalNotificationKeys.add(dedupKey);
         await NotificationService.showLocalNotification(
@@ -317,9 +388,32 @@ class GuestNotificationProvider with ChangeNotifier {
           payload: {
             'bookingId': bId,
             'category': category,
-            'role': 'guest'
+            'role': 'guest',
+            'action': action
           },
         );
+      }
+
+      // Optimistically insert into _notifications list so the guest app displays it immediately
+      final notifId = (notif['_id'] ?? notif['id'] ?? data['notificationId'] ?? DateTime.now().millisecondsSinceEpoch.toString()).toString();
+      final existsKey = '${title.toLowerCase()}__${body.toLowerCase()}';
+      final exists = _notifications.any((n) =>
+          (n.id.isNotEmpty && n.id == notifId) ||
+          ('${n.title.trim().toLowerCase()}__${n.message.trim().toLowerCase()}' == existsKey));
+      if (!exists) {
+        _notifications.insert(
+          0,
+          NotificationModel(
+            id: notifId,
+            title: title,
+            message: body,
+            category: (category.isNotEmpty && category != 'General') ? category : 'Check-in',
+            isRead: false,
+            propertyId: (notif['propertyId'] ?? data['propertyId'] ?? 'HS-9HQ8P').toString(),
+            createdAt: DateTime.now().toIso8601String(),
+          ),
+        );
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('⚠️ Error in _handleSocketIncomingAlert: $e');
@@ -327,7 +421,32 @@ class GuestNotificationProvider with ChangeNotifier {
   }
 
   void _registerFcmListeners() {
-    _fcmForegroundSub = NotificationService.onForegroundMessage.listen((_) {
+    _fcmForegroundSub = NotificationService.onForegroundMessage.listen((msg) {
+      final title = (msg.notification?.title ?? msg.data['title']?.toString() ?? '').trim();
+      final body = (msg.notification?.body ?? msg.data['message']?.toString() ?? msg.data['body']?.toString() ?? '').trim();
+      final cat = (msg.data['category']?.toString() ?? 'Check-in').trim();
+      final notifId = (msg.data['notificationId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString()).trim();
+      if (title.isNotEmpty || body.isNotEmpty) {
+        final key = '${title.toLowerCase()}__${body.toLowerCase()}';
+        final exists = _notifications.any((n) =>
+            (n.id.isNotEmpty && n.id == notifId) ||
+            ('${n.title.trim().toLowerCase()}__${n.message.trim().toLowerCase()}' == key));
+        if (!exists) {
+          _notifications.insert(
+            0,
+            NotificationModel(
+              id: notifId,
+              title: title,
+              message: body,
+              category: cat.isNotEmpty ? cat : 'Check-in',
+              isRead: false,
+              propertyId: msg.data['propertyId']?.toString() ?? 'HS-9HQ8P',
+              createdAt: DateTime.now().toIso8601String(),
+            ),
+          );
+          notifyListeners();
+        }
+      }
       _debouncedFetchNotifications();
     });
     _fcmTapSub = NotificationService.onNotificationTap.listen((_) {
@@ -373,33 +492,21 @@ class GuestNotificationProvider with ChangeNotifier {
         }
         _notifications = unique;
 
-        // Bridge to device local notifications: Alert guest when check-in confirmed arrives
+        // Bridge to device local notifications: Alert guest when any update arrives
         if (!_hasInitialLoaded) {
           // On app launch initial load, record existing IDs to prevent historical notification spam
           for (final n in unique) {
             _shownLocalNotificationKeys.add(n.id);
-            _shownLocalNotificationKeys.add('${n.title.trim().toLowerCase()}_${n.message.trim().toLowerCase()}');
+            _shownLocalNotificationKeys.add('${n.title.trim().toLowerCase()}:::${n.message.trim().toLowerCase()}');
           }
           _hasInitialLoaded = true;
         } else {
-          // On polling or real-time sync refresh, trigger system notification for newly arrived alerts
+          // On polling or real-time sync refresh, trigger system notification for EVERY newly arrived update alert
           for (final n in unique) {
-            final dedupKey = '${n.title.trim().toLowerCase()}_${n.message.trim().toLowerCase()}';
+            final dedupKey = '${n.title.trim().toLowerCase()}:::${n.message.trim().toLowerCase()}';
             if (!n.isRead && !_shownLocalNotificationKeys.contains(n.id) && !_shownLocalNotificationKeys.contains(dedupKey)) {
               _shownLocalNotificationKeys.add(n.id);
               _shownLocalNotificationKeys.add(dedupKey);
-
-              final isRelevant = n.title.toLowerCase().contains('check-in') ||
-                  n.title.toLowerCase().contains('checked in') ||
-                  n.title.toLowerCase().contains('extend') ||
-                  n.title.toLowerCase().contains('stay') ||
-                  n.title.toLowerCase().contains('booking') ||
-                  n.message.toLowerCase().contains('checked into') ||
-                  n.message.toLowerCase().contains('checked in') ||
-                  n.message.toLowerCase().contains('extended') ||
-                  n.category.toLowerCase().contains('check-in') ||
-                  n.category.toLowerCase().contains('stay') ||
-                  n.category.toLowerCase().contains('booking');
 
               final isCheckinArrived = n.title.toLowerCase().contains('check-in time arrived') ||
                   n.title.toLowerCase().contains('ready for check-in') ||
@@ -417,18 +524,17 @@ class GuestNotificationProvider with ChangeNotifier {
                 }
               }
 
-              if (isRelevant) {
-                NotificationService.showLocalNotification(
-                  title: n.title,
-                  body: n.message,
-                  payload: {
-                    'notificationId': n.id,
-                    'category': n.category,
-                    'type': n.type,
-                    'role': 'guest'
-                  },
-                );
-              }
+              // Trigger local heads-up notification for every update notification
+              NotificationService.showLocalNotification(
+                title: n.title,
+                body: n.message,
+                payload: {
+                  'notificationId': n.id,
+                  'category': n.category,
+                  'type': n.type,
+                  'role': 'guest'
+                },
+              );
             }
           }
         }

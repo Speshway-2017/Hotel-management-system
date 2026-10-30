@@ -199,28 +199,11 @@ class NotificationService {
         final body = message.notification?.body ?? message.data['body'] ?? '';
 
         if (title.isNotEmpty || body.isNotEmpty) {
-          _localNotifications.show(
-            message.hashCode,
-            title,
-            body,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                _highImportanceChannel.id,
-                _highImportanceChannel.name,
-                channelDescription: _highImportanceChannel.description,
-                importance: Importance.max,
-                priority: Priority.high,
-                icon: '@mipmap/ic_launcher',
-                playSound: true,
-                enableVibration: true,
-              ),
-              iOS: const DarwinNotificationDetails(
-                presentAlert: true,
-                presentBadge: true,
-                presentSound: true,
-              ),
-            ),
-            payload: jsonEncode(message.data),
+          showLocalNotification(
+            title: title,
+            body: body,
+            payload: message.data,
+            id: message.hashCode,
           );
         }
       });
@@ -266,6 +249,8 @@ class NotificationService {
           try {
             await messaging.subscribeToTopic('hourstay_global');
             await messaging.subscribeToTopic('hourstay_all');
+            await messaging.subscribeToTopic('hourstay_guest');
+            await messaging.subscribeToTopic('hourstay_manager');
           } catch (_) {}
 
           // Automatically sync with backend if user is already authenticated
@@ -312,6 +297,8 @@ class NotificationService {
     }
   }
 
+  static final Map<String, int> _recentNotificationTimestamps = {};
+
   /// Displays a local heads-up system notification in the device tray
   static Future<void> showLocalNotification({
     required String title,
@@ -320,11 +307,29 @@ class NotificationService {
     int? id,
   }) async {
     try {
+      final cleanTitle = title.trim();
+      final cleanBody = body.trim();
+      if (cleanTitle.isEmpty && cleanBody.isEmpty) return;
+
+      final dedupKey = '${cleanTitle.toLowerCase()}:::${cleanBody.toLowerCase()}';
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (_recentNotificationTimestamps.containsKey(dedupKey)) {
+        final last = _recentNotificationTimestamps[dedupKey]!;
+        if (now - last < 8000) {
+          debugPrint('ℹ️ [LOCAL NOTIF] Suppressing duplicate notification within 8s: "$cleanTitle"');
+          return;
+        }
+      }
+      _recentNotificationTimestamps[dedupKey] = now;
+      if (_recentNotificationTimestamps.length > 100) {
+        _recentNotificationTimestamps.removeWhere((_, time) => now - time > 60000);
+      }
+
       final notifId = id ?? (DateTime.now().millisecondsSinceEpoch.remainder(100000));
       await _localNotifications.show(
         notifId,
-        title,
-        body,
+        cleanTitle.isNotEmpty ? cleanTitle : 'Hour Stay',
+        cleanBody,
         NotificationDetails(
           android: AndroidNotificationDetails(
             _highImportanceChannel.id,
@@ -344,7 +349,7 @@ class NotificationService {
         ),
         payload: payload != null ? jsonEncode(payload) : null,
       );
-      debugPrint('🔔 [LOCAL NOTIF] Displayed notification in system tray: "$title"');
+      debugPrint('🔔 [LOCAL NOTIF] Displayed notification in system tray: "$cleanTitle"');
     } catch (e) {
       debugPrint('⚠️ [LOCAL NOTIF ERROR] Failed to display local notification: $e');
     }

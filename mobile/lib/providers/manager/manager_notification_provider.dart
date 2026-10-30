@@ -57,7 +57,16 @@ class ManagerNotificationProvider with ChangeNotifier {
         if (target == 'guest experience' && (cat.contains('guest') || cat.contains('feedback') || cat.contains('review'))) {
           return true;
         }
-        if (target == 'operations' && (cat.contains('operat') || cat.contains('room') || cat.contains('shift') || cat.contains('staff'))) {
+        if (target == 'operations' &&
+            (cat.contains('operat') ||
+                cat.contains('room') ||
+                cat.contains('shift') ||
+                cat.contains('staff') ||
+                cat.contains('check') ||
+                cat.contains('alert') ||
+                cat.contains('system') ||
+                cat.contains('stay') ||
+                cat.contains('general'))) {
           return true;
         }
         return cat == target || type == target;
@@ -77,19 +86,70 @@ class ManagerNotificationProvider with ChangeNotifier {
     });
   }
 
+  void _handleIncomingPayload(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      final notifMap = data['notification'] is Map<String, dynamic>
+          ? data['notification'] as Map<String, dynamic>
+          : data;
+      try {
+        final newNotif = NotificationModel.fromJson(notifMap);
+        if (newNotif.title.trim().isNotEmpty || newNotif.message.trim().isNotEmpty) {
+          final key = '${newNotif.title.trim().toLowerCase()}__${newNotif.message.trim().toLowerCase()}';
+          final exists = _notifications.any((n) =>
+              (n.id.isNotEmpty && n.id == newNotif.id) ||
+              ('${n.title.trim().toLowerCase()}__${n.message.trim().toLowerCase()}' == key));
+          if (!exists) {
+            _notifications.insert(0, newNotif);
+            notifyListeners();
+          }
+        }
+      } catch (_) {}
+    }
+    _debouncedFetchNotifications();
+  }
+
   void _registerSocketListeners() {
-    SocketService.on('notification_received', (_) => _debouncedFetchNotifications());
-    SocketService.on('notification_created', (_) => _debouncedFetchNotifications());
-    SocketService.on('new_notification', (_) => _debouncedFetchNotifications());
-    SocketService.on('manager_notification', (_) => _debouncedFetchNotifications());
+    // 1. Core notification broadcasts
+    SocketService.on('notification_received', _handleIncomingPayload);
+    SocketService.on('notification_created', _handleIncomingPayload);
+    SocketService.on('new_notification', _handleIncomingPayload);
+    SocketService.on('manager_notification', _handleIncomingPayload);
+    SocketService.on('guest_notification', _handleIncomingPayload);
     SocketService.on('unread_notifications_count_updated', (_) => _debouncedFetchNotifications());
     SocketService.on('dashboard_sync', (_) => _debouncedFetchNotifications());
+
+    // 2. Guest Feedback events
     SocketService.on('feedback_received', (_) => _debouncedFetchNotifications());
     SocketService.on('feedback_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('feedback_updated', (_) => _debouncedFetchNotifications());
+
+    // 3. Manager approval & operations events
     SocketService.on('approval_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('approval_updated', (_) => _debouncedFetchNotifications());
+
+    // 4. Booking & Stay lifecycle events
     SocketService.on('booking_created', (_) => _debouncedFetchNotifications());
     SocketService.on('booking_updated', (_) => _debouncedFetchNotifications());
     SocketService.on('reservation_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('checkin_completed', (_) => _debouncedFetchNotifications());
+    SocketService.on('checkout_completed', (_) => _debouncedFetchNotifications());
+    SocketService.on('room_assigned', (_) => _debouncedFetchNotifications());
+    SocketService.on('stay_extended', (_) => _debouncedFetchNotifications());
+    SocketService.on('room_status_changed', (_) => _debouncedFetchNotifications());
+    SocketService.on('charge_added', (_) => _debouncedFetchNotifications());
+    SocketService.on('availability_changed', (_) => _debouncedFetchNotifications());
+
+    // 5. Financial & Billing events
+    SocketService.on('payment_received', (_) => _debouncedFetchNotifications());
+    SocketService.on('payment_logged', (_) => _debouncedFetchNotifications());
+    SocketService.on('payment_added', (_) => _debouncedFetchNotifications());
+    SocketService.on('payment_updated', (_) => _debouncedFetchNotifications());
+    SocketService.on('refund_requested', (_) => _debouncedFetchNotifications());
+    SocketService.on('refund_status_updated', (_) => _debouncedFetchNotifications());
+
+    // 6. User & Profile lifecycle events
+    SocketService.on('user_created', (_) => _debouncedFetchNotifications());
+    SocketService.on('user_updated', (_) => _debouncedFetchNotifications());
     SocketService.on('user_deleted', (_) => _debouncedFetchNotifications());
     SocketService.on('guest_deleted', (_) => _debouncedFetchNotifications());
     SocketService.on('guest_status_changed', (_) => _debouncedFetchNotifications());
@@ -97,9 +157,33 @@ class ManagerNotificationProvider with ChangeNotifier {
   }
 
   void _registerFcmListeners() {
-    _fcmForegroundSub = NotificationService.onForegroundMessage.listen((_) {
+    _fcmForegroundSub = NotificationService.onForegroundMessage.listen((msg) {
+      final title = (msg.notification?.title ?? msg.data['title']?.toString() ?? '').trim();
+      final body = (msg.notification?.body ?? msg.data['message']?.toString() ?? msg.data['body']?.toString() ?? '').trim();
+      final cat = (msg.data['category']?.toString() ?? 'General').trim();
+      if (title.isNotEmpty || body.isNotEmpty) {
+        final key = '${title.toLowerCase()}__${body.toLowerCase()}';
+        final exists = _notifications.any((n) =>
+            ('${n.title.trim().toLowerCase()}__${n.message.trim().toLowerCase()}' == key));
+        if (!exists) {
+          _notifications.insert(
+            0,
+            NotificationModel(
+              id: msg.data['notificationId']?.toString() ?? '',
+              title: title,
+              message: body,
+              category: cat,
+              isRead: false,
+              propertyId: msg.data['propertyId']?.toString() ?? 'HS-9HQ8P',
+              createdAt: DateTime.now().toIso8601String(),
+            ),
+          );
+          notifyListeners();
+        }
+      }
       _debouncedFetchNotifications();
     });
+
     _fcmTapSub = NotificationService.onNotificationTap.listen((_) {
       _debouncedFetchNotifications();
     });

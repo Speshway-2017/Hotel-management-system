@@ -38,6 +38,8 @@ class ReservationModel {
   final int adults;
   final int children;
   final int roomsCount;
+  final bool hasFeedback;
+  final double? feedbackRating;
 
   // Compatibility getters
   String get guestName => guest;
@@ -102,6 +104,8 @@ class ReservationModel {
     this.adults = 2,
     this.children = 0,
     this.roomsCount = 1,
+    this.hasFeedback = false,
+    this.feedbackRating,
   });
 
   ReservationModel copyWith({
@@ -141,6 +145,8 @@ class ReservationModel {
     int? adults,
     int? children,
     int? roomsCount,
+    bool? hasFeedback,
+    double? feedbackRating,
   }) {
     return ReservationModel(
       id: id ?? this.id,
@@ -179,6 +185,8 @@ class ReservationModel {
       adults: adults ?? this.adults,
       children: children ?? this.children,
       roomsCount: roomsCount ?? this.roomsCount,
+      hasFeedback: hasFeedback ?? this.hasFeedback,
+      feedbackRating: feedbackRating ?? this.feedbackRating,
     );
   }
 
@@ -283,6 +291,8 @@ class ReservationModel {
       adults: adCount,
       children: chCount,
       roomsCount: rmCount,
+      hasFeedback: json['hasFeedback'] == true || (json['feedbackRating'] != null),
+      feedbackRating: double.tryParse(json['feedbackRating']?.toString() ?? ''),
     );
   }
 
@@ -326,6 +336,8 @@ class ReservationModel {
       'adults': adults,
       'children': children,
       'roomsCount': roomsCount,
+      'hasFeedback': hasFeedback,
+      if (feedbackRating != null) 'feedbackRating': feedbackRating,
     };
   }
 }

@@ -509,6 +509,23 @@ router.post('/guests/:id/charge', async (req, res) => {
       category: 'General'
     });
 
+    const guestRecipient = booking.guestId || booking.userId || booking.email;
+    if (guestRecipient) {
+      await triggerNotification({
+        role: 'guest',
+        userId: guestRecipient,
+        propertyId: req.user.propertyId || 'HS-9HQ8P',
+        title: 'Folio Charge Posted',
+        message: `A service charge of ₹${amount} (${description || 'room service/laundry'}) was added to your folio. [Ref: #${booking.bookingId || booking._id}]`,
+        category: 'Payments',
+        data: {
+          bookingId: booking.bookingId || booking._id,
+          amount,
+          description
+        }
+      });
+    }
+
     return sendSuccess(res, 200, updated, `Incidentals charge of ₹${amount} posted successfully.`);
   } catch (err) {
     return sendError(res, 500, err.message);
@@ -1439,6 +1456,23 @@ router.post('/folios/:id/charges', async (req, res) => {
       category: 'General'
     });
 
+    const guestChargeRecipient = booking.guestId || booking.userId || booking.email;
+    if (guestChargeRecipient) {
+      await triggerNotification({
+        role: 'guest',
+        userId: guestChargeRecipient,
+        propertyId,
+        title: 'Folio Charge Posted',
+        message: `A service charge of ₹${amount} (${description || 'service charge'}) was added to your folio. [Ref: #${booking.bookingId || booking._id}]`,
+        category: 'Payments',
+        data: {
+          bookingId: booking.bookingId || booking._id,
+          amount,
+          description
+        }
+      });
+    }
+
     const io = req.app.get('socketio');
     if (io) {
       emitRealtimeSync(io, propertyId, 'booking_updated', { booking: updated, propertyId, action: 'charge_added' });
@@ -1493,14 +1527,21 @@ router.post('/folios/:id/payments', async (req, res) => {
       category: 'Payments'
     });
 
-    if (booking.guestId) {
+    const guestPayRecipient = booking.guestId || booking.userId || booking.email;
+    if (guestPayRecipient) {
       await triggerNotification({
         req,
-        userId: booking.guestId,
+        userId: guestPayRecipient,
         role: 'guest',
+        propertyId,
         title: 'Payment Received',
-        message: `Payment of ₹${amount} processed successfully via ${method || 'UPI'}.`,
-        category: 'Payment Update'
+        message: `Payment of ₹${amount} processed successfully via ${method || 'UPI'}. [Ref: #${booking.bookingId || booking._id}]`,
+        category: 'Payment Update',
+        data: {
+          bookingId: booking.bookingId || booking._id,
+          amount,
+          method
+        }
       });
     }
 
