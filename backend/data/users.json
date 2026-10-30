@@ -901,19 +901,17 @@
     "idDocNumber": "6353 7576 4646",
     "loyaltyPoints": 3200,
     "notes": "VIP Guest of Speshway Luxury Hotel",
-    "createdAt": "2026-10-29T07:29:00.710Z",
-    "updatedAt": "2026-10-30T08:15:18.031Z",
-    "aadhaarVerifiedAt": null,
+    "createdAt": "2026-09-04T04:49:58.712Z",
+    "updatedAt": "2026-10-30T09:55:09.383Z",
+    "aadhaarVerifiedAt": "2026-10-29T07:29:41.646Z",
     "idProofNumber": "6353 7576 4646",
     "idProofType": "Aadhaar Card",
     "isAadhaarVerified": true,
     "verifiedAadhaar": "6353 7576 4646",
-    "verifiedAadhaarLast4": "",
+    "verifiedAadhaarLast4": "4646",
     "id": "6ab3778914c9f1411d008200",
-    "fcmToken": "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM",
-    "fcmTokens": [
-      "ek2wz0BLR9WMSprg6h32tt:APA91bH1ealfQghnYFBUrOhTtM4-_MxWMQlskprkGR3HkFMTbJJGmT3LLfiKNnPbZJYA4p6-r40csz2sunprm-stElIQndvfz0kys_AOoziKWZTGQlWnLBM"
-    ]
+    "fcmToken": null,
+    "fcmTokens": []
   },
   {
     "_id": "usr-gst-mani",

@@ -18,7 +18,6 @@ class GuestNotificationProvider with ChangeNotifier {
   StreamSubscription? _fcmTapSub;
   Timer? _debounceTimer;
   final Set<String> _shownLocalNotificationKeys = {};
-  bool _hasInitialLoaded = false;
 
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -492,51 +491,10 @@ class GuestNotificationProvider with ChangeNotifier {
         }
         _notifications = unique;
 
-        // Bridge to device local notifications: Alert guest when any update arrives
-        if (!_hasInitialLoaded) {
-          // On app launch initial load, record existing IDs to prevent historical notification spam
-          for (final n in unique) {
-            _shownLocalNotificationKeys.add(n.id);
-            _shownLocalNotificationKeys.add('${n.title.trim().toLowerCase()}:::${n.message.trim().toLowerCase()}');
-          }
-          _hasInitialLoaded = true;
-        } else {
-          // On polling or real-time sync refresh, trigger system notification for EVERY newly arrived update alert
-          for (final n in unique) {
-            final dedupKey = '${n.title.trim().toLowerCase()}:::${n.message.trim().toLowerCase()}';
-            if (!n.isRead && !_shownLocalNotificationKeys.contains(n.id) && !_shownLocalNotificationKeys.contains(dedupKey)) {
-              _shownLocalNotificationKeys.add(n.id);
-              _shownLocalNotificationKeys.add(dedupKey);
-
-              final isCheckinArrived = n.title.toLowerCase().contains('check-in time arrived') ||
-                  n.title.toLowerCase().contains('ready for check-in') ||
-                  n.message.toLowerCase().contains('reception desk to complete check-in') ||
-                  n.message.toLowerCase().contains('front desk is preparing your room key');
-
-              if (isCheckinArrived) {
-                final bProv = rootNavigatorKey.currentContext?.read<GuestBookingProvider>();
-                final hasActiveStay = bProv != null && (bProv.currentStay != null || bProv.bookings.any((b) {
-                  final s = b.status.toLowerCase().trim();
-                  return s == 'checked-in' || s == 'checked_in' || s == 'staying' || s == 'in-house';
-                }));
-                if (hasActiveStay) {
-                  continue; // Skip local notification for check-in arrival if guest is already checked-in
-                }
-              }
-
-              // Trigger local heads-up notification for every update notification
-              NotificationService.showLocalNotification(
-                title: n.title,
-                body: n.message,
-                payload: {
-                  'notificationId': n.id,
-                  'category': n.category,
-                  'type': n.type,
-                  'role': 'guest'
-                },
-              );
-            }
-          }
+        // Record all fetched notification keys to ensure seen state
+        for (final n in unique) {
+          _shownLocalNotificationKeys.add(n.id);
+          _shownLocalNotificationKeys.add('${n.title.trim().toLowerCase()}:::${n.message.trim().toLowerCase()}');
         }
       } else {
         if (!silent && response.statusCode != 401) {
