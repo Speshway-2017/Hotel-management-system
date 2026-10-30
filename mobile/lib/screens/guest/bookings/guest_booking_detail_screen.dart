@@ -4,6 +4,7 @@ import 'package:hour_stay_mobile/core/constants/app_colors.dart';
 import 'package:hour_stay_mobile/core/utils/formatters.dart';
 import 'package:hour_stay_mobile/models/reservation_model.dart';
 import 'package:hour_stay_mobile/providers/guest/guest_booking_provider.dart';
+import 'package:hour_stay_mobile/providers/guest/guest_feedback_provider.dart';
 import 'package:hour_stay_mobile/widgets/custom_button.dart';
 import 'package:hour_stay_mobile/widgets/status_badge.dart';
 import '../feedback/guest_add_feedback_screen.dart';
@@ -27,6 +28,9 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
   void initState() {
     super.initState();
     _booking = widget.booking;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<GuestFeedbackProvider>().fetchMyFeedbacks(silent: true);
+    });
   }
 
   // Handle Booking Cancellation (Only allowed before check-in)
@@ -1264,10 +1268,16 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final bookingProvider = context.watch<GuestBookingProvider>();
+    final feedbackProvider = context.watch<GuestFeedbackProvider>();
     final currentBooking = bookingProvider.bookings.firstWhere(
       (b) => b.id == _booking.id || b.bookingId == _booking.bookingId,
       orElse: () => _booking,
     );
+
+    final hasFeedback = currentBooking.hasFeedback ||
+        (currentBooking.feedbackRating != null && currentBooking.feedbackRating! > 0) ||
+        feedbackProvider.hasFeedbackForBooking(currentBooking.id, currentBooking.bookingId) ||
+        feedbackProvider.hasFeedbackForBooking(currentBooking.bookingId, currentBooking.reservationNumber);
 
     final statusLower = currentBooking.status.toLowerCase();
     final isCompleted = statusLower == 'checked_out' ||
@@ -1724,21 +1734,58 @@ class _GuestBookingDetailScreenState extends State<GuestBookingDetailScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Write Review Button if completed / checked-out
-            if (isCompleted) ...[
+            // Write Review Button if completed / checked-out and no feedback yet
+            if (isCompleted && !hasFeedback) ...[
               CustomButton(
                 text: 'Leave a Review for this Stay',
                 backgroundColor: AppColors.primary,
                 icon: Icons.star_rate,
-                onPressed: () {
-                  Navigator.of(context).push(
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => GuestAddFeedbackScreen(reservationId: currentBooking.id),
+                      builder: (_) => GuestAddFeedbackScreen(
+                        booking: currentBooking,
+                        reservationId: currentBooking.id,
+                      ),
                     ),
                   );
+                  if (result == true && context.mounted) {
+                    context.read<GuestBookingProvider>().markBookingFeedbackGiven(currentBooking.bookingId, currentBooking.id);
+                    context.read<GuestFeedbackProvider>().fetchMyFeedbacks(silent: true);
+                    context.read<GuestBookingProvider>().fetchDashboardData(silent: true);
+                    setState(() {
+                      _booking = _booking.copyWith(hasFeedback: true);
+                    });
+                  }
                 },
               ),
               const SizedBox(height: 16),
+            ] else if (isCompleted && hasFeedback) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Feedback submitted for this stay. Thank you!',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF15803D),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ],
         ),

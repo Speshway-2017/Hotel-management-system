@@ -272,7 +272,16 @@ router.get('/bookings', async (req, res) => {
     const feedbacks = await Feedback.find(feedbackQuery.length > 0 ? { $or: feedbackQuery } : {}).lean();
     const feedbackMap = new Map();
     feedbacks.forEach(f => {
-      if (f.bookingId) feedbackMap.set(String(f.bookingId), f);
+      if (f.bookingId) {
+        const raw = String(f.bookingId).trim();
+        const clean = raw.replace(/^(BK|FOL|BKG)-/i, '');
+        feedbackMap.set(raw, f);
+        feedbackMap.set(raw.toLowerCase(), f);
+        feedbackMap.set(clean, f);
+        feedbackMap.set(clean.toLowerCase(), f);
+        feedbackMap.set(`BK-${clean}`, f);
+        feedbackMap.set(`BK-${clean}`.toLowerCase(), f);
+      }
     });
 
     const mapped = bookings.map(b => {
@@ -282,7 +291,15 @@ router.get('/bookings', async (req, res) => {
       const checkIn = formatToYYYYMMDD(b.checkIn || b.checkInDate) || (b.checkIn ? String(b.checkIn) : '2026-10-07');
       const checkOut = formatToYYYYMMDD(b.checkOut || b.checkOutDate) || (b.checkOut ? String(b.checkOut) : '2026-10-08');
       const bId = b.bookingId || b._id || b.id;
-      const fb = feedbackMap.get(String(bId)) || feedbackMap.get(String(b._id)) || feedbackMap.get(String(b.bookingId));
+      const cleanBId = String(b.bookingId || '').replace(/^(BK|FOL|BKG)-/i, '').toLowerCase();
+      const fb = feedbackMap.get(String(bId)) || 
+                 feedbackMap.get(String(bId).toLowerCase()) ||
+                 feedbackMap.get(String(b._id)) || 
+                 feedbackMap.get(String(b.bookingId)) ||
+                 (cleanBId ? feedbackMap.get(cleanBId) : null);
+      
+      const hasFeedback = b.hasFeedback === true || Boolean(fb);
+      const feedbackRating = fb?.rating || b.feedbackRating || null;
       
       const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
       const balance = Number(b.balance || 0);
@@ -340,8 +357,8 @@ router.get('/bookings', async (req, res) => {
         cancellationPolicy: prop?.cancellationPolicy || prop?.settings?.cancellationPolicy || 'Free cancellation up to 24 hours prior to check-in. Cancellations within 24 hours will attract a 1-night tariff penalty.',
         refundRequest: b.refundRequest || null,
         refundStatus: b.refundStatus || b.refundRequest?.status || null,
-        hasFeedback: Boolean(fb),
-        feedbackRating: fb?.rating || null,
+        hasFeedback: hasFeedback,
+        feedbackRating: feedbackRating,
         createdAt: b.createdAt
       };
     });
@@ -362,12 +379,43 @@ router.get('/dashboard', async (req, res) => {
 
     const bookings = await Booking.find(bookingQuery).sort({ createdAt: -1 });
 
+    const feedbackQuery = [];
+    if (userId) feedbackQuery.push({ userId });
+    if (req.user?.email) feedbackQuery.push({ guestEmail: req.user.email });
+    if (req.user?.mobile) feedbackQuery.push({ guestPhone: req.user.mobile });
+    if (req.user?.name) feedbackQuery.push({ guestName: req.user.name });
+
+    const feedbacks = await Feedback.find(feedbackQuery.length > 0 ? { $or: feedbackQuery } : {}).lean();
+    const feedbackMap = new Map();
+    feedbacks.forEach(f => {
+      if (f.bookingId) {
+        const raw = String(f.bookingId).trim();
+        const clean = raw.replace(/^(BK|FOL|BKG)-/i, '');
+        feedbackMap.set(raw, f);
+        feedbackMap.set(raw.toLowerCase(), f);
+        feedbackMap.set(clean, f);
+        feedbackMap.set(clean.toLowerCase(), f);
+        feedbackMap.set(`BK-${clean}`, f);
+        feedbackMap.set(`BK-${clean}`.toLowerCase(), f);
+      }
+    });
+
     const mapped = bookings.map(b => {
       const prop = properties.find(p => p._id === b.propertyId || p.id === b.propertyId || p._id === b.hotelId);
       const propName = b.hotel || b.hotelName || b.propertyName || (prop ? (prop.settings?.hotelName || prop.name) : 'Hour Stay Property');
       const city = b.city || (prop ? (prop.settings?.city || prop.city) : 'Hyderabad');
       const checkIn = formatToYYYYMMDD(b.checkIn || b.checkInDate) || (b.checkIn ? String(b.checkIn) : '2026-10-07');
       const checkOut = formatToYYYYMMDD(b.checkOut || b.checkOutDate) || (b.checkOut ? String(b.checkOut) : '2026-10-08');
+      const bId = b.bookingId || b._id || b.id;
+      const cleanBId = String(b.bookingId || '').replace(/^(BK|FOL|BKG)-/i, '').toLowerCase();
+      const fb = feedbackMap.get(String(bId)) || 
+                 feedbackMap.get(String(bId).toLowerCase()) ||
+                 feedbackMap.get(String(b._id)) || 
+                 feedbackMap.get(String(b.bookingId)) ||
+                 (cleanBId ? feedbackMap.get(cleanBId) : null);
+
+      const hasFeedback = b.hasFeedback === true || Boolean(fb);
+      const feedbackRating = fb?.rating || b.feedbackRating || null;
       const { totalAmount, originalAmount, discountAmount, couponCode } = getBookingEffectiveAmounts(b);
 
       return {
@@ -390,6 +438,8 @@ router.get('/dashboard', async (req, res) => {
         status: b.status || 'Confirmed',
         paymentStatus: b.paymentStatus || 'Paid',
         balance: Number(b.balance || 0),
+        hasFeedback: hasFeedback,
+        feedbackRating: feedbackRating,
         createdAt: b.createdAt
       };
     });
@@ -558,23 +608,31 @@ router.post('/feedback', async (req, res) => {
     let guestEmail = customGuestEmail || req.user?.email || '';
     let guestPhone = req.user?.mobile || '';
 
+    let matchedBooking = null;
     if (effectiveBookingId) {
       const bQuery = buildBookingLookupQuery(effectiveBookingId);
-      const b = await Booking.findOne(bQuery);
-      if (b) {
-        propertyId = b.propertyId || 'HS-9HQ8P';
-        room = b.roomNumber || (b.room ? String(b.room).match(/\b\d{3,4}\b/)?.[0] || b.room.split(' ')[0] : '101');
-        roomType = b.roomType || (b.room && b.room.includes('·') ? b.room.split('·')[1]?.trim() : (b.room || 'Standard Room'));
-        if (b.hotel || b.hotelName) hotelName = b.hotel || b.hotelName;
+      matchedBooking = await Booking.findOne(bQuery);
+      if (matchedBooking) {
+        propertyId = matchedBooking.propertyId || 'HS-9HQ8P';
+        room = matchedBooking.roomNumber || (matchedBooking.room ? String(matchedBooking.room).match(/\b\d{3,4}\b/)?.[0] || matchedBooking.room.split(' ')[0] : '101');
+        roomType = matchedBooking.roomType || (matchedBooking.room && matchedBooking.room.includes('·') ? matchedBooking.room.split('·')[1]?.trim() : (matchedBooking.room || 'Standard Room'));
+        if (matchedBooking.hotel || matchedBooking.hotelName) hotelName = matchedBooking.hotel || matchedBooking.hotelName;
+
+        // Persist hasFeedback on the Booking document in MongoDB
+        await Booking.updateOne(
+          { _id: matchedBooking._id },
+          { $set: { hasFeedback: true, feedbackRating } }
+        );
       }
     }
 
     const ratingNum = Number(rating) || 5;
     const sentiment = ratingNum >= 4 ? 'Positive' : ratingNum === 3 ? 'Neutral' : 'Negative';
+    const finalBookingId = matchedBooking?.bookingId || effectiveBookingId || `BK-${Date.now().toString().slice(-5)}`;
 
     // Single source of truth: Create Feedback document in MongoDB 'feedbacks' collection
     const newFeedback = await Feedback.create({
-      bookingId: effectiveBookingId || `BK-${Date.now().toString().slice(-5)}`,
+      bookingId: finalBookingId,
       guestName: guestName || req.user?.name || 'Guest',
       guestEmail: guestEmail || req.user?.email || '',
       guestPhone: guestPhone,
@@ -1091,6 +1149,9 @@ router.get('/notifications', async (req, res) => {
       { userId: userId },
       { userId: userIdStr }
     ];
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      guestQueries.push({ userId: new mongoose.Types.ObjectId(userId) });
+    }
     if (userEmail) guestQueries.push({ userId: userEmail });
     if (userPhone) guestQueries.push({ userId: userPhone });
 
@@ -1102,11 +1163,10 @@ router.get('/notifications', async (req, res) => {
       }
     }
 
-    // General broadcast announcements (broadcast with no specific user ID)
+    // Broadcast announcements and updates for guests (broadcast with no specific user ID)
     guestQueries.push({
-      role: 'guest',
-      userId: { $in: [null, undefined, '', 'all'] },
-      category: { $in: ['General', 'Announcement', 'Announcements', 'Promo', 'Promotions'] }
+      role: { $in: ['guest', 'all'] },
+      userId: { $in: [null, undefined, '', 'all'] }
     });
 
     // Strict exclusion of Account Deletion & non-guest system alerts at database level
@@ -1173,9 +1233,8 @@ router.get('/notifications', async (req, res) => {
       } else {
         // No booking reference: if not explicitly for me, must be broadcast guest announcement
         if (!isExplicitlyForMe) {
-          const allowedCats = ['general', 'announcement', 'announcements', 'promo', 'promotions'];
           const nRole = (n.role || '').toLowerCase();
-          if (!isBroadcast || (nRole !== 'guest' && nRole !== 'all') || !allowedCats.includes(category.toLowerCase())) {
+          if (!isBroadcast || (nRole !== 'guest' && nRole !== 'all')) {
             continue;
           }
         }
@@ -1886,6 +1945,14 @@ const handleGetSingleBooking = async (req, res) => {
       ? Number(booking.refundableAmount) 
       : Math.max(0, paidAmount - cancellationFee);
 
+    const fb = await Feedback.findOne({
+      $or: [
+        { bookingId: booking.bookingId },
+        { bookingId: String(booking._id) },
+        { bookingId: bookingId }
+      ]
+    }).lean();
+
     const result = {
       ...(booking.toObject ? booking.toObject() : booking),
       id: booking.bookingId || booking._id,
@@ -1908,7 +1975,9 @@ const handleGetSingleBooking = async (req, res) => {
       cancellationReason: booking.cancellationReason || '',
       cancellationRemarks: booking.cancellationRemarks || booking.remarks || '',
       refundRequest: booking.refundRequest || null,
-      refundStatus: booking.refundStatus || booking.refundRequest?.status || null
+      refundStatus: booking.refundStatus || booking.refundRequest?.status || null,
+      hasFeedback: booking.hasFeedback === true || Boolean(fb),
+      feedbackRating: fb?.rating || booking.feedbackRating || null
     };
 
     return sendSuccess(res, 200, result, 'Booking details retrieved successfully');

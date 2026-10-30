@@ -22,6 +22,56 @@ class GuestFeedbackProvider with ChangeNotifier {
 
   int get totalReviews => _feedbacks.length;
 
+  String _normalizeId(String val) {
+    return val.trim().toLowerCase().replaceAll(RegExp(r'^(bk|fol|bkg|#)-?'), '').replaceAll('#', '').trim();
+  }
+
+  bool _matchesBookingId(FeedbackModel f, String bId, String? rId) {
+    final fbId = f.bookingId.trim().toLowerCase();
+    final fId = f.id.trim().toLowerCase();
+    final normFbId = _normalizeId(fbId);
+    final normFId = _normalizeId(fId);
+
+    final cleanBId = _normalizeId(bId);
+    final cleanRId = rId != null ? _normalizeId(rId) : '';
+
+    // Direct string match
+    if (bId.isNotEmpty && (fbId == bId || fId == bId)) return true;
+    if (rId != null && rId.isNotEmpty && (fbId == rId || fId == rId)) return true;
+
+    // Normalized match (handling prefixes like BK-, BKG-, #)
+    if (cleanBId.isNotEmpty) {
+      if (normFbId.isNotEmpty && normFbId == cleanBId) return true;
+      if (normFId.isNotEmpty && normFId == cleanBId) return true;
+    }
+    if (cleanRId.isNotEmpty) {
+      if (normFbId.isNotEmpty && normFbId == cleanRId) return true;
+      if (normFId.isNotEmpty && normFId == cleanRId) return true;
+    }
+
+    return false;
+  }
+
+  bool hasFeedbackForBooking(String bookingId, [String? reservationId]) {
+    final bId = bookingId.trim().toLowerCase();
+    final rId = reservationId?.trim().toLowerCase();
+    if (bId.isEmpty && (rId == null || rId.isEmpty)) return false;
+
+    return _feedbacks.any((f) => _matchesBookingId(f, bId, rId));
+  }
+
+  FeedbackModel? getFeedbackForBooking(String bookingId, [String? reservationId]) {
+    final bId = bookingId.trim().toLowerCase();
+    final rId = reservationId?.trim().toLowerCase();
+    if (bId.isEmpty && (rId == null || rId.isEmpty)) return null;
+
+    try {
+      return _feedbacks.firstWhere((f) => _matchesBookingId(f, bId, rId));
+    } catch (_) {
+      return null;
+    }
+  }
+
   GuestFeedbackProvider() {
     _registerSocketListeners();
   }

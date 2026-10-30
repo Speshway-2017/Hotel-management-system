@@ -49,7 +49,51 @@ class GuestBookingProvider with ChangeNotifier {
     SocketService.on('booking_updated', (_) => fetchDashboardData(silent: true));
     SocketService.on('checkin_completed', (_) => fetchDashboardData(silent: true));
     SocketService.on('checkout_completed', (_) => fetchDashboardData(silent: true));
+    SocketService.on('feedback_created', (_) => fetchDashboardData(silent: true));
+    SocketService.on('feedback_updated', (_) => fetchDashboardData(silent: true));
+    SocketService.on('feedback_deleted', (_) => fetchDashboardData(silent: true));
     SocketService.on('dashboard_sync', (_) => fetchDashboardData(silent: true));
+  }
+
+  void markBookingFeedbackGiven(String bookingId, [String? reservationId]) {
+    final bId = bookingId.trim().toLowerCase();
+    final rId = reservationId?.trim().toLowerCase();
+    final cleanBId = bId.replaceAll(RegExp(r'^(bk|fol|bkg|#)-?'), '');
+    final cleanRId = (rId ?? '').replaceAll(RegExp(r'^(bk|fol|bkg|#)-?'), '');
+
+    _bookings = _bookings.map((b) {
+      final curId = b.id.trim().toLowerCase();
+      final curBkId = b.bookingId.trim().toLowerCase();
+      final cleanCurBkId = curBkId.replaceAll(RegExp(r'^(bk|fol|bkg|#)-?'), '');
+
+      final matches = (bId.isNotEmpty && (curId == bId || curBkId == bId || (cleanBId.isNotEmpty && cleanCurBkId == cleanBId))) ||
+          (rId != null && rId.isNotEmpty && (curId == rId || curBkId == rId || (cleanRId.isNotEmpty && cleanCurBkId == cleanRId)));
+
+      if (matches) {
+        return b.copyWith(hasFeedback: true);
+      }
+      return b;
+    }).toList();
+
+    if (_upcomingStay != null) {
+      final curId = _upcomingStay!.id.trim().toLowerCase();
+      final curBkId = _upcomingStay!.bookingId.trim().toLowerCase();
+      if ((bId.isNotEmpty && (curId == bId || curBkId == bId)) ||
+          (rId != null && rId.isNotEmpty && (curId == rId || curBkId == rId))) {
+        _upcomingStay = _upcomingStay!.copyWith(hasFeedback: true);
+      }
+    }
+
+    if (_currentStay != null) {
+      final curId = _currentStay!.id.trim().toLowerCase();
+      final curBkId = _currentStay!.bookingId.trim().toLowerCase();
+      if ((bId.isNotEmpty && (curId == bId || curBkId == bId)) ||
+          (rId != null && rId.isNotEmpty && (curId == rId || curBkId == rId))) {
+        _currentStay = _currentStay!.copyWith(hasFeedback: true);
+      }
+    }
+
+    notifyListeners();
   }
 
   Future<void> fetchMyBookings({bool silent = false}) => fetchDashboardData(silent: silent);

@@ -221,10 +221,37 @@ export const processCheckInReminders = async (ioInstance = null) => {
 
   try {
     const upcomingBookings = await Booking.find({
-      status: { $in: ['Confirmed', 'Paid', 'Reserved', 'Booked', 'pending', 'confirmed', 'paid'] }
+      status: {
+        $in: [
+          'Confirmed', 'confirmed',
+          'Paid', 'paid',
+          'Reserved', 'reserved',
+          'Booked', 'booked',
+          'Pending', 'pending',
+          'Upcoming', 'upcoming',
+          'Active', 'active'
+        ]
+      }
     });
 
     if (!upcomingBookings || upcomingBookings.length === 0) return { processed: 0 };
+
+    // Cache property settings for default checkInTime & checkOutTime if not on booking
+    let propertySettingsCache = {};
+    try {
+      const properties = await Property.find({}).lean();
+      if (Array.isArray(properties)) {
+        properties.forEach(p => {
+          const propId = p.propertyId || p.id || p._id;
+          if (propId) {
+            propertySettingsCache[String(propId)] = {
+              checkInTime: p.settings?.checkInTime || '12:00 PM',
+              checkOutTime: p.settings?.checkOutTime || '11:00 AM'
+            };
+          }
+        });
+      }
+    } catch (_) {}
 
     for (const b of upcomingBookings) {
       const bookingData = b.toObject ? b.toObject() : b;
@@ -240,12 +267,13 @@ export const processCheckInReminders = async (ioInstance = null) => {
         continue;
       }
 
+      const propSettings = propertySettingsCache[String(bookingData.propertyId)] || {};
       const checkInDate = bookingData.checkIn || bookingData.checkInDate;
-      const checkInTime = bookingData.checkInTime || bookingData.checkInSlot || '12:00 PM';
+      const checkInTime = bookingData.checkInTime || bookingData.checkInSlot || propSettings.checkInTime || '12:00 PM';
       const scheduledCheckIn = parseDateTimeToIST(checkInDate, checkInTime);
 
       const checkOutDate = bookingData.checkOut || bookingData.checkOutDate;
-      const checkOutTime = bookingData.checkOutTime || '11:00 AM';
+      const checkOutTime = bookingData.checkOutTime || bookingData.checkOutSlot || propSettings.checkOutTime || '11:00 AM';
       const scheduledCheckOut = parseDateTimeToIST(checkOutDate, checkOutTime);
 
       // If scheduled checkout has already passed, stay is in the past! Mark flags and skip
@@ -259,7 +287,7 @@ export const processCheckInReminders = async (ioInstance = null) => {
       if (scheduledCheckIn) {
         const diffMins = Math.round((scheduledCheckIn.getTime() - now.getTime()) / 60000);
 
-        // Pre-checkin reminder: 10 to 15 mins before scheduled checkin (diffMins between 1 and 15)
+        // Pre-checkin reminder: 15 mins before scheduled checkin (diffMins between 1 and 15)
         if (diffMins <= 15 && diffMins > 0 && !bookingData.checkinReminderSent) {
           try {
             console.log(`🛎️ [CheckinReminder] Sending 15-min check-in reminder for booking #${bookingData.bookingId || bId} (Room: ${roomNum || 'N/A'}, Remaining: ${diffMins}m)`);
@@ -288,9 +316,11 @@ export const processCheckInReminders = async (ioInstance = null) => {
             });
             await Booking.findByIdAndUpdate(bId, {
               checkinArrivedSent: true,
+              checkinReminderSent: true,
               checkinArrivedSentAt: now.toISOString()
             });
             bookingData.checkinArrivedSent = true;
+            bookingData.checkinReminderSent = true;
           } catch (arrivedErr) {
             console.warn(`⚠️ Failed to dispatch check-in arrived notification for #${bId}:`, arrivedErr.message);
           }
@@ -302,6 +332,7 @@ export const processCheckInReminders = async (ioInstance = null) => {
             checkinArrivedSentAt: now.toISOString()
           });
           bookingData.checkinArrivedSent = true;
+          bookingData.checkinReminderSent = true;
         }
       }
     }

@@ -35,11 +35,14 @@ class _GuestFeedbackScreenState extends State<GuestFeedbackScreen> {
     final totalReviews = feedbackProvider.totalReviews;
 
     // Completed bookings that might be eligible for review
-    final reviewedBookingIds = feedbacks.map((f) => f.bookingId).toSet();
     final eligibleStays = bookingProvider.bookings.where((b) {
-      final s = b.status.toLowerCase();
-      final isCompleted = s == 'checked_out' || s == 'checked-out' || s == 'completed' || s == 'paid';
-      return isCompleted && !reviewedBookingIds.contains(b.id) && !reviewedBookingIds.contains(b.bookingId);
+      final s = b.status.toLowerCase().trim().replaceAll(' ', '-').replaceAll('_', '-');
+      final isCompleted = s == 'checked-out' || s == 'completed' || s == 'paid';
+      final hasFeedback = b.hasFeedback ||
+          (b.feedbackRating != null && b.feedbackRating! > 0) ||
+          feedbackProvider.hasFeedbackForBooking(b.id, b.bookingId) ||
+          feedbackProvider.hasFeedbackForBooking(b.bookingId, b.reservationNumber);
+      return isCompleted && !hasFeedback;
     }).toList();
 
     return Scaffold(

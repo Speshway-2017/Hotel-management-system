@@ -9,6 +9,7 @@ import { sendPushToTokens } from '../services/fcm.service.js';
 
 // In-memory 60-second duplicate suppression cache
 const recentNotificationCache = new Map();
+const recentManagerDispatchCache = new Map();
 
 /**
  * Retrieves the set of property IDs that are currently managed by an Admin
@@ -226,6 +227,19 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       }
     }
 
+    // Manager dispatch duplicate check (prevents duplicate manager pushes/inserts across multi-role calls within 45s)
+    const mgrDispatchKey = `${targetPropId || 'all'}:::${cleanTitle.toLowerCase()}:::${cleanMsg.toLowerCase()}`;
+    const lastMgrDispatch = recentManagerDispatchCache.get(mgrDispatchKey) || 0;
+    const shouldDispatchToManager = (role === 'manager') || (now - lastMgrDispatch >= 45000);
+    if (shouldDispatchToManager) {
+      recentManagerDispatchCache.set(mgrDispatchKey, now);
+      if (recentManagerDispatchCache.size > 200) {
+        for (const [k, v] of recentManagerDispatchCache.entries()) {
+          if (now - v > 90000) recentManagerDispatchCache.delete(k);
+        }
+      }
+    }
+
     // 2. Database deduplication check (60 seconds)
     const sixtySecondsAgo = new Date(now - 60000);
     const duplicateQuery = {
@@ -256,15 +270,19 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       isRead: false
     });
 
-    // Persist to ManagerNotification for manager scoped notifications
-    if (role === 'manager') {
+    // Persist to ManagerNotification so manager mobile app gets every notification update
+    if (shouldDispatchToManager) {
       try {
         let existingMn = null;
         try {
           existingMn = await ManagerNotification.findOne({
             title: cleanTitle,
             message: cleanMsg,
-            propertyId: targetPropId || 'HS-9HQ8P',
+            $or: [
+              { propertyId: targetPropId || 'HS-9HQ8P' },
+              { propertyId: 'HS-9HQ8P' },
+              { propertyId: null }
+            ],
             createdAt: { $gte: sixtySecondsAgo }
           });
         } catch (_) {}
@@ -319,9 +337,16 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       });
       emitRealtimeSync(socketIo, targetPropId, 'notification_received', notif);
       emitRealtimeSync(socketIo, targetPropId, 'new_notification', notif);
-      if (role === 'manager') {
+      
+      // Real-time broadcast for manager mobile app and manager console
+      if (shouldDispatchToManager) {
         emitRealtimeSync(socketIo, targetPropId, 'manager_notification', notif);
+        emitRealtimeSync(socketIo, targetPropId, 'unread_notifications_count_updated', {
+          role: 'manager',
+          propertyId: targetPropId
+        });
       }
+
       if (role === 'guest') {
         emitRealtimeSync(socketIo, targetPropId, 'guest_notification', notif);
       }
@@ -341,6 +366,9 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       const userQuery = [];
       if (userId) {
         userQuery.push({ _id: String(userId) }, { id: String(userId) });
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          userQuery.push({ _id: new mongoose.Types.ObjectId(userId) });
+        }
         if (typeof userId === 'string' && userId.includes('@')) {
           userQuery.push({ email: userId.toLowerCase().trim() });
         }
@@ -359,7 +387,7 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
       }
 
       if (userQuery.length === 0) {
-        if (role && targetPropId) {
+        if (role && role !== 'guest' && targetPropId) {
           userQuery.push({ role, propertyId: targetPropId });
         } else if (role) {
           userQuery.push({ role });
@@ -404,8 +432,32 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
         } catch (_) {}
       }
 
+      // Always include manager users so the manager mobile app receives push for EVERY update
+      let managerUsers = [];
+      if (shouldDispatchToManager) {
+        const mgrPropQuery = targetPropId
+          ? { role: 'manager', $or: [{ propertyId: targetPropId }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: '' }] }
+          : { role: 'manager' };
+        try {
+          managerUsers = (await User.find(mgrPropQuery)) || [];
+          if (managerUsers.length === 0) {
+            managerUsers = (await User.find({ role: 'manager' })) || [];
+          }
+        } catch (_) {}
+      }
+
+      // Merge recipient users (deduplicated by ID)
+      const userMap = new Map();
+      for (const u of [...(targetUsers || []), ...(managerUsers || [])]) {
+        const uid = String(u._id || u.id);
+        if (uid && !userMap.has(uid)) {
+          userMap.set(uid, u);
+        }
+      }
+      const finalUsers = Array.from(userMap.values());
+
       const tokens = new Set();
-      for (const u of (targetUsers || [])) {
+      for (const u of finalUsers) {
         if (u.fcmToken) tokens.add(u.fcmToken);
         if (Array.isArray(u.fcmTokens)) {
           for (const t of u.fcmTokens) {
@@ -533,6 +585,15 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       title = 'Stay Extended';
       msg = `Stay extended for guest ${guestName} to ${checkOut} (Ref: #${bookingId}).`;
       category = 'Operations';
+    } else if (action === 'status_change' || action === 'updated' || action === 'modified' || action === 'confirmed') {
+      const curStatus = booking.status || 'Updated';
+      title = `Reservation Status: ${curStatus}`;
+      msg = `Booking #${bookingId} for guest ${guestName} (${roomInfo}) is now ${curStatus}.`;
+      category = 'Reservations';
+    } else if (action === 'charge_added') {
+      title = 'Folio Charge Posted';
+      msg = `Service charge posted to folio for guest ${guestName} (${roomInfo}) [Ref: #${bookingId}].`;
+      category = 'Payments';
     }
 
     // 1. Notify Admin (Global)
@@ -578,12 +639,14 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
 
     if (!resolvedGuestUser && rawGuestId) {
       try {
-        const u = await User.findOne({
-          $or: [
-            { _id: String(rawGuestId) },
-            { id: String(rawGuestId) }
-          ]
-        });
+        const idQueries = [
+          { _id: String(rawGuestId) },
+          { id: String(rawGuestId) }
+        ];
+        if (mongoose.Types.ObjectId.isValid(rawGuestId)) {
+          idQueries.push({ _id: new mongoose.Types.ObjectId(rawGuestId) });
+        }
+        const u = await User.findOne({ $or: idQueries });
         if (u) resolvedGuestUser = u;
       } catch (_) {}
     }
@@ -612,6 +675,17 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       } catch (_) {}
     }
 
+    if (!resolvedGuestUser && (booking.guest || booking.guestName)) {
+      try {
+        const gName = (booking.guest || booking.guestName).trim();
+        const u = await User.findOne({
+          name: { $regex: new RegExp(`^${gName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          role: 'guest'
+        });
+        if (u) resolvedGuestUser = u;
+      } catch (_) {}
+    }
+
     const targetGuestId = resolvedGuestUser
       ? String(resolvedGuestUser._id || resolvedGuestUser.id)
       : (rawGuestId ? String(rawGuestId) : bookingGuestEmail || null);
@@ -622,39 +696,49 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
     }
 
     // 5. Notify Guest
+    const hotelName = booking.hotel || booking.hotelName || booking.propertyName || 'Hour Stay Hotel & Suites';
+    const roomText = String(roomInfo).toLowerCase().startsWith('room') ? roomInfo : `Room ${roomInfo}`;
+
     let guestTitle = action === 'created' || action === 'booked' ? 'Booking Confirmed!' :
-      action === 'checkin_reminder' ? `Check-in in ${minutesRemaining || 15} Minutes` :
+      action === 'checkin_reminder' ? (minutesRemaining && minutesRemaining < 15 ? `Check-in in ${minutesRemaining} Minutes` : 'Check-in in 15 Minutes') :
       action === 'checkin_arrived' ? 'Check-in Time Arrived' :
       action === 'checkin' ? 'Check-in Confirmed!' :
       action === 'checkout_reminder' ? `Check-out in ${minutesRemaining || 15} Minutes` :
       action === 'checkout' ? 'Check-out Time Arrived' :
       action === 'room_assigned' ? 'Room Assigned' :
       action === 'extended' ? 'Stay Extended' :
-      action === 'cancelled' ? 'Reservation Cancelled' : title;
+      action === 'cancelled' ? 'Reservation Cancelled' :
+      (action === 'status_change' || action === 'updated' || action === 'modified' || action === 'confirmed') ? `Reservation Status: ${booking.status || 'Updated'}` :
+      action === 'charge_added' ? 'Folio Charge Added' : title;
 
     let guestMsg = action === 'created' || action === 'booked'
       ? `Your reservation is confirmed for ${checkIn} → ${checkOut}. Booking Reference: #${bookingId}.`
       : action === 'checkin_reminder'
-      ? `Your check-in time for Room ${roomInfo} is approaching in ${minutesRemaining || 15} minutes. You can review your booking or prepare for arrival at the hotel. [Ref: #${bookingId}]`
+      ? `Your check-in time for ${roomText} at ${hotelName} is approaching in ${minutesRemaining || 15} minutes. You can review your booking or prepare for arrival. [Ref: #${bookingId}]`
       : action === 'checkin_arrived'
-      ? `Your scheduled check-in time has arrived for Room ${roomInfo}! Welcome to Hour Stay. Please visit the reception desk to complete check-in. [Ref: #${bookingId}]`
+      ? `Your scheduled check-in time has arrived for ${roomText} at ${hotelName}! Welcome to Hour Stay. Please visit the reception desk to complete check-in and collect your key card. [Ref: #${bookingId}]`
       : action === 'checkin'
-      ? `Welcome! You have checked in to Room ${roomInfo}. Enjoy your stay! [Ref: #${bookingId}]`
+      ? `Welcome! You have checked in to ${roomText}. Enjoy your stay! [Ref: #${bookingId}]`
       : action === 'checkout_reminder'
-      ? `Your check-out time for Room ${roomInfo} is approaching in ${minutesRemaining || 15} minutes. If you want to stay extra, please extend your booking or contact the front desk. [Ref: #${bookingId}]`
+      ? `Your check-out time for ${roomText} is approaching in ${minutesRemaining || 15} minutes. If you want to stay extra, please extend your booking or contact the front desk. [Ref: #${bookingId}]`
       : action === 'checkout'
-      ? `Your scheduled check-out time has arrived for Room ${roomInfo}. If you want to stay extra, please extend your booking or visit the front desk to complete check-out. [Ref: #${bookingId}]`
+      ? `Your scheduled check-out time has arrived for ${roomText}. If you want to stay extra, please extend your booking or visit the front desk to complete check-out. [Ref: #${bookingId}]`
       : action === 'room_assigned'
-      ? `Room ${roomInfo} has been assigned for your reservation. [Ref: #${bookingId}]`
+      ? `${roomText} has been assigned for your reservation. [Ref: #${bookingId}]`
       : action === 'extended'
       ? `Your reservation #${bookingId} has been extended to ${checkOut}. Enjoy your continued stay!`
       : action === 'cancelled'
-      ? `Your reservation #${bookingId} for ${roomInfo} has been cancelled.`
+      ? `Your reservation #${bookingId} for ${roomText} has been cancelled.`
+      : (action === 'status_change' || action === 'updated' || action === 'modified' || action === 'confirmed')
+      ? `Your reservation #${bookingId} (${roomText}) status is now ${booking.status || 'Updated'}.`
+      : action === 'charge_added'
+      ? `A new charge has been posted to your room folio for reservation #${bookingId}.`
       : msg;
 
     const guestCategory = (action === 'checkout' || action === 'checkout_reminder') ? 'Check-out' :
       (action === 'checkin' || action === 'checkin_reminder' || action === 'checkin_arrived') ? 'Check-in' :
       action === 'created' || action === 'booked' ? 'Booking Confirmation' :
+      (action === 'charge_added') ? 'Payments' :
       'Stay';
 
     await triggerNotification({
@@ -681,11 +765,9 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
       }
     });
 
-    // 6. Realtime Socket.io Broadcast
+    // 6. Realtime Socket.io Broadcast across property, all, and global rooms
     if (socketIo) {
-      emitRealtimeSync(socketIo, propId, 'booking_created', { booking, propertyId: propId });
-      emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), action, booking, propertyId: propId });
-      emitRealtimeSync(socketIo, propId, 'guest_notification', {
+      const guestPayload = {
         action,
         bookingId,
         title: guestTitle,
@@ -693,9 +775,28 @@ export const notifyBookingEvent = async ({ req, io, action = 'created', booking,
         category: guestCategory,
         userId: targetGuestId,
         email: bookingGuestEmail,
+        phone: bookingGuestPhone,
+        booking
+      };
+
+      emitRealtimeSync(socketIo, propId, 'booking_created', { booking, propertyId: propId });
+      emitRealtimeSync(socketIo, propId, 'booking_updated', { type: action.toUpperCase(), action, booking, propertyId: propId });
+      emitRealtimeSync(socketIo, propId, 'guest_notification', guestPayload);
+      emitRealtimeSync(socketIo, 'all', 'guest_notification', guestPayload);
+      emitRealtimeSync(socketIo, 'global', 'guest_notification', guestPayload);
+
+      emitRealtimeSync(socketIo, propId, 'notification_created', {
+        action,
+        bookingId,
+        role: 'guest',
+        userId: targetGuestId,
+        title: guestTitle,
+        message: guestMsg,
+        category: guestCategory,
+        email: bookingGuestEmail,
         phone: bookingGuestPhone
       });
-      emitRealtimeSync(socketIo, propId, 'notification_created', {
+      emitRealtimeSync(socketIo, 'all', 'notification_created', {
         action,
         bookingId,
         role: 'guest',

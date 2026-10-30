@@ -53,10 +53,10 @@ class SocketService {
         final prop = propertyId ?? 'HS-9HQ8P';
         _socket!.emit('join_property', prop);
         _socket!.emit('join_property', 'HS-9HQ8P');
-        _socket!.emit('join_property', 'HS-9HQ8P');
         _socket!.emit('join_property', 'HS-MUM');
         _socket!.emit('join_property', 'HS-UDA');
         _socket!.emit('join_property', 'all');
+        _socket!.emit('join_property', 'global');
       });
 
       _socket!.onDisconnect((_) {
@@ -89,11 +89,17 @@ class SocketService {
         'notification_created',
         'notification_received',
         'new_notification',
+        'guest_notification',
         'manager_notification',
         'unread_notifications_count_updated',
         'feedback_received',
         'feedback_created',
         'feedback_updated',
+        'room_assigned',
+        'stay_extended',
+        'refund_requested',
+        'refund_status_updated',
+        'charge_added',
         'dashboard_sync',
       };
 
