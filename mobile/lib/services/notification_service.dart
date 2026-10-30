@@ -67,10 +67,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               androidChannel.name,
               channelDescription: androidChannel.description,
               importance: Importance.max,
-              priority: Priority.high,
+              priority: Priority.max,
               icon: '@mipmap/ic_launcher',
               playSound: true,
               enableVibration: true,
+              visibility: NotificationVisibility.public,
+              category: AndroidNotificationCategory.reminder,
             ),
             iOS: const DarwinNotificationDetails(
               presentAlert: true,
@@ -336,10 +338,12 @@ class NotificationService {
             _highImportanceChannel.name,
             channelDescription: _highImportanceChannel.description,
             importance: Importance.max,
-            priority: Priority.high,
+            priority: Priority.max,
             icon: '@mipmap/ic_launcher',
             playSound: true,
             enableVibration: true,
+            visibility: NotificationVisibility.public,
+            category: AndroidNotificationCategory.reminder,
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,
@@ -355,15 +359,9 @@ class NotificationService {
     }
   }
 
-  /// Sends the current FCM device token to the backend for the logged-in user.
+  /// Sends the current FCM device token to the backend for the logged-in or guest user.
   static Future<bool> syncTokenWithBackend([String? explicitToken]) async {
     try {
-      final authToken = await StorageService.getToken();
-      if (authToken == null || authToken.isEmpty) {
-        debugPrint('ℹ️ [FCM SYNC] User not authenticated yet. Token will sync upon login.');
-        return false;
-      }
-
       String? token = explicitToken ?? _cachedToken;
       if (token == null || token.isEmpty) {
         try {
@@ -377,14 +375,23 @@ class NotificationService {
         return false;
       }
 
-      debugPrint('📤 [FCM SYNC] Sending FCM token to backend (/auth/fcm-token)...');
-      final response = await ApiService.post(ApiEndpoints.fcmToken, {
+      final savedUser = await StorageService.getUser();
+      final body = <String, dynamic>{
         'token': token,
         'platform': defaultTargetPlatform.name,
-      });
+        if (savedUser != null) ...{
+          'userId': savedUser.id,
+          'email': savedUser.email,
+          'phone': savedUser.mobile,
+          'role': savedUser.role,
+        }
+      };
+
+      debugPrint('📤 [FCM SYNC] Sending FCM token to backend (/auth/fcm-token)...');
+      final response = await ApiService.post(ApiEndpoints.fcmToken, body);
 
       if (response.success) {
-        debugPrint('✅ [FCM SYNC SUCCESS] FCM token registered with backend for authenticated user.');
+        debugPrint('✅ [FCM SYNC SUCCESS] FCM token registered with backend for ${savedUser?.email ?? "device"}.');
         return true;
       } else {
         debugPrint('❌ [FCM SYNC ERROR] Backend rejected FCM token: ${response.message}');

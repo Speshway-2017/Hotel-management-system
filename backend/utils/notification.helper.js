@@ -5,7 +5,7 @@ import User from '../models/user.model.js';
 import Booking from '../models/booking.model.js';
 import mongoose from 'mongoose';
 import { emitRealtimeSync } from './socketEmitter.js';
-import { sendPushToTokens } from '../services/fcm.service.js';
+import { sendPushToTokens, sendPushToTopic } from '../services/fcm.service.js';
 
 // In-memory 60-second duplicate suppression cache
 const recentNotificationCache = new Map();
@@ -487,6 +487,42 @@ export const triggerNotification = async ({ req, io, userId, role, propertyId, t
         }).catch(pushErr => console.warn("⚠️ FCM push dispatch notice:", pushErr.message));
       } else {
         console.log(`ℹ️ [FCM PUSH] No device tokens found for notification "${cleanTitle}" (role: ${role || 'all'}, userId: ${userId || 'none'})`);
+      }
+
+      // Role & broadcast topic fallback ensures push reaches devices in background
+      if (shouldDispatchToManager) {
+        sendPushToTopic('hourstay_manager', {
+          title: cleanTitle,
+          body: cleanMsg,
+          data: {
+            ...(data || {}),
+            notificationId: notif._id || notif.id,
+            category: category || 'General',
+            role: 'manager',
+            propertyId: targetPropId || ''
+          },
+          notificationId: notif._id || notif.id,
+          category: category || 'General',
+          role: 'manager',
+          propertyId: targetPropId || ''
+        }).catch(() => null);
+      }
+      if (role === 'guest' && (!userId || userId === 'all' || tokens.size === 0)) {
+        sendPushToTopic('hourstay_guest', {
+          title: cleanTitle,
+          body: cleanMsg,
+          data: {
+            ...(data || {}),
+            notificationId: notif._id || notif.id,
+            category: category || 'General',
+            role: 'guest',
+            propertyId: targetPropId || ''
+          },
+          notificationId: notif._id || notif.id,
+          category: category || 'General',
+          role: 'guest',
+          propertyId: targetPropId || ''
+        }).catch(() => null);
       }
     } catch (fcmErr) {
       console.warn("⚠️ FCM lookup notice:", fcmErr.message);

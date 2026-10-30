@@ -52,7 +52,11 @@ export const sendPushToTokens = async (tokensInput, { title, body, data = {}, no
       notification: {
         channelId: 'hourstay_high_importance_channel',
         sound: 'default',
-        priority: 'high',
+        priority: 'max',
+        defaultSound: true,
+        defaultVibrateTimings: true,
+        visibility: 'public',
+        notificationCount: 1,
         clickAction: 'FLUTTER_NOTIFICATION_CLICK'
       }
     },
@@ -163,7 +167,74 @@ export const dispatchPushNotification = async ({ userIds, role, propertyId, titl
   }
 };
 
+/**
+ * Sends a push notification to an FCM topic (e.g. 'hourstay_guest', 'hourstay_manager', 'hourstay_all').
+ */
+export const sendPushToTopic = async (topic, { title, body, data = {}, notificationId, category, role, propertyId }) => {
+  const messaging = getFirebaseMessaging();
+  if (!messaging) return null;
+
+  const stringData = {};
+  if (data && typeof data === 'object') {
+    for (const [key, val] of Object.entries(data)) {
+      if (val !== undefined && val !== null) {
+        stringData[key] = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      }
+    }
+  }
+  stringData.title = String(title || '');
+  stringData.body = String(body || '');
+  stringData.message = String(body || '');
+  if (notificationId) stringData.notificationId = String(notificationId);
+  if (category) stringData.category = String(category);
+  if (role) stringData.role = String(role);
+  if (propertyId) stringData.propertyId = String(propertyId);
+  stringData.click_action = 'FLUTTER_NOTIFICATION_CLICK';
+
+  const cleanTopic = String(topic).replace(/^\/topics\//, '');
+
+  const payload = {
+    topic: cleanTopic,
+    notification: {
+      title: title || 'Hour Stay Notification',
+      body: body || ''
+    },
+    data: stringData,
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'hourstay_high_importance_channel',
+        sound: 'default',
+        priority: 'max',
+        defaultSound: true,
+        defaultVibrateTimings: true,
+        visibility: 'public',
+        notificationCount: 1,
+        clickAction: 'FLUTTER_NOTIFICATION_CLICK'
+      }
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: 'default',
+          badge: 1
+        }
+      }
+    }
+  };
+
+  try {
+    const messageId = await messaging.send(payload);
+    console.log(`📡 [FCM TOPIC PUSH] Dispatched to topic "${cleanTopic}": ${messageId} ("${title}")`);
+    return messageId;
+  } catch (err) {
+    console.warn(`⚠️ [FCM TOPIC PUSH] Failed to dispatch to topic "${cleanTopic}":`, err.message);
+    return null;
+  }
+};
+
 export default {
   sendPushToTokens,
+  sendPushToTopic,
   dispatchPushNotification
 };

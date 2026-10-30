@@ -8,9 +8,11 @@ import 'socket_service.dart';
 
 class AuthService {
   static Future<ApiResponse<UserModel>> login(String email, String password) async {
+    final cachedFcmToken = NotificationService.cachedToken;
     final response = await ApiService.post(ApiEndpoints.login, {
       'email': email.trim(),
       'password': password,
+      if (cachedFcmToken != null && cachedFcmToken.isNotEmpty) 'fcmToken': cachedFcmToken,
     });
 
     if (response.success && response.data != null) {
@@ -51,12 +53,14 @@ class AuthService {
     required String password,
     required String mobile,
   }) async {
+    final cachedFcmToken = NotificationService.cachedToken;
     final response = await ApiService.post(ApiEndpoints.register, {
       'name': name.trim(),
       'email': email.trim(),
       'password': password,
       'mobile': mobile.trim(),
       'role': 'guest',
+      if (cachedFcmToken != null && cachedFcmToken.isNotEmpty) 'fcmToken': cachedFcmToken,
     });
 
     if (response.success && response.data != null) {

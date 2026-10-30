@@ -119,8 +119,19 @@ router.post('/login', async (req, res) => {
     }
 
     const nowIso = new Date().toISOString();
+    const fcmToken = req.body.fcmToken || req.body.token;
     try {
-      await User.findOneAndUpdate({ $or: [{ _id: user._id }, { id: user.id }, { email: user.email }] }, { lastLogin: nowIso, lastActive: nowIso });
+      const updateData = { lastLogin: nowIso, lastActive: nowIso };
+      if (fcmToken && typeof fcmToken === 'string' && fcmToken.length > 10) {
+        updateData.fcmToken = fcmToken;
+      }
+      await User.findOneAndUpdate(
+        { $or: [{ _id: user._id }, { id: user.id }, { email: user.email }] },
+        {
+          $set: updateData,
+          ...(fcmToken && typeof fcmToken === 'string' && fcmToken.length > 10 ? { $addToSet: { fcmTokens: fcmToken } } : {})
+        }
+      );
     } catch {}
 
     return sendSuccess(res, 200, {
@@ -442,41 +453,64 @@ router.put('/profile', protect, upload.single('avatar'), async (req, res) => {
   }
 });
 
-// @desc    Register or update FCM device token for authenticated user
+// @desc    Register or update FCM device token for authenticated or identified user
 // @route   POST /api/auth/fcm-token
-// @access  Private
-router.post('/fcm-token', protect, async (req, res) => {
-  const { token, platform, deviceType } = req.body;
+// @access  Public / Private
+router.post('/fcm-token', async (req, res) => {
+  const { token, platform, deviceType, userId: bodyUserId, email: bodyEmail, phone: bodyPhone } = req.body;
   if (!token || typeof token !== 'string') {
     return sendError(res, 400, 'Valid FCM token string is required');
   }
 
   try {
-    const userId = req.user.id || req.user._id;
-    const query = [{ _id: userId }, { id: userId }, { email: req.user.email }];
-    if (mongoose.Types.ObjectId.isValid(userId) && String(new mongoose.Types.ObjectId(userId)) === String(userId)) {
-      query.unshift({ _id: new mongoose.Types.ObjectId(userId) });
+    let authUser = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      try {
+        const jwtToken = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
+        if (decoded?.id) authUser = await User.findById(decoded.id);
+        if (!authUser && decoded?.email) authUser = await User.findOne({ email: decoded.email });
+      } catch (_) {}
     }
 
-    const updatedUser = await User.findOneAndUpdate(
-      { $or: query },
-      {
-        $set: { fcmToken: token },
-        $addToSet: { fcmTokens: token }
-      },
-      { new: true }
-    );
+    const userId = authUser ? (authUser.id || authUser._id) : bodyUserId;
+    const userEmail = authUser ? authUser.email : bodyEmail;
+    const userPhone = authUser ? (authUser.mobile || authUser.phone) : bodyPhone;
 
-    if (!updatedUser) {
-      return sendError(res, 404, 'User not found');
+    const query = [];
+    if (userId) {
+      query.push({ _id: userId }, { id: userId });
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        query.push({ _id: new mongoose.Types.ObjectId(userId) });
+      }
+    }
+    if (userEmail) query.push({ email: String(userEmail).toLowerCase().trim() });
+    if (userPhone) {
+      const cleanP = String(userPhone).replace(/[^0-9]/g, '');
+      query.push({ phone: userPhone }, { mobile: userPhone });
+      if (cleanP.length >= 10) {
+        query.push({ phone: { $regex: cleanP.slice(-10) } }, { mobile: { $regex: cleanP.slice(-10) } });
+      }
     }
 
-    console.log(`📲 [FCM BACKEND] Registered FCM token for user: ${req.user.email} (${req.user.role}) [platform: ${platform || 'unknown'}]`);
+    let updatedUser = null;
+    if (query.length > 0) {
+      updatedUser = await User.findOneAndUpdate(
+        { $or: query },
+        {
+          $set: { fcmToken: token },
+          $addToSet: { fcmTokens: token }
+        },
+        { new: true }
+      );
+    }
+
+    console.log(`📲 [FCM BACKEND] Registered FCM token for ${updatedUser ? updatedUser.email : 'guest/device'} (${updatedUser?.role || 'device'}) [platform: ${platform || 'unknown'}]`);
 
     return sendSuccess(res, 200, {
       success: true,
       token,
-      userId: updatedUser.id || updatedUser._id
+      userId: updatedUser ? (updatedUser.id || updatedUser._id) : null
     }, 'FCM device token registered successfully');
   } catch (error) {
     console.error('FCM Token Registration Error:', error);
