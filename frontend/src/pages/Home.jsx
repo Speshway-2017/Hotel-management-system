@@ -36,6 +36,7 @@ import { inr, searchResults, blogPosts } from "@/data/hs-data";
 import { InsightsStackedCarousel } from "@/components/hs/InsightsStackedCarousel";
 import { CategoryLayeredCards } from "@/components/hs/CategoryLayeredCards";
 import { SoilCircularCards } from "@/components/hs/SoilCircularCards";
+import { PricingPlansSection } from "@/components/hs/PricingPlansSection";
 
 // Import Slider Images
 import jaipurImg from "@/assets/resort_jaipur.png";
@@ -698,6 +699,9 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* Subscription Pricing Plans Section */}
+      <PricingPlansSection />
 
       {/* Latest Blog Insights from Journal - Overlapping Stacked Card Carousel */}
       <section id="journal" className="bg-cream/40 py-24 border-t border-navy/5 overflow-hidden scroll-mt-20">

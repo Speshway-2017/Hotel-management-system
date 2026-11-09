@@ -8,10 +8,8 @@ import { cn } from "@/utils/utils";
 
 const links = [
   { label: "Home", to: "/" },
-  { label: "Categories", to: "/#categories" },
-  { label: "Stays", to: "/#signature-stays" },
   { label: "Features", to: "/features" },
-  { label: "Pricing", to: "/features#pricing" },
+  { label: "Pricing", to: "/#pricing" },
   { label: "About", to: "/about" },
   { label: "Blog", to: "/blog" },
   { label: "Contact", to: "/contact" }
