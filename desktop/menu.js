@@ -5,19 +5,23 @@ const { Menu, app, dialog } = require('electron');
  * @param {Electron.BrowserWindow} mainWindow
  * @param {string} frontendBaseUrl
  */
+const ALLOWED_ROUTE_PATTERN = /^\/reception(\/[a-z0-9-]+)*$/i;
+
 function createReceptionMenu(mainWindow, frontendBaseUrl = 'http://localhost:5173') {
   const navigateTo = (route) => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    
+    if (!ALLOWED_ROUTE_PATTERN.test(String(route || ''))) return;
+
     // Attempt React Router client-side navigation via IPC first
     mainWindow.webContents.send('menu:navigate', route);
 
-    // Renderer client-side dispatch without hard reload
+    // Renderer client-side dispatch without hard reload (safely JSON-encoded)
+    const encodedRoute = JSON.stringify(route);
     mainWindow.webContents.executeJavaScript(`
       if (typeof window.__appNavigate === 'function') {
-        window.__appNavigate('${route}');
+        window.__appNavigate(${encodedRoute});
       } else if (window.dispatchEvent) {
-        window.dispatchEvent(new CustomEvent('app:navigate', { detail: '${route}' }));
+        window.dispatchEvent(new CustomEvent('app:navigate', { detail: ${encodedRoute} }));
       }
     `).catch(() => {});
   };

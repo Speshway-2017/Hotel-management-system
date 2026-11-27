@@ -1,9 +1,9 @@
 /**
  * High-Performance Centralized API Client
  * - Automatic Authorization Header injection
- * - In-flight Request Deduplication (prevents duplicate simultaneous HTTP calls)
- * - Micro-caching (5s TTL) for idempotent GET requests
- * - Automatic Cache Invalidation on Mutations (POST, PUT, DELETE, PATCH)
+ * - CSRF Double-Submit Header + Cookie credentials support
+ * - Automatic Refresh-Token Rotation on 401 (single-flight deduplicated)
+ * - In-flight Request Deduplication & Micro-caching (5s TTL)
  */
 
 const getApiBaseUrl = () => {
@@ -19,16 +19,17 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Memory cache for GET responses: key -> { data, timestamp }
 const cache = new Map();
-const CACHE_TTL_MS = 5000; // 5 seconds micro-cache
-
-// In-flight pending requests: key -> Promise
+const CACHE_TTL_MS = 5000;
 const inFlightRequests = new Map();
+let activeRefreshPromise = null;
 
-/**
- * Clear the entire API cache or keys matching a prefix
- */
+function getCookieValue(name) {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 export function invalidateApiCache(prefix = '') {
   if (!prefix) {
     cache.clear();
@@ -41,10 +42,53 @@ export function invalidateApiCache(prefix = '') {
   }
 }
 
-/**
- * Primary request function with deduplication and caching
- */
-export async function apiRequest(path, options = {}) {
+async function tryRefreshAccessToken() {
+  if (activeRefreshPromise) return activeRefreshPromise;
+
+  activeRefreshPromise = (async () => {
+    try {
+      const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('hms_refresh_token') : null;
+      const csrfToken = getCookieValue('XSRF-TOKEN');
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Client-Platform': typeof window !== 'undefined' && window.electronAPI?.isDesktop ? 'desktop' : 'web'
+      };
+      if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify(refreshToken ? { refreshToken } : {})
+      });
+
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json?.success && json?.data?.token) {
+        localStorage.setItem('hms_token', json.data.token);
+        if (json.data.refreshToken) {
+          localStorage.setItem('hms_refresh_token', json.data.refreshToken);
+        }
+        if (json.data.user) {
+          localStorage.setItem('hms_user', JSON.stringify(json.data.user));
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('auth-token-refreshed'));
+        }
+        return json.data.token;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
+}
+
+export async function apiRequest(path, options = {}, _isRetry = false) {
   const method = (options.method || 'GET').toUpperCase();
   const token = typeof window !== 'undefined' ? localStorage.getItem('hms_token') : null;
   const isGet = method === 'GET';
@@ -66,12 +110,10 @@ export async function apiRequest(path, options = {}) {
 
   const cacheKey = `${method}:${url}:${token || ''}`;
 
-  // If mutation, invalidate matching cache entries
   if (!isGet) {
     invalidateApiCache();
   }
 
-  // 1. Check in-memory cache for GET requests
   if (isGet && !bypassCache) {
     const cached = cache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
@@ -79,19 +121,23 @@ export async function apiRequest(path, options = {}) {
     }
   }
 
-  // 2. In-flight request deduplication for concurrent identical GETs
   if (isGet && inFlightRequests.has(cacheKey)) {
     return inFlightRequests.get(cacheKey);
   }
 
-  // 3. Execute HTTP request
   const headers = {
     'Content-Type': 'application/json',
+    'X-Client-Platform': typeof window !== 'undefined' && window.electronAPI?.isDesktop ? 'desktop' : 'web',
     ...(options.headers || {})
   };
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const csrfToken = getCookieValue('XSRF-TOKEN');
+  if (csrfToken && !isGet) {
+    headers['X-CSRF-Token'] = csrfToken;
   }
 
   if (options.body instanceof FormData) {
@@ -103,8 +149,18 @@ export async function apiRequest(path, options = {}) {
       const response = await fetch(url, {
         ...options,
         method,
-        headers
+        headers,
+        credentials: 'include'
       });
+
+      // Automatic silent refresh-token rotation on 401
+      const isAuthEndpoint = path.includes('/auth/login') || path.includes('/auth/register') || path.includes('/auth/refresh');
+      if (response.status === 401 && !_isRetry && !isAuthEndpoint && token) {
+        const refreshed = await tryRefreshAccessToken();
+        if (refreshed) {
+          return apiRequest(path, options, true);
+        }
+      }
 
       let data;
       const contentType = response.headers.get('content-type');
@@ -126,7 +182,6 @@ export async function apiRequest(path, options = {}) {
         throw error;
       }
 
-      // Store in micro-cache
       if (isGet) {
         cache.set(cacheKey, { data, timestamp: Date.now() });
       }

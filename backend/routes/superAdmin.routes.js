@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import { protect, authorize, checkPropertyStatus, checkPropertyAccess, clearUserCache } from '../middleware/auth.middleware.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
@@ -8,7 +9,7 @@ import User from '../models/user.model.js';
 import AuditLog from '../models/auditLog.model.js';
 import CMS from '../models/cms.model.js';
 import Announcement from '../models/announcement.model.js';
-import { upload, uploadImageToCloudinary, deleteImageFromCloudinary } from '../utils/uploader.js';
+import { upload, uploadImageToCloudinary, deleteImageFromCloudinary, validateUploadedImageMagicBytes } from '../utils/uploader.js';
 import SubscriptionPlan from '../models/subscriptionPlan.model.js';
 import PromoCoupon from '../models/promoCoupon.model.js';
 import Coupon from '../models/coupon.model.js';
@@ -26,15 +27,17 @@ import {
   syncVerifiedAadhaarToGuestProfile,
   findExistingVerifiedAadhaar,
   formatAadhaar,
-  resolveGuestAadhaar,
-  generateConsistentAadhaar
+  getMaskedAadhaarSummary
 } from '../utils/aadhaarValidator.js';
+import { encryptSensitive, hmacSensitiveIdentifier } from '../utils/cryptoVault.js';
+import { recordSecurityEvent } from '../services/securityMonitor.service.js';
 import { buildBookingLookupQuery } from '../utils/bookingHelper.js';
 import { sendAccountCreatedEmail } from '../services/email.service.js';
 
 const router = express.Router();
 
 router.use(protect);
+router.use(authorize('super-admin', 'admin', 'manager', 'receptionist'));
 
 const logAction = async (user, action, entity, req) => {
   try {
@@ -130,10 +133,14 @@ const calculateDynamicMetrics = async (property) => {
 // ==========================================
 // IMAGE UPLOAD ROUTE
 // ==========================================
-router.post('/upload', upload.single('image'), async (req, res) => {
+router.post('/upload', authorize('super-admin', 'admin'), upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return sendError(res, 400, 'No image file uploaded');
+    }
+    const magic = validateUploadedImageMagicBytes(req.file.path);
+    if (!magic.valid) {
+      return sendError(res, 400, magic.message);
     }
     const result = await uploadImageToCloudinary(req.file.path);
     return sendSuccess(res, 200, result, 'Image uploaded successfully');
@@ -457,21 +464,19 @@ router.delete('/properties/:id', authorize('super-admin'), async (req, res) => {
 // ==========================================
 // 3. USER & STAFF MANAGEMENT (CRUD)
 // ==========================================
-router.get('/users', checkPropertyStatus, async (req, res) => {
+router.get('/users', authorize('super-admin', 'admin'), checkPropertyStatus, async (req, res) => {
   try {
     let query = {};
     if (req.user.role !== 'super-admin') {
       const propId = req.user.propertyId || 'HS-9HQ8P';
-      query = { $or: [{ propertyId: propId }, { propertyId: 'HS-9HQ8P' }, { propertyId: 'HS-9HQ8P' }, { propertyId: null }, { propertyId: { $exists: false } }] };
+      query = { $or: [{ propertyId: propId }, { role: 'guest', propertyId: null }] };
     }
     if (req.query.role) {
       query.role = req.query.role;
     }
-    const users = await User.find(query);
+    const users = await User.find(query).select('-password -otp -otpExpires -idDocNumberEncrypted');
     const sanitized = users.map(u => {
-      const isGuest = u.role === 'guest';
-      const effectiveAadhaar = resolveGuestAadhaar(u);
-      const isVerified = Boolean(u.isAadhaarVerified || u.verifiedAadhaar || (isGuest && effectiveAadhaar));
+      const aadh = getMaskedAadhaarSummary(u);
       return {
         id: u.id || u._id,
         _id: u.id || u._id,
@@ -492,14 +497,14 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
         type: u.type || 'Regular',
         preferences: u.preferences || '',
         idDocType: u.idDocType || u.idProofType || 'Aadhaar Card',
-        idDocNumber: isGuest ? effectiveAadhaar : (u.idDocNumber || ''),
+        idDocNumber: aadh.maskedAadhaar,
         idProofType: u.idProofType || u.idDocType || 'Aadhaar Card',
-        idProofNumber: isGuest ? effectiveAadhaar : (u.idProofNumber || u.idDocNumber || ''),
-        verifiedAadhaar: isGuest ? effectiveAadhaar : (u.verifiedAadhaar || ''),
-        verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
-        isAadhaarVerified: isVerified,
-        aadhaarNumber: isGuest ? effectiveAadhaar : (u.aadhaarNumber || ''),
-        aadharNumber: isGuest ? effectiveAadhaar : (u.aadharNumber || ''),
+        idProofNumber: aadh.maskedAadhaar,
+        verifiedAadhaar: aadh.maskedAadhaar,
+        verifiedAadhaarLast4: aadh.last4,
+        isAadhaarVerified: aadh.isAadhaarVerified,
+        aadhaarNumber: aadh.maskedAadhaar,
+        aadharNumber: aadh.maskedAadhaar,
         loyaltyPoints: u.loyaltyPoints || 0,
         notes: u.notes || ''
       };
@@ -510,18 +515,19 @@ router.get('/users', checkPropertyStatus, async (req, res) => {
   }
 });
 
-router.get('/users/:id', checkPropertyStatus, async (req, res) => {
+router.get('/users/:id', authorize('super-admin', 'admin'), checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
     const userQuery = [{ _id: id }, { id: id }, { email: id }];
     if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id) {
       userQuery.unshift({ _id: new mongoose.Types.ObjectId(id) });
     }
-    const user = await User.findOne({ $or: userQuery });
+    const user = await User.findOne({ $or: userQuery }).select('-password -otp -otpExpires -idDocNumberEncrypted');
     if (!user) return sendError(res, 404, 'Staff not found');
-    const isGuest = user.role === 'guest';
-    const effectiveAadhaar = resolveGuestAadhaar(user);
-    const isVerified = Boolean(user.isAadhaarVerified || user.verifiedAadhaar || (isGuest && effectiveAadhaar));
+    if (req.user.role !== 'super-admin' && user.propertyId && req.user.propertyId && String(user.propertyId) !== String(req.user.propertyId)) {
+      return sendError(res, 403, 'Access denied: User belongs to another property.');
+    }
+    const aadh = getMaskedAadhaarSummary(user);
     return sendSuccess(res, 200, {
       id: user.id || user._id,
       _id: user.id || user._id,
@@ -542,14 +548,14 @@ router.get('/users/:id', checkPropertyStatus, async (req, res) => {
       type: user.type || 'Regular',
       preferences: user.preferences || '',
       idDocType: user.idDocType || user.idProofType || 'Aadhaar Card',
-      idDocNumber: isGuest ? effectiveAadhaar : (user.idDocNumber || ''),
+      idDocNumber: aadh.maskedAadhaar,
       idProofType: user.idProofType || user.idDocType || 'Aadhaar Card',
-      idProofNumber: isGuest ? effectiveAadhaar : (user.idProofNumber || user.idDocNumber || ''),
-      verifiedAadhaar: isGuest ? effectiveAadhaar : (user.verifiedAadhaar || ''),
-      verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
-      isAadhaarVerified: isVerified,
-      aadhaarNumber: isGuest ? effectiveAadhaar : (user.aadhaarNumber || ''),
-      aadharNumber: isGuest ? effectiveAadhaar : (user.aadharNumber || ''),
+      idProofNumber: aadh.maskedAadhaar,
+      verifiedAadhaar: aadh.maskedAadhaar,
+      verifiedAadhaarLast4: aadh.last4,
+      isAadhaarVerified: aadh.isAadhaarVerified,
+      aadhaarNumber: aadh.maskedAadhaar,
+      aadharNumber: aadh.maskedAadhaar,
       notes: user.notes || '',
       lastLogin: user.lastLogin || '—'
     }, 'User retrieved successfully');
@@ -558,9 +564,9 @@ router.get('/users/:id', checkPropertyStatus, async (req, res) => {
   }
 });
 
-router.post('/users', checkPropertyStatus, async (req, res) => {
+router.post('/users', authorize('super-admin', 'admin'), checkPropertyStatus, async (req, res) => {
   try {
-    const { 
+    const {
       name, email, password, role, mobile, phone, propertyId, status, dept, shift,
       city, state, country, address, type, preferences, notes,
       idDocType, idDocNumber, idProofType, idProofNumber
@@ -569,30 +575,41 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       return sendError(res, 400, 'All fields (name, email, password, role) are required');
     }
 
+    const effectiveRole = String(role).toLowerCase().trim();
     let targetPropertyId = propertyId || null;
     if (req.user.role !== 'super-admin') {
       targetPropertyId = req.user.propertyId || 'HS-9HQ8P';
-      if (role === 'super-admin') {
-        return sendError(res, 403, 'Access denied: You cannot create super-admin users');
+      if (effectiveRole === 'super-admin' || effectiveRole === 'admin') {
+        await recordSecurityEvent({
+          type: 'PRIVILEGE_ESCALATION_ATTEMPT',
+          severity: 'high',
+          req,
+          user: req.user,
+          details: `Non-super-admin attempted to create ${effectiveRole} account`,
+          notifyAdmins: true
+        });
+        return sendError(res, 403, 'Access denied: You cannot create admin or super-admin users');
       }
     }
 
-    const existing = await User.findOne({ email });
+    const cleanEmail = String(email).toLowerCase().trim();
+    const existing = await User.findOne({ email: cleanEmail });
     if (existing) return sendError(res, 400, 'User with this email already exists');
 
-    const effectiveRole = String(role).toLowerCase();
-    const isGuest = effectiveRole === 'guest';
     const rawDocNum = idDocNumber || idProofNumber;
     let finalAadhaar = '';
-    if (rawDocNum) {
+    let encryptedAadhaar = '';
+    let aadhaarHash = '';
+    if (rawDocNum && !String(rawDocNum).includes('•')) {
       finalAadhaar = formatAadhaar(rawDocNum);
-    } else if (isGuest) {
-      finalAadhaar = generateConsistentAadhaar(email || mobile || phone || name);
+      const digits = String(finalAadhaar).replace(/\D/g, '');
+      encryptedAadhaar = encryptSensitive(finalAadhaar);
+      if (digits.length === 12) aadhaarHash = hmacSensitiveIdentifier(digits);
     }
 
     const newUser = await User.create({
       name,
-      email,
+      email: cleanEmail,
       password,
       role: effectiveRole,
       mobile: mobile || phone || '',
@@ -610,28 +627,24 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       notes: notes || '',
       idDocType: idDocType || idProofType || 'Aadhaar Card',
       idDocNumber: finalAadhaar,
+      idDocNumberEncrypted: encryptedAadhaar,
       idProofType: idProofType || idDocType || 'Aadhaar Card',
       idProofNumber: finalAadhaar,
       verifiedAadhaar: finalAadhaar,
+      verifiedAadhaarHash: aadhaarHash,
       verifiedAadhaarLast4: finalAadhaar ? finalAadhaar.replace(/\D/g, '').slice(-4) : '',
       isAadhaarVerified: Boolean(finalAadhaar),
       aadhaarVerifiedAt: finalAadhaar ? new Date() : null
     });
 
-    // Send Account Credentials Email via Nodemailer
-    sendAccountCreatedEmail(newUser.email, newUser.name, newUser.role, password, targetPropertyId || 'Hour Stay Platform').catch(err => {
+    sendAccountCreatedEmail(newUser.email, newUser.name, newUser.role, '[Configured by Administrator]', targetPropertyId || 'Hour Stay Platform').catch(err => {
       console.warn('⚠️ [SuperAdmin] Non-blocking account email error:', err.message);
     });
 
-    await logAction(req.user, 'Created User', `${name} (${role})`, req);
+    await logAction(req.user, 'Created User', `${name} (${effectiveRole})`, req);
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, 'all', 'user_created', newUser);
-      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'user_created', id: newUser._id });
-    }
-
-    return sendSuccess(res, 201, {
+    const aadhSummary = getMaskedAadhaarSummary(newUser);
+    const safeUserDto = {
       id: newUser.id || newUser._id,
       _id: newUser.id || newUser._id,
       name: newUser.name,
@@ -644,22 +657,31 @@ router.post('/users', checkPropertyStatus, async (req, res) => {
       dept: newUser.dept,
       shift: newUser.shift,
       idDocType: newUser.idDocType,
-      idDocNumber: newUser.idDocNumber,
+      idDocNumber: aadhSummary.maskedAadhaar,
       idProofType: newUser.idProofType,
-      idProofNumber: newUser.idProofNumber,
-      verifiedAadhaar: newUser.verifiedAadhaar,
-      isAadhaarVerified: newUser.isAadhaarVerified,
+      idProofNumber: aadhSummary.maskedAadhaar,
+      verifiedAadhaar: aadhSummary.maskedAadhaar,
+      verifiedAadhaarLast4: aadhSummary.last4,
+      isAadhaarVerified: aadhSummary.isAadhaarVerified,
       lastLogin: newUser.lastLogin || '—'
-    }, 'User created successfully');
+    };
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, targetPropertyId || 'all', 'user_created', safeUserDto);
+      emitRealtimeSync(io, targetPropertyId || 'all', 'dashboard_sync', { action: 'user_created', id: safeUserDto.id });
+    }
+
+    return sendSuccess(res, 201, safeUserDto, 'User created successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to create user');
   }
 });
 
-router.put('/users/:id', checkPropertyStatus, async (req, res) => {
+router.put('/users/:id', authorize('super-admin', 'admin'), checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
+    const {
       name, role, mobile, phone, status, propertyId, dept, shift,
       idDocType, idDocNumber, idProofType, idProofNumber,
       city, state, country, address, type, preferences, notes
@@ -673,15 +695,18 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
     let targetUser = await User.findOne({ $or: userQuery });
     if (!targetUser) return sendError(res, 404, 'Staff not found');
 
-    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
-      if (targetUser.propertyId && req.user.propertyId && targetUser.propertyId.toString() !== req.user.propertyId.toString()) {
+    if (req.user.role !== 'super-admin') {
+      if (targetUser.role === 'super-admin' || (targetUser.propertyId && req.user.propertyId && targetUser.propertyId.toString() !== req.user.propertyId.toString())) {
         return sendError(res, 403, 'Access denied: You are not authorized to update this user');
+      }
+      if (role && ['super-admin', 'admin'].includes(String(role).toLowerCase())) {
+        return sendError(res, 403, 'Access denied: Role escalation forbidden');
       }
     }
 
     const updateFields = {};
     if (name !== undefined) updateFields.name = name;
-    if (role !== undefined) updateFields.role = role;
+    if (role !== undefined) updateFields.role = String(role).toLowerCase();
     if (mobile !== undefined) updateFields.mobile = mobile;
     if (phone !== undefined) updateFields.phone = phone;
     if (status !== undefined) updateFields.status = status;
@@ -696,16 +721,19 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
     if (notes !== undefined) updateFields.notes = notes;
 
     const docNum = idDocNumber || idProofNumber;
-    if (docNum !== undefined) {
+    if (docNum !== undefined && docNum !== '' && !String(docNum).includes('•')) {
       const formatted = formatAadhaar(docNum);
+      const digits = String(formatted).replace(/\D/g, '');
       const isAadh = String(idDocType || idProofType || 'Aadhaar Card').toLowerCase().includes('aadhaar');
       updateFields.idDocType = idDocType || idProofType || 'Aadhaar Card';
       updateFields.idDocNumber = formatted;
+      updateFields.idDocNumberEncrypted = encryptSensitive(formatted);
       updateFields.idProofType = idProofType || idDocType || 'Aadhaar Card';
       updateFields.idProofNumber = formatted;
-      if (isAadh) {
+      if (isAadh && digits.length === 12) {
         updateFields.verifiedAadhaar = formatted;
-        updateFields.verifiedAadhaarLast4 = formatted.replace(/\D/g, '').slice(-4);
+        updateFields.verifiedAadhaarHash = hmacSensitiveIdentifier(digits);
+        updateFields.verifiedAadhaarLast4 = digits.slice(-4);
         updateFields.isAadhaarVerified = true;
         updateFields.aadhaarVerifiedAt = new Date();
       }
@@ -721,14 +749,8 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
     clearUserCache();
     await logAction(req.user, 'Updated User', `${updated.name}`, req);
 
-    const io = req.app.get('socketio');
-    if (io) {
-      emitRealtimeSync(io, 'all', 'user_updated', updated);
-      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'staff_updated', id });
-    }
-
-    const effectiveAadhaar = resolveGuestAadhaar(updated);
-    return sendSuccess(res, 200, {
+    const aadhSummary = getMaskedAadhaarSummary(updated);
+    const safeUpdatedDto = {
       id: updated.id || updated._id,
       _id: updated.id || updated._id,
       name: updated.name,
@@ -741,23 +763,31 @@ router.put('/users/:id', checkPropertyStatus, async (req, res) => {
       dept: updated.dept,
       shift: updated.shift,
       idDocType: updated.idDocType || 'Aadhaar Card',
-      idDocNumber: effectiveAadhaar,
+      idDocNumber: aadhSummary.maskedAadhaar,
       idProofType: updated.idProofType || 'Aadhaar Card',
-      idProofNumber: effectiveAadhaar,
-      verifiedAadhaar: effectiveAadhaar,
-      verifiedAadhaarLast4: effectiveAadhaar ? effectiveAadhaar.replace(/\D/g, '').slice(-4) : '',
-      isAadhaarVerified: Boolean(updated.isAadhaarVerified || effectiveAadhaar),
+      idProofNumber: aadhSummary.maskedAadhaar,
+      verifiedAadhaar: aadhSummary.maskedAadhaar,
+      verifiedAadhaarLast4: aadhSummary.last4,
+      isAadhaarVerified: aadhSummary.isAadhaarVerified,
       city: updated.city || '',
       state: updated.state || '',
       address: updated.address || '',
       lastLogin: updated.lastLogin || '—'
-    }, 'User updated successfully');
+    };
+
+    const io = req.app.get('socketio');
+    if (io) {
+      emitRealtimeSync(io, updated.propertyId || 'all', 'user_updated', safeUpdatedDto);
+      emitRealtimeSync(io, updated.propertyId || 'all', 'dashboard_sync', { action: 'staff_updated', id });
+    }
+
+    return sendSuccess(res, 200, safeUpdatedDto, 'User updated successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to update user');
   }
 });
 
-router.delete('/users/:id', checkPropertyStatus, async (req, res) => {
+router.delete('/users/:id', authorize('super-admin', 'admin'), checkPropertyStatus, async (req, res) => {
   try {
     const { id } = req.params;
     const userQuery = [{ _id: id }, { id }, { email: id }];
@@ -777,11 +807,11 @@ router.delete('/users/:id', checkPropertyStatus, async (req, res) => {
 
     const io = req.app.get('socketio');
     if (io) {
-      emitRealtimeSync(io, 'all', 'user_deleted', { id, name: deleted?.name });
-      emitRealtimeSync(io, 'all', 'dashboard_sync', { action: 'user_deleted', id });
+      emitRealtimeSync(io, targetUser.propertyId || 'all', 'user_deleted', { id, name: deleted?.name });
+      emitRealtimeSync(io, targetUser.propertyId || 'all', 'dashboard_sync', { action: 'user_deleted', id });
     }
 
-    return sendSuccess(res, 200, deleted, 'User deleted successfully');
+    return sendSuccess(res, 200, { id }, 'User deleted successfully');
   } catch (error) {
     return sendError(res, 500, error.message || 'Failed to delete user');
   }

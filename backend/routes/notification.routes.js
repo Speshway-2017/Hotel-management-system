@@ -530,7 +530,28 @@ router.get('/unread-count', protect, async (req, res) => {
   }
 });
 
-// 3. Mark notification as read (strictly scoped to target notification ID)
+// Helper to verify notification ownership for read/unread/delete actions
+const canAccessNotification = (notif, user) => {
+  if (!notif || !user) return false;
+  if (user.role === 'super-admin') return true;
+  const userId = String(user.id || user._id || '');
+  const userEmail = String(user.email || '').toLowerCase().trim();
+  const notifUserId = notif.userId ? String(notif.userId).trim() : '';
+
+  if (notifUserId && (notifUserId === userId || (userEmail && notifUserId.toLowerCase() === userEmail))) {
+    return true;
+  }
+
+  if (user.role === 'guest') {
+    return !notifUserId && (notif.role === 'guest' || notif.role === 'all');
+  }
+
+  // Staff roles (admin, manager, receptionist) can manage notifications for their role/property
+  const sameProp = !notif.propertyId || !user.propertyId || String(notif.propertyId) === String(user.propertyId);
+  return sameProp && (!notif.role || notif.role === user.role || notif.role === 'all' || user.role === 'admin');
+};
+
+// 3. Mark notification as read (strictly scoped to target notification ID & owner)
 const handleMarkNotificationRead = async (req, res) => {
   try {
     const id = req.params.id;
@@ -538,6 +559,9 @@ const handleMarkNotificationRead = async (req, res) => {
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
     const existing = await Notification.findOne({ $or: idQuery });
+    if (existing && !canAccessNotification(existing, req.user)) {
+      return res.status(403).json({ success: false, message: 'Access denied for this notification' });
+    }
 
     await Promise.all([
       Notification.updateMany({ $or: idQuery }, { isRead: true }),
@@ -550,9 +574,7 @@ const handleMarkNotificationRead = async (req, res) => {
     if (io) {
       const prop = existing?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, prop, 'unread_notifications_count_updated', { propertyId: prop, userId: req.user?.id || req.user?._id });
-      emitRealtimeSync(io, 'global', 'unread_notifications_count_updated', { userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, prop, 'dashboard_sync', { action: 'notification_read', id });
-      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'notification_read', id });
     }
 
     return res.status(200).json({ success: true, data: { id, isRead: true, ...(existing ? existing.toObject() : {}) } });
@@ -573,6 +595,9 @@ const handleMarkNotificationUnread = async (req, res) => {
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
     const existing = await Notification.findOne({ $or: idQuery });
+    if (existing && !canAccessNotification(existing, req.user)) {
+      return res.status(403).json({ success: false, message: 'Access denied for this notification' });
+    }
 
     await Promise.all([
       Notification.updateMany({ $or: idQuery }, { isRead: false }),
@@ -585,9 +610,7 @@ const handleMarkNotificationUnread = async (req, res) => {
     if (io) {
       const prop = existing?.propertyId || req.user?.propertyId || 'HS-9HQ8P';
       emitRealtimeSync(io, prop, 'unread_notifications_count_updated', { propertyId: prop, userId: req.user?.id || req.user?._id });
-      emitRealtimeSync(io, 'global', 'unread_notifications_count_updated', { userId: req.user?.id || req.user?._id });
       emitRealtimeSync(io, prop, 'dashboard_sync', { action: 'notification_unread', id });
-      emitRealtimeSync(io, 'global', 'dashboard_sync', { action: 'notification_unread', id });
     }
 
     return res.status(200).json({ success: true, data: { id, isRead: false, ...(existing ? existing.toObject() : {}) } });
@@ -720,16 +743,23 @@ router.post('/read-all', protect, handleMarkAllNotificationsRead);
 router.patch('/read-all', protect, handleMarkAllNotificationsRead);
 router.put('/read-all', protect, handleMarkAllNotificationsRead);
 
-// 5. Delete notification
+// 5. Delete notification (strictly authorized to owner or staff for same property)
 router.delete('/:id', protect, async (req, res) => {
   try {
     const id = req.params.id;
     const isObjectId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
     const idQuery = isObjectId ? [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }, { id }] : [{ _id: id }, { id }];
 
+    const existing = await Notification.findOne({ $or: idQuery });
+    if (existing && !canAccessNotification(existing, req.user)) {
+      return res.status(403).json({ success: false, message: 'Access denied: Cannot delete another user\'s notification' });
+    }
+
     await Promise.all([
       Notification.deleteMany({ $or: idQuery }).catch(() => null),
-      ManagerNotification.deleteMany({ $or: idQuery }).catch(() => null)
+      (req.user.role === 'manager' || req.user.role === 'admin' || req.user.role === 'super-admin')
+        ? ManagerNotification.deleteMany({ $or: idQuery }).catch(() => null)
+        : Promise.resolve()
     ]);
 
     return res.status(200).json({ success: true, message: 'Notification deleted' });

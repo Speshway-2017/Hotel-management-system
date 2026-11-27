@@ -37,6 +37,25 @@ class _ServerConfigDialogState extends State<ServerConfigDialog> {
   Future<void> _saveConfig() async {
     final newUrl = _urlController.text.trim();
     if (newUrl.isNotEmpty) {
+      final parsed = Uri.tryParse(newUrl);
+      final isValidScheme = parsed != null &&
+          (parsed.scheme == 'https' ||
+              (!ApiEndpoints.isProduction && parsed.scheme == 'http'));
+      if (!isValidScheme || parsed.host.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                ApiEndpoints.isProduction
+                    ? 'Production mode requires a valid HTTPS server URL.'
+                    : 'Please enter a valid http:// or https:// server URL.',
+              ),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
       await _storageService.saveServerUrl(newUrl);
       await StorageService.saveSocketUrl(ApiEndpoints.getDefaultSocketUrl(newUrl));
       ApiEndpoints.setBaseUrl(newUrl);

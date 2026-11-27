@@ -233,7 +233,7 @@ class NotificationService {
 
       // 10. Handle Token Refresh
       messaging.onTokenRefresh.listen((newToken) async {
-        debugPrint('🔄 [FCM REFRESH] FCM Token refreshed: $newToken');
+        debugPrint('🔄 [FCM REFRESH] FCM Token refreshed.');
         _cachedToken = newToken;
         await syncTokenWithBackend(newToken);
       });
@@ -242,10 +242,7 @@ class NotificationService {
       try {
         _cachedToken = await messaging.getToken();
         if (_cachedToken != null) {
-          debugPrint('================================================================');
-          debugPrint('📱 [FCM DEVICE TOKEN GENERATED SUCCESSFULLY]:');
-          debugPrint('   $_cachedToken');
-          debugPrint('================================================================');
+          debugPrint('📱 [FCM DEVICE TOKEN GENERATED SUCCESSFULLY] (redacted for security)');
 
           // Subscribe to general broadcast topics
           try {

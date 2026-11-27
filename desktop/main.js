@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, shell, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, shell, nativeImage, session } = require('electron');
 const path = require('path');
 const http = require('http');
 const { createReceptionMenu } = require('./menu');
@@ -19,6 +19,27 @@ let isAppClosing = false;
 
 const FRONTEND_DEV_URL = process.env.ELECTRON_START_URL || 'http://localhost:5173';
 const RECEPTION_DEFAULT_PATH = '/reception';
+
+function isAllowedAppUrl(targetUrl) {
+  try {
+    const parsed = new URL(targetUrl);
+    const allowedBase = new URL(FRONTEND_DEV_URL);
+    if (parsed.origin === allowedBase.origin) return true;
+    const isLoopback = ['localhost', '127.0.0.1'].includes(parsed.hostname);
+    return !app.isPackaged && isLoopback && (parsed.protocol === 'http:' || parsed.protocol === 'https:');
+  } catch {
+    return false;
+  }
+}
+
+function isSafeExternalUrl(targetUrl) {
+  try {
+    const parsed = new URL(targetUrl);
+    return parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Checks if the local frontend Vite dev server is running and ready.
@@ -49,15 +70,14 @@ function checkServerReady(url) {
   });
 }
 
-/**
- * Splash / Connecting HTML displayed while waiting for the Vite dev server
- */
 function getConnectingHtml(targetUrl) {
+  const safeDisplayUrl = String(targetUrl).replace(/[<>&"']/g, '');
   return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
       <title>Connecting to HourStay HMS</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
@@ -93,18 +113,8 @@ function getConnectingHtml(targetUrl) {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
-        h1 {
-          font-size: 22px;
-          font-weight: 600;
-          margin-bottom: 12px;
-          color: #ffffff;
-        }
-        p {
-          font-size: 14px;
-          color: #9ca3af;
-          line-height: 1.5;
-          margin-bottom: 20px;
-        }
+        h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; color: #ffffff; }
+        p { font-size: 14px; color: #9ca3af; line-height: 1.5; margin-bottom: 20px; }
         .badge {
           display: inline-block;
           font-size: 12px;
@@ -113,7 +123,6 @@ function getConnectingHtml(targetUrl) {
           border: 1px solid rgba(56, 189, 248, 0.3);
           padding: 4px 12px;
           border-radius: 9999px;
-          font-mono: true;
         }
       </style>
     </head>
@@ -122,7 +131,7 @@ function getConnectingHtml(targetUrl) {
         <div class="spinner"></div>
         <h1>HourStay Receptionist Desk</h1>
         <p>Connecting to hotel workspace server...</p>
-        <div class="badge">${targetUrl}</div>
+        <div class="badge">${safeDisplayUrl}</div>
       </div>
     </body>
     </html>
@@ -131,9 +140,6 @@ function getConnectingHtml(targetUrl) {
 
 let activeDialogWin = null;
 
-/**
- * Displays the custom Hour Stay close confirmation modal dialog
- */
 function showCustomCloseConfirmation(parentWin) {
   return new Promise((resolve) => {
     if (activeDialogWin && !activeDialogWin.isDestroyed()) {
@@ -156,6 +162,9 @@ function showCustomCloseConfirmation(parentWin) {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
         preload: path.join(__dirname, 'dialog-preload.js')
       }
     });
@@ -192,9 +201,6 @@ function showCustomCloseConfirmation(parentWin) {
   });
 }
 
-/**
- * Creates and initializes the primary Receptionist desktop window
- */
 function createMainWindow() {
   const iconPath = path.join(__dirname, 'icon.ico');
   const appIcon = nativeImage.createFromPath(iconPath);
@@ -207,13 +213,15 @@ function createMainWindow() {
     title: 'HourStay HMS - Receptionist Desk',
     icon: appIcon.isEmpty() ? iconPath : appIcon,
     backgroundColor: '#090d16',
-    show: false, // reveal gracefully on ready-to-show
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      sandbox: false,
-      webSecurity: true
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      devTools: !app.isPackaged
     }
   });
 
@@ -221,35 +229,45 @@ function createMainWindow() {
     mainWindow.setIcon(appIcon);
   }
 
-  // Attach Receptionist desktop menu bar
   createReceptionMenu(mainWindow, FRONTEND_DEV_URL);
 
-  // Intercept external links to open safely in OS default browser
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http:') || url.startsWith('https:')) {
-      if (!url.includes('localhost:') && !url.includes('127.0.0.1')) {
-        shell.openExternal(url);
-        return { action: 'deny' };
+  // Restrict all top-level navigation to trusted HMS origins only
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    if (!isAllowedAppUrl(targetUrl)) {
+      event.preventDefault();
+      if (isSafeExternalUrl(targetUrl)) {
+        shell.openExternal(targetUrl);
       }
     }
-    return { action: 'allow' };
   });
 
-  // Load dev server with retry/wait logic
+  // Prevent unauthorized <webview> embedding
+  mainWindow.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+  });
+
+  // Intercept popups & external links safely
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedAppUrl(url)) {
+      return { action: 'allow' };
+    }
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   loadFrontendApp(mainWindow, FRONTEND_DEV_URL);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Intercept window close to show custom Hour Stay confirmation dialog
   mainWindow.on('close', async (event) => {
     if (isAppClosing) {
       return;
     }
-
     event.preventDefault();
-
     try {
       const shouldClose = await showCustomCloseConfirmation(mainWindow);
       if (shouldClose) {
@@ -258,7 +276,7 @@ function createMainWindow() {
           mainWindow.close();
         }
       }
-    } catch (err) {
+    } catch {
       isAppClosing = true;
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.destroy();
@@ -271,9 +289,6 @@ function createMainWindow() {
   });
 }
 
-/**
- * Polls until the dev server is active, then navigates to the receptionist workspace.
- */
 async function loadFrontendApp(win, baseUrl) {
   const isReady = await checkServerReady(baseUrl);
 
@@ -282,7 +297,6 @@ async function loadFrontendApp(win, baseUrl) {
       win.loadURL(baseUrl);
     });
   } else {
-    // Show connecting screen and poll
     win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getConnectingHtml(baseUrl))}`);
 
     const retryInterval = setInterval(async () => {
@@ -290,7 +304,6 @@ async function loadFrontendApp(win, baseUrl) {
         clearInterval(retryInterval);
         return;
       }
-
       const ready = await checkServerReady(baseUrl);
       if (ready) {
         clearInterval(retryInterval);
@@ -302,7 +315,6 @@ async function loadFrontendApp(win, baseUrl) {
   }
 }
 
-// Focus existing window if secondary instance attempts to launch
 app.on('second-instance', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -310,17 +322,30 @@ app.on('second-instance', () => {
   }
 });
 
-// App Lifecycle
 app.whenReady().then(() => {
-  // Setup IPC Handlers
+  // Enforce strict runtime permissions (deny geolocation/midi/usb/etc. unless explicitly allowed)
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = new Set(['notifications', 'media']);
+    const url = webContents.getURL();
+    callback(allowedPermissions.has(permission) && isAllowedAppUrl(url));
+  });
+
+  // Inject baseline security headers for Electron desktop views
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...(details.responseHeaders || {}) };
+    responseHeaders['X-Content-Type-Options'] = ['nosniff'];
+    responseHeaders['Referrer-Policy'] = ['strict-origin-when-cross-origin'];
+    callback({ responseHeaders });
+  });
+
   ipcMain.handle('app:print', async (_event, options = {}) => {
     if (!mainWindow || mainWindow.isDestroyed()) return false;
     return new Promise((resolve) => {
       mainWindow.webContents.print(
         {
-          silent: options.silent || false,
+          silent: Boolean(options.silent),
           printBackground: options.printBackground !== false,
-          deviceName: options.deviceName || ''
+          deviceName: typeof options.deviceName === 'string' ? options.deviceName : ''
         },
         (success, failureReason) => {
           resolve({ success, failureReason });
@@ -332,8 +357,8 @@ app.whenReady().then(() => {
   ipcMain.handle('app:notify', (_event, { title, body }) => {
     if (Notification.isSupported()) {
       new Notification({
-        title: title || 'HourStay HMS',
-        body: body || '',
+        title: String(title || 'HourStay HMS').slice(0, 120),
+        body: String(body || '').slice(0, 500),
         icon: path.join(__dirname, 'icon.ico')
       }).show();
       return true;

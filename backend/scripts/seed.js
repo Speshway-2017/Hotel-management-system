@@ -26,6 +26,7 @@ const SEED_USERS = [
   { name: 'Vamsi', email: 'vamsi@gmail.com', password: 'password123', role: 'guest', mobile: '+91 98765 10202' },
   { name: 'Sai', email: 'sai@gmail.com', password: 'password123', role: 'guest', mobile: '+91 98765 10404' },
   { name: 'Sunny', email: 'sunny@gmail.com', password: 'password123', role: 'guest', mobile: '9876543210' },
+  { name: 'Verification User', email: 'verification@gmail.com', password: 'verify@123', role: 'guest', mobile: '9876543210', otp: '123456' },
   { name: 'Vikram Rathore', email: 'vikram.rathore@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98290 11223', propertyId: 'HS-JAI', status: 'Active' },
   { name: 'Meera Nair', email: 'meera.nair@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 97444 88321', propertyId: 'HS-UDA', status: 'Active' },
   { name: 'Joaquim Fernandes', email: 'joaquim@hourstay.com', password: 'password123', role: 'admin', mobile: '+91 98221 44556', propertyId: 'HS-GOA', status: 'Active' },
@@ -331,6 +332,9 @@ export const seedUsers = async () => {
         idDocNumber: u.idDocNumber || '',
         loyaltyPoints: u.loyaltyPoints || 0,
         notes: u.notes || '',
+        otp: u.otp || undefined,
+        otpExpires: u.otpExpires ? new Date(u.otpExpires) : undefined,
+        otpAttempts: 0,
         fcmToken: u.fcmToken || null,
         fcmTokens: u.fcmTokens || []
       };
@@ -347,9 +351,9 @@ export const seedUsers = async () => {
         } else {
           // Sync any newly added profile fields if missing
           const syncFields = {};
-          ['city', 'address', 'state', 'country', 'avatar', 'preferences', 'mobile', 'name'].forEach(field => {
+          ['city', 'address', 'state', 'country', 'avatar', 'preferences', 'mobile', 'name', 'otp', 'otpExpires'].forEach(field => {
             if (u[field] && !exists[field]) {
-              syncFields[field] = u[field];
+              syncFields[field] = field === 'otpExpires' ? new Date(u[field]) : u[field];
             }
           });
           if (u.propertyId && exists.propertyId !== u.propertyId) {

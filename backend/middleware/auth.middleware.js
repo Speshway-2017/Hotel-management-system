@@ -1,7 +1,9 @@
-import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/user.model.js';
 import Property from '../models/property.model.js';
+import Session from '../models/session.model.js';
+import { verifyAccessToken } from '../utils/tokenManager.js';
+import { recordSecurityEvent } from '../services/securityMonitor.service.js';
 
 const userCache = new Map();
 
@@ -28,59 +30,96 @@ export const protect = async (req, res, next) => {
 
   if (
     req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
+    req.headers.authorization.startsWith('Bearer ')
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
+      const decoded = verifyAccessToken(token);
+      req.authPayload = decoded;
 
-      // Decode token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // If token carries a session ID, verify session has not been revoked
+      if (decoded.sid) {
+        const activeSession = await Session.findOne({ sessionId: decoded.sid });
+        if (!activeSession || activeSession.revokedAt) {
+          await recordSecurityEvent({
+            type: 'REVOKED_SESSION_ACCESS',
+            severity: 'medium',
+            req,
+            details: `Attempted access using revoked or missing session (${decoded.sid})`
+          });
+          return res.status(401).json({ success: false, message: 'Session expired or revoked. Please log in again.' });
+        }
+      }
+
       const cacheKey = String(decoded.id || decoded.email || '');
-
       const cached = userCache.get(cacheKey);
-      if (cached && (Date.now() - cached.timestamp < 60000)) {
-        req.user = cached.user;
-        return next();
+      let user = null;
+
+      if (cached && (Date.now() - cached.timestamp < 30000)) {
+        user = cached.user;
+      } else {
+        if (decoded.id) {
+          try { user = await User.findById(decoded.id).select('-password -otp -otpExpires -idDocNumberEncrypted'); } catch (_) {}
+        }
+        if (!user && decoded.id) {
+          try {
+            user = await User.findOne({ $or: [{ _id: String(decoded.id) }, { id: String(decoded.id) }] })
+              .select('-password -otp -otpExpires -idDocNumberEncrypted');
+          } catch (_) {}
+        }
+        if (!user && decoded.email) {
+          try {
+            user = await User.findOne({ email: String(decoded.email).toLowerCase().trim() })
+              .select('-password -otp -otpExpires -idDocNumberEncrypted');
+          } catch (_) {}
+        }
+        if (user) {
+          userCache.set(cacheKey, { user, timestamp: Date.now() });
+        }
       }
 
-      // Get user from token safely
-      let user = null;
-      if (decoded.id) {
-        try { user = await User.findById(decoded.id).select('-password'); } catch (_) {}
-      }
-      if (!user && decoded.id) {
-        try { user = await User.findOne({ $or: [{ _id: String(decoded.id) }, { id: String(decoded.id) }] }).select('-password'); } catch (_) {}
-      }
-      if (!user && decoded.email) {
-        try { user = await User.findOne({ email: decoded.email }).select('-password'); } catch (_) {}
-      }
-      req.user = user;
-      if (!req.user) {
-        console.warn('❌ User not found for token payload:', decoded, 'on url:', req.originalUrl);
+      if (!user) {
         return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
       }
 
-      if (req.user.status !== 'Active') {
+      if (user.status !== 'Active') {
+        clearUserCache(user._id || user.id);
         return res.status(403).json({ success: false, message: 'Your account is suspended. Access denied.' });
       }
 
-      userCache.set(cacheKey, { user: req.user, timestamp: Date.now() });
+      if (decoded.tv !== undefined && Number(user.tokenVersion || 0) !== Number(decoded.tv || 0)) {
+        clearUserCache(user._id || user.id);
+        return res.status(401).json({ success: false, message: 'Session invalidated. Please log in again.' });
+      }
 
-      next();
+      req.user = user;
+      return next();
     } catch (error) {
-      console.error('JWT Verification Error:', error.message);
+      await recordSecurityEvent({
+        type: 'TOKEN_MANIPULATION_OR_INVALID',
+        severity: 'medium',
+        req,
+        details: `JWT verification failed: ${error.message}`
+      });
       return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
     }
   }
 
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'Not authorized, no token' });
-  }
+  return res.status(401).json({ success: false, message: 'Not authorized, no token' });
 };
 
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
+      recordSecurityEvent({
+        type: 'PRIVILEGE_ESCALATION_ATTEMPT',
+        severity: 'high',
+        req,
+        user: req.user,
+        details: `Role (${req.user ? req.user.role : 'none'}) attempted unauthorized access to ${req.method} ${req.originalUrl}`,
+        notifyAdmins: true
+      }).catch(() => {});
+
       return res.status(403).json({
         success: false,
         message: `Role (${req.user ? req.user.role : 'none'}) is not authorized to access this resource`
@@ -107,20 +146,18 @@ export const checkPropertyStatus = async (req, res, next) => {
   }
 
   try {
-    let property = await Property.findById(req.user.propertyId);
+    const property = await Property.findById(req.user.propertyId);
     if (!property) {
-      property = await Property.create({
-        _id: req.user.propertyId,
-        name: "Speshway Luxury Hotel",
-        city: "Madhapur,Hyderabad",
-        rooms: 128,
-        occupancy: 78,
-        adr: 11400,
-        revpar: 8892,
-        status: "Active",
-        gm: req.user.name || "Madhu"
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Assigned property not found.'
       });
-      console.log(`🌱 Auto-created property for admin: ${property._id}`);
+    }
+    if (property.status === 'Suspended' || property.status === 'Rejected') {
+      return res.status(403).json({
+        success: false,
+        message: `Property access restricted (status: ${property.status}).`
+      });
     }
     next();
   } catch (err) {
@@ -130,13 +167,26 @@ export const checkPropertyStatus = async (req, res, next) => {
 
 // Enforce property-level authorization for bookings, rooms, rates, etc.
 export const checkPropertyAccess = (req, res, next) => {
-  const propertyId = req.query.propertyId || req.params.propertyId || req.body.propertyId || req.headers['x-property-id'];
-  
-  if (!propertyId) {
-    // Default to their assigned property if not super-admin
-    if (req.user.role !== 'super-admin') {
-      req.query.propertyId = req.user.propertyId;
+  const propertyId = req.query.propertyId || req.params.propertyId || req.body?.propertyId || req.headers['x-property-id'];
+
+  if (!propertyId || propertyId === 'all') {
+    if (req.user.role === 'super-admin') {
+      return next();
     }
+    if (propertyId === 'all') {
+      recordSecurityEvent({
+        type: 'CROSS_PROPERTY_ACCESS_ATTEMPT',
+        severity: 'high',
+        req,
+        user: req.user,
+        details: `User (${req.user.role}) attempted global 'all' property query without super-admin privilege`
+      }).catch(() => {});
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Global cross-property access requires Super Admin privileges.'
+      });
+    }
+    req.query.propertyId = req.user.propertyId;
     return next();
   }
 
@@ -147,6 +197,15 @@ export const checkPropertyAccess = (req, res, next) => {
   if (req.user.propertyId && req.user.propertyId.toString() === propertyId.toString()) {
     return next();
   }
+
+  recordSecurityEvent({
+    type: 'CROSS_PROPERTY_ACCESS_ATTEMPT',
+    severity: 'high',
+    req,
+    user: req.user,
+    details: `User assigned to ${req.user.propertyId} attempted to access property ${propertyId}`,
+    notifyAdmins: true
+  }).catch(() => {});
 
   return res.status(403).json({
     success: false,

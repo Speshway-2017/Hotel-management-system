@@ -8,11 +8,34 @@ export const connectDB = async () => {
 
   const isSrv = process.env.MONGODB_URI.startsWith('mongodb+srv://');
 
+  const ensureSrvDnsResolution = async () => {
+    if (!isSrv) return;
+    try {
+      const parsed = new URL(process.env.MONGODB_URI);
+      if (!parsed.hostname) return;
+      await dns.promises.resolveSrv(`_mongodb._tcp.${parsed.hostname}`);
+    } catch (dnsCheckErr) {
+      const isDnsFailure =
+        dnsCheckErr?.code === 'ECONNREFUSED' ||
+        dnsCheckErr?.code === 'ENOTFOUND' ||
+        dnsCheckErr?.code === 'ETIMEOUT' ||
+        String(dnsCheckErr?.message || '').includes('querySrv');
+      if (isDnsFailure) {
+        try {
+          dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+          console.log('🌐 Local DNS cannot resolve SRV records; using public DNS resolvers (Google/Cloudflare DNS)');
+        } catch (dnsErr) {
+          console.warn('⚠️ Failed to set public DNS resolvers:', dnsErr.message);
+        }
+      }
+    }
+  };
+
   const tryConnect = async (usePublicDns = false) => {
     if (isSrv && usePublicDns) {
       try {
-        dns.setServers(['8.8.8.8', '8.8.4.4']);
-        console.log('🌐 Configured Node.js to use public DNS resolvers (Google DNS)');
+        dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+        console.log('🌐 Configured Node.js to use public DNS resolvers (Google/Cloudflare DNS)');
       } catch (dnsErr) {
         console.warn('⚠️ Failed to set public DNS resolvers:', dnsErr.message);
       }
@@ -26,6 +49,7 @@ export const connectDB = async () => {
 
   try {
     console.log('🔌 Connecting to MongoDB...');
+    await ensureSrvDnsResolution();
     await tryConnect(false);
     console.log('🍃 MongoDB Atlas connected successfully (Hour Stay HMS)');
   } catch (error) {

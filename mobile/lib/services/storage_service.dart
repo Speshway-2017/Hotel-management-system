@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 
 class StorageService {
   static const String _keyToken = 'hms_mobile_token';
+  static const String _keyRefreshToken = 'hms_mobile_refresh_token';
   static const String _keyUser = 'hms_mobile_user';
   static const String _keyBaseUrl = 'hms_mobile_base_url';
   static const String _keySocketUrl = 'hms_mobile_socket_url';
@@ -42,6 +43,16 @@ class StorageService {
     return prefs.getString(_keyToken);
   }
 
+  static Future<void> saveRefreshToken(String refreshToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyRefreshToken, refreshToken);
+  }
+
+  static Future<String?> getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyRefreshToken);
+  }
+
   static Future<void> saveUser(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyUser, jsonEncode(user.toJson()));
@@ -78,13 +89,13 @@ class StorageService {
     return prefs.getString(_keySocketUrl);
   }
 
-  // Instance aliases for convenience
   Future<void> saveServerUrl(String url) => saveBaseUrl(url);
   Future<String?> getServerUrl() => getBaseUrl();
 
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyToken);
+    await prefs.remove(_keyRefreshToken);
     await prefs.remove(_keyUser);
   }
 }
