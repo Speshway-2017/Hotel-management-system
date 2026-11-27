@@ -1,0 +1,32 @@
+[
+  {
+    "type": "REVOKED_SESSION_ACCESS",
+    "severity": "medium",
+    "userId": null,
+    "userEmail": "",
+    "role": "",
+    "propertyId": null,
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "path": "/api/notifications/unread-count",
+    "details": "Attempted access using revoked or missing session (72d1c771-1ef4-4fa8-9b81-b3dc7f02f8d9)",
+    "metadata": {},
+    "_id": "SEC-1795775784003-gm6k0",
+    "createdAt": "2026-11-27T10:36:24.003Z"
+  },
+  {
+    "type": "REVOKED_SESSION_ACCESS",
+    "severity": "medium",
+    "userId": null,
+    "userEmail": "",
+    "role": "",
+    "propertyId": null,
+    "ip": "127.0.0.1",
+    "method": "GET",
+    "path": "/api/notifications/unread-count",
+    "details": "Attempted access using revoked or missing session (72d1c771-1ef4-4fa8-9b81-b3dc7f02f8d9)",
+    "metadata": {},
+    "_id": "SEC-1795776828196-yqi8u",
+    "createdAt": "2026-11-27T10:53:48.196Z"
+  }
+]

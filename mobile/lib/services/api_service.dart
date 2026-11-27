@@ -83,6 +83,7 @@ class ApiService {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'X-Client-Platform': 'mobile',
     };
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -90,14 +91,72 @@ class ApiService {
     return headers;
   }
 
+  static Future<bool>? _refreshFuture;
+
+  static Future<bool> _tryRefreshToken(String baseUrl) async {
+    if (_refreshFuture != null) return _refreshFuture!;
+
+    final completer = Completer<bool>();
+    _refreshFuture = completer.future;
+
+    () async {
+      try {
+        final refreshToken = await StorageService.getRefreshToken();
+        if (refreshToken == null || refreshToken.isEmpty) {
+          completer.complete(false);
+          return;
+        }
+        final uri = Uri.parse('$baseUrl/auth/refresh');
+        final res = await http
+            .post(
+              uri,
+              headers: const {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Client-Platform': 'mobile',
+              },
+              body: jsonEncode({'refreshToken': refreshToken}),
+            )
+            .timeout(const Duration(seconds: 6));
+
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final decoded = jsonDecode(res.body);
+          final data = decoded is Map<String, dynamic> ? (decoded['data'] ?? decoded) : null;
+          if (data is Map<String, dynamic> && data['token'] != null) {
+            await StorageService.saveToken(data['token'].toString());
+            if (data['refreshToken'] != null) {
+              await StorageService.saveRefreshToken(data['refreshToken'].toString());
+            }
+            completer.complete(true);
+            return;
+          }
+        }
+        completer.complete(false);
+      } catch (_) {
+        completer.complete(false);
+      } finally {
+        _refreshFuture = null;
+      }
+    }();
+
+    return completer.future;
+  }
+
   static Future<ApiResponse<dynamic>> _executeWithFallback(
-    Future<http.Response> Function(String baseUrl, Map<String, String> headers) requestFn,
-  ) async {
+    Future<http.Response> Function(String baseUrl, Map<String, String> headers) requestFn, {
+    bool isRetry = false,
+  }) async {
     final headers = await _getHeaders();
     final currentBase = await getBaseUrl();
 
     try {
       final response = await requestFn(currentBase, headers).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 401 && !isRetry && headers.containsKey('Authorization')) {
+        final refreshed = await _tryRefreshToken(currentBase);
+        if (refreshed) {
+          return _executeWithFallback(requestFn, isRetry: true);
+        }
+      }
       return _handleResponse(response);
     } catch (e) {
       debugPrint('⚠️ Request failed on $currentBase ($e). Probing candidate endpoints...');

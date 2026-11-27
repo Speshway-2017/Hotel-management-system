@@ -18,11 +18,15 @@ class AuthService {
     if (response.success && response.data != null) {
       final data = response.data as Map<String, dynamic>;
       final token = data['token']?.toString();
+      final refreshToken = data['refreshToken']?.toString();
       final userMap = data['user'] as Map<String, dynamic>?;
 
       if (token != null && userMap != null) {
         final user = UserModel.fromJson(userMap);
         await StorageService.saveToken(token);
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await StorageService.saveRefreshToken(refreshToken);
+        }
         await StorageService.saveUser(user);
         
         // Connect Socket.IO
@@ -66,11 +70,15 @@ class AuthService {
     if (response.success && response.data != null) {
       final data = response.data as Map<String, dynamic>;
       final token = data['token']?.toString();
+      final refreshToken = data['refreshToken']?.toString();
       final userMap = data['user'] as Map<String, dynamic>?;
 
       if (token != null && userMap != null) {
         final user = UserModel.fromJson(userMap);
         await StorageService.saveToken(token);
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await StorageService.saveRefreshToken(refreshToken);
+        }
         await StorageService.saveUser(user);
         await SocketService.connect();
 

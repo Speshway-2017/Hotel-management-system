@@ -56,6 +56,10 @@ const userSchema = new mongoose.Schema({
     twoFactorAuth: { type: Boolean, default: false },
     lastPasswordChange: { type: Date }
   },
+  tokenVersion: { type: Number, default: 0 },
+  otpAttempts: { type: Number, default: 0 },
+  idDocNumberEncrypted: { type: String, default: '' },
+  verifiedAadhaarHash: { type: String, default: '' },
   notes: { type: String, trim: true },
   fcmToken: { type: String, default: null },
   fcmTokens: [{ type: String }]
@@ -231,6 +235,9 @@ const MockUser = {
       idDocNumber: data.idDocNumber || '',
       loyaltyPoints: Number(data.loyaltyPoints) || 0,
       notes: data.notes || '',
+      otp: data.otp || undefined,
+      otpExpires: data.otpExpires || undefined,
+      otpAttempts: Number(data.otpAttempts) || 0,
       fcmToken: data.fcmToken || null,
       fcmTokens: Array.isArray(data.fcmTokens) ? data.fcmTokens : (data.fcmToken ? [data.fcmToken] : []),
       createdAt: new Date().toISOString(),

@@ -24,53 +24,128 @@ import { initializeFirebaseAdmin } from './config/firebase.config.js';
 
 import { Server } from 'socket.io';
 import { startAutoCheckoutScheduler } from './services/autoCheckout.service.js';
+import { isOriginAllowed } from './middleware/security.middleware.js';
+import { verifyAccessToken } from './utils/tokenManager.js';
+import User from './models/user.model.js';
+import { recordSecurityEvent } from './services/securityMonitor.service.js';
+import { redactSensitiveData } from './utils/logger.js';
 
-// Auto checkout scheduler active with interval 30s
+const STAFF_ROLES = new Set(['super-admin', 'admin', 'manager', 'receptionist']);
 
 const startServer = async () => {
-  // Connect to Database
   await connectDB();
-
-  // Initialize Firebase Admin SDK for FCM
   initializeFirebaseAdmin();
-
-  // Seed demo workspace accounts
   await seedUsers();
-
-  // Clean up any legacy account deletion notifications stored under guest/all scope
   await purgeGuestAccountDeletionNotifications();
 
-  // Create HTTP Server & Socket.io instance
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) return callback(null, true);
+        return callback(new Error('Socket CORS origin denied'), false);
+      },
+      credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
     }
   });
 
-  app.set('socketio', io);
+  // Socket.io JWT Authentication Middleware
+  io.use(async (socket, next) => {
+    const authToken =
+      socket.handshake.auth?.token ||
+      (socket.handshake.headers?.authorization?.startsWith('Bearer ')
+        ? socket.handshake.headers.authorization.split(' ')[1]
+        : null);
 
-  // Initialize background automatic checkout persistent engine (every 30s)
+    if (!authToken) {
+      // Allow public availability channel only, with zero operational room permissions
+      socket.isPublicAnonymous = true;
+      socket.user = null;
+      return next();
+    }
+
+    try {
+      const decoded = verifyAccessToken(authToken);
+      const user = await User.findById(decoded.id).select('-password -otp -otpExpires -idDocNumberEncrypted');
+      if (!user || user.status !== 'Active') {
+        return next(new Error('Unauthorized socket account'));
+      }
+      if (decoded.tv !== undefined && Number(user.tokenVersion || 0) !== Number(decoded.tv || 0)) {
+        return next(new Error('Session invalidated'));
+      }
+      socket.user = {
+        id: String(user._id || user.id),
+        email: user.email,
+        role: user.role,
+        propertyId: user.propertyId || null
+      };
+      socket.isPublicAnonymous = false;
+      return next();
+    } catch (err) {
+      await recordSecurityEvent({
+        type: 'SOCKET_AUTH_FAILED',
+        severity: 'medium',
+        details: `Rejected Socket.io connection with invalid token: ${err.message}`,
+        metadata: { ip: socket.handshake.address }
+      });
+      return next(new Error('Invalid socket authentication token'));
+    }
+  });
+
+  app.set('socketio', io);
   startAutoCheckoutScheduler(io, 30000);
 
   io.on('connection', (socket) => {
-    console.log('⚡ Socket.io client connected:', socket.id);
+    if (socket.user) {
+      // Automatically bind user to their personal authenticated channel
+      socket.join(`user_${socket.user.id}`);
+    }
 
-    // Join property-specific room
+    // Join property-specific room with strict RBAC & property ownership checks
     socket.on('join_property', (propertyId) => {
-      if (propertyId) {
-        const cleanProp = String(propertyId).replace(/^property_/, '');
-        const roomName = `property_${cleanProp}`;
-        socket.join(roomName);
-        if (cleanProp === 'all') {
-          socket.join('property_all');
-        }
-        console.log(`📡 Socket ${socket.id} joined room: ${roomName}`);
+      if (!socket.user) {
+        socket.emit('security_error', { message: 'Authentication required to join property rooms' });
+        return;
       }
+      if (!propertyId) return;
+
+      const cleanProp = String(propertyId).replace(/^property_/, '').trim();
+      const role = socket.user.role;
+
+      if (role === 'guest') {
+        // Guests may only listen to their personal user_${id} room; never property operational rooms
+        socket.join(`user_${socket.user.id}`);
+        return;
+      }
+
+      if (role === 'super-admin') {
+        if (cleanProp === 'all' || cleanProp === 'global') {
+          socket.join('property_all');
+        } else {
+          socket.join(`property_${cleanProp}`);
+        }
+        return;
+      }
+
+      // Admin / Manager / Receptionist: strictly bound to their assigned propertyId
+      const userProp = String(socket.user.propertyId || '').trim();
+      if (cleanProp === 'all' || cleanProp === 'global' || (userProp && cleanProp !== userProp)) {
+        recordSecurityEvent({
+          type: 'UNAUTHORIZED_SOCKET_ROOM_ACCESS',
+          severity: 'high',
+          user: socket.user,
+          details: `Staff (${role}) assigned to ${userProp} attempted to join room ${cleanProp}`,
+          metadata: { ip: socket.handshake.address },
+          notifyAdmins: true
+        }).catch(() => {});
+        socket.emit('security_error', { message: 'Access denied for requested property room' });
+        return;
+      }
+
+      socket.join(`property_${userProp || cleanProp}`);
     });
 
-    // Leave property room
     socket.on('leave_property', (propertyId) => {
       if (propertyId) {
         const cleanProp = String(propertyId).replace(/^property_/, '');
@@ -78,7 +153,7 @@ const startServer = async () => {
       }
     });
 
-    // Rebroadcast client actions across property room & global
+    // Scoped client-to-server relay: strictly restricted to authenticated staff within their property
     const relayEvents = [
       'booking_updated',
       'booking_created',
@@ -99,25 +174,38 @@ const startServer = async () => {
 
     relayEvents.forEach((evt) => {
       socket.on(evt, (payload = {}) => {
-        const propId = payload.propertyId;
-        if (propId) {
-          socket.to(`property_${propId}`).emit(evt, payload);
+        if (!socket.user || !STAFF_ROLES.has(socket.user.role)) {
+          recordSecurityEvent({
+            type: 'UNAUTHORIZED_SOCKET_EMIT',
+            severity: 'high',
+            user: socket.user,
+            details: `Unauthorized socket emit '${evt}' blocked`,
+            metadata: { ip: socket.handshake.address }
+          }).catch(() => {});
+          return;
         }
-        socket.to('property_all').emit(evt, payload);
-        socket.broadcast.emit(evt, payload);
+
+        const safePayload = redactSensitiveData(payload);
+        const requestedProp = safePayload.propertyId || socket.user.propertyId;
+
+        if (socket.user.role !== 'super-admin' && socket.user.propertyId && requestedProp !== socket.user.propertyId) {
+          return;
+        }
+
+        if (requestedProp) {
+          socket.to(`property_${requestedProp}`).emit(evt, safePayload);
+        }
+        socket.to('property_all').emit(evt, safePayload);
       });
     });
 
-    socket.on('disconnect', () => {
-      console.log('🔌 Socket.io client disconnected:', socket.id);
-    });
+    socket.on('disconnect', () => {});
   });
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`❌ Port ${PORT} is already in use.`);
-      console.log(`💡 A backend instance is already running on port ${PORT} and active.`);
-      process.exit(0); // Exit cleanly
+      process.exit(0);
     } else {
       console.error('❌ Server error:', err.message);
       process.exit(1);
@@ -125,17 +213,15 @@ const startServer = async () => {
   });
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🏨 Hour Stay HMS Backend Server running on 0.0.0.0:${PORT} (LAN IP: 192.168.1.14:${PORT}) with Socket.io real-time updates enabled`);
+    console.log(`🏨 Hour Stay HMS Backend Server running on 0.0.0.0:${PORT} with hardened security & Socket.io enabled`);
   });
 
   const gracefulShutdown = (signal) => {
     console.log(`🔌 Received ${signal}. Shutting down gracefully...`);
     server.close(() => {
-      console.log('🛑 HTTP server closed.');
       process.exit(0);
     });
     setTimeout(() => {
-      console.error('⚠️ Forced shutdown due to timeout');
       process.exit(1);
     }, 2000);
   };
@@ -143,7 +229,6 @@ const startServer = async () => {
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   process.once('SIGUSR2', () => {
-    console.log('🔄 Nodemon restart signal received. Releasing port...');
     server.close(() => {
       process.exit(0);
     });
@@ -154,4 +239,3 @@ startServer().catch((err) => {
   console.error('❌ Failed to start HMS server:', err.message);
   process.exit(1);
 });
-// Trigger seed refresh - force rerun migration v4

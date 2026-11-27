@@ -6,7 +6,9 @@ export const authService = {
     const res = await apiClient.post('/auth/login', { email, password });
     if (res.success && res.data.token) {
       localStorage.setItem('hms_token', res.data.token);
+      if (res.data.refreshToken) localStorage.setItem('hms_refresh_token', res.data.refreshToken);
       localStorage.setItem('hms_user', JSON.stringify(res.data.user));
+      window.dispatchEvent(new Event('user-profile-updated'));
     }
     return res;
   },
@@ -16,7 +18,9 @@ export const authService = {
     const res = await apiClient.post('/auth/register', { name, email, password, mobile, role });
     if (res.success && res.data.token) {
       localStorage.setItem('hms_token', res.data.token);
+      if (res.data.refreshToken) localStorage.setItem('hms_refresh_token', res.data.refreshToken);
       localStorage.setItem('hms_user', JSON.stringify(res.data.user));
+      window.dispatchEvent(new Event('user-profile-updated'));
     }
     return res;
   },
@@ -67,9 +71,13 @@ export const authService = {
 
   // Logout
   logout: () => {
+    const refreshToken = localStorage.getItem('hms_refresh_token');
+    apiClient.post('/auth/logout', refreshToken ? { refreshToken } : {}).catch(() => {});
     localStorage.removeItem('hms_token');
+    localStorage.removeItem('hms_refresh_token');
     localStorage.removeItem('hms_user');
     apiClient.invalidateCache();
+    window.dispatchEvent(new Event('user-logged-out'));
   },
 
   // Get stored user info

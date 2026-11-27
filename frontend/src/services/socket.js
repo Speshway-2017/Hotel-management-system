@@ -15,9 +15,15 @@ const getSocketUrl = () => {
 
 const SOCKET_URL = getSocketUrl();
 
+const getAuthToken = () => (typeof window !== 'undefined' ? localStorage.getItem('hms_token') : null);
+
 export const socket = io(SOCKET_URL, {
   transports: ['websocket', 'polling'],
   autoConnect: true,
+  withCredentials: true,
+  auth: (cb) => {
+    cb({ token: getAuthToken() || undefined });
+  },
   reconnection: true,
   reconnectionAttempts: 10,
   reconnectionDelay: 2000,
@@ -31,20 +37,28 @@ export const getCurrentPropertyId = () => {
     const raw = typeof window !== 'undefined' ? localStorage.getItem('hms_user') : null;
     if (raw) {
       const user = JSON.parse(raw);
+      if (user?.role === 'super-admin') return 'all';
       return user?.propertyId || null;
     }
   } catch (e) {}
   return null;
 };
 
-// Join property room on connect
+// Join property room on connect (only when authenticated)
 export const joinCurrentProperty = () => {
+  const token = getAuthToken();
+  if (!token) return;
   const propertyId = getCurrentPropertyId();
   if (propertyId) {
     socket.emit('join_property', propertyId);
-  } else {
-    socket.emit('join_property', 'property_all');
   }
+};
+
+const reconnectSocketWithAuth = () => {
+  if (socket.connected) {
+    socket.disconnect();
+  }
+  socket.connect();
 };
 
 socket.on('connect', () => {
@@ -55,19 +69,25 @@ socket.on('reconnect', () => {
   joinCurrentProperty();
 });
 
-socket.on('connect_error', (err) => {
-  // Silent fallback to polling without console spam
+socket.on('connect_error', () => {
+  // Silent fallback without console spam
 });
 
-// Re-join property if login changes or storage updates
+// Re-join property or reconnect with updated JWT if login/logout/refresh occurs
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    if (e.key === 'hms_user') {
-      joinCurrentProperty();
+    if (e.key === 'hms_user' || e.key === 'hms_token') {
+      reconnectSocketWithAuth();
     }
   });
   window.addEventListener('user-profile-updated', () => {
-    joinCurrentProperty();
+    reconnectSocketWithAuth();
+  });
+  window.addEventListener('auth-token-refreshed', () => {
+    reconnectSocketWithAuth();
+  });
+  window.addEventListener('user-logged-out', () => {
+    reconnectSocketWithAuth();
   });
 }
 

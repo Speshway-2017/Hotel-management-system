@@ -1,1 +1,34 @@
-[]
+[
+  {
+    "id": "L-32160",
+    "_id": "L-32160",
+    "user": "anonymous",
+    "role": "system",
+    "action": "Security: REVOKED_SESSION_ACCESS",
+    "module": "Security",
+    "property": "Global",
+    "description": "Attempted access using revoked or missing session (72d1c771-1ef4-4fa8-9b81-b3dc7f02f8d9)",
+    "status": "Logged",
+    "entity": "/api/notifications/unread-count",
+    "ip": "127.0.0.1",
+    "time": "27/11/2026, 4:06:24 pm",
+    "createdAt": "2026-11-27T10:36:24.005Z",
+    "updatedAt": "2026-11-27T10:36:24.005Z"
+  },
+  {
+    "id": "L-79523",
+    "_id": "L-79523",
+    "user": "anonymous",
+    "role": "system",
+    "action": "Security: REVOKED_SESSION_ACCESS",
+    "module": "Security",
+    "property": "Global",
+    "description": "Attempted access using revoked or missing session (72d1c771-1ef4-4fa8-9b81-b3dc7f02f8d9)",
+    "status": "Logged",
+    "entity": "/api/notifications/unread-count",
+    "ip": "127.0.0.1",
+    "time": "27/11/2026, 4:23:48 pm",
+    "createdAt": "2026-11-27T10:53:48.198Z",
+    "updatedAt": "2026-11-27T10:53:48.198Z"
+  }
+]

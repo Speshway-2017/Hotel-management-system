@@ -1,13 +1,18 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import Booking from '../models/booking.model.js';
 import User from '../models/user.model.js';
+import { encryptSensitive, decryptSensitive, hmacSensitiveIdentifier } from './cryptoVault.js';
+import { isSafeUrlOrImageData } from './uploader.js';
 
 /**
  * Normalizes an Aadhaar string by removing all spaces, hyphens, and non-numeric characters.
+ * Transparently decrypts encrypted Aadhaar values when resolving internally.
  */
 export const normalizeAadhaar = (val) => {
   if (!val) return '';
-  return String(val).replace(/\D/g, '').trim();
+  const plain = decryptSensitive(String(val));
+  return String(plain).replace(/\D/g, '').trim();
 };
 
 /**
@@ -318,18 +323,58 @@ export const validateAadhaarConsistency = async ({ booking, idDocType, idDocNumb
  * Synchronizes the verified Aadhaar onto the booking and guest user profile in MongoDB.
  * Prevents creation of duplicate guest identities.
  */
+/**
+ * Returns masked Aadhaar summary for API directory/list responses (never leaks full 12-digit Aadhaar).
+ */
+export const getMaskedAadhaarSummary = (record) => {
+  if (!record) {
+    return {
+      maskedAadhaar: '',
+      last4: '',
+      isAadhaarVerified: false
+    };
+  }
+  const raw =
+    record.idDocNumberEncrypted ||
+    record.verifiedAadhaar ||
+    record.idDocNumber ||
+    record.idProofNumber ||
+    record.aadhaarNumber ||
+    '';
+  const norm = normalizeAadhaar(raw);
+  const last4 = record.verifiedAadhaarLast4 || (norm.length >= 4 ? norm.slice(-4) : '');
+  const masked = last4 ? `•••• •••• ${last4}` : '';
+  return {
+    maskedAadhaar: masked,
+    last4,
+    isAadhaarVerified: Boolean(record.isAadhaarVerified || last4)
+  };
+};
+
 export const syncVerifiedAadhaarToGuestProfile = async ({ booking, idDocType, idDocNumber, cleanAadhaar, idDocImage, verifiedBy }) => {
   const docType = idDocType || 'Aadhaar Card';
   const rawNum = idDocNumber !== undefined ? idDocNumber : cleanAadhaar;
   const isAadhaar = String(docType).toLowerCase().includes('aadhaar');
   const formattedDocNumber = isAadhaar ? formatAadhaar(rawNum) : String(rawNum).trim();
   const normalizedDocNumber = isAadhaar ? normalizeAadhaar(rawNum) : String(rawNum).trim();
+  const encryptedDocNumber = normalizedDocNumber ? encryptSensitive(formattedDocNumber) : '';
+  const aadhaarHash = isAadhaar && normalizedDocNumber ? hmacSensitiveIdentifier(normalizedDocNumber) : '';
+
+  let safeDocImage = booking?.idDocImage || '';
+  if (idDocImage) {
+    if (!isSafeUrlOrImageData(idDocImage, { allowPdf: true })) {
+      throw new Error('Invalid or unsafe ID document image payload.');
+    }
+    safeDocImage = idDocImage;
+  }
 
   const now = new Date();
   const verificationPayload = {
     idDocType: docType,
     idDocNumber: formattedDocNumber,
-    idDocImage: idDocImage || booking?.idDocImage || '',
+    idDocNumberEncrypted: encryptedDocNumber,
+    verifiedAadhaarHash: aadhaarHash,
+    idDocImage: safeDocImage,
     idVerification: 'Verified',
     idVerifiedAt: now,
     idVerifiedBy: verifiedBy || 'Staff'
@@ -355,37 +400,38 @@ export const syncVerifiedAadhaarToGuestProfile = async ({ booking, idDocType, id
     }
 
     if (guestUser) {
-      // Update existing guest profile without creating duplicates
       guestUser.idDocType = docType;
       guestUser.idDocNumber = formattedDocNumber;
+      guestUser.idDocNumberEncrypted = encryptedDocNumber;
       guestUser.idProofType = docType;
       guestUser.idProofNumber = formattedDocNumber;
       guestUser.verifiedAadhaar = formattedDocNumber;
+      guestUser.verifiedAadhaarHash = aadhaarHash;
       guestUser.verifiedAadhaarLast4 = normalizedDocNumber ? normalizedDocNumber.slice(-4) : '';
       guestUser.isAadhaarVerified = true;
       guestUser.aadhaarVerifiedAt = now;
       if (!guestUser.mobile && cleanPhone) guestUser.mobile = cleanPhone;
       await guestUser.save();
 
-      // Ensure booking references the existing guest user ID
       if (!booking.guestId || String(booking.guestId) !== String(guestUser._id)) {
         await Booking.findByIdAndUpdate(bookingId, { guestId: String(guestUser._id) });
       }
     } else if (cleanEmail) {
-      // Create guest profile if one does not exist yet (e.g. for walk-in / direct guest)
-      const defaultPassword = `Guest@${Math.floor(1000 + Math.random() * 9000)}`;
+      const randomPassword = crypto.randomBytes(12).toString('base64url');
       const newGuestUser = await User.create({
         name: booking.guest || 'Guest',
         email: cleanEmail,
         mobile: cleanPhone || '',
         role: 'guest',
-        password: defaultPassword,
+        password: randomPassword,
         status: 'Active',
         idDocType: docType,
         idDocNumber: formattedDocNumber,
+        idDocNumberEncrypted: encryptedDocNumber,
         idProofType: docType,
         idProofNumber: formattedDocNumber,
         verifiedAadhaar: formattedDocNumber,
+        verifiedAadhaarHash: aadhaarHash,
         verifiedAadhaarLast4: normalizedDocNumber ? normalizedDocNumber.slice(-4) : '',
         isAadhaarVerified: true,
         aadhaarVerifiedAt: now

@@ -1,7 +1,9 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import CMS from '../models/cms.model.js';
+import { verifyAccessToken, createAuthSession } from '../utils/tokenManager.js';
+import { recordSecurityEvent } from '../services/securityMonitor.service.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import Property from '../models/property.model.js';
 import Booking from '../models/booking.model.js';
@@ -58,7 +60,7 @@ const extractUserIdentity = async (req) => {
   if (req.headers && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
     try {
       const token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      const decoded = verifyAccessToken(token);
       if (decoded && decoded.id) {
         userId = userId || decoded.id;
         const u = await User.findById(decoded.id).select('email mobile name');
@@ -711,24 +713,22 @@ router.post('/bookings', async (req, res) => {
       if (!bookingCity) bookingCity = 'Hyderabad';
     }
 
-    // 2. Identify or Create Guest Account (Website -> First Booking creates account and links booking)
+    // 2. Identify or Create Guest Account (never allow unauthenticated JWT minting for existing accounts)
     let guestUser = null;
+    let isAuthenticatedCaller = false;
+    let isNewlyCreatedGuest = false;
 
-    // Check if Authorization token provided
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       try {
         const tokenVal = req.headers.authorization.split(' ')[1];
-        const decoded = jwt.verify(tokenVal, process.env.JWT_SECRET || 'secret123');
-        if (decoded?.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
-          guestUser = await User.findById(decoded.id);
-        }
-      } catch (e) {}
-    }
-
-    if (!guestUser && req.body.guestId) {
-      try {
-        if (mongoose.Types.ObjectId.isValid(req.body.guestId)) {
-          guestUser = await User.findById(req.body.guestId);
+        const decoded = verifyAccessToken(tokenVal);
+        if (decoded?.id) {
+          guestUser = await User.findById(decoded.id).select('-password -otp -otpExpires');
+          if (guestUser && guestUser.status === 'Active') {
+            isAuthenticatedCaller = true;
+          } else {
+            guestUser = null;
+          }
         }
       } catch (e) {}
     }
@@ -737,20 +737,20 @@ router.post('/bookings', async (req, res) => {
     const cleanPhone = String(phone || '').trim();
 
     if (!guestUser && cleanEmail) {
-      guestUser = await User.findOne({ email: cleanEmail });
+      guestUser = await User.findOne({ email: cleanEmail }).select('-password -otp -otpExpires');
     }
 
     if (!guestUser) {
-      // Create new Guest account in MongoDB
-      const defaultPassword = `Guest@${Math.floor(1000 + Math.random() * 9000)}`;
+      const randomPassword = crypto.randomBytes(12).toString('base64url');
       guestUser = await User.create({
         name: gName,
         email: cleanEmail,
         mobile: cleanPhone,
         role: 'guest',
-        password: defaultPassword,
+        password: randomPassword,
         status: 'Active'
       });
+      isNewlyCreatedGuest = true;
     }
 
     const guestId = guestUser ? (guestUser._id || guestUser.id) : null;
@@ -761,6 +761,30 @@ router.post('/bookings', async (req, res) => {
     const grossAmount = rawGross > 0 ? rawGross : 7080;
     let finalAmount = rawPassedFinal > 0 ? rawPassedFinal : grossAmount;
     const requestedCouponCode = req.body.couponCode || req.body.coupon;
+
+    // Authoritative server-side room tariff calculation to block price tampering
+    const roomNightlyRate = Number(finalAssignedRoom?.currentRate || finalAssignedRoom?.baseRate || 0);
+    let serverGrossAmount = grossAmount;
+    if (roomNightlyRate > 0) {
+      const roomsMultiplier = Math.max(1, Number(roomsCount) || 1);
+      const baseRoomSubtotal = roomNightlyRate * Math.max(1, nights) * roomsMultiplier;
+      const gstRate = propDoc?.settings?.gstEnabled === false ? 0 : (Number(propDoc?.settings?.cgst || 9) + Number(propDoc?.settings?.sgst || 9)) / 100;
+      const taxInclusive = propDoc?.settings?.taxInclusive !== false;
+      serverGrossAmount = taxInclusive ? Math.round(baseRoomSubtotal) : Math.round(baseRoomSubtotal * (1 + gstRate));
+
+      if (rawPassedFinal > 0 && !requestedCouponCode && rawPassedFinal < serverGrossAmount - 50) {
+        await recordSecurityEvent({
+          type: 'BOOKING_PRICE_TAMPER_ATTEMPT',
+          severity: 'high',
+          req,
+          user: isAuthenticatedCaller ? guestUser : null,
+          userEmail: cleanEmail,
+          details: `Client passed tampered booking amount ₹${rawPassedFinal} vs server tariff ₹${serverGrossAmount}`,
+          notifyAdmins: true
+        });
+        return sendError(res, 400, 'Booking amount validation failed. Please refresh room rates and try again.');
+      }
+    }
 
     if (requestedCouponCode) {
       const cleanCode = String(requestedCouponCode).trim().toUpperCase();
@@ -956,14 +980,18 @@ router.post('/bookings', async (req, res) => {
       property: targetPropObj
     });
 
-    // Generate JWT token for guest
-    const token = guestUser ? jwt.sign({ id: guestUser._id || guestUser.id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '30d' }) : null;
+    // Only issue a new session token when a brand-new guest account was created (never for existing unauthenticated accounts!)
+    let token = null;
+    if (isNewlyCreatedGuest && guestUser && guestUser.role === 'guest') {
+      const session = await createAuthSession({ user: guestUser, req, platform: 'web' });
+      token = session.accessToken;
+    }
 
     const responsePayload = {
       ...(newBooking.toObject ? newBooking.toObject() : newBooking),
       booking: newBooking,
       token,
-      user: guestUser ? {
+      user: (isAuthenticatedCaller || isNewlyCreatedGuest) && guestUser ? {
         id: guestUser._id || guestUser.id,
         _id: guestUser._id || guestUser.id,
         name: guestUser.name,

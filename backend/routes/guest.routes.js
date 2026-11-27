@@ -1,6 +1,5 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/user.model.js';
 import Booking from '../models/booking.model.js';
@@ -8,6 +7,10 @@ import Property from '../models/property.model.js';
 import Review from '../models/review.model.js';
 import Notification from '../models/notification.model.js';
 import { Room, Feedback, Payment, Approval } from '../models/managerData.model.js';
+import { clearUserCache } from '../middleware/auth.middleware.js';
+import { verifyAccessToken, revokeAllUserSessions } from '../utils/tokenManager.js';
+import { getMaskedAadhaarSummary } from '../utils/aadhaarValidator.js';
+import { recordSecurityEvent } from '../services/securityMonitor.service.js';
 import { emitRealtimeSync } from '../utils/socketEmitter.js';
 import { notifyFeedbackEvent, triggerNotification, notifyAccountDeletionEvent, notifyBookingEvent } from '../utils/notification.helper.js';
 import { calculateStayNights, formatToYYYYMMDD, parseDateSafe, parseDateTimeToIST } from '../utils/dateUtils.js';
@@ -26,25 +29,55 @@ import { validatePhone } from '../utils/validator.js';
 
 const router = express.Router();
 
+const isGuestBookingOwner = (booking, user) => {
+  if (!booking || !user) return false;
+  if (user.role === 'super-admin') return true;
+  const userId = String(user._id || user.id || '');
+  const userEmail = String(user.email || '').toLowerCase().trim();
+  const userPhone = String(user.mobile || user.phone || '').replace(/\D/g, '').slice(-10);
+  const bEmail = String(booking.email || booking.guestEmail || '').toLowerCase().trim();
+  const bPhone = String(booking.phone || booking.guestPhone || '').replace(/\D/g, '').slice(-10);
+  return (
+    (booking.guestId && String(booking.guestId) === userId) ||
+    (booking.userId && String(booking.userId) === userId) ||
+    (userEmail && bEmail && bEmail === userEmail) ||
+    (userPhone.length >= 10 && bPhone === userPhone)
+  );
+};
+
 const guestAuth = async (req, res, next) => {
   try {
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       const token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      const decoded = verifyAccessToken(token);
+      req.authPayload = decoded;
       if (decoded.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
-        req.user = await User.findById(decoded.id).select('-password');
+        req.user = await User.findById(decoded.id).select('-password -otp -otpExpires -idDocNumberEncrypted');
       }
       if (!req.user && decoded.id) {
-        req.user = await User.findOne({ $or: [{ _id: decoded.id }, { id: decoded.id }] }).select('-password');
+        req.user = await User.findOne({ $or: [{ _id: decoded.id }, { id: decoded.id }] })
+          .select('-password -otp -otpExpires -idDocNumberEncrypted');
       }
       if (!req.user && decoded.email) {
-        req.user = await User.findOne({ email: decoded.email }).select('-password');
+        req.user = await User.findOne({ email: String(decoded.email).toLowerCase().trim() })
+          .select('-password -otp -otpExpires -idDocNumberEncrypted');
+      }
+      if (req.user && req.user.status !== 'Active') {
+        return sendError(res, 403, 'Account is suspended or inactive.');
+      }
+      if (req.user && decoded.tv !== undefined && Number(req.user.tokenVersion || 0) !== Number(decoded.tv || 0)) {
+        return sendError(res, 401, 'Session invalidated. Please log in again.');
       }
     }
   } catch (e) {
-    console.warn('GuestAuth error:', e.message);
+    await recordSecurityEvent({
+      type: 'GUEST_TOKEN_INVALID',
+      severity: 'medium',
+      req,
+      details: `Guest JWT verification failed: ${e.message}`
+    });
   }
-  
+
   if (!req.user) {
     return sendError(res, 401, 'Authentication required to access guest portal');
   }
@@ -1572,7 +1605,19 @@ router.get('/notifications/unread-count', async (req, res) => {
 router.delete('/notifications/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = String(req.user?._id || req.user?.id || '');
+    const userEmail = String(req.user?.email || '').toLowerCase().trim();
     const idQuery = mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }, { id }] : [{ _id: id }, { id }];
+    const existing = await Notification.findOne({ $or: idQuery });
+    if (!existing) {
+      return sendError(res, 404, 'Notification not found');
+    }
+    const ownerMatch =
+      (existing.userId && (String(existing.userId) === userId || (userEmail && String(existing.userId).toLowerCase() === userEmail))) ||
+      req.user.role === 'super-admin';
+    if (!ownerMatch) {
+      return sendError(res, 403, 'Access denied: Cannot delete another user\'s notification');
+    }
     await Notification.deleteMany({ $or: idQuery });
     return sendSuccess(res, 200, { id }, 'Notification removed successfully');
   } catch (error) {
@@ -1598,6 +1643,18 @@ const handleGuestExtendStay = async (req, res) => {
     const booking = await Booking.findOne(bookingQuery);
     if (!booking) {
       return sendError(res, 404, 'Stay booking record not found.');
+    }
+
+    if (!isGuestBookingOwner(booking, req.user)) {
+      await recordSecurityEvent({
+        type: 'IDOR_ATTEMPT',
+        severity: 'high',
+        req,
+        user: req.user,
+        details: `Guest attempted to extend stay on booking ${id} belonging to another guest`,
+        notifyAdmins: true
+      });
+      return sendError(res, 403, 'Access denied: You can only extend your own bookings.');
     }
 
     const bStatus = String(booking.status || '').toLowerCase().trim();
@@ -1747,6 +1804,18 @@ const handleGuestRefundRequest = async (req, res) => {
 
     if (!booking) {
       return sendError(res, 404, 'No matching booking found to submit refund request.');
+    }
+
+    if (!isGuestBookingOwner(booking, req.user)) {
+      await recordSecurityEvent({
+        type: 'IDOR_ATTEMPT',
+        severity: 'high',
+        req,
+        user: req.user,
+        details: `Guest attempted refund request on another guest booking`,
+        notifyAdmins: true
+      });
+      return sendError(res, 403, 'Access denied: You can only request refunds for your own bookings.');
     }
 
     const refundAmount = Number(amount) > 0 ? Number(amount) : Number(booking.amount || booking.totalAmount || 0);
@@ -2373,7 +2442,23 @@ router.post('/payments/pay-balance', async (req, res) => {
       return sendError(res, 404, 'Booking record not found for reference: ' + rawRef);
     }
 
+    if (!isGuestBookingOwner(booking, req.user)) {
+      await recordSecurityEvent({
+        type: 'IDOR_ATTEMPT',
+        severity: 'high',
+        req,
+        user: req.user,
+        details: `Guest attempted pay-balance on another guest booking ${rawRef}`,
+        notifyAdmins: true
+      });
+      return sendError(res, 403, 'Access denied: Cannot process payment for another guest booking.');
+    }
+
     const payAmount = Number(amount);
+    const currentBalance = Number(booking.balance || 0);
+    if (!Number.isFinite(payAmount) || payAmount <= 0 || (currentBalance > 0 && payAmount > currentBalance + 1)) {
+      return sendError(res, 400, 'Invalid payment amount for current booking balance.');
+    }
     const newBalance = Math.max(0, Number(booking.balance || 0) - payAmount);
     const currentPaid = Number(booking.paidAmount || (Number(booking.amount || booking.totalAmount || 0) - Number(booking.balance || 0)));
     const newPaidAmount = currentPaid + payAmount;
@@ -2709,9 +2794,13 @@ router.post('/change-password', async (req, res) => {
     }
 
     user.password = newPassword;
+    user.tokenVersion = Number(user.tokenVersion || 0) + 1;
     if (!user.securitySettings) user.securitySettings = {};
     user.securitySettings.lastPasswordChange = new Date();
     await user.save();
+
+    await revokeAllUserSessions(String(userId), 'Password changed');
+    clearUserCache(userId);
 
     await triggerNotification({
       req,
@@ -2731,16 +2820,38 @@ router.post('/change-password', async (req, res) => {
 // GET /api/v1/guest/export-data
 router.get('/export-data', async (req, res) => {
   try {
-    const userId = req.user._id || req.user.id;
-    const user = await User.findById(userId).select('-password -otp -otpExpires').lean();
+    const userId = String(req.user._id || req.user.id);
+    const user = await User.findById(userId).select('-password -otp -otpExpires -idDocNumberEncrypted -verifiedAadhaarHash').lean();
     const bookings = await Booking.find({ $or: [{ guestId: userId }, { email: req.user.email }] }).lean();
-    const payments = await Payment.find({ guestName: req.user.name }).lean();
+    const myBookingIds = bookings.map((b) => b.bookingId || String(b._id)).filter(Boolean);
+    const payments = myBookingIds.length > 0
+      ? await Payment.find({ bookingId: { $in: myBookingIds } }).lean()
+      : [];
     const feedbacks = await Feedback.find({ $or: [{ userId }, { guestEmail: req.user.email }] }).lean();
 
+    const aadhSummary = getMaskedAadhaarSummary(user);
+    const safeUser = user ? {
+      ...user,
+      idDocNumber: aadhSummary.maskedAadhaar,
+      idProofNumber: aadhSummary.maskedAadhaar,
+      verifiedAadhaar: aadhSummary.maskedAadhaar,
+      verifiedAadhaarLast4: aadhSummary.last4
+    } : null;
+
+    const safeBookings = bookings.map((b) => {
+      const bAadh = getMaskedAadhaarSummary(b);
+      return {
+        ...b,
+        idDocNumber: bAadh.maskedAadhaar,
+        idDocNumberEncrypted: undefined,
+        verifiedAadhaarHash: undefined
+      };
+    });
+
     const exportBundle = {
-      userProfile: user,
-      totalBookings: bookings.length,
-      bookings: bookings,
+      userProfile: safeUser,
+      totalBookings: safeBookings.length,
+      bookings: safeBookings,
       totalPayments: payments.length,
       payments: payments,
       feedbacks: feedbacks,

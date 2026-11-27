@@ -2,17 +2,16 @@
   {
     "id": "HS-UDA",
     "_id": "HS-UDA",
-    "name": "Lake Palace View",
+    "name": "Hour Stay Udaipur",
     "city": "Udaipur",
-    "rooms": 30,
-    "occupancy": 70,
-    "adr": 9500,
-    "revpar": 6650,
+    "rooms": 10,
+    "occupancy": 0,
+    "adr": 0,
+    "revpar": 0,
     "status": "Active",
-    "gm": "Suryaveer Rathore",
     "assignedAdmin": null,
-    "subscriptionTier": "Premium",
-    "subscriptionStatus": "Active",
+    "subscriptionTier": "None",
+    "subscriptionStatus": "None",
     "commissionRate": 12,
     "settings": {
       "logo": "",
@@ -68,8 +67,8 @@
       "channelWhatsApp": true,
       "channelPush": false
     },
-    "createdAt": "2026-09-01T04:34:46.084Z",
-    "updatedAt": "2026-09-01T04:34:46.087Z"
+    "createdAt": "2026-11-27T06:50:48.341Z",
+    "updatedAt": "2026-11-27T06:50:48.360Z"
   },
   {
     "id": "HS-GOA",

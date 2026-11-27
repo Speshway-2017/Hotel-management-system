@@ -34,12 +34,17 @@ class SocketService {
           ? customSocketUrl.trim()
           : ApiEndpoints.getDefaultSocketUrl();
 
+      final token = await StorageService.getToken();
+      final user = await StorageService.getUser();
+      final userRole = (user?.role ?? 'guest').toLowerCase();
+
       debugPrint('🔌 Connecting Socket.IO at $socketUrl');
 
       _socket = socket_io.io(
         socketUrl,
         socket_io.OptionBuilder()
             .setTransports(['websocket', 'polling'])
+            .setAuth(token != null && token.isNotEmpty ? {'token': token} : {})
             .enableAutoConnect()
             .enableReconnection()
             .setReconnectionAttempts(10)
@@ -50,13 +55,17 @@ class SocketService {
       _socket!.onConnect((_) {
         _isConnected = true;
         debugPrint('⚡ Socket.IO Connected: ${_socket?.id}');
-        final prop = propertyId ?? 'HS-9HQ8P';
-        _socket!.emit('join_property', prop);
-        _socket!.emit('join_property', 'HS-9HQ8P');
-        _socket!.emit('join_property', 'HS-MUM');
-        _socket!.emit('join_property', 'HS-UDA');
-        _socket!.emit('join_property', 'all');
-        _socket!.emit('join_property', 'global');
+        if (token == null || token.isEmpty) return;
+
+        if (userRole == 'super-admin') {
+          _socket!.emit('join_property', 'all');
+        } else if (userRole == 'admin' || userRole == 'manager' || userRole == 'receptionist') {
+          final prop = propertyId ?? user?.propertyId;
+          if (prop != null && prop.isNotEmpty) {
+            _socket!.emit('join_property', prop);
+          }
+        }
+        // Guests remain scoped strictly to their server-bound user_<id> room
       });
 
       _socket!.onDisconnect((_) {
